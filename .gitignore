@@ -1,0 +1,36 @@
+﻿# OS / Editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Logs / temp
+*.log
+*.tmp
+.tmp/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# JS / tooling
+node_modules/
+
+# Secrets / credentials
+.env
+.env.*
+*.env
+credentials.json
+token.json
+token.pickle
+API_keys.env
+
+# Local runtime data
+inventory_db.json
+cloudflared.exe
+
+# Build / exported artifacts
+*.pdf
+*.xlsx

@@ -1,0 +1,130 @@
+.table-container {
+    overflow-x: auto;
+    background: var(--panel-bg);
+    border: 1px solid var(--panel-border);
+    border-radius: 12px;
+    padding: 0;
+}
+
+table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+th,
+td {
+    padding: 1rem 0.75rem;
+    text-align: left;
+    border-bottom: 1px solid var(--panel-border);
+    white-space: nowrap;
+}
+
+td:first-child,
+th:first-child {
+    white-space: normal;
+}
+
+th {
+    color: var(--text-secondary);
+    font-weight: 500;
+    font-size: 0.875rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    background: rgba(0, 0, 0, 0.2);
+}
+
+tr:last-child td {
+    border-bottom: none;
+}
+
+.total-row td {
+    font-weight: 600;
+    font-size: 1.125rem;
+    color: #fff;
+    border-top: 2px solid var(--panel-border);
+    background: rgba(59, 130, 246, 0.1);
+}
+
+.text-right {
+    text-align: right;
+}
+
+.add-item-btn {
+    margin-top: 1.5rem;
+    width: 100%;
+    padding: 1rem;
+    border: 2px dashed var(--panel-border);
+    background: transparent;
+    color: var(--text-secondary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+}
+
+.add-item-btn:hover {
+    border-color: var(--accent-color);
+    color: var(--accent-color);
+    background: rgba(59, 130, 246, 0.05);
+}
+
+.badge {
+    background: var(--accent-color);
+    color: white;
+    padding: 0.125rem 0.5rem;
+    border-radius: 9999px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    margin-left: 0.5rem;
+}
+
+.mt-2 {
+    margin-top: 0.5rem;
+}
+
+.mb-2 {
+    margin-bottom: 0.5rem;
+}
+
+.mt-4 {
+    margin-top: 1rem;
+}
+
+.mb-4 {
+    margin-bottom: 1rem;
+}
+
+.grid-qty-input {
+    background: rgba(0, 0, 0, 0.4);
+    color: #fff;
+    border: 1px solid var(--panel-border);
+    border-radius: 4px;
+    text-align: center;
+    font-size: 0.875rem;
+}
+
+.grid-qty-input:focus {
+    outline: none;
+    border-color: var(--accent-color);
+    box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.3);
+}
+
+.grid-discount-input {
+    background: rgba(0, 0, 0, 0.4);
+    color: #fff;
+    border: 1px solid var(--panel-border);
+    border-radius: 4px;
+    text-align: center;
+}
+
+.custom-discount {
+    color: #fbbf24 !important;
+    border-color: rgba(251, 191, 36, 0.5) !important;
+    background: rgba(251, 191, 36, 0.1) !important;
+    font-weight: 600;
+}
+
+.grid-discount-input:focus {
+    outline: none;
+    border-color: var(--accent-color);
+}

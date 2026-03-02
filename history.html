@@ -1,0 +1,130 @@
+﻿<!DOCTYPE html>
+<html lang="sv">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mina Offerter</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles/main.css">
+    <link rel="stylesheet" href="styles/layout.css">
+    <link rel="stylesheet" href="styles/components/buttons.css">
+
+    <script type="module">
+        import { requireAuth, onAuthChange } from './services/authService.js';
+        requireAuth();
+
+        onAuthChange((user) => {
+            const badge = document.getElementById('userBadge');
+            if (badge && user) {
+                badge.querySelector('.user-email').textContent = user.email;
+                badge.style.display = 'flex';
+            }
+        });
+    </script>
+
+    <style>
+        .history-card {
+            background: var(--panel-bg);
+            border: 1px solid var(--panel-border);
+            border-radius: 8px;
+            padding: 1.5rem;
+            margin-bottom: 1rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: all 0.2s;
+        }
+
+        .history-card:hover {
+            border-color: rgba(255, 255, 255, 0.3);
+            background: rgba(31, 41, 55, 0.9);
+        }
+
+        .history-details h3 {
+            margin: 0 0 0.5rem 0;
+            font-size: 1.25rem;
+        }
+
+        .history-details p {
+            margin: 0;
+            color: var(--text-secondary);
+            font-size: 0.875rem;
+            line-height: 1.5;
+        }
+
+        .history-actions {
+            display: flex;
+            gap: 0.75rem;
+            flex-shrink: 0;
+        }
+
+        .btn-sm {
+            padding: 0.5rem 1rem;
+            font-size: 0.875rem;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 4rem 2rem;
+            color: var(--text-secondary);
+            background: var(--panel-bg);
+            border: 1px dashed var(--panel-border);
+            border-radius: 8px;
+        }
+
+        .loading-state {
+            text-align: center;
+            padding: 4rem 2rem;
+            color: var(--text-secondary);
+        }
+
+        @media (max-width: 768px) {
+            .history-card {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 1rem;
+            }
+
+            .history-actions {
+                width: 100%;
+                justify-content: stretch;
+            }
+
+            .history-actions button {
+                flex: 1;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <header>
+        <div style="display: flex; justify-content: space-between; align-items: center; max-width: 1200px; margin: 0 auto;">
+            <h1 style="margin: 0;">Mina Offerter</h1>
+            <div style="display: flex; align-items: center; gap: 0.75rem;">
+                <a href="index.html" class="primary" style="text-decoration: none; padding: 0.5rem 1rem; border-radius: 6px; font-size: 0.875rem;">+ Ny Offert</a>
+
+                <div id="userBadge" style="display: none; align-items: center; gap: 0.5rem;
+                    background: var(--panel-bg); padding: 0.35rem 0.75rem; border-radius: 6px;
+                    border: 1px solid var(--panel-border); font-size: 0.8rem;">
+                    <span style="color: var(--text-secondary);">&#x1F464;</span>
+                    <span class="user-email" style="color: var(--text-primary); font-weight: 500;"></span>
+                    <button data-action="logout" style="background: none; border: none; color: var(--text-secondary); cursor: pointer; font-size: 0.75rem; padding: 0.2rem 0.4rem;
+                        border-left: 1px solid var(--panel-border); margin-left: 0.25rem;" title="Logga ut">Logga ut</button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <main style="max-width: 900px;">
+        <div id="historyContainer">
+            <div class="loading-state">Laddar offerter...</div>
+        </div>
+    </main>
+
+    <script type="module" src="history.js"></script>
+</body>
+
+</html>
+
