@@ -16,10 +16,7 @@ import {
 import { currentUser, onAuthChange, logout } from './services/authService.js';
 import { createQuoteRepository, normalizeQuoteStatus } from './services/quoteRepository.js';
 import { escapeHtml } from './features/utils.js';
-import { computeQuoteTotals } from './services/calculationEngine.js';
-import { generatePDF } from './features/pdfExport.js?v=20260302-5';
-import { sendQuoteToScrive, refreshScriveStatus, isValidEmail } from './services/scriveApi.js';
-import { initNotifications, notifyError, notifyInfo, notifySuccess, notifyWarn, confirmAction } from './services/notificationService.js';
+import { initNotifications, notifyError, notifyInfo, notifySuccess, confirmAction } from './services/notificationService.js';
 
 const STATUS_LABELS = {
     draft: 'Utkast',
@@ -38,20 +35,6 @@ const DOM = {
 const quoteLifecycleEnabled = typeof window === 'undefined'
     ? true
     : window.FEATURE_QUOTE_LIFECYCLE !== false;
-const scriveFeatureEnabled = typeof window === 'undefined'
-    ? false
-    : window.FEATURE_SCRIVE === true;
-
-const SCRIVE_STATUS_LABELS = {
-    not_sent: 'Inte skickad',
-    preparation: 'Förbereder',
-    pending: 'Väntar signatur',
-    closed: 'Signerad',
-    rejected: 'Avvisad',
-    canceled: 'Avbruten',
-    timedout: 'Utgången',
-    failed: 'Misslyckad'
-};
 
 const quoteRepository = createQuoteRepository({
     db,
@@ -98,18 +81,6 @@ function statusBadge(status) {
     return `<span class="status-badge status-${normalized}">${escapeHtml(STATUS_LABELS[normalized])}</span>`;
 }
 
-function normalizeScriveStatus(status) {
-    const normalized = String(status || '').toLowerCase();
-    return Object.prototype.hasOwnProperty.call(SCRIVE_STATUS_LABELS, normalized)
-        ? normalized
-        : 'not_sent';
-}
-
-function scriveBadge(status) {
-    const normalized = normalizeScriveStatus(status);
-    return `<span class="scrive-badge scrive-${normalized}">${escapeHtml(SCRIVE_STATUS_LABELS[normalized])}</span>`;
-}
-
 function updateMetaText() {
     if (!DOM.historyMeta) return;
     const total = viewState.quotes.length;
@@ -151,15 +122,12 @@ function renderQuoteCards() {
 
     DOM.historyContainer.innerHTML = viewState.quotes.map((quote) => {
         const status = normalizeQuoteStatus(quote.status);
-        const scriveStatus = normalizeScriveStatus(quote.scriveStatus);
-        const canSendScrive = scriveFeatureEnabled && quote.scriveEnabled === true;
         return `
             <article class="history-card" data-quote-id="${escapeHtml(quote.quoteId)}">
                 <div class="history-details">
                     <div class="history-title-row">
                         <h3>${escapeHtml(quote.customerName || 'Okand kund')}</h3>
                         ${statusBadge(status)}
-                        ${scriveBadge(scriveStatus)}
                     </div>
                     <p>
                         <strong>Foretag:</strong> ${escapeHtml(quote.company || '-')}
@@ -176,8 +144,6 @@ function renderQuoteCards() {
                 <div class="history-actions">
                     ${quoteActionSelect(status, quote.quoteId)}
                     <button class="primary btn-sm" data-action="open-latest" data-id="${escapeHtml(quote.quoteId)}">${quoteLifecycleEnabled ? 'Oppna senaste' : 'Oppna offert'}</button>
-                    ${canSendScrive ? `<button class="btn-sm" data-action="send-scrive" data-id="${escapeHtml(quote.quoteId)}">Skicka till Scrive</button>` : ''}
-                    ${canSendScrive ? `<button class="btn-sm" data-action="sync-scrive" data-id="${escapeHtml(quote.quoteId)}">Uppdatera Scrive</button>` : ''}
                     ${quoteLifecycleEnabled ? `<button class="btn-sm" data-action="toggle-revisions" data-id="${escapeHtml(quote.quoteId)}">Visa revisioner</button>` : ''}
                     <button class="btn-danger btn-sm" data-action="delete" data-id="${escapeHtml(quote.quoteId)}">Ta bort</button>
                 </div>
@@ -194,7 +160,7 @@ function renderRevisions(quoteId, revisions = []) {
     if (!container) return;
 
     if (!revisions.length) {
-        container.innerHTML = `<p class="revisions-empty">Inga revisioner hittades.</p>`;
+        container.innerHTML = '<p class="revisions-empty">Inga revisioner hittades.</p>';
         return;
     }
 
@@ -255,21 +221,11 @@ async function openRevisionPayload(quoteId, revision) {
     const nextState = {
         ...revision.state,
         customerInfo: {
-            ...(revision.state?.customerInfo || {}),
-            email: revision.state?.customerInfo?.email || metadata?.scriveSignerEmail || ''
+            ...(revision.state?.customerInfo || {})
         },
         activeQuoteId: quoteId,
         activeQuoteVersion: Number(revision.version) || 1,
-        quoteStatus: normalizeQuoteStatus(metadata?.status || 'draft'),
-        scriveEnabled: Boolean(metadata?.scriveEnabled),
-        scriveStatus: normalizeScriveStatus(metadata?.scriveStatus || 'not_sent'),
-        scriveDocumentId: metadata?.scriveDocumentId || null,
-        scriveSignerName: metadata?.scriveSignerName || revision?.state?.customerInfo?.name || '',
-        scriveSignerEmail: metadata?.scriveSignerEmail || revision?.state?.customerInfo?.email || '',
-        scriveLastError: metadata?.scriveLastError || null,
-        scriveSentAtMs: Number.isFinite(Number(metadata?.scriveSentAtMs)) ? Number(metadata.scriveSentAtMs) : null,
-        scriveLastEventAtMs: Number.isFinite(Number(metadata?.scriveLastEventAtMs)) ? Number(metadata.scriveLastEventAtMs) : null,
-        scriveCompletedAtMs: Number.isFinite(Number(metadata?.scriveCompletedAtMs)) ? Number(metadata.scriveCompletedAtMs) : null
+        quoteStatus: normalizeQuoteStatus(metadata?.status || 'draft')
     };
 
     localStorage.setItem('offertverktyg_state', JSON.stringify(nextState));
@@ -305,93 +261,6 @@ async function openSpecificRevision(quoteId, revisionId) {
         return;
     }
     await openRevisionPayload(quoteId, revision);
-}
-
-function buildPdfFromRevisionState(revisionState) {
-    const sourceCatalog = (typeof window !== 'undefined' && window.catalogData)
-        ? window.catalogData
-        : (typeof globalThis !== 'undefined' ? globalThis.catalogData : {});
-
-    const summary = computeQuoteTotals({
-        state: revisionState,
-        catalogData: sourceCatalog
-    });
-    return generatePDF(revisionState, summary, true);
-}
-
-async function sendLatestRevisionToScrive(quoteId) {
-    if (!scriveFeatureEnabled) {
-        notifyInfo('Scrive ar inte aktiverat i denna miljo.');
-        return;
-    }
-    const user = currentUser();
-    if (!user) return;
-
-    try {
-        const payload = await quoteRepository.getQuoteLatestRevision({
-            userId: user.uid,
-            quoteId
-        });
-        const revisionState = payload?.revision?.state;
-        const metadata = payload?.metadata || {};
-        if (!revisionState) {
-            notifyInfo('Ingen revision att skicka.');
-            return;
-        }
-
-        const signerName = String(
-            metadata.scriveSignerName ||
-            revisionState?.customerInfo?.name ||
-            metadata.customerName ||
-            'Kund'
-        ).trim();
-        const signerEmail = String(
-            metadata.scriveSignerEmail ||
-            revisionState?.customerInfo?.email ||
-            ''
-        ).trim();
-        if (!isValidEmail(signerEmail)) {
-            notifyWarn('Offerten saknar giltig signerings-e-post.');
-            return;
-        }
-
-        const pdfBlob = buildPdfFromRevisionState(revisionState);
-        if (!pdfBlob) {
-            notifyError('Kunde inte skapa PDF for Scrive.');
-            return;
-        }
-
-        const safeRef = String(revisionState?.customerInfo?.reference || metadata.reference || 'offert').trim() || 'offert';
-        const quoteTitle = `${safeRef} - ${signerName}`;
-        const fileName = `${safeRef.replace(/\s+/g, '-')}.pdf`;
-
-        await sendQuoteToScrive({
-            quoteId,
-            revisionVersion: payload?.revision?.version || metadata?.latestVersion || 1,
-            pdfBlob,
-            signerName,
-            signerEmail,
-            quoteTitle,
-            fileName
-        });
-        notifySuccess('Skickad till Scrive.');
-        await loadQuotes();
-    } catch (err) {
-        console.error('Failed to send Scrive payload:', err);
-        notifyError('Kunde inte skicka till Scrive: ' + err.message);
-    }
-}
-
-async function syncQuoteScrive(quoteId) {
-    if (!scriveFeatureEnabled) return;
-    try {
-        await refreshScriveStatus({ quoteId });
-        notifyInfo('Scrive-status uppdaterad.');
-        await loadQuotes();
-    } catch (err) {
-        console.error('Failed to sync Scrive status:', err);
-        notifyError('Kunde inte uppdatera Scrive-status: ' + err.message);
-    }
 }
 
 async function toggleRevisions(quoteId) {
@@ -501,14 +370,6 @@ async function handleHeaderAction(event) {
     }
     if (action === 'open-revision') {
         await openSpecificRevision(id, revisionId);
-        return;
-    }
-    if (action === 'send-scrive') {
-        await sendLatestRevisionToScrive(id);
-        return;
-    }
-    if (action === 'sync-scrive') {
-        await syncQuoteScrive(id);
         return;
     }
     if (action === 'delete') {

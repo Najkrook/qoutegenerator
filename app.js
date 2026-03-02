@@ -19,7 +19,6 @@ import { generatePDF } from "./features/pdfExport.js?v=20260302-5";
 import { generateExcel } from "./features/excelExport.js";
 import { parseLocalFloat, formatLocalFloat } from "./features/utils.js";
 import { LEGAL_TEMPLATES, DEFAULT_TEMPLATE_ID, getTemplateById, isLegalTemplateId } from './features/legalTemplates.js';
-import { sendQuoteToScrive as sendQuoteToScriveApi, refreshScriveStatus, isValidEmail } from './services/scriveApi.js';
 import { renderProductLines as _renderProductLines } from "./features/stepProductLines.js";
 import { renderConfigStep as _renderConfigStep, addNewBuilderItem as _addNewBuilderItem } from "./features/stepConfig.js";
 import { renderPricingStep as _renderPricingStep, renderCustomCosts as _renderCustomCosts } from "./features/stepPricing.js";
@@ -112,21 +111,6 @@ const quoteLifecycleEnabled = typeof window === 'undefined'
 const pdfLegalTemplatesEnabled = typeof window === 'undefined'
     ? true
     : window.FEATURE_PDF_LEGAL_TEMPLATES !== false;
-const scriveFeatureEnabled = typeof window === 'undefined'
-    ? false
-    : window.FEATURE_SCRIVE === true;
-
-const SCRIVE_STATUS_LABELS = {
-    not_sent: 'Inte skickad',
-    preparation: 'Förbereder',
-    pending: 'Väntar signatur',
-    closed: 'Signerad',
-    rejected: 'Avvisad',
-    canceled: 'Avbruten',
-    timedout: 'Utgången',
-    failed: 'Misslyckad'
-};
-
 const modalState = {
     activeModal: null,
     triggerEl: null,
@@ -229,93 +213,6 @@ function syncPdfOptionsUi() {
     if (validityDaysInput) validityDaysInput.value = String(state.quoteValidityDays);
     if (paymentToggle) paymentToggle.checked = state.includePaymentBox !== false;
     if (signatureToggle) signatureToggle.checked = state.includeSignatureBlock !== false;
-}
-
-function normalizeScriveStateDefaults() {
-    if (typeof state.scriveEnabled !== 'boolean') state.scriveEnabled = false;
-    const nextStatus = String(state.scriveStatus || '').toLowerCase();
-    state.scriveStatus = Object.prototype.hasOwnProperty.call(SCRIVE_STATUS_LABELS, nextStatus)
-        ? nextStatus
-        : 'not_sent';
-    state.scriveDocumentId = state.scriveDocumentId ? String(state.scriveDocumentId) : null;
-    state.scriveSignerName = String(state.scriveSignerName || state.customerInfo?.name || '');
-    state.scriveSignerEmail = String(state.scriveSignerEmail || state.customerInfo?.email || '');
-    state.scriveLastError = state.scriveLastError ? String(state.scriveLastError) : null;
-    state.scriveSentAtMs = Number.isFinite(Number(state.scriveSentAtMs)) ? Number(state.scriveSentAtMs) : null;
-    state.scriveLastEventAtMs = Number.isFinite(Number(state.scriveLastEventAtMs)) ? Number(state.scriveLastEventAtMs) : null;
-    state.scriveCompletedAtMs = Number.isFinite(Number(state.scriveCompletedAtMs)) ? Number(state.scriveCompletedAtMs) : null;
-}
-
-function setScriveStateFromMetadata(metadata = {}) {
-    state.scriveEnabled = Boolean(metadata.scriveEnabled);
-    state.scriveStatus = String(metadata.scriveStatus || state.scriveStatus || 'not_sent').toLowerCase();
-    state.scriveDocumentId = metadata.scriveDocumentId ? String(metadata.scriveDocumentId) : null;
-    state.scriveSignerName = String(metadata.scriveSignerName || state.customerInfo?.name || '');
-    state.scriveSignerEmail = String(metadata.scriveSignerEmail || state.customerInfo?.email || '');
-    state.scriveLastError = metadata.scriveLastError ? String(metadata.scriveLastError) : null;
-    state.scriveSentAtMs = Number.isFinite(Number(metadata.scriveSentAtMs)) ? Number(metadata.scriveSentAtMs) : null;
-    state.scriveLastEventAtMs = Number.isFinite(Number(metadata.scriveLastEventAtMs)) ? Number(metadata.scriveLastEventAtMs) : null;
-    state.scriveCompletedAtMs = Number.isFinite(Number(metadata.scriveCompletedAtMs)) ? Number(metadata.scriveCompletedAtMs) : null;
-    normalizeScriveStateDefaults();
-}
-
-function formatScriveDate(ms) {
-    if (!Number.isFinite(Number(ms))) return '-';
-    return new Date(Number(ms)).toLocaleString('sv-SE');
-}
-
-function renderScriveStatusPanel() {
-    const panel = document.getElementById('scriveStatusPanel');
-    if (!panel) return;
-    normalizeScriveStateDefaults();
-
-    const statusLabel = SCRIVE_STATUS_LABELS[state.scriveStatus] || SCRIVE_STATUS_LABELS.not_sent;
-    panel.innerHTML = `
-        <div style="display: flex; gap: 0.45rem; flex-wrap: wrap;">
-            <span style="font-weight: 700; color: var(--text-primary);">Scrive:</span>
-            <span style="font-weight: 600; color: var(--primary);">${statusLabel}</span>
-        </div>
-        <div style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.4rem; line-height: 1.35;">
-            Dokument-ID: ${state.scriveDocumentId || '-'}<br>
-            Senast event: ${formatScriveDate(state.scriveLastEventAtMs)}<br>
-            Signerad: ${formatScriveDate(state.scriveCompletedAtMs)}${state.scriveLastError ? `<br>Fel: ${state.scriveLastError}` : ''}
-        </div>
-    `;
-}
-
-function syncScriveUi() {
-    normalizeScriveStateDefaults();
-    const scriveSection = document.getElementById('scriveSection');
-    const scriveToggle = document.getElementById('toggleScrive');
-    const scriveSendBtn = document.getElementById('btnSendToScrive');
-    const scriveRefreshBtn = document.getElementById('btnRefreshScrive');
-    const custEmail = document.getElementById('custEmail');
-
-    if (!scriveFeatureEnabled) {
-        if (scriveSection) scriveSection.style.display = 'none';
-        return;
-    }
-
-    if (scriveSection) scriveSection.style.display = 'block';
-    if (scriveToggle) scriveToggle.checked = state.scriveEnabled === true;
-    if (custEmail && !custEmail.value && state.customerInfo?.email) {
-        custEmail.value = state.customerInfo.email;
-    }
-
-    const hasSignerEmail = isValidEmail(state.customerInfo?.email || state.scriveSignerEmail);
-    const hasQuoteRows = Array.isArray(state.selectedLines) && state.selectedLines.length > 0;
-    const sendDisabled = !(state.scriveEnabled && hasSignerEmail && hasQuoteRows);
-    if (scriveSendBtn) {
-        scriveSendBtn.disabled = sendDisabled;
-        scriveSendBtn.title = sendDisabled
-            ? 'Aktivera Scrive, ange giltig e-post och ha en offert redo.'
-            : 'Skicka aktuell offert till Scrive';
-    }
-    if (scriveRefreshBtn) {
-        scriveRefreshBtn.disabled = !state.activeQuoteId;
-    }
-
-    renderScriveStatusPanel();
 }
 
 function setupModalAccessibility(modalId, closeHandler) {
@@ -425,7 +322,6 @@ function init() {
             initCustomerInfoFields();
             if (DOM.toggleVat) DOM.toggleVat.checked = state.includesVat;
             syncPdfOptionsUi();
-            syncScriveUi();
         }
 
         goToStep(state.step);
@@ -440,12 +336,6 @@ function startNewQuote() {
     state.activeQuoteId = null;
     state.activeQuoteVersion = 0;
     state.quoteStatus = 'draft';
-    state.scriveStatus = 'not_sent';
-    state.scriveDocumentId = null;
-    state.scriveLastError = null;
-    state.scriveSentAtMs = null;
-    state.scriveLastEventAtMs = null;
-    state.scriveCompletedAtMs = null;
     flushStateNow();
 
     // Ensure the inventory panel is hidden if it was left open
@@ -507,24 +397,12 @@ async function saveQuoteToHistory() {
     }
 
     const summaryData = calculateTotals();
-    const scrivePayload = {
-        enabled: state.scriveEnabled === true,
-        status: state.scriveStatus || 'not_sent',
-        documentId: state.scriveDocumentId || null,
-        signerName: state.customerInfo?.name || state.scriveSignerName || '',
-        signerEmail: state.customerInfo?.email || state.scriveSignerEmail || '',
-        lastError: state.scriveLastError || null,
-        sentAtMs: state.scriveSentAtMs || null,
-        lastEventAtMs: state.scriveLastEventAtMs || null,
-        completedAtMs: state.scriveCompletedAtMs || null
-    };
     const basePayload = {
         user,
         state,
         summary: summaryData,
         customerInfo: state.customerInfo || {},
-        status: state.quoteStatus || 'draft',
-        scrive: scrivePayload
+        status: state.quoteStatus || 'draft'
     };
 
     try {
@@ -532,7 +410,7 @@ async function saveQuoteToHistory() {
             const quoteId = `quote_${Date.now()}`;
             const snapshot = {
                 timestamp: new Date().toISOString(),
-                customerName: state.customerInfo.name || 'Okänd kund',
+                customerName: state.customerInfo.name || 'Okand kund',
                 company: state.customerInfo.company || '',
                 reference: state.customerInfo.reference || '-',
                 totalSek: summaryData.finalTotalSek,
@@ -559,118 +437,11 @@ async function saveQuoteToHistory() {
 
         state.activeQuoteVersion = saved?.metadata?.latestVersion || saved?.revision?.version || 1;
         state.quoteStatus = saved?.metadata?.status || state.quoteStatus || 'draft';
-        setScriveStateFromMetadata(saved?.metadata || {});
         markStateDirty();
-        syncScriveUi();
         notifySuccess(`Offerten sparades (version ${state.activeQuoteVersion}) i "Mina Offerter".`);
     } catch (err) {
         console.error('Failed to save quote:', err);
         notifyError('Kunde inte spara offerten: ' + err.message);
-    }
-}
-
-function buildScriveQuoteTitle() {
-    const reference = String(state.customerInfo?.reference || '').trim();
-    const customer = String(state.customerInfo?.name || '').trim();
-    if (reference && customer) return `${reference} - ${customer}`;
-    return reference || customer || 'Offert';
-}
-
-async function sendQuoteToScrive() {
-    if (!scriveFeatureEnabled) {
-        notifyWarn('Scrive-integration ar inte aktiverad i denna miljo.');
-        return;
-    }
-
-    if (state.scriveEnabled !== true) {
-        notifyWarn('Aktivera Scrive-vaxeln for att skicka offerten.');
-        return;
-    }
-
-    const signerEmail = String(state.customerInfo?.email || '').trim();
-    if (!isValidEmail(signerEmail)) {
-        notifyWarn('Ange en giltig kund-e-post innan du skickar till Scrive.');
-        return;
-    }
-
-    if (!state.activeQuoteId) {
-        await saveQuoteToHistory();
-    }
-    if (!state.activeQuoteId) {
-        notifyError('Kunde inte forbereda offerten for Scrive.');
-        return;
-    }
-
-    const pdfBlob = exportPDF(true);
-    if (!pdfBlob) {
-        notifyError('Kunde inte skapa PDF for Scrive.');
-        return;
-    }
-
-    const sendButton = document.getElementById('btnSendToScrive');
-    if (sendButton) sendButton.disabled = true;
-    try {
-        const response = await sendQuoteToScriveApi({
-            quoteId: state.activeQuoteId,
-            revisionVersion: state.activeQuoteVersion || 1,
-            pdfBlob,
-            signerName: String(state.customerInfo?.name || '').trim() || 'Kund',
-            signerEmail,
-            quoteTitle: buildScriveQuoteTitle(),
-            fileName: buildPdfFileName()
-        });
-
-        setScriveStateFromMetadata({
-            scriveEnabled: true,
-            scriveStatus: response?.scriveStatus || 'pending',
-            scriveDocumentId: response?.scriveDocumentId || state.scriveDocumentId,
-            scriveSignerName: response?.scriveSignerName || state.customerInfo?.name || '',
-            scriveSignerEmail: response?.scriveSignerEmail || signerEmail,
-            scriveLastError: null,
-            scriveSentAtMs: response?.sentAtMs || Date.now(),
-            scriveLastEventAtMs: response?.sentAtMs || Date.now(),
-            scriveCompletedAtMs: response?.completedAtMs || null
-        });
-        markStateDirty();
-        syncScriveUi();
-        notifySuccess('Offerten skickades till Scrive.');
-    } catch (err) {
-        state.scriveStatus = 'failed';
-        state.scriveLastError = err.message || 'Okant fel';
-        state.scriveLastEventAtMs = Date.now();
-        markStateDirty();
-        syncScriveUi();
-        notifyError('Kunde inte skicka till Scrive: ' + err.message);
-    } finally {
-        syncScriveUi();
-    }
-}
-
-async function syncScriveFromBackend() {
-    if (!scriveFeatureEnabled) return;
-    if (!state.activeQuoteId) {
-        notifyInfo('Spara offerten forst for att hamta Scrive-status.');
-        return;
-    }
-
-    try {
-        const response = await refreshScriveStatus({ quoteId: state.activeQuoteId });
-        setScriveStateFromMetadata({
-            scriveEnabled: response?.scriveEnabled ?? state.scriveEnabled,
-            scriveStatus: response?.scriveStatus || state.scriveStatus,
-            scriveDocumentId: response?.scriveDocumentId || state.scriveDocumentId,
-            scriveSignerName: response?.scriveSignerName || state.scriveSignerName,
-            scriveSignerEmail: response?.scriveSignerEmail || state.scriveSignerEmail,
-            scriveLastError: response?.scriveLastError ?? state.scriveLastError,
-            scriveSentAtMs: response?.scriveSentAtMs ?? state.scriveSentAtMs,
-            scriveLastEventAtMs: response?.scriveLastEventAtMs ?? state.scriveLastEventAtMs,
-            scriveCompletedAtMs: response?.scriveCompletedAtMs ?? state.scriveCompletedAtMs
-        });
-        markStateDirty();
-        syncScriveUi();
-        notifyInfo('Scrive-status uppdaterad.');
-    } catch (err) {
-        notifyError('Kunde inte hamta Scrive-status: ' + err.message);
     }
 }
 
@@ -846,14 +617,6 @@ function setupEventListeners() {
     if (DOM.btnSaveQuote) {
         DOM.btnSaveQuote.addEventListener('click', saveQuoteToHistory);
     }
-    const btnSendToScrive = document.getElementById('btnSendToScrive');
-    if (btnSendToScrive) {
-        btnSendToScrive.addEventListener('click', sendQuoteToScrive);
-    }
-    const btnRefreshScrive = document.getElementById('btnRefreshScrive');
-    if (btnRefreshScrive) {
-        btnRefreshScrive.addEventListener('click', syncScriveFromBackend);
-    }
 
     if (DOM.btnUploadPrices && DOM.excelUpload) {
         DOM.btnUploadPrices.addEventListener('click', () => {
@@ -897,14 +660,7 @@ function setupEventListeners() {
             el.addEventListener('input', (e) => {
                 const key = id.replace('cust', '').toLowerCase();
                 state.customerInfo[key] = e.target.value;
-                if (key === 'name') {
-                    state.scriveSignerName = e.target.value;
-                }
-                if (key === 'email') {
-                    state.scriveSignerEmail = e.target.value;
-                }
                 markStateDirty();
-                syncScriveUi();
 
                 // Debounce PDF update to avoid freezing while typing
                 clearTimeout(window.pdfPreviewTimeout);
@@ -932,10 +688,8 @@ function setupEventListeners() {
     const validityDaysInput = document.getElementById('quoteValidityDaysInput');
     const paymentToggle = document.getElementById('togglePaymentBox');
     const signatureToggle = document.getElementById('toggleSignatureBlock');
-    const scriveToggle = document.getElementById('toggleScrive');
 
     syncPdfOptionsUi();
-    syncScriveUi();
 
     if (termsToggle) {
         termsToggle.addEventListener('change', (e) => {
@@ -1006,13 +760,6 @@ function setupEventListeners() {
         });
     }
 
-    if (scriveFeatureEnabled && scriveToggle) {
-        scriveToggle.addEventListener('change', (e) => {
-            state.scriveEnabled = e.target.checked;
-            markStateDirty();
-            syncScriveUi();
-        });
-    }
 }
 
 function goToStep(stepNum) {
@@ -1047,9 +794,6 @@ function goToStep(stepNum) {
         }
     }
 
-    if (stepNum === 4) {
-        syncScriveUi();
-    }
 }
 
 // ---------------------------
@@ -1172,12 +916,12 @@ async function exportPDFToDisk() {
             return;
         }
         if (pickerResult === 'canceled') {
-            notifyWarn('PDF-export avbröts.');
+            notifyWarn('PDF-export avbrots.');
             return;
         }
 
         if (pickerResult === 'failed') {
-            notifyWarn('Kunde inte öppna spara-dialog. Använder nedladdning istället.');
+            notifyWarn('Kunde inte oppna spara-dialog. Anvander nedladdning istallet.');
         }
         if (pickerResult === 'failed' || pickerResult === 'unavailable') {
             downloadBlob(pdfBlob, fileName);
@@ -1310,3 +1054,4 @@ window.exportExcel = exportExcel;
 
 // Boot
 document.addEventListener('DOMContentLoaded', init);
+

@@ -97,11 +97,8 @@ node .\scripts\backfill-quote-metadata.mjs
 
 Requires Firebase Admin credentials (`GOOGLE_APPLICATION_CREDENTIALS` or `FIREBASE_SERVICE_ACCOUNT_JSON`).
 
-## 8) Scrive integration (feature-flagged)
+## 8) Scrive integration (currently disabled)
 
-- Frontend flag defaults to off. Enable only when proxy is deployed:
-  - `window.FEATURE_SCRIVE = true`
-  - `window.SCRIVE_PROXY_BASE_URL = "https://<cloud-run-url>"`
-- Scrive proxy service is in `integrations/scrive-proxy/`.
-- Configure Scrive/API secrets in Cloud Run env/Secret Manager.
-- Scrive metadata is stored on quote metadata docs (`/users/{uid}/quotes/{quoteId}`).
+- Scrive UI/actions are disabled in the current release.
+- Existing Scrive metadata fields on quote documents are kept for backward compatibility.
+- The backend scaffold in `integrations/scrive-proxy/` is kept as inactive reference code.
