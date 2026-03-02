@@ -2,7 +2,7 @@
 
 Local quote/inventory tool for BRIXX.
 
-## 1) First-time GitHub publish (private repo)
+## 1) First-time GitHub publish
 
 Create an empty private repository on GitHub first (no README, no .gitignore, no license), then run:
 
@@ -31,14 +31,24 @@ powershell -ExecutionPolicy Bypass -File .\scripts\verify-git-safety.ps1
 
 The script fails if common secret files are tracked.
 
-## 3) Connect repository in Codex UI
+## 3) Security baseline (public repo)
+
+1. Never commit secrets or local-only runtime files.
+2. All changes must go through PRs into `main` (no direct pushes).
+3. Run the safety script before every push:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\verify-git-safety.ps1
+```
+
+## 4) Connect repository in Codex UI
 
 In Codex:
 
 1. `Select repository` -> `Configure Repositories on GitHub`
 2. Authorize Codex app
 3. Choose `Only select repositories`
-4. Select this private repository
+4. Select this repository
 5. Refresh repository list
 
 Then create environment with:
@@ -46,7 +56,7 @@ Then create environment with:
 - Startup command: `python server.py`
 - App URL: `http://localhost:8000/index.html`
 
-## 4) Daily workflow
+## 5) Daily workflow
 
 ```powershell
 git checkout main
@@ -60,3 +70,15 @@ git push -u origin fix/<short-name>
 
 Open a PR to `main` from GitHub.
 
+## 6) Firestore security rules
+
+This repository includes [`firestore.rules`](firestore.rules) with the intended baseline:
+
+- Users can only access their own quotes: `/users/{uid}/quotes/*`
+- Inventory and inventory logs are admin-only: `/stock/*`, `/inventory_logs/*`
+- All other document paths are denied
+
+Before deploy:
+
+1. Replace `UID_ADMIN_1..3` in `firestore.rules` with your real Firebase Auth UIDs.
+2. Deploy rules from Firebase console or Firebase CLI.
