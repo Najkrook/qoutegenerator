@@ -122,7 +122,7 @@ export function renderSummaryStep(DOM, updatePDFPreview) {
  * Populate the customer info input fields from state (handles hydration from saved quotes).
  */
 export function initCustomerInfoFields() {
-    const fields = ['custName', 'custCompany', 'custReference', 'custDate', 'custValidity'];
+    const fields = ['custName', 'custCompany', 'custEmail', 'custReference', 'custDate', 'custValidity'];
     fields.forEach((id) => {
         const el = document.getElementById(id);
         if (!el) return;

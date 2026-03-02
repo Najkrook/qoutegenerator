@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest';
 import {
     applyQuoteFilters,
     createQuoteRepository,
-    normalizeQuoteMetadata
+    normalizeQuoteMetadata,
+    normalizeScriveStatus
 } from '../services/quoteRepository.js';
 import { createFirestoreMock } from './fixtures/firestoreMock.js';
 
@@ -197,6 +198,34 @@ describe('quoteRepository', () => {
         expect(latest?.revision?.state?.customerInfo?.reference).toBe('REV-2');
         expect(latest?.metadata?.status).toBe('sent');
     });
+
+    it('updateQuoteScrive stores scrive metadata on quote document', async () => {
+        const { repo } = buildRepo();
+        const created = await repo.createQuote({
+            user,
+            state: baseState,
+            summary: baseSummary,
+            customerInfo: baseState.customerInfo,
+            status: 'draft'
+        });
+
+        const updated = await repo.updateQuoteScrive({
+            userId: user.uid,
+            quoteId: created.quoteId,
+            scrive: {
+                enabled: true,
+                status: 'pending',
+                documentId: 'doc_123',
+                signerEmail: 'customer@example.com',
+                signerName: 'Testkund'
+            }
+        });
+
+        expect(updated.scriveEnabled).toBe(true);
+        expect(updated.scriveStatus).toBe('pending');
+        expect(updated.scriveDocumentId).toBe('doc_123');
+        expect(updated.scriveSignerEmail).toBe('customer@example.com');
+    });
 });
 
 describe('quoteRepository pure helpers', () => {
@@ -209,6 +238,8 @@ describe('quoteRepository pure helpers', () => {
 
         expect(normalized.status).toBe('draft');
         expect(normalized.latestVersion).toBe(1);
+        expect(normalized.scriveEnabled).toBe(false);
+        expect(normalized.scriveStatus).toBe('not_sent');
         expect(normalized.searchText).toContain('draft');
     });
 
@@ -221,5 +252,11 @@ describe('quoteRepository pure helpers', () => {
         expect(applyQuoteFilters(rows, { status: 'won', search: '' })).toHaveLength(1);
         expect(applyQuoteFilters(rows, { status: '', search: 'acme' })).toHaveLength(1);
         expect(applyQuoteFilters(rows, { status: 'lost', search: '' })).toHaveLength(0);
+    });
+
+    it('normalizeScriveStatus falls back to not_sent for invalid values', () => {
+        expect(normalizeScriveStatus('closed')).toBe('closed');
+        expect(normalizeScriveStatus('PENDING')).toBe('pending');
+        expect(normalizeScriveStatus('bad-status')).toBe('not_sent');
     });
 });

@@ -1,4 +1,5 @@
 export const QUOTE_STATUS_VALUES = ['draft', 'sent', 'won', 'lost', 'archived'];
+export const SCRIVE_STATUS_VALUES = ['not_sent', 'preparation', 'pending', 'closed', 'rejected', 'canceled', 'timedout', 'failed'];
 
 function toNumber(value, fallback = 0) {
     const parsed = Number(value);
@@ -8,6 +9,25 @@ function toNumber(value, fallback = 0) {
 export function normalizeQuoteStatus(status) {
     const normalized = String(status || '').toLowerCase();
     return QUOTE_STATUS_VALUES.includes(normalized) ? normalized : 'draft';
+}
+
+export function normalizeScriveStatus(status) {
+    const normalized = String(status || '').toLowerCase();
+    return SCRIVE_STATUS_VALUES.includes(normalized) ? normalized : 'not_sent';
+}
+
+function normalizeScriveMetadata(raw = {}, fallbackCustomer = {}) {
+    return {
+        scriveEnabled: Boolean(raw.scriveEnabled),
+        scriveStatus: normalizeScriveStatus(raw.scriveStatus),
+        scriveDocumentId: raw.scriveDocumentId ? String(raw.scriveDocumentId) : null,
+        scriveSignerName: String(raw.scriveSignerName || fallbackCustomer.name || ''),
+        scriveSignerEmail: String(raw.scriveSignerEmail || fallbackCustomer.email || ''),
+        scriveLastError: raw.scriveLastError ? String(raw.scriveLastError) : null,
+        scriveSentAtMs: raw.scriveSentAtMs == null ? null : toNumber(raw.scriveSentAtMs, null),
+        scriveLastEventAtMs: raw.scriveLastEventAtMs == null ? null : toNumber(raw.scriveLastEventAtMs, null),
+        scriveCompletedAtMs: raw.scriveCompletedAtMs == null ? null : toNumber(raw.scriveCompletedAtMs, null)
+    };
 }
 
 export function buildQuoteSearchText({
@@ -34,6 +54,7 @@ export function normalizeQuoteMetadata(quoteId, raw = {}) {
     const latestVersion = Math.max(1, toNumber(raw.latestVersion, raw.state ? 1 : 0));
     const status = normalizeQuoteStatus(raw.status);
     const latestRevisionId = String(raw.latestRevisionId || '');
+    const scrive = normalizeScriveMetadata(raw, fallbackCustomer);
 
     return {
         quoteId,
@@ -48,6 +69,7 @@ export function normalizeQuoteMetadata(quoteId, raw = {}) {
         latestVersion,
         latestRevisionId,
         totalSek,
+        ...scrive,
         searchText: String(
             raw.searchText ||
             buildQuoteSearchText({ customerName, company, reference, status })
@@ -88,6 +110,7 @@ export function buildQuoteMetadata({
     customerInfo = {},
     summary = {},
     status = 'draft',
+    scrive = {},
     nowMs,
     user,
     latestVersion,
@@ -98,6 +121,36 @@ export function buildQuoteMetadata({
     const customerName = String(customerInfo.name || existing.customerName || 'Okand kund');
     const company = String(customerInfo.company || existing.company || '');
     const reference = String(customerInfo.reference || existing.reference || '-');
+    const existingScrive = normalizeScriveMetadata(existing, customerInfo);
+    const normalizedScriveStatus = normalizeScriveStatus(scrive.status || existingScrive.scriveStatus || 'not_sent');
+    const scriveDocumentId = scrive.documentId || existingScrive.scriveDocumentId || null;
+    const scriveEnabled = typeof scrive.enabled === 'boolean'
+        ? scrive.enabled
+        : existingScrive.scriveEnabled;
+    const scriveSignerName = String(
+        scrive.signerName ||
+        customerInfo.name ||
+        existingScrive.scriveSignerName ||
+        customerName
+    );
+    const scriveSignerEmail = String(
+        scrive.signerEmail ||
+        customerInfo.email ||
+        existingScrive.scriveSignerEmail ||
+        ''
+    );
+    const scriveLastError = scrive.lastError != null
+        ? (scrive.lastError ? String(scrive.lastError) : null)
+        : (existingScrive.scriveLastError || null);
+    const scriveSentAtMs = scrive.sentAtMs != null
+        ? toNumber(scrive.sentAtMs, null)
+        : existingScrive.scriveSentAtMs;
+    const scriveLastEventAtMs = scrive.lastEventAtMs != null
+        ? toNumber(scrive.lastEventAtMs, null)
+        : existingScrive.scriveLastEventAtMs;
+    const scriveCompletedAtMs = scrive.completedAtMs != null
+        ? toNumber(scrive.completedAtMs, null)
+        : existingScrive.scriveCompletedAtMs;
 
     return {
         quoteId,
@@ -112,6 +165,15 @@ export function buildQuoteMetadata({
         latestVersion: Math.max(1, toNumber(latestVersion, 1)),
         latestRevisionId: String(latestRevisionId || existing.latestRevisionId || ''),
         totalSek: toNumber(summary?.finalTotalSek, existing.totalSek || 0),
+        scriveEnabled,
+        scriveStatus: normalizedScriveStatus,
+        scriveDocumentId,
+        scriveSignerName,
+        scriveSignerEmail,
+        scriveLastError,
+        scriveSentAtMs,
+        scriveLastEventAtMs,
+        scriveCompletedAtMs,
         searchText: buildQuoteSearchText({
             customerName,
             company,
@@ -165,6 +227,7 @@ export function createQuoteRepository(deps) {
         summary,
         customerInfo,
         status,
+        scrive,
         changeNote
     }) => {
         const quoteRef = quoteDocRef(user.uid, quoteId);
@@ -191,6 +254,7 @@ export function createQuoteRepository(deps) {
             customerInfo,
             summary,
             status,
+            scrive,
             nowMs,
             user,
             latestVersion: version,
@@ -211,6 +275,7 @@ export function createQuoteRepository(deps) {
         summary,
         customerInfo = {},
         status = 'draft',
+        scrive = {},
         changeNote = ''
     }) {
         if (!user?.uid) throw new Error('Missing authenticated user.');
@@ -224,6 +289,7 @@ export function createQuoteRepository(deps) {
                 summary,
                 customerInfo,
                 status,
+                scrive,
                 changeNote
             });
         }
@@ -255,6 +321,7 @@ export function createQuoteRepository(deps) {
                 customerInfo,
                 summary,
                 status,
+                scrive,
                 nowMs,
                 user,
                 latestVersion: version,
@@ -275,6 +342,7 @@ export function createQuoteRepository(deps) {
         summary,
         customerInfo = {},
         status = 'draft',
+        scrive = {},
         changeNote = 'Initial save'
     }) {
         if (!user?.uid) throw new Error('Missing authenticated user.');
@@ -286,6 +354,7 @@ export function createQuoteRepository(deps) {
             summary,
             customerInfo,
             status,
+            scrive,
             changeNote
         });
         return { quoteId, ...saved };
@@ -456,6 +525,49 @@ export function createQuoteRepository(deps) {
         };
     }
 
+    async function updateQuoteScrive({ userId, quoteId, scrive = {} }) {
+        if (!userId || !quoteId) throw new Error('userId and quoteId are required.');
+        const quoteRef = quoteDocRef(userId, quoteId);
+        const snap = await getDoc(quoteRef);
+        if (!snap.exists()) throw new Error('Quote not found.');
+
+        const existing = normalizeQuoteMetadata(quoteId, snap.data() || {});
+        const updatedAtMs = Date.now();
+        const scrivePatch = {
+            scriveEnabled: typeof scrive.enabled === 'boolean' ? scrive.enabled : existing.scriveEnabled,
+            scriveStatus: normalizeScriveStatus(scrive.status || existing.scriveStatus),
+            scriveDocumentId: scrive.documentId !== undefined
+                ? (scrive.documentId ? String(scrive.documentId) : null)
+                : existing.scriveDocumentId,
+            scriveSignerName: String(scrive.signerName || existing.scriveSignerName || existing.customerName || ''),
+            scriveSignerEmail: String(scrive.signerEmail || existing.scriveSignerEmail || ''),
+            scriveLastError: scrive.lastError !== undefined
+                ? (scrive.lastError ? String(scrive.lastError) : null)
+                : existing.scriveLastError,
+            scriveSentAtMs: scrive.sentAtMs !== undefined
+                ? (scrive.sentAtMs == null ? null : toNumber(scrive.sentAtMs, existing.scriveSentAtMs || null))
+                : existing.scriveSentAtMs,
+            scriveLastEventAtMs: scrive.lastEventAtMs !== undefined
+                ? (scrive.lastEventAtMs == null ? null : toNumber(scrive.lastEventAtMs, existing.scriveLastEventAtMs || null))
+                : existing.scriveLastEventAtMs,
+            scriveCompletedAtMs: scrive.completedAtMs !== undefined
+                ? (scrive.completedAtMs == null ? null : toNumber(scrive.completedAtMs, existing.scriveCompletedAtMs || null))
+                : existing.scriveCompletedAtMs,
+            updatedAtMs
+        };
+
+        if (typeof updateDoc === 'function') {
+            await updateDoc(quoteRef, scrivePatch);
+        } else {
+            await setDoc(quoteRef, scrivePatch, { merge: true });
+        }
+
+        return {
+            ...existing,
+            ...scrivePatch
+        };
+    }
+
     async function deleteQuote({ userId, quoteId }) {
         if (!userId || !quoteId) throw new Error('userId and quoteId are required.');
         const quoteRef = quoteDocRef(userId, quoteId);
@@ -489,6 +601,7 @@ export function createQuoteRepository(deps) {
         getQuoteLatestRevision,
         getQuoteRevisions,
         deleteQuote,
-        updateQuoteStatus
+        updateQuoteStatus,
+        updateQuoteScrive
     };
 }

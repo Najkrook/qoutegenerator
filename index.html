@@ -29,7 +29,7 @@
     <script type="module" src="https://www.gstatic.com/firebasejs/10.9.0/firebase-firestore.js"></script>
 
     <!-- Convert app.js to module so we can use imports -->
-    <script type="module" src="app.js?v=20260302-5" defer></script>
+    <script type="module" src="app.js?v=20260302-6" defer></script>
 
     <!-- Auth gate: redirect if not logged in -->
     <script type="module">
@@ -362,6 +362,10 @@
                                 <label>Företag</label>
                                 <input type="text" id="custCompany" placeholder="Företagsnamn">
                             </div>
+                            <div class="form-group flex-1">
+                                <label>E-post (för signering)</label>
+                                <input type="email" id="custEmail" placeholder="kund@exempel.se">
+                            </div>
                         </div>
                         <div class="flex-row">
                             <div class="form-group flex-1">
@@ -443,6 +447,31 @@
                                     style="width: 16px; height: 16px; cursor: pointer;">
                                 Visa signeringsruta i PDF
                             </label>
+                        </div>
+                    </div>
+
+                    <!-- Scrive signing -->
+                    <div class="config-section mb-4" id="scriveSection" style="padding: 1rem 1.25rem; display: none;">
+                        <div
+                            style="display: flex; justify-content: space-between; align-items: center; gap: 0.75rem; margin-bottom: 0.5rem; flex-wrap: wrap;">
+                            <h3 style="margin: 0; font-size: 1rem;">Scrive e-signering</h3>
+                            <label
+                                style="cursor: pointer; display: flex; align-items: center; gap: 0.5rem; font-weight: 500; font-size: 0.85rem;">
+                                <input type="checkbox" id="toggleScrive"
+                                    style="width: 16px; height: 16px; cursor: pointer;">
+                                Aktivera Scrive för denna offert
+                            </label>
+                        </div>
+                        <div id="scriveStatusPanel"
+                            style="background: rgba(255, 255, 255, 0.03); border: 1px solid var(--panel-border); border-radius: 6px; padding: 0.75rem; margin-bottom: 0.75rem; font-size: 0.8rem; color: var(--text-secondary);">
+                            Scrive-status visas här.
+                        </div>
+                        <div style="display: flex; gap: 0.75rem; flex-wrap: wrap;">
+                            <button type="button" id="btnSendToScrive" class="primary">Skicka till Scrive</button>
+                            <button type="button" id="btnRefreshScrive"
+                                style="background: var(--panel-bg); color: var(--text-primary); border: 1px solid var(--panel-border);">
+                                Uppdatera Scrive-status
+                            </button>
                         </div>
                     </div>
 

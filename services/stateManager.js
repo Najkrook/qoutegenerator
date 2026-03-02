@@ -2,6 +2,7 @@ import { DEFAULT_TEMPLATE_ID, getTemplateById, isLegalTemplateId } from '../feat
 
 const DEFAULT_TERMS_TEXT = getTemplateById(DEFAULT_TEMPLATE_ID).body;
 const VALID_QUOTE_STATUSES = ['draft', 'sent', 'won', 'lost', 'archived'];
+const VALID_SCRIVE_STATUSES = ['not_sent', 'preparation', 'pending', 'closed', 'rejected', 'canceled', 'timedout', 'failed'];
 
 function normalizePositiveInt(value, fallback) {
     const parsed = Number.parseInt(value, 10);
@@ -21,6 +22,7 @@ export const state = {
     customerInfo: {
         name: '',
         company: '',
+        email: '',
         reference: '',
         date: '',
         validity: '30 dagar'
@@ -38,7 +40,16 @@ export const state = {
     includeSignatureBlock: true,
     includePaymentBox: true,
     paymentTermsDays: 30,
-    quoteValidityDays: 14
+    quoteValidityDays: 14,
+    scriveEnabled: false,
+    scriveStatus: 'not_sent',
+    scriveDocumentId: null,
+    scriveSignerName: '',
+    scriveSignerEmail: '',
+    scriveLastError: null,
+    scriveSentAtMs: null,
+    scriveLastEventAtMs: null,
+    scriveCompletedAtMs: null
 };
 
 let saveDebounceMs = 750;
@@ -86,6 +97,15 @@ export function loadState() {
         if (saved) {
             const parsed = JSON.parse(saved);
             Object.assign(state, parsed);
+            if (!state.customerInfo || typeof state.customerInfo !== 'object') {
+                state.customerInfo = {};
+            }
+            state.customerInfo.name = String(state.customerInfo.name || '');
+            state.customerInfo.company = String(state.customerInfo.company || '');
+            state.customerInfo.email = String(state.customerInfo.email || '');
+            state.customerInfo.reference = String(state.customerInfo.reference || '');
+            state.customerInfo.date = String(state.customerInfo.date || '');
+            state.customerInfo.validity = String(state.customerInfo.validity || '30 dagar');
             if (!state.activeQuoteId) state.activeQuoteId = null;
             if (!Number.isFinite(Number(state.activeQuoteVersion))) state.activeQuoteVersion = 0;
             if (!VALID_QUOTE_STATUSES.includes(String(state.quoteStatus || '').toLowerCase())) {
@@ -96,6 +116,20 @@ export function loadState() {
             if (typeof state.includePaymentBox !== 'boolean') state.includePaymentBox = true;
             state.paymentTermsDays = normalizePositiveInt(state.paymentTermsDays, 30);
             state.quoteValidityDays = normalizePositiveInt(state.quoteValidityDays, 14);
+            if (typeof state.scriveEnabled !== 'boolean') state.scriveEnabled = false;
+            const normalizedScriveStatus = String(state.scriveStatus || '').toLowerCase();
+            if (!VALID_SCRIVE_STATUSES.includes(normalizedScriveStatus)) {
+                state.scriveStatus = 'not_sent';
+            } else {
+                state.scriveStatus = normalizedScriveStatus;
+            }
+            state.scriveDocumentId = state.scriveDocumentId ? String(state.scriveDocumentId) : null;
+            state.scriveSignerName = String(state.scriveSignerName || state.customerInfo?.name || '');
+            state.scriveSignerEmail = String(state.scriveSignerEmail || state.customerInfo?.email || '');
+            state.scriveLastError = state.scriveLastError ? String(state.scriveLastError) : null;
+            state.scriveSentAtMs = Number.isFinite(Number(state.scriveSentAtMs)) ? Number(state.scriveSentAtMs) : null;
+            state.scriveLastEventAtMs = Number.isFinite(Number(state.scriveLastEventAtMs)) ? Number(state.scriveLastEventAtMs) : null;
+            state.scriveCompletedAtMs = Number.isFinite(Number(state.scriveCompletedAtMs)) ? Number(state.scriveCompletedAtMs) : null;
 
             const hasSavedTerms = typeof state.termsText === 'string' && state.termsText.trim().length > 0;
             if (!hasSavedTerms) {
@@ -135,6 +169,14 @@ export function clearState() {
     state.includesVat = false;
     state.globalDiscountPct = 0;
     state.prevGlobalDiscountPct = 0;
+    state.customerInfo = {
+        name: '',
+        company: '',
+        email: '',
+        reference: '',
+        date: '',
+        validity: '30 dagar'
+    };
     state.activeQuoteId = null;
     state.activeQuoteVersion = 0;
     state.quoteStatus = 'draft';
@@ -146,5 +188,14 @@ export function clearState() {
     state.includePaymentBox = true;
     state.paymentTermsDays = 30;
     state.quoteValidityDays = 14;
+    state.scriveEnabled = false;
+    state.scriveStatus = 'not_sent';
+    state.scriveDocumentId = null;
+    state.scriveSignerName = '';
+    state.scriveSignerEmail = '';
+    state.scriveLastError = null;
+    state.scriveSentAtMs = null;
+    state.scriveLastEventAtMs = null;
+    state.scriveCompletedAtMs = null;
     location.reload();
 }
