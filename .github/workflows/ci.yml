@@ -1,0 +1,28 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+jobs:
+  safety-and-sanity:
+    name: Safety and Sanity
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Verify sensitive/local-only files are not tracked
+        shell: pwsh
+        run: ./scripts/verify-git-safety.ps1
+
+      - name: Ensure repository remains clean after checks
+        shell: bash
+        run: |
+          if [ -n "$(git status --porcelain)" ]; then
+            echo "Repository is dirty after checks:"
+            git status --short
+            exit 1
+          fi
