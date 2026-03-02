@@ -16,7 +16,7 @@ jobs:
 
       - name: Verify sensitive/local-only files are not tracked
         shell: pwsh
-        run: powershell -ExecutionPolicy Bypass -File .\scripts\verify-git-safety.ps1
+        run: ./scripts/verify-git-safety.ps1
 
       - name: Ensure repository remains clean after checks
         shell: bash
