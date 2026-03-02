@@ -1,8 +1,9 @@
-﻿// app.js
+// app.js
 
-import { db, doc, getDoc, setDoc, updateDoc, increment, collection, writeBatch, query, orderBy, limit, getDocs } from "./services/firebase.js";
+import { db, doc, getDoc, setDoc, updateDoc, increment, collection, writeBatch, query, orderBy, limit, getDocs, deleteDoc, runTransaction } from "./services/firebase.js";
 import { currentUser, logout } from './services/authService.js';
 import { state, loadState, clearState, initStatePersistence, markStateDirty, flushStateNow } from "./services/stateManager.js";
+import { createQuoteRepository } from './services/quoteRepository.js';
 import {
     fetchInventory,
     fetchActivityLogs,
@@ -103,12 +104,31 @@ const DOM = {
 };
 
 // Numeric parsing & formatting imported from features/utils.js
+const quoteLifecycleEnabled = typeof window === 'undefined'
+    ? true
+    : window.FEATURE_QUOTE_LIFECYCLE !== false;
 
 const modalState = {
     activeModal: null,
     triggerEl: null,
     keyHandler: null
 };
+
+const quoteRepository = createQuoteRepository({
+    db,
+    doc,
+    getDoc,
+    setDoc,
+    updateDoc,
+    deleteDoc,
+    collection,
+    getDocs,
+    query,
+    orderBy,
+    limit,
+    writeBatch,
+    runTransaction
+});
 
 function setupModalAccessibility(modalId, closeHandler) {
     const modal = document.getElementById(modalId);
@@ -231,6 +251,9 @@ function init() {
 
 function startNewQuote() {
     state.step = 1;
+    state.activeQuoteId = null;
+    state.activeQuoteVersion = 0;
+    state.quoteStatus = 'draft';
     flushStateNow();
 
     // Ensure the inventory panel is hidden if it was left open
@@ -292,23 +315,48 @@ async function saveQuoteToHistory() {
     }
 
     const summaryData = calculateTotals();
-    const quoteId = 'quote_' + Date.now();
-
-    // Create snapshot object
-    const snapshot = {
-        timestamp: new Date().toISOString(),
-        customerName: state.customerInfo.name || "Okänd Kund",
-        reference: state.customerInfo.reference || "-",
-        totalSek: summaryData.finalTotalSek,
-        savedBy: user.email,
-        savedByUid: user.uid,
-        state: JSON.parse(JSON.stringify(state)) // deep clone current state
+    const basePayload = {
+        user,
+        state,
+        summary: summaryData,
+        customerInfo: state.customerInfo || {},
+        status: state.quoteStatus || 'draft'
     };
 
     try {
-        const docRef = doc(db, 'users', user.uid, 'quotes', quoteId);
-        await setDoc(docRef, snapshot);
-        notifySuccess('Offerten har sparats till "Mina Offerter".');
+        if (!quoteLifecycleEnabled) {
+            const quoteId = `quote_${Date.now()}`;
+            const snapshot = {
+                timestamp: new Date().toISOString(),
+                customerName: state.customerInfo.name || 'Okänd kund',
+                company: state.customerInfo.company || '',
+                reference: state.customerInfo.reference || '-',
+                totalSek: summaryData.finalTotalSek,
+                savedBy: user.email,
+                savedByUid: user.uid,
+                state: JSON.parse(JSON.stringify(state))
+            };
+            const docRef = doc(db, 'users', user.uid, 'quotes', quoteId);
+            await setDoc(docRef, snapshot);
+            notifySuccess('Offerten har sparats till "Mina Offerter".');
+            return;
+        }
+
+        let saved;
+        if (!state.activeQuoteId) {
+            saved = await quoteRepository.createQuote(basePayload);
+            state.activeQuoteId = saved.quoteId;
+        } else {
+            saved = await quoteRepository.saveQuoteRevision({
+                ...basePayload,
+                quoteId: state.activeQuoteId
+            });
+        }
+
+        state.activeQuoteVersion = saved?.metadata?.latestVersion || saved?.revision?.version || 1;
+        state.quoteStatus = saved?.metadata?.status || state.quoteStatus || 'draft';
+        markStateDirty();
+        notifySuccess(`Offerten sparades (version ${state.activeQuoteVersion}) i "Mina Offerter".`);
     } catch (err) {
         console.error('Failed to save quote:', err);
         notifyError('Kunde inte spara offerten: ' + err.message);
@@ -866,6 +914,3 @@ window.exportExcel = exportExcel;
 
 // Boot
 document.addEventListener('DOMContentLoaded', init);
-
-
-

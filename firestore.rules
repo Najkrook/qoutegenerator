@@ -17,6 +17,10 @@ service cloud.firestore {
       allow read, create, update, delete: if isSignedIn() && request.auth.uid == userId;
     }
 
+    match /users/{userId}/quotes/{quoteId}/revisions/{revisionId} {
+      allow read, create, update, delete: if isSignedIn() && request.auth.uid == userId;
+    }
+
     match /stock/{docId} {
       allow read, write: if isAdmin();
     }

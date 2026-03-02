@@ -1,4 +1,4 @@
-﻿import { BRIXX_LOGO_BASE64 } from '../assets/logoData.js';
+import { BRIXX_LOGO_BASE64 } from '../assets/logoData.js';
 import { notifyWarn, notifyError } from '../services/notificationService.js';
 import { buildPdfTableData, buildExportSummary } from '../services/exportDataBuilders.js';
 
@@ -23,16 +23,16 @@ export function generatePDF(state, summaryData, returnBlob = false) {
     const pageWidth = doc.internal.pageSize.width;
     const pageHeight = doc.internal.pageSize.height;
 
-    // â”€â”€ Brand Colors â”€â”€
+//
     const brandOrange = [243, 156, 18];   // #f39c12
     const darkText = [30, 30, 30];
     const grayText = [120, 120, 120];
     const lightGray = [230, 230, 230];
     const accentGreen = [46, 174, 96];     // For "Ert Pris" highlight
 
-    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+//
     //  HEADER: Logo + Title + Date/Ref
-    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+//
 
     // Logo (left side)
     try {
@@ -65,9 +65,9 @@ export function generatePDF(state, summaryData, returnBlob = false) {
     doc.setLineWidth(0.8);
     doc.line(14, 32, pageWidth - 14, 32);
 
-    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+//
     //  CUSTOMER INFO BLOCK
-    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+//
 
     let currentY = 42;
 
@@ -79,7 +79,7 @@ export function generatePDF(state, summaryData, returnBlob = false) {
     doc.setFontSize(10);
     doc.setTextColor(...darkText);
 
-    doc.text(`Malmö ${state.customerInfo.date || new Date().toLocaleDateString('sv-SE')}`, 18, currentY);
+    doc.text(`Malmo ${state.customerInfo.date || new Date().toLocaleDateString('sv-SE')}`, 18, currentY);
     currentY += 6;
     doc.setTextColor(...grayText);
     doc.text("Ca kostnad enligt diskussion.", 18, currentY);
@@ -102,9 +102,9 @@ export function generatePDF(state, summaryData, returnBlob = false) {
 
     currentY = 70;
 
-    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+//
     //  ITEMS TABLE
-    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+//
 
     const tableData = buildPdfTableData(state, summaryData, formatSEK);
 
@@ -177,9 +177,9 @@ export function generatePDF(state, summaryData, returnBlob = false) {
         finalY = y + 6;
     }
 
-    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+//
     //  TOTALS SECTION
-    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+//
 
     doc.setFontSize(10);
     let rightColX = pageWidth - 90;
@@ -224,9 +224,9 @@ export function generatePDF(state, summaryData, returnBlob = false) {
         doc.setTextColor(...darkText);
     }
 
-    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+//
     //  TERMS & CONDITIONS PAGE (optional)
-    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+//
 
     if (state.includeTerms && state.termsText) {
         doc.addPage();
@@ -263,7 +263,7 @@ export function generatePDF(state, summaryData, returnBlob = false) {
 
         termsLines.forEach(line => {
             if (termsY > footerZone) {
-                // Would overflow into footer â€” skip (could add page break logic later)
+//
                 return;
             }
 
@@ -273,7 +273,7 @@ export function generatePDF(state, summaryData, returnBlob = false) {
             }
 
             // Check if this is a heading (ALL CAPS line)
-            const isHeading = line === line.toUpperCase() && line.trim().length > 2 && !line.startsWith('•');
+            const isHeading = line === line.toUpperCase() && line.trim().length > 2 && !line.startsWith('-');
             if (isHeading) {
                 termsY += 3;
                 doc.setFont("helvetica", "bold");
@@ -295,9 +295,9 @@ export function generatePDF(state, summaryData, returnBlob = false) {
         });
     }
 
-    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+//
     //  FOOTER (all pages)
-    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+//
 
     const pageCount = doc.internal.getNumberOfPages();
     for (let i = 1; i <= pageCount; i++) {
@@ -318,13 +318,13 @@ export function generatePDF(state, summaryData, returnBlob = false) {
         doc.setFont("helvetica", "bold");
         doc.setFontSize(8);
         doc.setTextColor(255, 255, 255);
-        doc.text("Parasoll    ·    Värme    ·    Vindskydd    ·    Miljö", pageWidth / 2, footerY, { align: "center" });
+        doc.text("Parasoll | Varme | Vindskydd | Miljo", pageWidth / 2, footerY, { align: "center" });
 
         footerY += 5;
         doc.setFont("helvetica", "normal");
         doc.setFontSize(7.5);
         doc.setTextColor(180, 180, 190);
-        doc.text("BRIXX EUROPE  |  Dockplatsen 1  |  SE 211 19 Malmö  |  SWEDEN", pageWidth / 2, footerY, { align: "center" });
+        doc.text("BRIXX EUROPE | Dockplatsen 1 | SE 211 19 Malmo | SWEDEN", pageWidth / 2, footerY, { align: "center" });
 
         footerY += 4;
         doc.setFontSize(7);
@@ -355,4 +355,3 @@ export function generatePDF(state, summaryData, returnBlob = false) {
         return null;
     }
 }
-

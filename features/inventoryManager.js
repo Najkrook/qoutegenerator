@@ -1,7 +1,8 @@
-﻿import { db, doc, getDoc, setDoc, collection, writeBatch, query, orderBy, limit, getDocs } from "../services/firebase.js";
+import { db, doc, getDoc, setDoc, collection, writeBatch, query, orderBy, limit, getDocs } from "../services/firebase.js";
 import { state, markStateDirty } from "../services/stateManager.js";
 import { currentUser } from '../services/authService.js';
 import { notifySuccess, notifyError, notifyWarn, confirmAction } from "../services/notificationService.js";
+import { escapeHtml } from './utils.js';
 
 const hooks = {
     goToStep: null,
@@ -210,8 +211,8 @@ function renderInventory(searchTerm = "") {
 
         const id = item['ID'] || "-";
 
-        // Extract Grenställ prefix 
-        let prefix = "Övrigt";
+        // Extract Grenstall prefix
+        let prefix = "Ovrigt";
         const upperId = id.toUpperCase();
 
         if (id !== "-" && id.includes('.')) {
@@ -227,7 +228,7 @@ function renderInventory(searchTerm = "") {
             } else if (validNumeric.includes(potentialPrefix)) {
                 prefix = potentialPrefix;
             } else {
-                prefix = "Övrigt";
+                prefix = "Ovrigt";
             }
         } else if (id !== "-") {
             // Handle edge cases where there is no dot
@@ -235,23 +236,23 @@ function renderInventory(searchTerm = "") {
             else if (upperId === 'LOD' || upperId.startsWith('L')) prefix = "Lod";
             else if (upperId === 'BLACK' || upperId.startsWith('B')) prefix = "Black";
             else if (['3', '4', '5', '6'].includes(id)) prefix = id;
-            else prefix = "Övrigt";
+            else prefix = "Ovrigt";
         }
 
-        // Check if we need to render a new Grenställ Header
+        // Check if we need to render a new Grenstall Header
         if (prefix !== currentGrenstall) {
             currentGrenstall = prefix;
 
             const headerRow = document.createElement('tr');
             headerRow.innerHTML = `
                 <td colspan="6" style="padding: 1rem; background: var(--bg-color); border-bottom: 2px solid var(--primary); color: var(--primary); font-weight: bold; font-size: 1rem; text-transform: uppercase;">
-                    Grenställ: ${prefix}
+                    Grenstall: ${escapeHtml(prefix)}
                 </td>
             `;
             DOM_INV.inventoryTableBody.appendChild(headerRow);
         }
         const typ = item['TYP'] || "BA";
-        const size = item['STORLEK'] || "Okänd";
+        const size = item['STORLEK'] || "Okand";
         const desc = item['BESKRIVNING'] || "";
         const kommentar = item['Kommentar'] || "";
 
@@ -268,11 +269,11 @@ function renderInventory(searchTerm = "") {
         tr.className = rowClass;
 
         tr.innerHTML = `
-            <td style="padding: 0.75rem; border-bottom: 1px solid var(--panel-border); font-weight: 500;">${id}</td>
-            <td style="padding: 0.75rem; border-bottom: 1px solid var(--panel-border);">${typ}</td>
-            <td style="padding: 0.75rem; border-bottom: 1px solid var(--panel-border);">${size}</td>
-            <td style="padding: 0.75rem; border-bottom: 1px solid var(--panel-border); max-width: 400px; white-space: normal;">${desc}</td>
-            <td style="padding: 0.75rem; border-bottom: 1px solid var(--panel-border);"><em>${kommentar}</em></td>
+            <td style="padding: 0.75rem; border-bottom: 1px solid var(--panel-border); font-weight: 500;">${escapeHtml(id)}</td>
+            <td style="padding: 0.75rem; border-bottom: 1px solid var(--panel-border);">${escapeHtml(typ)}</td>
+            <td style="padding: 0.75rem; border-bottom: 1px solid var(--panel-border);">${escapeHtml(size)}</td>
+            <td style="padding: 0.75rem; border-bottom: 1px solid var(--panel-border); max-width: 400px; white-space: normal;">${escapeHtml(desc)}</td>
+            <td style="padding: 0.75rem; border-bottom: 1px solid var(--panel-border);"><em>${escapeHtml(kommentar)}</em></td>
         `;
 
         const tdAction = document.createElement('td');
@@ -281,25 +282,25 @@ function renderInventory(searchTerm = "") {
         const btnAdd = document.createElement('button');
         btnAdd.className = "add-item-btn";
         btnAdd.style = "width: auto; padding: 0.4rem 0.75rem; font-size: 0.75rem; background: var(--panel-bg); color: var(--text-primary); border: 1px solid var(--panel-border);";
-        btnAdd.textContent = "+ Lägg i Korg";
+        btnAdd.textContent = "+ Lagg i Korg";
         btnAdd.addEventListener('click', () => addInventoryToBasket(item, btnAdd));
 
         const btnEdit = document.createElement('button');
         btnEdit.style = "width: auto; padding: 0.4rem 0.6rem; font-size: 0.75rem; background: transparent; color: var(--primary); border: 1px solid var(--primary); border-radius: 4px; cursor: pointer;";
-        btnEdit.textContent = "✎";
+        btnEdit.textContent = "Edit";
         btnEdit.title = "Redigera Artikel";
         btnEdit.setAttribute('aria-label', `Redigera artikel ${id}`);
         btnEdit.addEventListener('click', () => openInventoryModal(actualIndex, item));
 
         const btnDelete = document.createElement('button');
         btnDelete.style = "width: auto; padding: 0.4rem 0.6rem; font-size: 0.75rem; background: transparent; color: var(--danger); border: 1px solid var(--danger); border-radius: 4px; cursor: pointer;";
-        btnDelete.textContent = "🗑";
+        btnDelete.textContent = "Del";
         btnDelete.title = "Ta bort Artikel";
         btnDelete.setAttribute('aria-label', `Ta bort artikel ${id}`);
         btnDelete.addEventListener('click', async () => {
             const ok = await confirmAction({
                 title: 'Ta bort artikel',
-                message: `Är du säker på att du vill ta bort artikel ID: ${id} permanent från databasen?`,
+                message: `Ar du saker pa att du vill ta bort artikel ID: ${id} permanent fran databasen?`,
                 confirmText: 'Ta bort',
                 cancelText: 'Avbryt',
                 tone: 'danger'
@@ -327,7 +328,7 @@ function addInventoryToBasket(item, sourceButton = null) {
     const addBtn = sourceButton;
     if (addBtn) {
         const originalText = addBtn.textContent;
-        addBtn.textContent = "✓ Tillagd";
+        addBtn.textContent = "Tillagd";
         addBtn.style.background = "var(--success)";
         addBtn.style.color = "white";
         setTimeout(() => {
@@ -379,14 +380,14 @@ export function renderBasket() {
         card.style.cssText = "background: rgba(255,255,255,0.03); border: 1px solid var(--panel-border); border-radius: 4px; padding: 0.75rem; position: relative;";
 
         card.innerHTML = `
-            <div style="font-size: 0.75rem; color: var(--primary); font-weight: bold; margin-bottom: 0.25rem;">ID: ${id}</div>
-            <div style="font-size: 0.85rem; color: var(--text-primary); line-height: 1.4;">${desc}</div>
+            <div style="font-size: 0.75rem; color: var(--primary); font-weight: bold; margin-bottom: 0.25rem;">ID: ${escapeHtml(id)}</div>
+            <div style="font-size: 0.85rem; color: var(--text-primary); line-height: 1.4;">${escapeHtml(desc)}</div>
         `;
 
         const removeBtn = document.createElement('button');
-        removeBtn.innerHTML = '✕';
+        removeBtn.textContent = 'x';
         removeBtn.style.cssText = "position: absolute; top: 0.5rem; right: 0.5rem; background: transparent; border: none; color: var(--text-secondary); cursor: pointer; font-size: 1rem; line-height: 1;";
-        removeBtn.setAttribute('aria-label', `Ta bort artikel ${id} från korgen`);
+        removeBtn.setAttribute('aria-label', `Ta bort artikel ${id} fran korgen`);
         removeBtn.addEventListener('click', () => removeInventoryFromBasket(index));
 
         card.appendChild(removeBtn);
@@ -569,7 +570,7 @@ async function runFirebaseMigration() {
         const docRef = doc(db, "stock", "main_inventory");
         await setDoc(docRef, localData);
 
-        console.log("✅ Migration successful! The local JSON has been written to Cloud Firestore.");
+        console.log("Migration successful! The local JSON has been written to Cloud Firestore.");
         notifySuccess("Migrering lyckades! Uppdatera sidan.");
     } catch (err) {
         console.error("Migration failed:", err);
@@ -578,17 +579,17 @@ async function runFirebaseMigration() {
             body: err.stack || err.message || err.toString()
         }).catch(e => console.error("Could not send log to server", e));
 
-        notifyError("Migrering misslyckades. Se konsolen för detaljer.");
+        notifyError("Migrering misslyckades. Se konsolen for detaljer.");
     }
 }
 
 function generateDiffTag(title, description, icon, color) {
     return `
         <div style="background: rgba(255,255,255,0.03); border-left: 3px solid ${color}; padding: 0.5rem 0.75rem; border-radius: 4px; display: flex; flex-direction: column; gap: 0.25rem;">
-            <div style="font-size: 0.75rem; color: var(--text-secondary); text-transform: uppercase;">${title}</div>
+            <div style="font-size: 0.75rem; color: var(--text-secondary); text-transform: uppercase;">${escapeHtml(title)}</div>
             <div style="font-size: 0.9rem; display: flex; justify-content: space-between; align-items: center;">
-                <span>${description}</span>
-                <span style="font-weight: bold; color: ${color};">${icon}</span>
+                <span>${escapeHtml(description)}</span>
+                <span style="font-weight: bold; color: ${color};">${escapeHtml(icon)}</span>
             </div>
         </div>
     `;
@@ -616,18 +617,18 @@ function renderPendingChanges() {
         if (!cloudMap[i.ID]) {
             changes.push(generateDiffTag("BaHaMa: Lades Till", `${i.ID} - ${i.TYP} ${i.STORLEK || ''}`, "+", "var(--success)"));
         } else if (JSON.stringify(i) !== JSON.stringify(cloudMap[i.ID])) {
-            changes.push(generateDiffTag("BaHaMa: Ändrades", `${i.ID}`, "✍", "var(--primary)"));
+            changes.push(generateDiffTag("BaHaMa: Andrades", `${i.ID}`, "upd", "var(--primary)"));
         }
     });
 
     bahamaCloud.forEach(i => {
         if (i.ID && !localMap[i.ID]) {
-            changes.push(generateDiffTag("BaHaMa: Togs Bort", `${i.ID}`, "−", "var(--danger)"));
+            changes.push(generateDiffTag("BaHaMa: Togs Bort", `${i.ID}`, "-", "var(--danger)"));
         }
     });
 
     if (fallbackGlobalDiff && JSON.stringify(bahamaLocal) !== JSON.stringify(bahamaCloud)) {
-        changes.push(generateDiffTag("BaHaMa", "Massuppdatering via Excel", "ℹ", "var(--primary)"));
+        changes.push(generateDiffTag("BaHaMa", "Massuppdatering via Excel", "i", "var(--primary)"));
     }
 
     // Check ClickitUP differences
@@ -642,7 +643,7 @@ function renderPendingChanges() {
             const delta = locVal - cloVal;
 
             if (delta !== 0) {
-                const fName = f.replace('_h', ' Höger').replace('_v', ' Vänster').replace('dorr', 'Dörr').replace('hane', 'Hane').replace('sektion', 'Sektion');
+                const fName = f.replace('_h', ' Hoger').replace('_v', ' Vanster').replace('dorr', 'Dorr').replace('hane', 'Hane').replace('sektion', 'Sektion');
                 const sign = delta > 0 ? '+' : '';
                 const color = delta > 0 ? 'var(--success)' : 'var(--danger)';
                 changes.push(generateDiffTag(`ClickitUP ${size}`, fName, `${sign}${delta}`, color));
@@ -657,7 +658,7 @@ function renderPendingChanges() {
         DOM_INV.pendingChangesCount.textContent = changes.length;
         DOM_INV.pendingChangesCount.style.display = 'inline-block';
     } else {
-        DOM_INV.pendingChangesList.innerHTML = `<p id="pendingChangesEmptyState" style="color: var(--text-secondary); text-align: center; font-size: 0.875rem; margin: 0; padding: 2rem 0;">Inga ändringar gjorda ännu.</p>`;
+        DOM_INV.pendingChangesList.innerHTML = `<p id="pendingChangesEmptyState" style="color: var(--text-secondary); text-align: center; font-size: 0.875rem; margin: 0; padding: 2rem 0;">Inga andringar gjorda annu.</p>`;
         DOM_INV.btnSaveInventoryChanges.style.display = 'none';
         DOM_INV.pendingChangesCount.style.display = 'none';
     }
@@ -712,7 +713,7 @@ async function commitInventoryChanges() {
                 batch.set(newLog, {
                     timestamp: new Date().toISOString(),
                     createdAt: Date.now(),
-                    action: "Ändrades",
+                    action: "Andrades",
                     system: "BaHaMa",
                     category: "bahama",
                     targetType: "item",
@@ -774,7 +775,7 @@ async function commitInventoryChanges() {
                 const cloVal = (cCloud[size] && cCloud[size][f]) || 0;
                 const delta = locVal - cloVal;
                 if (delta !== 0) {
-                    const fName = f.replace('_h', ' Höger').replace('_v', ' Vänster').replace('dorr', 'Dörr').replace('hane', 'Hane').replace('sektion', 'Sektion');
+                    const fName = f.replace('_h', ' Hoger').replace('_v', ' Vanster').replace('dorr', 'Dorr').replace('hane', 'Hane').replace('sektion', 'Sektion');
                     const sign = delta > 0 ? '+' : '';
                     const newLog = doc(logsRef);
                     batch.set(newLog, {
@@ -806,18 +807,18 @@ async function commitInventoryChanges() {
         // Refresh the Dashboard feed if it exists
         fetchActivityLogs();
 
-        DOM_INV.btnSaveInventoryChanges.textContent = "✓ Sparat!";
+        DOM_INV.btnSaveInventoryChanges.textContent = "Sparat!";
         DOM_INV.btnSaveInventoryChanges.style.background = "var(--panel-bg)";
         setTimeout(() => {
-            DOM_INV.btnSaveInventoryChanges.textContent = "Spara ändringar";
+            DOM_INV.btnSaveInventoryChanges.textContent = "Spara andringar";
             DOM_INV.btnSaveInventoryChanges.style.background = "var(--success)";
             DOM_INV.btnSaveInventoryChanges.disabled = false;
         }, 2000);
 
     } catch (err) {
-        console.error("Misslyckades att spara ändringar:", err);
+        console.error("Misslyckades att spara andringar:", err);
         notifyError("Natverksfel. Kontrollera din internetuppkoppling.");
-        DOM_INV.btnSaveInventoryChanges.textContent = "Spara ändringar";
+        DOM_INV.btnSaveInventoryChanges.textContent = "Spara andringar";
         DOM_INV.btnSaveInventoryChanges.disabled = false;
     }
 }
@@ -862,7 +863,7 @@ function renderClickitupInventory() {
                 btn.className = 'btn-remove-item';
                 btn.type = 'button';
                 btn.textContent = text;
-                btn.setAttribute('aria-label', `${delta > 0 ? 'Öka' : 'Minska'} ${f.key} ${size} med ${Math.abs(delta)}`);
+                btn.setAttribute('aria-label', `${delta > 0 ? 'Oka' : 'Minska'} ${f.key} ${size} med ${Math.abs(delta)}`);
                 btn.style.cssText = `padding: 0.2rem ${small ? '0.4rem' : '0.5rem'}; border-radius: 4px; border: 1px solid var(--panel-border); background: var(--panel-bg); color: var(--text-primary); cursor: pointer; ${small ? 'font-size:0.75rem;' : ''}`;
                 btn.addEventListener('click', () => updateClickitupStock(size, f.key, delta));
                 return btn;
@@ -894,17 +895,17 @@ function getLogTimeValue(entry) {
 }
 
 function getLogVisual(entry) {
-    let icon = "📝";
+    let icon = "log";
     let color = "var(--primary)";
 
     if (entry.action === "Lades Till" || (entry.action === "Justering" && Number(entry.delta) > 0)) {
-        icon = "📦";
+        icon = "in";
         color = "var(--success)";
     } else if (entry.action === "Togs Bort" || (entry.action === "Justering" && Number(entry.delta) < 0)) {
-        icon = "🔻";
+        icon = "out";
         color = "var(--danger)";
     } else if (entry.action === "Massuppdatering") {
-        icon = "🔄";
+        icon = "sync";
         color = "var(--primary)";
     }
 
@@ -930,7 +931,7 @@ export async function fetchActivityLogs() {
     try {
         const querySnapshot = await fetchRecentLogDocs(20);
         if (querySnapshot.empty) {
-            logContainer.innerHTML = `<p style="color: var(--text-secondary); text-align: center; font-style: italic;">Inga loggade händelser ännu.</p>`;
+            logContainer.innerHTML = `<p style="color: var(--text-secondary); text-align: center; font-style: italic;">Inga loggade handelser annu.</p>`;
             return;
         }
 
@@ -950,11 +951,11 @@ export async function fetchActivityLogs() {
                     <div style="font-size: 1.25rem; line-height: 1;">${icon}</div>
                     <div style="flex: 1;">
                         <div style="display: flex; justify-content: space-between; margin-bottom: 0.25rem;">
-                            <span style="font-weight: 600; color: var(--text-primary); font-size: 0.9rem;">${data.system}: ${data.action}</span>
-                            <span style="font-size: 0.75rem; color: var(--text-secondary);">${dateStr} ${timeStr}</span>
+                            <span style="font-weight: 600; color: var(--text-primary); font-size: 0.9rem;">${escapeHtml(data.system)}: ${escapeHtml(data.action)}</span>
+                            <span style="font-size: 0.75rem; color: var(--text-secondary);">${escapeHtml(dateStr)} ${escapeHtml(timeStr)}</span>
                         </div>
-                        <div style="font-size: 0.85rem; color: var(--text-primary); margin-bottom: 0.15rem;">${label}</div>
-                        <div style="font-size: 0.75rem; color: var(--text-secondary);">${data.details || '-'}</div>
+                        <div style="font-size: 0.85rem; color: var(--text-primary); margin-bottom: 0.15rem;">${escapeHtml(label)}</div>
+                        <div style="font-size: 0.75rem; color: var(--text-secondary);">${escapeHtml(data.details || '-')}</div>
                     </div>
                 </div>
             `;
@@ -984,6 +985,3 @@ window.runFirebaseMigration = runFirebaseMigration;
 window.renderPendingChanges = renderPendingChanges;
 window.commitInventoryChanges = commitInventoryChanges;
 window.fetchActivityLogs = fetchActivityLogs;
-
-
-

@@ -1,7 +1,8 @@
-// features/stepSummary.js â€” Step 4: Summary, Totals, Customer Info
+// features/stepSummary.js - Step 4: Summary, Totals, Customer Info
 
 import { state } from '../services/stateManager.js';
 import { computeQuoteTotals } from '../services/calculationEngine.js';
+import { escapeHtml } from './utils.js';
 
 /**
  * Calculate all totals from the current state.
@@ -17,6 +18,7 @@ export function calculateTotals() {
         catalogData: sourceCatalog
     });
 }
+
 /**
  * Render the Step 4 summary table.
  * @param {object} DOM - The cached DOM references object
@@ -47,19 +49,19 @@ export function renderSummaryStep(DOM, updatePDFPreview) {
 
     const tbody = table.querySelector('tbody');
 
-    summaryData.totals.forEach(t => {
+    summaryData.totals.forEach((t) => {
         const tr = document.createElement('tr');
-        if (t.isAddon) tr.style.color = "var(--text-secondary)";
-        if (t.isCustom) tr.style.fontStyle = "italic";
+        if (t.isAddon) tr.style.color = 'var(--text-secondary)';
+        if (t.isCustom) tr.style.fontStyle = 'italic';
         tr.innerHTML = `
-            <td>${t.model}</td>
-            <td>${t.size}</td>
+            <td>${escapeHtml(t.model)}</td>
+            <td>${escapeHtml(t.size)}</td>
             <td class="text-right">${fmt(t.unitPrice)} SEK</td>
             <td>${t.qty}</td>
             <td class="text-right" style="font-weight:600;">${fmt(t.net)} SEK</td>
             <td class="text-right">${fmt(t.gross)} SEK</td>
             <td class="text-right" style="color:var(--danger-color)">- ${fmt(t.discountSek)} SEK</td>
-            <td class="text-right" style="color:var(--danger-color)">${t.discountPct}%</td>
+            <td class="text-right" style="color:var(--danger-color)">${escapeHtml(t.discountPct)}%</td>
         `;
         tbody.appendChild(tr);
     });
@@ -67,7 +69,7 @@ export function renderSummaryStep(DOM, updatePDFPreview) {
     if (summaryData.globalDiscountAmt > 0) {
         const globalTr = document.createElement('tr');
         globalTr.innerHTML = `
-            <td colspan="5"><i>Overgripande Offertrabatt (${state.globalDiscountPct}%)</i></td>
+            <td colspan="5"><i>Overgripande offertrabatt (${state.globalDiscountPct}%)</i></td>
             <td class="text-right">-</td>
             <td class="text-right" style="color:var(--danger-color)">- ${fmt(summaryData.globalDiscountAmt)} SEK</td>
             <td class="text-right">-</td>
@@ -77,7 +79,7 @@ export function renderSummaryStep(DOM, updatePDFPreview) {
 
     const totalTr = document.createElement('tr');
     totalTr.innerHTML = `
-        <td colspan="4" style="font-weight: 600;">Totalt Exkl. Moms</td>
+        <td colspan="4" style="font-weight: 600;">Totalt exkl. moms</td>
         <td class="text-right" style="font-weight:600;">${fmt(summaryData.finalTotalSek)} SEK</td>
         <td class="text-right">${fmt(summaryData.grossTotalSek)} SEK</td>
         <td class="text-right" style="color:var(--danger-color)">- ${fmt(summaryData.totalDiscountSek)} SEK</td>
@@ -100,7 +102,7 @@ export function renderSummaryStep(DOM, updatePDFPreview) {
         const totalIncVatTr = document.createElement('tr');
         totalIncVatTr.className = 'total-row';
         totalIncVatTr.innerHTML = `
-            <td colspan="4">TOTALT ATT BETALA (Ink. Moms)</td>
+            <td colspan="4">TOTALT ATT BETALA (inkl. moms)</td>
             <td class="text-right" style="color:var(--success-color); font-size:1.25rem;">${fmt(grossWithVat)} SEK</td>
             <td colspan="3"></td>
         `;
@@ -108,8 +110,8 @@ export function renderSummaryStep(DOM, updatePDFPreview) {
     } else {
         totalTr.className = 'total-row';
         totalTr.querySelector('td:first-child').textContent = 'TOTALBELOPP';
-        totalTr.querySelector('td:nth-child(2)').style.color = "var(--success-color)";
-        totalTr.querySelector('td:nth-child(2)').style.fontSize = "1.25rem";
+        totalTr.querySelector('td:nth-child(2)').style.color = 'var(--success-color)';
+        totalTr.querySelector('td:nth-child(2)').style.fontSize = '1.25rem';
     }
 
     DOM.summaryContainer.appendChild(table);
@@ -121,7 +123,7 @@ export function renderSummaryStep(DOM, updatePDFPreview) {
  */
 export function initCustomerInfoFields() {
     const fields = ['custName', 'custCompany', 'custReference', 'custDate', 'custValidity'];
-    fields.forEach(id => {
+    fields.forEach((id) => {
         const el = document.getElementById(id);
         if (!el) return;
         const key = id.replace('cust', '').toLowerCase();

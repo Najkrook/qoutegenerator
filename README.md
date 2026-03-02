@@ -75,6 +75,7 @@ Open a PR to `main` from GitHub.
 This repository includes [`firestore.rules`](firestore.rules) with the intended baseline:
 
 - Users can only access their own quotes: `/users/{uid}/quotes/*`
+- Users can only access their own quote revisions: `/users/{uid}/quotes/*/revisions/*`
 - Inventory and inventory logs are admin-only: `/stock/*`, `/inventory_logs/*`
 - All other document paths are denied
 
@@ -82,3 +83,16 @@ Before deploy:
 
 1. Replace `UID_ADMIN_1..3` in `firestore.rules` with your real Firebase Auth UIDs.
 2. Deploy rules from Firebase console or Firebase CLI.
+
+## 7) Quote lifecycle rollout notes
+
+- Lifecycle is enabled by default. You can disable it locally by setting:
+  - `window.FEATURE_QUOTE_LIFECYCLE = false` (before app scripts run)
+- Legacy quote docs are still readable.
+- Optional metadata backfill script:
+
+```powershell
+node .\scripts\backfill-quote-metadata.mjs
+```
+
+Requires Firebase Admin credentials (`GOOGLE_APPLICATION_CREDENTIALS` or `FIREBASE_SERVICE_ACCOUNT_JSON`).

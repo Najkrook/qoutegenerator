@@ -1,4 +1,4 @@
-﻿export const state = {
+export const state = {
     step: 0,
     selectedLines: [],
     builderItems: [],
@@ -18,6 +18,9 @@
     inventoryData: { bahama: [], clickitup: {} },
     cloudInventoryData: { bahama: [], clickitup: {} },
     inventoryBasket: [],
+    activeQuoteId: null,
+    activeQuoteVersion: 0,
+    quoteStatus: 'draft',
     includeTerms: true,
     termsText: `BETALNINGSVILLKOR
 - Betalning sker mot faktura med 30 dagars netto.
@@ -87,6 +90,12 @@ export function loadState() {
         if (saved) {
             const parsed = JSON.parse(saved);
             Object.assign(state, parsed);
+            if (!state.activeQuoteId) state.activeQuoteId = null;
+            if (!Number.isFinite(Number(state.activeQuoteVersion))) state.activeQuoteVersion = 0;
+            const validStatuses = ['draft', 'sent', 'won', 'lost', 'archived'];
+            if (!validStatuses.includes(String(state.quoteStatus || '').toLowerCase())) {
+                state.quoteStatus = 'draft';
+            }
         }
     } catch (e) {
         // Ignore parse errors
@@ -108,8 +117,8 @@ export function clearState() {
     state.includesVat = false;
     state.globalDiscountPct = 0;
     state.prevGlobalDiscountPct = 0;
+    state.activeQuoteId = null;
+    state.activeQuoteVersion = 0;
+    state.quoteStatus = 'draft';
     location.reload();
 }
-
-
-

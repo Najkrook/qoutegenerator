@@ -1,6 +1,7 @@
-// features/stepConfig.js — Step 2: Product Configuration (Builder + Grid)
+// features/stepConfig.js - Step 2: Product Configuration (Builder + Grid)
 
 import { state } from '../services/stateManager.js';
+import { getUnitSekPrice } from './utils.js';
 
 /**
  * Generate a short unique ID for builder items
@@ -51,7 +52,7 @@ export function renderConfigStep(DOM) {
 
         const header = document.createElement('h3');
         header.style.cursor = "grab";
-        header.innerHTML = `<span style="margin-right:0.5rem; color:var(--text-secondary);">≡</span><span>Builder Rad ${index + 1} (${item.line})</span> <button class="btn-remove-item" data-id="${item.id}">Ta bort</button>`;
+        header.innerHTML = `<span style="margin-right:0.5rem; color:var(--text-secondary);">=</span><span>Builder Rad ${index + 1} (${item.line})</span> <button class="btn-remove-item" data-id="${item.id}">Ta bort</button>`;
         section.appendChild(header);
 
         section.addEventListener('dragstart', (e) => {
@@ -218,9 +219,7 @@ export function renderConfigStep(DOM) {
             if (item.line && item.model && item.size) {
                 const sizeData = catalogData[item.line]?.models?.[item.model]?.sizes?.[item.size];
                 if (sizeData) {
-                    const currency = catalogData[item.line].currency || 'EUR';
-                    const EUR_TO_SEK = 12.2;
-                    const priceSEK = currency === 'EUR' ? Math.round(sizeData.price * EUR_TO_SEK) : sizeData.price;
+                    const priceSEK = Math.round(getUnitSekPrice(sizeData.price, item.line));
                     const total = priceSEK * item.qty;
                     sumLabel.textContent = `${total.toLocaleString('sv-SE')} SEK`;
                     return;
@@ -249,7 +248,6 @@ export function renderConfigStep(DOM) {
                 const addonList = document.createElement('div');
                 addonList.className = 'addon-list';
 
-                const EUR_TO_SEK = 12.2;
                 const renderAddonFields = (addonDef, container) => {
                     const addonItem = document.createElement('div');
                     addonItem.className = 'addon-item';
@@ -259,9 +257,7 @@ export function renderConfigStep(DOM) {
                     const isChecked = !!existingAddon;
                     const addonQty = isChecked ? existingAddon.qty : 1;
 
-                    // Convert to SEK if needed
-                    const currency = catalogData[item.line]?.currency || 'EUR';
-                    const priceSEK = currency === 'EUR' ? Math.round(addonDef.price * EUR_TO_SEK) : addonDef.price;
+                    const priceSEK = Math.round(getUnitSekPrice(addonDef.price, item.line));
 
                     // Checkbox + Name
                     const labelEl = document.createElement('label');
@@ -357,7 +353,7 @@ export function renderConfigStep(DOM) {
         const section = document.createElement('div');
         section.className = 'config-section';
         section.innerHTML = `<h3><span>Grid View: ${data.name}</span></h3>
-        <p style="font-size:0.875rem; color:var(--text-secondary); margin-bottom:1rem;">Lista för ${data.name}. Fyll i Antal för de artiklar som ska ingå.</p>`;
+        <p style="font-size:0.875rem; color:var(--text-secondary); margin-bottom:1rem;">Lista for ${data.name}. Fyll i Antal for de artiklar som ska inga.</p>`;
 
         const table = document.createElement('table');
         table.style.cssText = 'width:100%; table-layout:fixed;';
