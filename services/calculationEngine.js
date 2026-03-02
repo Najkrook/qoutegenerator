@@ -1,0 +1,222 @@
+﻿function toFloat(value) {
+    if (typeof value === 'number') return Number.isFinite(value) ? value : 0;
+    if (value === null || value === undefined) return 0;
+    const cleaned = String(value).replace(/,/g, '.').replace(/[^\d.-]/g, '');
+    const parsed = parseFloat(cleaned);
+    return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function toInt(value, fallback = 1) {
+    const parsed = parseInt(value, 10);
+    return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+function getUnitSekPrice(basePrice, lineKey, catalogData, exchangeRate) {
+    const lineCurrency = catalogData?.[lineKey]?.currency;
+    if (lineCurrency === 'EUR') {
+        return basePrice * exchangeRate;
+    }
+    return basePrice;
+}
+
+function findBuilderAddonDefinition(modelData, addonId) {
+    if (!modelData || !addonId) return null;
+
+    if (Array.isArray(modelData.addonCategories)) {
+        for (const category of modelData.addonCategories) {
+            const match = (category.items || []).find((item) => item.id === addonId);
+            if (match) return match;
+        }
+    }
+
+    if (Array.isArray(modelData.addons)) {
+        return modelData.addons.find((item) => item.id === addonId) || null;
+    }
+
+    return null;
+}
+
+function findGridBasePrice(lineData, model, size) {
+    if (!lineData || !Array.isArray(lineData.gridItems)) return 0;
+    for (const group of lineData.gridItems) {
+        if (group.model !== model) continue;
+        const sizeRow = (group.sizes || []).find((row) => row.size === size);
+        if (sizeRow) return toFloat(sizeRow.price);
+    }
+    return 0;
+}
+
+function findGridAddon(lineData, addonId) {
+    if (!lineData || !Array.isArray(lineData.addonCategories)) return null;
+    for (const category of lineData.addonCategories) {
+        const addon = (category.items || []).find((item) => item.id === addonId);
+        if (addon) return addon;
+    }
+    return null;
+}
+
+/**
+ * Pure quote total computation used by summary and export flows.
+ * @param {{state: object, catalogData: object}} params
+ * @returns {{ totals: object[], grossTotalSek: number, totalDiscountSek: number, finalTotalSek: number, globalDiscountAmt: number }}
+ */
+export function computeQuoteTotals({ state, catalogData }) {
+    const safeState = state || {};
+    const safeCatalog = catalogData || {};
+
+    const exchangeRate = toFloat(safeState.exchangeRate || 0);
+    const totals = [];
+    let grossTotalSek = 0;
+    let totalDiscountSek = 0;
+
+    for (const item of safeState.builderItems || []) {
+        let basePrice = 0;
+        if (item?.line && item?.model && item?.size) {
+            basePrice = toFloat(
+                safeCatalog?.[item.line]?.models?.[item.model]?.sizes?.[item.size]?.price || 0
+            );
+        }
+
+        const unitPrice = getUnitSekPrice(basePrice, item?.line, safeCatalog, exchangeRate);
+        const qty = toInt(item?.qty, 1);
+        const gross = unitPrice * qty;
+        const discountPct = toFloat(item?.discountPct || 0);
+        const discountSek = gross * (discountPct / 100);
+        const net = gross - discountSek;
+
+        grossTotalSek += gross;
+        totalDiscountSek += discountSek;
+
+        totals.push({
+            model: `${item?.line || ''} ${item?.model || ''}`.trim(),
+            size: item?.size || '-',
+            unitPrice,
+            qty,
+            gross,
+            discountPct,
+            discountSek,
+            net,
+            isAddon: false
+        });
+
+        for (const addon of item?.addons || []) {
+            const modelData = safeCatalog?.[item.line]?.models?.[item.model];
+            const addonDef = findBuilderAddonDefinition(modelData, addon?.id);
+            const addonBasePrice = toFloat(addonDef?.price || 0);
+            const addonUnitPrice = getUnitSekPrice(addonBasePrice, item?.line, safeCatalog, exchangeRate);
+            const addonQty = toInt(addon?.qty, 1);
+            const addonGross = addonUnitPrice * addonQty;
+            const addonDiscountPct = toFloat(addon?.discountPct || 0);
+            const addonDiscountSek = addonGross * (addonDiscountPct / 100);
+            const addonNet = addonGross - addonDiscountSek;
+
+            grossTotalSek += addonGross;
+            totalDiscountSek += addonDiscountSek;
+
+            totals.push({
+                model: `  + Tillval: ${addonDef?.name || addon?.id || 'Okant tillval'}`,
+                size: '-',
+                unitPrice: addonUnitPrice,
+                qty: addonQty,
+                gross: addonGross,
+                discountPct: addonDiscountPct,
+                discountSek: addonDiscountSek,
+                net: addonNet,
+                isAddon: true
+            });
+        }
+    }
+
+    const gridSelections = safeState.gridSelections || {};
+    for (const line of Object.keys(gridSelections)) {
+        const lineData = safeCatalog?.[line];
+        const gridState = gridSelections[line] || {};
+
+        for (const key of Object.keys(gridState.items || {})) {
+            const [model, size] = key.split('|');
+            const gridItem = gridState.items[key] || {};
+            const basePrice = findGridBasePrice(lineData, model, size);
+            const unitPrice = getUnitSekPrice(basePrice, line, safeCatalog, exchangeRate);
+            const qty = toInt(gridItem.qty, 1);
+            const gross = unitPrice * qty;
+            const discountPct = toFloat(gridItem.discountPct || 0);
+            const discountSek = gross * (discountPct / 100);
+            const net = gross - discountSek;
+
+            grossTotalSek += gross;
+            totalDiscountSek += discountSek;
+
+            totals.push({
+                model: model || '',
+                size: size || '-',
+                unitPrice,
+                qty,
+                gross,
+                discountPct,
+                discountSek,
+                net,
+                isAddon: false
+            });
+        }
+
+        for (const addonId of Object.keys(gridState.addons || {})) {
+            const addonState = gridState.addons[addonId] || {};
+            const addonDef = findGridAddon(lineData, addonId);
+            const basePrice = toFloat(addonDef?.price || 0);
+            const unitPrice = getUnitSekPrice(basePrice, line, safeCatalog, exchangeRate);
+            const qty = toInt(addonState.qty, 1);
+            const gross = unitPrice * qty;
+            const discountPct = toFloat(addonState.discountPct || 0);
+            const discountSek = gross * (discountPct / 100);
+            const net = gross - discountSek;
+
+            grossTotalSek += gross;
+            totalDiscountSek += discountSek;
+
+            totals.push({
+                model: `  + Tillval: ${addonDef?.name || addonId}`,
+                size: '-',
+                unitPrice,
+                qty,
+                gross,
+                discountPct,
+                discountSek,
+                net,
+                isAddon: true
+            });
+        }
+    }
+
+    for (const cost of safeState.customCosts || []) {
+        const unitPrice = toFloat(cost?.price || 0);
+        const qty = toInt(cost?.qty, 1);
+        const gross = unitPrice * qty;
+
+        grossTotalSek += gross;
+
+        totals.push({
+            model: `Ovrigt: ${cost?.description || 'Kostnad'}`,
+            size: '-',
+            unitPrice,
+            qty,
+            gross,
+            discountPct: 0,
+            discountSek: 0,
+            net: gross,
+            isAddon: false,
+            isCustom: true
+        });
+    }
+
+    // Global discount is an editing helper and must not be applied a second time.
+    const globalDiscountAmt = 0;
+    const finalTotalSek = grossTotalSek - totalDiscountSek;
+
+    return {
+        totals,
+        grossTotalSek,
+        totalDiscountSek,
+        finalTotalSek,
+        globalDiscountAmt
+    };
+}

@@ -26,3 +26,16 @@ jobs:
             git status --short
             exit 1
           fi
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install test dependencies
+        shell: bash
+        run: npm install --no-package-lock
+
+      - name: Run calculation regression tests
+        shell: bash
+        run: npm run test:run

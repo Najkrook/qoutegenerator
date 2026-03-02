@@ -676,8 +676,9 @@ async function commitInventoryChanges() {
 
         // 2. Generate Audit Logs for every detected change
         const logsRef = collection(db, "inventory_logs");
-        const timestamp = new Date().toISOString();
-        const userEmail = currentUser()?.email || 'unknown';
+        const user = currentUser();
+        const userEmail = user?.email || 'unknown';
+        const userUid = user?.uid || null;
 
         // 2a. BaHaMa Diffs
         const bahamaLocal = state.inventoryData.bahama || [];
@@ -692,23 +693,75 @@ async function commitInventoryChanges() {
             localMap[i.ID] = i;
             if (!cloudMap[i.ID]) {
                 const newLog = doc(logsRef);
-                batch.set(newLog, { timestamp, action: "Lades Till", system: "BaHaMa", element: i.ID, details: `${i.TYP} ${i.STORLEK || ''}`, user: userEmail });
+                batch.set(newLog, {
+                    timestamp: new Date().toISOString(),
+                    createdAt: Date.now(),
+                    action: "Lades Till",
+                    system: "BaHaMa",
+                    category: "bahama",
+                    targetType: "item",
+                    targetId: String(i.ID || ''),
+                    element: i.ID,
+                    details: `${i.TYP} ${i.STORLEK || ''}`,
+                    user: userEmail,
+                    userUid,
+                    delta: null
+                });
             } else if (JSON.stringify(i) !== JSON.stringify(cloudMap[i.ID])) {
                 const newLog = doc(logsRef);
-                batch.set(newLog, { timestamp, action: "Ändrades", system: "BaHaMa", element: i.ID, details: "Attribut uppdaterade", user: userEmail });
+                batch.set(newLog, {
+                    timestamp: new Date().toISOString(),
+                    createdAt: Date.now(),
+                    action: "Ändrades",
+                    system: "BaHaMa",
+                    category: "bahama",
+                    targetType: "item",
+                    targetId: String(i.ID || ''),
+                    element: i.ID,
+                    details: "Attribut uppdaterade",
+                    user: userEmail,
+                    userUid,
+                    delta: null
+                });
             }
         });
 
         bahamaCloud.forEach(i => {
             if (i.ID && !localMap[i.ID]) {
                 const newLog = doc(logsRef);
-                batch.set(newLog, { timestamp, action: "Togs Bort", system: "BaHaMa", element: i.ID, details: "-", user: userEmail });
+                batch.set(newLog, {
+                    timestamp: new Date().toISOString(),
+                    createdAt: Date.now(),
+                    action: "Togs Bort",
+                    system: "BaHaMa",
+                    category: "bahama",
+                    targetType: "item",
+                    targetId: String(i.ID || ''),
+                    element: i.ID,
+                    details: "-",
+                    user: userEmail,
+                    userUid,
+                    delta: null
+                });
             }
         });
 
         if (fallbackGlobalDiff && JSON.stringify(bahamaLocal) !== JSON.stringify(bahamaCloud)) {
             const newLog = doc(logsRef);
-            batch.set(newLog, { timestamp, action: "Massuppdatering", system: "BaHaMa", element: "Excel Uppladdning", details: `${bahamaLocal.length} rader`, user: userEmail });
+            batch.set(newLog, {
+                timestamp: new Date().toISOString(),
+                createdAt: Date.now(),
+                action: "Massuppdatering",
+                system: "BaHaMa",
+                category: "bahama",
+                targetType: "batch",
+                targetId: "excel-upload",
+                element: "Excel Uppladdning",
+                details: `${bahamaLocal.length} rader`,
+                user: userEmail,
+                userUid,
+                delta: null
+            });
         }
 
         // 2b. ClickitUP Diffs
@@ -724,7 +777,20 @@ async function commitInventoryChanges() {
                     const fName = f.replace('_h', ' Höger').replace('_v', ' Vänster').replace('dorr', 'Dörr').replace('hane', 'Hane').replace('sektion', 'Sektion');
                     const sign = delta > 0 ? '+' : '';
                     const newLog = doc(logsRef);
-                    batch.set(newLog, { timestamp, action: "Justering", system: "ClickitUP", element: size, details: `${fName} (${sign}${delta})`, user: userEmail });
+                    batch.set(newLog, {
+                        timestamp: new Date().toISOString(),
+                        createdAt: Date.now(),
+                        action: "Justering",
+                        system: "ClickitUP",
+                        category: "clickitup",
+                        targetType: "size",
+                        targetId: String(size),
+                        element: size,
+                        details: `${fName} (${sign}${delta})`,
+                        user: userEmail,
+                        userUid,
+                        delta
+                    });
                 }
             });
         }
@@ -821,36 +887,63 @@ function renderClickitupInventory() {
     });
 };
 
+function getLogTimeValue(entry) {
+    if (typeof entry.createdAt === 'number') return entry.createdAt;
+    const parsed = Date.parse(entry.timestamp || '');
+    return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function getLogVisual(entry) {
+    let icon = "📝";
+    let color = "var(--primary)";
+
+    if (entry.action === "Lades Till" || (entry.action === "Justering" && Number(entry.delta) > 0)) {
+        icon = "📦";
+        color = "var(--success)";
+    } else if (entry.action === "Togs Bort" || (entry.action === "Justering" && Number(entry.delta) < 0)) {
+        icon = "🔻";
+        color = "var(--danger)";
+    } else if (entry.action === "Massuppdatering") {
+        icon = "🔄";
+        color = "var(--primary)";
+    }
+
+    return { icon, color };
+}
+
+async function fetchRecentLogDocs(maxRows = 20) {
+    const logsRef = collection(db, "inventory_logs");
+
+    try {
+        const byTimestamp = query(logsRef, orderBy("timestamp", "desc"), limit(maxRows));
+        return await getDocs(byTimestamp);
+    } catch (err) {
+        const byCreatedAt = query(logsRef, orderBy("createdAt", "desc"), limit(maxRows));
+        return await getDocs(byCreatedAt);
+    }
+}
+
 export async function fetchActivityLogs() {
     const logContainer = document.getElementById('dashboardActivityLog');
     if (!logContainer) return;
 
     try {
-        const logsRef = collection(db, "inventory_logs");
-        const q = query(logsRef, orderBy("timestamp", "desc"), limit(20));
-        const querySnapshot = await getDocs(q);
-
+        const querySnapshot = await fetchRecentLogDocs(20);
         if (querySnapshot.empty) {
             logContainer.innerHTML = `<p style="color: var(--text-secondary); text-align: center; font-style: italic;">Inga loggade händelser ännu.</p>`;
             return;
         }
 
+        const logs = querySnapshot.docs.map((docSnap) => docSnap.data());
+        logs.sort((a, b) => getLogTimeValue(b) - getLogTimeValue(a));
+
         let html = '';
-        querySnapshot.forEach((doc) => {
-            const data = doc.data();
-            const date = new Date(data.timestamp);
+        logs.forEach((data) => {
+            const date = new Date(getLogTimeValue(data) || Date.now());
             const timeStr = date.toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit' });
             const dateStr = date.toLocaleDateString('sv-SE', { month: 'short', day: 'numeric' });
-
-            let icon = "📝";
-            let color = "var(--primary)";
-            if (data.action === "Lades Till" || data.action === "Justering" && data.details.includes('+')) {
-                icon = "📦"; color = "var(--success)";
-            } else if (data.action === "Togs Bort" || data.action === "Justering" && data.details.includes('-')) {
-                icon = "🔻"; color = "var(--danger)";
-            } else if (data.action === "Massuppdatering") {
-                icon = "🔄"; color = "var(--primary)";
-            }
+            const { icon, color } = getLogVisual(data);
+            const label = data.targetId || data.element || '-';
 
             html += `
                 <div style="background: rgba(255,255,255,0.03); border-left: 3px solid ${color}; padding: 0.75rem 1rem; border-radius: 6px; display: flex; align-items: flex-start; gap: 1rem;">
@@ -860,8 +953,8 @@ export async function fetchActivityLogs() {
                             <span style="font-weight: 600; color: var(--text-primary); font-size: 0.9rem;">${data.system}: ${data.action}</span>
                             <span style="font-size: 0.75rem; color: var(--text-secondary);">${dateStr} ${timeStr}</span>
                         </div>
-                        <div style="font-size: 0.85rem; color: var(--text-primary); margin-bottom: 0.15rem;">${data.element}</div>
-                        <div style="font-size: 0.75rem; color: var(--text-secondary);">${data.details}</div>
+                        <div style="font-size: 0.85rem; color: var(--text-primary); margin-bottom: 0.15rem;">${label}</div>
+                        <div style="font-size: 0.75rem; color: var(--text-secondary);">${data.details || '-'}</div>
                     </div>
                 </div>
             `;
@@ -873,7 +966,7 @@ export async function fetchActivityLogs() {
         console.error("Failed to fetch activity logs:", err);
         logContainer.innerHTML = `<p style="color: var(--danger); text-align: center; font-size: 0.875rem;">Kunde inte ladda loggar.</p>`;
     }
-};
+}
 
 // Deprecated compatibility shims for non-core legacy bindings.
 window.handleInventoryUpload = handleInventoryUpload;

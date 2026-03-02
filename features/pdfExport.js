@@ -1,5 +1,6 @@
 ﻿import { BRIXX_LOGO_BASE64 } from '../assets/logoData.js';
 import { notifyWarn, notifyError } from '../services/notificationService.js';
+import { buildPdfTableData, buildExportSummary } from '../services/exportDataBuilders.js';
 
 export function generatePDF(state, summaryData, returnBlob = false) {
     if (!window.jspdf || !window.jspdf.jsPDF) {
@@ -105,29 +106,7 @@ export function generatePDF(state, summaryData, returnBlob = false) {
     //  ITEMS TABLE
     // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
-    const tableData = [];
-
-    summaryData.totals.forEach(t => {
-        tableData.push([
-            t.model,
-            t.size || "-",
-            `${formatSEK(t.unitPrice)} SEK`,
-            `${t.qty}`,
-            `${formatSEK(t.net)} SEK`,
-            `${formatSEK(t.gross)} SEK`,
-            `${formatSEK(t.discountSek)} SEK`,
-            `${t.discountPct}%`
-        ]);
-    });
-
-    if (summaryData.globalDiscountAmt > 0) {
-        tableData.push([
-            `Övergripande Rabatt (${state.globalDiscountPct}%)`,
-            "", "", "",
-            `-${formatSEK(summaryData.globalDiscountAmt)} SEK`,
-            "", "", "-"
-        ]);
-    }
+    const tableData = buildPdfTableData(state, summaryData, formatSEK);
 
     const autoTableResult = runAutoTable({
         startY: currentY,
@@ -217,32 +196,31 @@ export function generatePDF(state, summaryData, returnBlob = false) {
         doc.text(value, pageWidth - 14, y, { align: "right" });
     };
 
-    drawTotalLine("Totalt Rek Utpris:", `${formatSEK(summaryData.grossTotalSek)} SEK`, finalY);
+    const exportSummary = buildExportSummary(state, summaryData);
+    drawTotalLine("Totalt Rek Utpris:", `${formatSEK(exportSummary.grossTotalSek)} SEK`, finalY);
     finalY += 6;
 
     doc.setTextColor(...grayText);
-    drawTotalLine("Total Rabatt:", `-${formatSEK(summaryData.totalDiscountSek)} SEK`, finalY);
+    drawTotalLine("Total Rabatt:", `-${formatSEK(exportSummary.totalDiscountSek)} SEK`, finalY);
     finalY += 10;
 
     // Green bar for final total
-    drawTotalLine("Totalt Exkl. moms:", `${formatSEK(summaryData.finalTotalSek)} SEK`, finalY, true, accentGreen);
+    drawTotalLine("Totalt Exkl. moms:", `${formatSEK(exportSummary.finalTotalSek)} SEK`, finalY, true, accentGreen);
     doc.setTextColor(255, 255, 255);
     doc.setFont("helvetica", "bold");
     doc.text("Totalt Exkl. moms:", rightColX, finalY);
-    doc.text(`${formatSEK(summaryData.finalTotalSek)} SEK`, pageWidth - 14, finalY, { align: "right" });
+    doc.text(`${formatSEK(exportSummary.finalTotalSek)} SEK`, pageWidth - 14, finalY, { align: "right" });
     doc.setTextColor(...darkText);
     finalY += 10;
 
     if (state.includesVat) {
-        const vatAmount = summaryData.finalTotalSek * 0.25;
-        const totalWithVat = summaryData.finalTotalSek + vatAmount;
-        drawTotalLine("Moms 25%:", `${formatSEK(vatAmount)} SEK`, finalY);
+        drawTotalLine("Moms 25%:", `${formatSEK(exportSummary.vatAmount)} SEK`, finalY);
         finalY += 8;
-        drawTotalLine("Totalt inkl. moms:", `${formatSEK(totalWithVat)} SEK`, finalY, true, [35, 35, 45]);
+        drawTotalLine("Totalt inkl. moms:", `${formatSEK(exportSummary.totalWithVat)} SEK`, finalY, true, [35, 35, 45]);
         doc.setTextColor(255, 255, 255);
         doc.setFont("helvetica", "bold");
         doc.text("Totalt inkl. moms:", rightColX, finalY);
-        doc.text(`${formatSEK(totalWithVat)} SEK`, pageWidth - 14, finalY, { align: "right" });
+        doc.text(`${formatSEK(exportSummary.totalWithVat)} SEK`, pageWidth - 14, finalY, { align: "right" });
         doc.setTextColor(...darkText);
     }
 
@@ -377,9 +355,4 @@ export function generatePDF(state, summaryData, returnBlob = false) {
         return null;
     }
 }
-
-
-
-
-
 

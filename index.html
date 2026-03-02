@@ -54,6 +54,8 @@
             <a href="history.html"
                 style="color: var(--text-primary); text-decoration: none; font-weight: 500; font-size: 0.875rem; background: var(--panel-bg); padding: 0.4rem 0.75rem; border-radius: 6px; border: 1px solid var(--panel-border);">Mina
                 Offerter</a>
+            <a href="inventory-logs.html"
+                style="color: var(--text-primary); text-decoration: none; font-weight: 500; font-size: 0.875rem; background: var(--panel-bg); padding: 0.4rem 0.75rem; border-radius: 6px; border: 1px solid var(--panel-border);">Lagerloggar</a>
             <button data-action="clear-state"
                 style="background: var(--danger-color); border-color: var(--danger-color); color: #fff; font-size: 0.75rem; padding: 0.4rem 0.75rem; border-radius: 6px;"
                 title="Rensar aktuell offert och återgår till startmenyn">&#x1F3E0; Tillbaka till Start</button>
@@ -118,9 +120,12 @@
 
             <!-- Dashboard Activity Log Skeleton -->
             <div style="margin-top: 4rem; max-width: 800px; margin-left: auto; margin-right: auto;">
-                <h3
-                    style="color: var(--text-primary); border-bottom: 1px solid var(--panel-border); padding-bottom: 1rem; margin-bottom: 1.5rem;">
-                    Senaste Händelser</h3>
+                <div
+                    style="display: flex; justify-content: space-between; align-items: center; gap: 1rem; border-bottom: 1px solid var(--panel-border); padding-bottom: 1rem; margin-bottom: 1.5rem;">
+                    <h3 style="color: var(--text-primary); margin: 0;">Senaste Händelser</h3>
+                    <a href="inventory-logs.html"
+                        style="color: var(--primary); text-decoration: none; font-size: 0.85rem; font-weight: 600;">Visa alla loggar</a>
+                </div>
                 <div id="dashboardActivityLog" style="display: flex; flex-direction: column; gap: 0.75rem;">
                     <p style="color: var(--text-secondary); text-align: center; font-style: italic;">Laddar loggar...
                     </p>

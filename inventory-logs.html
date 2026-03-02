@@ -1,0 +1,159 @@
+﻿<!DOCTYPE html>
+<html lang="sv">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lagerloggar</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles/main.css">
+    <link rel="stylesheet" href="styles/layout.css">
+    <link rel="stylesheet" href="styles/components/buttons.css">
+    <link rel="stylesheet" href="styles/components/tables.css">
+
+    <style>
+        .logs-filter-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 0.75rem;
+        }
+
+        .logs-table-wrap {
+            overflow-x: auto;
+            border: 1px solid var(--panel-border);
+            border-radius: 8px;
+        }
+
+        .logs-table {
+            width: 100%;
+            border-collapse: collapse;
+            min-width: 980px;
+        }
+
+        .logs-table th,
+        .logs-table td {
+            padding: 0.65rem 0.75rem;
+            border-bottom: 1px solid var(--panel-border);
+            text-align: left;
+            font-size: 0.85rem;
+            white-space: nowrap;
+            vertical-align: top;
+        }
+
+        .logs-table th {
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            font-size: 0.75rem;
+            letter-spacing: 0.04em;
+            background: rgba(255, 255, 255, 0.02);
+        }
+
+        .logs-table td.details-cell {
+            white-space: normal;
+            min-width: 280px;
+        }
+
+        .logs-empty {
+            padding: 2rem;
+            color: var(--text-secondary);
+            text-align: center;
+        }
+    </style>
+</head>
+
+<body>
+    <header>
+        <div style="display: flex; justify-content: space-between; align-items: center; max-width: 1200px; margin: 0 auto;">
+            <h1 style="margin: 0;">Lagerloggar</h1>
+            <div style="display: flex; align-items: center; gap: 0.75rem;">
+                <a href="index.html" class="primary" style="text-decoration: none; padding: 0.5rem 1rem; border-radius: 6px; font-size: 0.875rem;">Dashboard</a>
+                <a href="history.html" style="text-decoration: none; padding: 0.5rem 1rem; border-radius: 6px; font-size: 0.875rem; border: 1px solid var(--panel-border); color: var(--text-primary); background: var(--panel-bg);">Mina Offerter</a>
+
+                <div id="userBadge" style="display: none; align-items: center; gap: 0.5rem;
+                    background: var(--panel-bg); padding: 0.35rem 0.75rem; border-radius: 6px;
+                    border: 1px solid var(--panel-border); font-size: 0.8rem;">
+                    <span style="color: var(--text-secondary);">&#x1F464;</span>
+                    <span class="user-email" style="color: var(--text-primary); font-weight: 500;"></span>
+                    <button data-action="logout" style="background: none; border: none; color: var(--text-secondary); cursor: pointer; font-size: 0.75rem; padding: 0.2rem 0.4rem;
+                        border-left: 1px solid var(--panel-border); margin-left: 0.25rem;" title="Logga ut">Logga ut</button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <main style="max-width: 1200px;">
+        <section class="config-section" style="margin-bottom: 1rem;">
+            <h3 style="margin-top: 0;">Filter</h3>
+            <div class="logs-filter-grid" style="margin-bottom: 0.75rem;">
+                <label>Fran datum
+                    <input type="date" id="filterFromDate">
+                </label>
+                <label>Till datum
+                    <input type="date" id="filterToDate">
+                </label>
+                <label>Kategori
+                    <select id="filterCategory">
+                        <option value="">Alla</option>
+                        <option value="bahama">BaHaMa</option>
+                        <option value="clickitup">ClickitUP</option>
+                    </select>
+                </label>
+                <label>Atgard
+                    <select id="filterAction">
+                        <option value="">Alla</option>
+                        <option value="Lades Till">Lades Till</option>
+                        <option value="Ändrades">Ändrades</option>
+                        <option value="Togs Bort">Togs Bort</option>
+                        <option value="Massuppdatering">Massuppdatering</option>
+                        <option value="Justering">Justering</option>
+                    </select>
+                </label>
+                <label>Anvandare
+                    <input type="text" id="filterActor" placeholder="E-post eller UID">
+                </label>
+                <label>Soktext
+                    <input type="text" id="filterSearch" placeholder="targetId eller details">
+                </label>
+            </div>
+            <div style="display: flex; gap: 0.5rem; justify-content: flex-end;">
+                <button type="button" id="btnResetFilters">Rensa filter</button>
+            </div>
+        </section>
+
+        <section class="config-section">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
+                <div id="logsMeta" style="color: var(--text-secondary); font-size: 0.85rem;">Laddar loggar...</div>
+                <div style="display: flex; align-items: center; gap: 0.5rem;">
+                    <button type="button" id="btnPrevPage">Foregaende</button>
+                    <span id="pageIndicator" style="min-width: 90px; text-align: center; color: var(--text-secondary);">Sida 1</span>
+                    <button type="button" id="btnNextPage">Nasta</button>
+                </div>
+            </div>
+            <div class="logs-table-wrap">
+                <table class="logs-table">
+                    <thead>
+                        <tr>
+                            <th>Tid</th>
+                            <th>Kategori</th>
+                            <th>Atgard</th>
+                            <th>Target</th>
+                            <th>Delta</th>
+                            <th>Anvandare</th>
+                            <th>UID</th>
+                            <th>Details</th>
+                        </tr>
+                    </thead>
+                    <tbody id="logsTableBody">
+                        <tr>
+                            <td colspan="8" class="logs-empty">Laddar...</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+    </main>
+
+    <script type="module" src="inventoryLogs.js"></script>
+</body>
+
+</html>

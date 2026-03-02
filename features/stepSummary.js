@@ -1,187 +1,22 @@
-// features/stepSummary.js — Step 4: Summary, Totals, Customer Info
+// features/stepSummary.js â€” Step 4: Summary, Totals, Customer Info
 
 import { state } from '../services/stateManager.js';
-import { parseLocalFloat, getUnitSekPrice } from './utils.js';
+import { computeQuoteTotals } from '../services/calculationEngine.js';
 
 /**
  * Calculate all totals from the current state.
  * @returns {{ totals, grossTotalSek, totalDiscountSek, finalTotalSek, globalDiscountAmt }}
  */
 export function calculateTotals() {
-    let totals = [];
-    let grossTotalSek = 0;
-    let totalDiscountSek = 0;
+    const sourceCatalog = (typeof window !== 'undefined' && window.catalogData)
+        ? window.catalogData
+        : (typeof globalThis !== 'undefined' ? globalThis.catalogData : {});
 
-    // Builder
-    state.builderItems.forEach((item) => {
-        let baseEur = 0;
-        if (item.line && item.model && item.size) {
-            const mData = catalogData[item.line]?.models[item.model];
-            const sData = mData?.sizes[item.size];
-            baseEur = parseLocalFloat(sData?.price || 0);
-        }
-        let baseSek = getUnitSekPrice(baseEur, item.line);
-        let qty = parseInt(item.qty) || 1;
-        let reklUtpris = baseSek * qty;
-        let discPct = parseLocalFloat(item.discountPct);
-        let discSek = reklUtpris * (discPct / 100);
-        let ertPris = reklUtpris - discSek;
-
-        grossTotalSek += reklUtpris;
-        totalDiscountSek += discSek;
-
-        totals.push({
-            model: `${item.line} ${item.model}`,
-            size: item.size,
-            unitPrice: baseSek,
-            qty: item.qty,
-            gross: reklUtpris,
-            discountPct: discPct,
-            discountSek: discSek,
-            net: ertPris,
-            isAddon: false
-        });
-
-        if (item.addons) {
-            item.addons.forEach(addon => {
-                const modelData = catalogData[item.line].models[item.model];
-                let addonDef = null;
-
-                if (modelData.addonCategories) {
-                    for (const cat of modelData.addonCategories) {
-                        addonDef = cat.items.find(a => a.id === addon.id);
-                        if (addonDef) break;
-                    }
-                } else if (modelData.addons) {
-                    addonDef = modelData.addons.find(a => a.id === addon.id);
-                }
-
-                let aBaseEur = addonDef ? parseLocalFloat(addonDef.price) : 0;
-                let aBaseSek = getUnitSekPrice(aBaseEur, item.line);
-                let aQty = parseInt(addon.qty) || 1;
-                let aRekUtpris = aBaseSek * aQty;
-                let aDiscPct = parseLocalFloat(addon.discountPct);
-                let aDiscSek = aRekUtpris * (aDiscPct / 100);
-                let aNet = aRekUtpris - aDiscSek;
-
-                grossTotalSek += aRekUtpris;
-                totalDiscountSek += aDiscSek;
-
-                totals.push({
-                    model: `  + Tillval: ${addonDef ? addonDef.name : addon.id}`,
-                    size: "-",
-                    unitPrice: aBaseSek,
-                    qty: addon.qty,
-                    gross: aRekUtpris,
-                    discountPct: aDiscPct,
-                    discountSek: aDiscSek,
-                    net: aNet,
-                    isAddon: true
-                });
-            });
-        }
+    return computeQuoteTotals({
+        state,
+        catalogData: sourceCatalog
     });
-
-    // Grid
-    Object.keys(state.gridSelections).forEach(line => {
-        const lineData = catalogData[line];
-        const gState = state.gridSelections[line];
-
-        Object.keys(gState.items).forEach(key => {
-            const [model, size] = key.split("|");
-            const gItem = gState.items[key];
-
-            let basePrice = 0;
-            lineData.gridItems.forEach(group => {
-                if (group.model === model) {
-                    const sz = group.sizes.find(s => s.size === size);
-                    if (sz) basePrice = parseLocalFloat(sz.price);
-                }
-            });
-
-            let baseSek = getUnitSekPrice(basePrice, line);
-            let rekUtpris = baseSek * gItem.qty;
-            let discSek = rekUtpris * (gItem.discountPct / 100);
-            let ertPris = rekUtpris - discSek;
-
-            grossTotalSek += rekUtpris;
-            totalDiscountSek += discSek;
-
-            totals.push({
-                model: model,
-                size: size,
-                unitPrice: baseSek,
-                qty: gItem.qty,
-                gross: rekUtpris,
-                discountPct: gItem.discountPct,
-                discountSek: discSek,
-                net: ertPris,
-                isAddon: false
-            });
-        });
-
-        Object.keys(gState.addons).forEach(id => {
-            const gAddon = gState.addons[id];
-
-            let basePrice = 0;
-            let name = "";
-            lineData.addonCategories.forEach(cat => {
-                const aDef = cat.items.find(i => i.id === id);
-                if (aDef) { basePrice = parseLocalFloat(aDef.price); name = aDef.name; }
-            });
-
-            let baseSek = getUnitSekPrice(basePrice, line);
-            let rekUtpris = baseSek * gAddon.qty;
-            let discSek = rekUtpris * (gAddon.discountPct / 100);
-            let ertPris = rekUtpris - discSek;
-
-            grossTotalSek += rekUtpris;
-            totalDiscountSek += discSek;
-
-            totals.push({
-                model: `  + Tillval: ${name}`,
-                size: "-",
-                unitPrice: baseSek,
-                qty: gAddon.qty,
-                gross: rekUtpris,
-                discountPct: gAddon.discountPct,
-                discountSek: discSek,
-                net: ertPris,
-                isAddon: true
-            });
-        });
-    });
-
-    // Custom Costs
-    state.customCosts.forEach(cost => {
-        let cPrice = parseLocalFloat(cost.price);
-        let cQty = parseInt(cost.qty) || 1;
-        let cTotal = cPrice * cQty;
-
-        grossTotalSek += cTotal;
-
-        totals.push({
-            model: `Övrigt: ${cost.description || 'Kostnad'}`,
-            size: "-",
-            unitPrice: cPrice,
-            qty: cQty,
-            gross: cTotal,
-            discountPct: 0,
-            discountSek: 0,
-            net: cTotal,
-            isAddon: false,
-            isCustom: true
-        });
-    });
-
-    // Global discount is used as an editor helper for line discounts only.
-    // It must not be applied as an additional discount in final totals.
-    let globalDiscountAmt = 0;
-    let finalTotalSek = grossTotalSek - totalDiscountSek;
-
-    return { totals, grossTotalSek, totalDiscountSek, finalTotalSek, globalDiscountAmt };
 }
-
 /**
  * Render the Step 4 summary table.
  * @param {object} DOM - The cached DOM references object
@@ -232,7 +67,7 @@ export function renderSummaryStep(DOM, updatePDFPreview) {
     if (summaryData.globalDiscountAmt > 0) {
         const globalTr = document.createElement('tr');
         globalTr.innerHTML = `
-            <td colspan="5"><i>Övergripande Offertrabatt (${state.globalDiscountPct}%)</i></td>
+            <td colspan="5"><i>Overgripande Offertrabatt (${state.globalDiscountPct}%)</i></td>
             <td class="text-right">-</td>
             <td class="text-right" style="color:var(--danger-color)">- ${fmt(summaryData.globalDiscountAmt)} SEK</td>
             <td class="text-right">-</td>
