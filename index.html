@@ -29,7 +29,7 @@
     <script type="module" src="https://www.gstatic.com/firebasejs/10.9.0/firebase-firestore.js"></script>
 
     <!-- Convert app.js to module so we can use imports -->
-    <script type="module" src="app.js?v=20260302-4" defer></script>
+    <script type="module" src="app.js?v=20260302-5" defer></script>
 
     <!-- Auth gate: redirect if not logged in -->
     <script type="module">
@@ -400,6 +400,18 @@
                                 Inkludera i PDF
                             </label>
                         </div>
+                        <div style="display: flex; gap: 0.75rem; align-items: end; margin-bottom: 0.75rem; flex-wrap: wrap;">
+                            <div class="form-group" style="flex: 1; min-width: 220px; margin: 0;">
+                                <label for="termsTemplateSelect">Juridisk textmall</label>
+                                <select id="termsTemplateSelect" style="width: 100%;">
+                                    <option value="">Laddar mallar...</option>
+                                </select>
+                            </div>
+                            <button type="button" id="applyTermsTemplateBtn"
+                                style="height: 38px; padding: 0.45rem 0.85rem; border-radius: 6px;">
+                                Använd mall
+                            </button>
+                        </div>
                         <textarea id="termsTextArea" rows="6" style="
                             width: 100%; font-size: 0.8rem; line-height: 1.5;
                             background: var(--bg-color, #0f0f1a);
@@ -408,6 +420,30 @@
                             border-radius: 6px; padding: 0.75rem;
                             resize: vertical; font-family: inherit;
                         "></textarea>
+                        <div style="display: flex; flex-wrap: wrap; gap: 1rem; margin-top: 0.75rem;">
+                            <div class="form-group" style="width: 160px; margin: 0;">
+                                <label for="paymentTermsDaysInput">Betalningsvillkor (dagar)</label>
+                                <input type="number" id="paymentTermsDaysInput" min="1" step="1" value="30">
+                            </div>
+                            <div class="form-group" style="width: 150px; margin: 0;">
+                                <label for="quoteValidityDaysInput">Giltig i (dagar)</label>
+                                <input type="number" id="quoteValidityDaysInput" min="1" step="1" value="14">
+                            </div>
+                        </div>
+                        <div style="display: flex; gap: 1rem; flex-wrap: wrap; margin-top: 0.5rem;">
+                            <label
+                                style="cursor: pointer; display: flex; align-items: center; gap: 0.5rem; font-size: 0.85rem;">
+                                <input type="checkbox" id="togglePaymentBox" checked
+                                    style="width: 16px; height: 16px; cursor: pointer;">
+                                Visa betalningsruta i PDF
+                            </label>
+                            <label
+                                style="cursor: pointer; display: flex; align-items: center; gap: 0.5rem; font-size: 0.85rem;">
+                                <input type="checkbox" id="toggleSignatureBlock" checked
+                                    style="width: 16px; height: 16px; cursor: pointer;">
+                                Visa signeringsruta i PDF
+                            </label>
+                        </div>
                     </div>
 
                     <div id="summaryContainer" class="table-container mb-4">

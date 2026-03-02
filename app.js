@@ -15,9 +15,10 @@ import {
     closeInventoryModal,
     saveInventoryItem
 } from './features/inventoryManager.js';
-import { generatePDF } from "./features/pdfExport.js?v=20260302-4";
+import { generatePDF } from "./features/pdfExport.js?v=20260302-5";
 import { generateExcel } from "./features/excelExport.js";
 import { parseLocalFloat, formatLocalFloat } from "./features/utils.js";
+import { LEGAL_TEMPLATES, DEFAULT_TEMPLATE_ID, getTemplateById, isLegalTemplateId } from './features/legalTemplates.js';
 import { renderProductLines as _renderProductLines } from "./features/stepProductLines.js";
 import { renderConfigStep as _renderConfigStep, addNewBuilderItem as _addNewBuilderItem } from "./features/stepConfig.js";
 import { renderPricingStep as _renderPricingStep, renderCustomCosts as _renderCustomCosts } from "./features/stepPricing.js";
@@ -107,6 +108,9 @@ const DOM = {
 const quoteLifecycleEnabled = typeof window === 'undefined'
     ? true
     : window.FEATURE_QUOTE_LIFECYCLE !== false;
+const pdfLegalTemplatesEnabled = typeof window === 'undefined'
+    ? true
+    : window.FEATURE_PDF_LEGAL_TEMPLATES !== false;
 
 const modalState = {
     activeModal: null,
@@ -129,6 +133,88 @@ const quoteRepository = createQuoteRepository({
     writeBatch,
     runTransaction
 });
+
+function normalizePositiveInt(value, fallback) {
+    const parsed = Number.parseInt(value, 10);
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+}
+
+function ensurePdfOptionDefaults() {
+    if (!isLegalTemplateId(state.termsTemplateId)) {
+        state.termsTemplateId = DEFAULT_TEMPLATE_ID;
+    }
+    if (typeof state.termsCustomized !== 'boolean') {
+        state.termsCustomized = false;
+    }
+    if (typeof state.includeSignatureBlock !== 'boolean') {
+        state.includeSignatureBlock = true;
+    }
+    if (typeof state.includePaymentBox !== 'boolean') {
+        state.includePaymentBox = true;
+    }
+    state.paymentTermsDays = normalizePositiveInt(state.paymentTermsDays, 30);
+    state.quoteValidityDays = normalizePositiveInt(state.quoteValidityDays, 14);
+    if (!state.termsText) {
+        state.termsText = getTemplateById(state.termsTemplateId).body;
+        state.termsCustomized = false;
+    }
+}
+
+function populateTermsTemplateSelect(selectEl) {
+    if (!selectEl) return;
+    selectEl.innerHTML = LEGAL_TEMPLATES.map((template) => (
+        `<option value="${template.id}">${template.label}</option>`
+    )).join('');
+}
+
+function applyTermsTemplate(templateId, termsArea) {
+    const template = getTemplateById(templateId);
+    state.termsTemplateId = template.id;
+    state.termsText = template.body;
+    state.termsCustomized = false;
+    if (termsArea) {
+        termsArea.value = template.body;
+    }
+}
+
+function syncPdfOptionsUi() {
+    ensurePdfOptionDefaults();
+
+    const termsArea = document.getElementById('termsTextArea');
+    const termsToggle = document.getElementById('toggleTerms');
+    if (termsArea) termsArea.value = state.termsText || '';
+    if (termsToggle) termsToggle.checked = state.includeTerms !== false;
+
+    const templateSelect = document.getElementById('termsTemplateSelect');
+    const applyTemplateBtn = document.getElementById('applyTermsTemplateBtn');
+    const paymentDaysInput = document.getElementById('paymentTermsDaysInput');
+    const validityDaysInput = document.getElementById('quoteValidityDaysInput');
+    const paymentToggle = document.getElementById('togglePaymentBox');
+    const signatureToggle = document.getElementById('toggleSignatureBlock');
+
+    if (!pdfLegalTemplatesEnabled) {
+        [templateSelect, applyTemplateBtn, paymentDaysInput, validityDaysInput, paymentToggle, signatureToggle]
+            .forEach((el) => {
+                if (el?.closest('.form-group')) {
+                    el.closest('.form-group').style.display = 'none';
+                } else if (el?.parentElement) {
+                    el.parentElement.style.display = 'none';
+                }
+            });
+        return;
+    }
+
+    if (templateSelect) {
+        if (!templateSelect.options.length || templateSelect.options[0].value === '') {
+            populateTermsTemplateSelect(templateSelect);
+        }
+        templateSelect.value = state.termsTemplateId || DEFAULT_TEMPLATE_ID;
+    }
+    if (paymentDaysInput) paymentDaysInput.value = String(state.paymentTermsDays);
+    if (validityDaysInput) validityDaysInput.value = String(state.quoteValidityDays);
+    if (paymentToggle) paymentToggle.checked = state.includePaymentBox !== false;
+    if (signatureToggle) signatureToggle.checked = state.includeSignatureBlock !== false;
+}
 
 function setupModalAccessibility(modalId, closeHandler) {
     const modal = document.getElementById(modalId);
@@ -235,11 +321,7 @@ function init() {
             renderSummaryStep();
             initCustomerInfoFields();
             if (DOM.toggleVat) DOM.toggleVat.checked = state.includesVat;
-            // Restore T&C state
-            const termsArea = document.getElementById('termsTextArea');
-            const termsToggle = document.getElementById('toggleTerms');
-            if (termsArea) termsArea.value = state.termsText || '';
-            if (termsToggle) termsToggle.checked = state.includeTerms !== false;
+            syncPdfOptionsUi();
         }
 
         goToStep(state.step);
@@ -597,9 +679,18 @@ function setupEventListeners() {
         });
     }
 
-    // Terms & Conditions
+    // Terms & Conditions / PDF legal options
     const termsToggle = document.getElementById('toggleTerms');
     const termsArea = document.getElementById('termsTextArea');
+    const templateSelect = document.getElementById('termsTemplateSelect');
+    const applyTemplateBtn = document.getElementById('applyTermsTemplateBtn');
+    const paymentDaysInput = document.getElementById('paymentTermsDaysInput');
+    const validityDaysInput = document.getElementById('quoteValidityDaysInput');
+    const paymentToggle = document.getElementById('togglePaymentBox');
+    const signatureToggle = document.getElementById('toggleSignatureBlock');
+
+    syncPdfOptionsUi();
+
     if (termsToggle) {
         termsToggle.addEventListener('change', (e) => {
             state.includeTerms = e.target.checked;
@@ -608,16 +699,63 @@ function setupEventListeners() {
         });
     }
     if (termsArea) {
-        // Populate on first render
-        if (!termsArea.value && state.termsText) {
-            termsArea.value = state.termsText;
-        }
         termsArea.addEventListener('input', (e) => {
             state.termsText = e.target.value;
+            state.termsCustomized = true;
             markStateDirty();
         });
         // Update PDF preview on blur (not every keystroke to avoid lag)
         termsArea.addEventListener('blur', () => {
+            updatePDFPreview();
+        });
+    }
+
+    if (pdfLegalTemplatesEnabled && templateSelect) {
+        templateSelect.addEventListener('change', (e) => {
+            state.termsTemplateId = e.target.value || DEFAULT_TEMPLATE_ID;
+            markStateDirty();
+        });
+    }
+
+    if (pdfLegalTemplatesEnabled && applyTemplateBtn) {
+        applyTemplateBtn.addEventListener('click', () => {
+            const nextTemplateId = templateSelect?.value || state.termsTemplateId || DEFAULT_TEMPLATE_ID;
+            applyTermsTemplate(nextTemplateId, termsArea);
+            markStateDirty();
+            updatePDFPreview();
+        });
+    }
+
+    if (pdfLegalTemplatesEnabled && paymentDaysInput) {
+        paymentDaysInput.addEventListener('change', (e) => {
+            state.paymentTermsDays = normalizePositiveInt(e.target.value, 30);
+            e.target.value = String(state.paymentTermsDays);
+            markStateDirty();
+            updatePDFPreview();
+        });
+    }
+
+    if (pdfLegalTemplatesEnabled && validityDaysInput) {
+        validityDaysInput.addEventListener('change', (e) => {
+            state.quoteValidityDays = normalizePositiveInt(e.target.value, 14);
+            e.target.value = String(state.quoteValidityDays);
+            markStateDirty();
+            updatePDFPreview();
+        });
+    }
+
+    if (pdfLegalTemplatesEnabled && paymentToggle) {
+        paymentToggle.addEventListener('change', (e) => {
+            state.includePaymentBox = e.target.checked;
+            markStateDirty();
+            updatePDFPreview();
+        });
+    }
+
+    if (pdfLegalTemplatesEnabled && signatureToggle) {
+        signatureToggle.addEventListener('change', (e) => {
+            state.includeSignatureBlock = e.target.checked;
+            markStateDirty();
             updatePDFPreview();
         });
     }

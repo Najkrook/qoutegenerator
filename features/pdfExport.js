@@ -2,6 +2,34 @@ import { BRIXX_LOGO_BASE64 } from '../assets/logoData.js';
 import { notifyWarn, notifyError } from '../services/notificationService.js';
 import { buildPdfTableData, buildExportSummary } from '../services/exportDataBuilders.js';
 
+function normalizePositiveInt(value, fallback) {
+    const parsed = Number.parseInt(value, 10);
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+}
+
+export function computeValidUntilDateString(quoteDateValue, quoteValidityDays, nowDate = new Date()) {
+    const validityDays = normalizePositiveInt(quoteValidityDays, 14);
+    let baseDate = null;
+
+    if (typeof quoteDateValue === 'string' && quoteDateValue.trim()) {
+        const rawDate = quoteDateValue.trim();
+        const parsed = rawDate.includes('T')
+            ? new Date(rawDate)
+            : new Date(`${rawDate}T00:00:00`);
+        if (!Number.isNaN(parsed.getTime())) {
+            baseDate = parsed;
+        }
+    }
+
+    if (!baseDate) {
+        baseDate = new Date(nowDate.getTime());
+    }
+
+    const validUntil = new Date(baseDate.getTime());
+    validUntil.setDate(validUntil.getDate() + validityDays);
+    return validUntil.toLocaleDateString('sv-SE');
+}
+
 export function generatePDF(state, summaryData, returnBlob = false) {
     if (!window.jspdf || !window.jspdf.jsPDF) {
         if (!returnBlob) notifyWarn("PDF-motorn laddar fortfarande, forsok igen om nagra sekunder.");
@@ -19,6 +47,11 @@ export function generatePDF(state, summaryData, returnBlob = false) {
     };
     try {
         const formatSEK = (val) => new Intl.NumberFormat('sv-SE', { minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(val);
+        const pdfLegalTemplatesEnabled = typeof window === 'undefined'
+            ? true
+            : window.FEATURE_PDF_LEGAL_TEMPLATES !== false;
+        const shouldRenderPaymentBox = pdfLegalTemplatesEnabled && state.includePaymentBox !== false;
+        const shouldRenderSignatureBlock = pdfLegalTemplatesEnabled && state.includeSignatureBlock !== false;
 
     const pageWidth = doc.internal.pageSize.width;
     const pageHeight = doc.internal.pageSize.height;
@@ -196,6 +229,79 @@ export function generatePDF(state, summaryData, returnBlob = false) {
         doc.text(value, pageWidth - 14, y, { align: "right" });
     };
 
+    const renderPaymentInfoBox = (startY) => {
+        const boxX = 14;
+        let boxY = Math.max(startY - 2, 84);
+        const boxWidth = Math.max(74, rightColX - boxX - 8);
+        const lines = [
+            `Betalningsvillkor: ${normalizePositiveInt(state.paymentTermsDays, 30)} dagar`,
+            `Giltig till: ${computeValidUntilDateString(state.customerInfo?.date, state.quoteValidityDays)}`
+        ];
+        if (state.customerInfo?.reference) {
+            lines.push(`Referens: ${state.customerInfo.reference}`);
+        }
+
+        const boxHeight = 14 + (lines.length * 5);
+        if (boxY + boxHeight > pageHeight - 35) {
+            doc.addPage();
+            boxY = 34;
+        }
+        doc.setFillColor(...lightGray);
+        doc.roundedRect(boxX, boxY, boxWidth, boxHeight, 1.5, 1.5, 'F');
+
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(9);
+        doc.setTextColor(...darkText);
+        doc.text("BETALNING & GILTIGHET", boxX + 3, boxY + 5);
+
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(8.5);
+        let lineY = boxY + 10;
+        lines.forEach((line) => {
+            const wrapped = doc.splitTextToSize(line, boxWidth - 6);
+            wrapped.forEach((chunk) => {
+                doc.text(chunk, boxX + 3, lineY);
+                lineY += 4;
+            });
+            lineY += 1;
+        });
+    };
+
+    const renderSignatureBlock = (preferredY = finalY + 12) => {
+        const blockHeight = 31;
+        const footerZone = pageHeight - 35;
+        let y = preferredY;
+
+        if (y + blockHeight > footerZone) {
+            doc.addPage();
+            y = 34;
+        }
+
+        const boxX = 14;
+        const boxWidth = pageWidth - 28;
+        doc.setDrawColor(190, 190, 190);
+        doc.setLineWidth(0.4);
+        doc.roundedRect(boxX, y, boxWidth, blockHeight, 2, 2, 'S');
+
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(10);
+        doc.setTextColor(...darkText);
+        doc.text("Godkännande", boxX + 4, y + 6);
+
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(8.5);
+        doc.text("Namnförtydligande", boxX + 4, y + 13);
+        doc.text("Datum", boxX + 110, y + 13);
+        doc.text("Signatur", boxX + 145, y + 13);
+
+        doc.setDrawColor(140, 140, 140);
+        doc.line(boxX + 4, y + 21, boxX + 104, y + 21);
+        doc.line(boxX + 110, y + 21, boxX + 140, y + 21);
+        doc.line(boxX + 145, y + 21, boxX + boxWidth - 4, y + 21);
+
+        return y + blockHeight + 4;
+    };
+
     const exportSummary = buildExportSummary(state, summaryData);
     drawTotalLine("Totalt Rek Utpris:", `${formatSEK(exportSummary.grossTotalSek)} SEK`, finalY);
     finalY += 6;
@@ -224,10 +330,15 @@ export function generatePDF(state, summaryData, returnBlob = false) {
         doc.setTextColor(...darkText);
     }
 
+    if (shouldRenderPaymentBox) {
+        renderPaymentInfoBox(finalY);
+    }
+
 //
     //  TERMS & CONDITIONS PAGE (optional)
 //
 
+    let termsPageEndY = null;
     if (state.includeTerms && state.termsText) {
         doc.addPage();
 
@@ -293,6 +404,16 @@ export function generatePDF(state, summaryData, returnBlob = false) {
                 });
             }
         });
+        termsPageEndY = termsY + 6;
+    }
+
+    if (shouldRenderSignatureBlock) {
+        if (termsPageEndY !== null) {
+            doc.setPage(doc.internal.getNumberOfPages());
+            renderSignatureBlock(termsPageEndY);
+        } else {
+            renderSignatureBlock(finalY + 12);
+        }
     }
 
 //
