@@ -41,14 +41,9 @@ export const catalogData = {
                 },
                 addonCategories: [
                     {
-                        name: "Gjuthylsa",
+                        name: "Installationsalternativ",
                         items: [
-                            { id: "gjuthylsa_jumbrella", name: "Gjuthylsa Jumbrella", price: 560 }
-                        ]
-                    },
-                    {
-                        name: "Installations alternativ",
-                        items: [
+                            { id: "gjuthylsa_jumbrella", name: "Gjuthylsa Jumbrella", price: 560 },
                             { id: "conn_comp_tipping", name: "Connecting Components - for In-Ground Tipping Base", price: 320 },
                             { id: "in_ground_ext", name: "In-Ground Installation Extension", price: 410 },
                             { id: "in_ground_sleeve", name: "In-Ground Sleeve", price: 450 },
@@ -197,9 +192,48 @@ export const catalogData = {
                 },
                 addonCategories: [
                     {
-                        name: "Gjuthylsa",
+                        name: "Installationsalternativ",
                         items: [
-                            { id: "xl_gjuthylsa", name: "Gjuthylsa XL", price: 740 }
+                            { id: "xl_gjuthylsa", name: "Gjuthylsa XL", price: 740 },
+                            { id: "xl_conn_tipping", name: "Connecting component for In-Ground Tipping base", price: 440 },
+                            { id: "xl_in_ground_ext", name: "In-Ground Installation Extension", price: 420 },
+                            { id: "xl_surface_mount", name: "Surface Mount", price: 1610 },
+                            { id: "xl_dual_console", name: "Dual Mounting Console", price: 2020 },
+                            { id: "xl_spacer", name: "Spacer", price: 610 },
+                            { id: "xl_spacer_electrics", name: "Spacer for Electrics", price: 660 },
+                            { id: "xl_steel_base_4", name: "Steel Plate Base 4", price: 2830 },
+                            { id: "xl_steel_base_8", name: "Steel Plate Base 8", price: 4940 },
+                            { id: "xl_powder_coat_steel_base", name: "Powder Coating for Steel Plate Base", price: 0 },
+                            { id: "xl_crossframe_16", name: "Cross-Frame 16 flagstones", price: 1880 },
+                            { id: "xl_flagstones_16", name: "Flagstones 16st", price: 440 },
+                            { id: "xl_powder_coat_crossframe", name: "Powder Coating for Cross-Frame", price: 0 }
+                        ]
+                    },
+                    {
+                        name: "Classic Light",
+                        items: [
+                            { id: "xl_classic_light_4", name: "4 Lampor längs centrumstativet", price: 720 },
+                            { id: "xl_classic_light_6", name: "6 Lampor längs centrumstativet", price: 910 }
+                        ]
+                    },
+                    {
+                        name: "Magic Light",
+                        items: [
+                            { id: "xl_magic_light", name: "Med 8 RGBW led-strips integrerade i armarna", price: 1690 }
+                        ]
+                    },
+                    {
+                        name: "Heating",
+                        items: [
+                            { id: "xl_premod_heating", name: "Pre modifacation for heating", price: 1980 },
+                            { id: "xl_kvarts_flex", name: "Kvartsvärmare FLEX 1500 watt 4 per parasoll", price: 3540 }
+                        ]
+                    },
+                    {
+                        name: "Cover",
+                        items: [
+                            { id: "xl_cover_comfort", name: "Protective Cover – comfort", price: 500 },
+                            { id: "xl_telescopic_rod", name: "Telescopic rod for Comfort cover", price: 170 }
                         ]
                     },
                     {
@@ -245,31 +279,6 @@ export const catalogData = {
                         ]
                     },
                     {
-                        name: "Installationsalternativ",
-                        items: [
-                            { id: "xl_conn_tipping", name: "Connecting component for In-Ground Tipping base", price: 440 },
-                            { id: "xl_in_ground_ext", name: "In-Ground Installation Extension", price: 420 },
-                            { id: "xl_surface_mount", name: "Surface Mount", price: 1610 },
-                            { id: "xl_dual_console", name: "Dual Mounting Console", price: 2020 },
-                            { id: "xl_spacer", name: "Spacer", price: 610 },
-                            { id: "xl_spacer_electrics", name: "Spacer for Electrics", price: 660 }
-                        ]
-                    },
-                    {
-                        name: "Steel Plate Base",
-                        items: [
-                            { id: "xl_steel_base_4", name: "Steel Plate Base 4", price: 2830 },
-                            { id: "xl_steel_base_8", name: "Steel Plate Base 8", price: 4940 }
-                        ]
-                    },
-                    {
-                        name: "Cross-Frame & Flagstones",
-                        items: [
-                            { id: "xl_crossframe_16", name: "Cross-Frame 16 flagstones", price: 1880 },
-                            { id: "xl_flagstones_16", name: "Flagstones 16st", price: 440 }
-                        ]
-                    },
-                    {
                         name: "Cosmetic",
                         items: [
                             { id: "xl_frame_fancy", name: "Frame Color fancy designs", price: 890 },
@@ -280,33 +289,6 @@ export const catalogData = {
                         name: "V4A",
                         items: [
                             { id: "xl_v4a_maritime", name: "V4A | Maritime Edition", price: 540 }
-                        ]
-                    },
-                    {
-                        name: "Classic Light",
-                        items: [
-                            { id: "xl_classic_light_4", name: "4 Lampor längs centrumstativet", price: 720 },
-                            { id: "xl_classic_light_6", name: "6 Lampor längs centrumstativet", price: 910 }
-                        ]
-                    },
-                    {
-                        name: "Magic Light",
-                        items: [
-                            { id: "xl_magic_light", name: "Med 8 RGBW led-strips integrerade i armarna", price: 1690 }
-                        ]
-                    },
-                    {
-                        name: "Heating",
-                        items: [
-                            { id: "xl_premod_heating", name: "Pre modifacation for heating", price: 1980 },
-                            { id: "xl_kvarts_flex", name: "Kvartsvärmare FLEX 1500 watt 4 per parasoll", price: 3540 }
-                        ]
-                    },
-                    {
-                        name: "Cover",
-                        items: [
-                            { id: "xl_cover_comfort", name: "Protective Cover – comfort", price: 500 },
-                            { id: "xl_telescopic_rod", name: "Telescopic rod for Comfort cover", price: 170 }
                         ]
                     },
                     {
@@ -347,6 +329,30 @@ export const catalogData = {
                 addons: [],
                 addonCategories: [
                     {
+                        name: "Installationsalternativ",
+                        items: [
+                            { id: "pure_gjuthylsa", name: "Gjuthylsa PURE", price: 360 },
+                            { id: "pure_surface_mount", name: "Surface Mount", price: 510 },
+                            { id: "pure_surface_above", name: "Surface Mount (ovan markinstallation)", price: 510 },
+                            { id: "pure_steel_base_4", name: "Steel Plate Base with 4 Steel Plates", price: 1580 },
+                            { id: "pure_steel_base_8", name: "Steel Plate Base with 8 Steel Plates", price: 2480 },
+                            { id: "pure_powder_coat_4", name: "Powder Coating of 4 Steel Plate", price: 540 },
+                            { id: "pure_crossframe_8", name: "Cross-Frame for 8 flagstones", price: 670 },
+                            { id: "pure_flagstone", name: "Cementsten (flagstone)", price: 7 },
+                            { id: "pure_flagstones_8", name: "8 Standard Flagstones", price: 220 },
+                            { id: "pure_leveling_feet", name: "4 Leveling Feet", price: 130 },
+                            { id: "pure_powder_coat_crossframe", name: "Powder Coating for Cross-Frame", price: 0 }
+                        ]
+                    },
+                    {
+                        name: "Protective Covers",
+                        items: [
+                            { id: "pure_cover_basic", name: "Protective Cover - basic", price: 140 },
+                            { id: "pure_cover_comfort", name: "Protective Cover - comfort", price: 400 },
+                            { id: "pure_cover_comfort_rod", name: "Protective Cover - comfort with telescopic rod", price: 490 }
+                        ]
+                    },
+                    {
                         name: "Textilduk Kvadrat",
                         items: [
                             { id: "pure_textil_2x2", name: "PURE Textilduk 2x2", price: 690 },
@@ -379,39 +385,6 @@ export const catalogData = {
                             { id: "pure_textil_4x25", name: "PURE Textilduk 4x2,5", price: 840 },
                             { id: "pure_textil_4x3", name: "PURE Textilduk 4x3", price: 920 },
                             { id: "pure_textil_4x35", name: "PURE Textilduk 4x3,5", price: 1000 }
-                        ]
-                    },
-                    {
-                        name: "Gjuthylsa",
-                        items: [
-                            { id: "pure_gjuthylsa", name: "Gjuthylsa PURE", price: 360 }
-                        ]
-                    },
-                    {
-                        name: "Tillbehör Pure (Surface/Bases)",
-                        items: [
-                            { id: "pure_surface_mount", name: "Surface Mount", price: 510 },
-                            { id: "pure_surface_above", name: "Surface Mount (ovan markinstallation)", price: 510 },
-                            { id: "pure_steel_base_4", name: "Steel Plate Base with 4 Steel Plates", price: 1580 },
-                            { id: "pure_steel_base_8", name: "Steel Plate Base with 8 Steel Plates", price: 2480 },
-                            { id: "pure_powder_coat_4", name: "Powder Coating of 4 Steel Plate", price: 540 }
-                        ]
-                    },
-                    {
-                        name: "Protective Covers",
-                        items: [
-                            { id: "pure_cover_basic", name: "Protective Cover - basic", price: 140 },
-                            { id: "pure_cover_comfort", name: "Protective Cover - comfort", price: 400 },
-                            { id: "pure_cover_comfort_rod", name: "Protective Cover - comfort with telescopic rod", price: 490 }
-                        ]
-                    },
-                    {
-                        name: "Flagstones & Feet",
-                        items: [
-                            { id: "pure_crossframe_8", name: "Cross-Frame for 8 flagstones", price: 670 },
-                            { id: "pure_flagstone", name: "Cementsten (flagstone)", price: 7 },
-                            { id: "pure_flagstones_8", name: "8 Standard Flagstones", price: 220 },
-                            { id: "pure_leveling_feet", name: "4 Leveling Feet", price: 130 }
                         ]
                     },
                     {

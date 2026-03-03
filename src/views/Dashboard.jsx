@@ -58,7 +58,7 @@ export function Dashboard({ onStartQuote, onOpenInventory, onOpenSketch }) {
     return (
         <div className="flex flex-col items-center animate-slide-in">
             <h2 className="text-center mb-12 text-4xl font-semibold tracking-tight text-text-primary">
-                Valkommen till Offertverktyg Pro
+                Välkommen till Offertverktyg Pro
             </h2>
 
             <div className="flex gap-8 justify-center flex-wrap w-full max-w-5xl">
@@ -66,10 +66,10 @@ export function Dashboard({ onStartQuote, onOpenInventory, onOpenSketch }) {
                     onClick={onStartQuote}
                     className="flex-1 min-w-[300px] max-w-[400px] bg-panel-bg border border-panel-border rounded-xl p-12 cursor-pointer text-center transition-all hover:-translate-y-1 hover:shadow-lg hover:border-primary group"
                 >
-                    <div className="text-5xl mb-4 group-hover:scale-110 transition-transform">[OFFERT]</div>
+                    <div className="text-5xl mb-4 group-hover:scale-110 transition-transform">📄</div>
                     <h3 className="text-2xl font-semibold text-text-primary mb-2">Skapa Ny Offert</h3>
                     <p className="text-text-secondary leading-relaxed m-0">
-                        Starta ett nytt offertflode for kund. Konfigurera produkter, priser och generera PDF.
+                        Starta ett nytt offertflöde för kund. Konfigurera produkter, priser och generera PDF.
                     </p>
                 </button>
 
@@ -78,10 +78,10 @@ export function Dashboard({ onStartQuote, onOpenInventory, onOpenSketch }) {
                         onClick={onOpenInventory}
                         className="flex-1 min-w-[250px] max-w-[350px] bg-panel-bg border border-panel-border rounded-xl p-12 cursor-pointer text-center transition-all hover:-translate-y-1 hover:shadow-lg hover:border-primary group"
                     >
-                        <div className="text-5xl mb-4 group-hover:scale-110 transition-transform">[LAGER]</div>
+                        <div className="text-5xl mb-4 group-hover:scale-110 transition-transform">📦</div>
                         <h3 className="text-2xl font-semibold text-text-primary mb-2">Hantera Lagersaldo</h3>
                         <p className="text-text-secondary leading-relaxed m-0">
-                            Uppdatera lagersaldon for BaHaMa och ClickitUP. Se loggar och historik.
+                            Uppdatera lagersaldon för BaHaMa och ClickitUP. Se loggar och historik.
                         </p>
                     </button>
                 )}
@@ -91,10 +91,10 @@ export function Dashboard({ onStartQuote, onOpenInventory, onOpenSketch }) {
                         onClick={onOpenSketch}
                         className="flex-1 min-w-[250px] max-w-[350px] bg-panel-bg border border-panel-border rounded-xl p-12 cursor-pointer text-center transition-all hover:-translate-y-1 hover:shadow-lg hover:border-primary group"
                     >
-                        <div className="text-5xl mb-4 group-hover:scale-110 transition-transform">[SKISS]</div>
+                        <div className="text-5xl mb-4 group-hover:scale-110 transition-transform">✏️</div>
                         <h3 className="text-2xl font-semibold text-text-primary mb-2">Rita Uteservering</h3>
                         <p className="text-text-secondary leading-relaxed m-0">
-                            Skissa snabbt en rektangel for att automatiskt berakna optimala ClickitUP-sektioner.
+                            Skissa snabbt en rektangel för att automatiskt beräkna optimala ClickitUP-sektioner.
                         </p>
                     </button>
                 )}
@@ -103,13 +103,13 @@ export function Dashboard({ onStartQuote, onOpenInventory, onOpenSketch }) {
             {canViewEverything && (
                 <div className="mt-16 w-full max-w-[800px]">
                     <div className="flex justify-between items-center gap-4 border-b border-panel-border pb-4 mb-6">
-                        <h3 className="text-xl font-semibold text-text-primary m-0">Senaste Handelser</h3>
+                        <h3 className="text-xl font-semibold text-text-primary m-0">Senaste Händelser</h3>
                     </div>
                     <div className="flex flex-col gap-3">
                         {logsLoading ? (
                             <p className="text-text-secondary text-center italic">Laddar loggar...</p>
                         ) : logs.length === 0 ? (
-                            <p className="text-text-secondary text-center italic">Inga loggade handelser annu.</p>
+                            <p className="text-text-secondary text-center italic">Inga loggade händelser ännu.</p>
                         ) : (
                             logs.slice(0, 10).map((entry, idx) => {
                                 const time = typeof entry.createdAt === 'number' ? entry.createdAt : Date.parse(entry.timestamp || '') || Date.now();

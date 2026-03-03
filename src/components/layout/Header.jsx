@@ -11,14 +11,13 @@ export function Header() {
         '1. Produktlinje',
         '2. Konfiguration',
         '3. Priser & Rabatter',
-        '4. Offertsammanstallning'
+        '4. Offertsammanställning'
     ];
 
     const resetToStart = () => {
-        if (window.confirm('Ar du saker pa att du vill rensa aktuell offert och ga tillbaka till start?')) {
-            localStorage.removeItem('offertverktyg_state');
-            dispatch({ type: 'RESET_STATE' });
-        }
+        localStorage.removeItem('offertverktyg_state');
+        dispatch({ type: 'RESET_STATE' });
+        window.location.assign('index.html');
     };
 
     const handleLogout = async () => {
@@ -44,15 +43,16 @@ export function Header() {
                 )}
 
                 <button
+                    type="button"
                     onClick={resetToStart}
                     className="bg-danger border-danger text-white text-xs px-3 py-1.5 rounded-md cursor-pointer hover:opacity-90 transition-opacity"
-                    title="Rensar aktuell offert och atergar till startmenyn"
+                    title="Rensar aktuell offert och återgår till startmenyn"
                 >
                     Tillbaka till Start
                 </button>
 
                 <div className="flex items-center gap-2 bg-panel-bg px-3 py-1.5 rounded-md border border-panel-border text-sm">
-                    <span className="text-text-secondary">Anvandare:</span>
+                    <span className="text-text-secondary">Användare:</span>
                     <span className="text-text-primary font-medium">{user?.email || '-'}</span>
                     <button
                         onClick={handleLogout}

@@ -5,9 +5,9 @@ import { BuilderItem } from './BuilderItem';
 
 export function BuilderConfig() {
     const { state, dispatch } = useQuote();
-    const { builderItems, selectedLines } = state;
+    const { builderItems, selectedLines, globalDiscountPct } = state;
 
-    const builderLines = selectedLines.filter(l => catalogData[l].type === 'builder');
+    const builderLines = selectedLines.filter((l) => catalogData[l].type === 'builder');
 
     const addNewItem = () => {
         const defaultLine = builderLines[0];
@@ -23,14 +23,14 @@ export function BuilderConfig() {
             size: defaultSize,
             qty: 1,
             addons: [],
-            discountPct: 0
+            discountPct: globalDiscountPct
         };
 
         dispatch({ type: 'SET_BUILDER_ITEMS', payload: [...builderItems, newItem] });
     };
 
     const removeItem = (id) => {
-        dispatch({ type: 'SET_BUILDER_ITEMS', payload: builderItems.filter(i => i.id !== id) });
+        dispatch({ type: 'SET_BUILDER_ITEMS', payload: builderItems.filter((i) => i.id !== id) });
     };
 
     if (builderLines.length === 0) return null;
@@ -44,7 +44,7 @@ export function BuilderConfig() {
                     </div>
                     <h4 className="text-xl font-bold text-white mb-2">Inga produkter valda ännu</h4>
                     <p className="text-text-secondary mb-6 max-w-sm">
-                        Klicka på knappen nedan för att välja modell, storlek och tillval för dina valda produktlinjer.
+                        Klicka på knappen nedan för att välja modell, storlek och tillägg för dina valda produktlinjer.
                     </p>
                     <button
                         onClick={addNewItem}
@@ -55,16 +55,6 @@ export function BuilderConfig() {
                 </div>
             ) : (
                 <>
-                    <div className="flex justify-between items-center bg-black/5 p-4 rounded-lg border border-panel-border">
-                        <h4 className="m-0 text-text-secondary text-sm font-medium">Lägg till fler produkter i offerten</h4>
-                        <button
-                            onClick={addNewItem}
-                            className="bg-panel-bg border border-panel-border text-text-primary text-sm px-4 py-2 rounded-md font-bold cursor-pointer hover:bg-white/5 transition-colors flex items-center gap-2"
-                        >
-                            <span className="text-lg leading-none">+</span> Lägg till produkt
-                        </button>
-                    </div>
-
                     <div className="space-y-4">
                         {builderItems.map((item, index) => (
                             <BuilderItem
@@ -75,8 +65,18 @@ export function BuilderConfig() {
                             />
                         ))}
                     </div>
+
+                    <div className="flex justify-end">
+                        <button
+                            onClick={addNewItem}
+                            className="bg-panel-bg border border-panel-border text-text-primary text-sm px-4 py-2 rounded-md font-bold cursor-pointer hover:bg-white/5 transition-colors flex items-center gap-2"
+                        >
+                            <span className="text-lg leading-none">+</span> Lägg till produkt
+                        </button>
+                    </div>
                 </>
             )}
         </div>
     );
 }
+

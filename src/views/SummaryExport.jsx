@@ -5,6 +5,7 @@ import { catalogData } from '../data/catalog';
 import { computeQuoteTotals } from '../../services/calculationEngine';
 import { CustomerInfoForm } from '../components/features/CustomerInfoForm';
 import { FinalSummaryTable } from '../components/features/FinalSummaryTable';
+import { TermsAndPaymentPanel } from '../components/features/TermsAndPaymentPanel';
 import { generatePDF } from '../../features/pdfExport';
 import { generateExcel } from '../../features/excelExport';
 
@@ -82,7 +83,7 @@ export function SummaryExport() {
                 previewUrlRef.current = '';
             }
             setPreviewUrl('');
-            setPreviewError('Kunde inte skapa PDF-forhandsvisning. Kontrollera att PDF-motorn ar laddad.');
+            setPreviewError('Kunde inte skapa PDF-förhandsvisning. Kontrollera att PDF-motorn är laddad.');
             return;
         }
 
@@ -124,12 +125,12 @@ export function SummaryExport() {
         }
 
         if (pickerResult === 'canceled') {
-            toast('PDF-export avbrots.', { icon: '!' });
+            toast('PDF-export avbröts.', { icon: '!' });
             return;
         }
 
         if (pickerResult === 'failed') {
-            toast('Kunde inte oppna spara-dialog. Anvander nedladdning i stallet.', { icon: '!' });
+            toast('Kunde inte öppna spara-dialog. Använder nedladdning i stället.', { icon: '!' });
         }
 
         if (pickerResult === 'failed' || pickerResult === 'unavailable') {
@@ -140,19 +141,19 @@ export function SummaryExport() {
 
     const handleExportExcel = () => {
         if (!window.XLSX) {
-            toast.error('Excel-motorn laddar fortfarande. Forsok igen om nagra sekunder.');
+            toast.error('Excel-motorn laddar fortfarande. Försök igen om några sekunder.');
             return;
         }
         generateExcel(state, summaryData);
     };
 
     const handleSaveQuote = () => {
-        toast.success('Offert sparad! (Firebase-integration kommer i nasta fas)');
+        toast.success('Offert sparad! (Firebase-integration kommer i nästa fas)');
     };
 
     return (
-        <div className="max-w-[1400px] mx-auto pb-20">
-            <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_420px] gap-8 items-start">
+        <div className="max-w-[1600px] mx-auto pb-20">
+            <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_520px] gap-8 items-start">
                 <div>
                     <div className="flex justify-between items-center mb-8">
                         <div>
@@ -164,7 +165,7 @@ export function SummaryExport() {
                                 onClick={handleSaveQuote}
                                 className="px-6 py-2.5 bg-panel-bg border border-panel-border text-text-primary rounded-lg font-bold hover:bg-white/5 transition-all text-sm uppercase tracking-wide"
                             >
-                                Spara Offert
+                                Spara offert
                             </button>
                         </div>
                     </div>
@@ -174,6 +175,10 @@ export function SummaryExport() {
                             <CustomerInfoForm />
                         </section>
 
+                        <section>
+                            <TermsAndPaymentPanel />
+                        </section>
+
                         <section className="bg-panel-bg border border-panel-border rounded-lg p-6 shadow-sm">
                             <h3 className="text-lg font-bold mb-6 flex items-center gap-2">
                                 <span className="text-primary text-xl">📋</span> Summering
@@ -181,24 +186,25 @@ export function SummaryExport() {
                             <FinalSummaryTable />
                         </section>
 
-                        <section className="flex flex-col md:flex-row justify-between items-center gap-6 mt-4 p-8 bg-black/40 border border-panel-border rounded-xl">
+                        <section className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mt-4 p-6 bg-black/40 border border-panel-border rounded-xl">
                             <button
                                 onClick={handleBack}
-                                className="text-text-secondary hover:text-white transition-colors flex items-center gap-2 group"
+                                className="text-text-secondary hover:text-white transition-colors flex items-center gap-2 group whitespace-nowrap text-sm md:text-base"
                             >
-                                <span className="group-hover:-translate-x-1 transition-transform">&larr;</span> Tillbaka för att ändra priser
+                                <span className="group-hover:-translate-x-1 transition-transform">&larr;</span>
+                                Tillbaka för att ändra priser
                             </button>
 
-                            <div className="flex flex-wrap gap-4">
+                            <div className="flex flex-col sm:flex-row gap-3 md:gap-4 w-full md:w-auto md:justify-end">
                                 <button
                                     onClick={handleExportPDF}
-                                    className="px-8 py-4 bg-primary text-white rounded-lg font-black hover:bg-primary-hover shadow-lg shadow-primary/20 transition-all uppercase tracking-wider flex items-center gap-3"
+                                    className="px-6 py-3 bg-primary text-white rounded-lg font-bold hover:bg-primary-hover shadow-lg shadow-primary/20 transition-all tracking-wide flex items-center justify-center gap-2"
                                 >
                                     <span>📄</span> Exportera som PDF
                                 </button>
                                 <button
                                     onClick={handleExportExcel}
-                                    className="px-8 py-4 bg-success text-white rounded-lg font-black hover:bg-success-hover shadow-lg shadow-success/20 transition-all uppercase tracking-wider flex items-center gap-3"
+                                    className="px-6 py-3 bg-success text-white rounded-lg font-bold hover:bg-success-hover shadow-lg shadow-success/20 transition-all tracking-wide flex items-center justify-center gap-2"
                                 >
                                     <span>📊</span> Exportera som Excel
                                 </button>
@@ -210,16 +216,16 @@ export function SummaryExport() {
                 <aside className="bg-panel-bg border border-panel-border rounded-lg p-4 xl:sticky xl:top-4 shadow-sm">
                     <h3 className="text-base font-bold text-text-primary">PDF förhandsvisning</h3>
                     <p className="text-xs text-text-secondary mt-1">Uppdateras automatiskt när offertdata ändras.</p>
-                    <div className="mt-3 h-[640px] bg-white border border-panel-border rounded-md overflow-hidden">
+                    <div className="mt-3 h-[760px] bg-white border border-panel-border rounded-md overflow-hidden">
                         {previewUrl ? (
                             <iframe
                                 title="PDF förhandsvisning"
-                                src={`${previewUrl}#toolbar=0&navpanes=0&statusbar=0&view=FitH`}
+                                src={previewUrl}
                                 className="w-full h-full"
                             />
                         ) : (
                             <div className="w-full h-full flex items-center justify-center p-6 text-center text-sm text-text-secondary bg-black/5">
-                                {previewError || 'Genererar PDF-forhandsvisning...'}
+                                {previewError || 'Genererar PDF-förhandsvisning...'}
                             </div>
                         )}
                     </div>

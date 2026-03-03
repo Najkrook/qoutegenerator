@@ -32,7 +32,7 @@ export function computeValidUntilDateString(quoteDateValue, quoteValidityDays, n
 
 export function generatePDF(state, summaryData, returnBlob = false) {
     if (!window.jspdf || !window.jspdf.jsPDF) {
-        if (!returnBlob) notifyWarn("PDF-motorn laddar fortfarande, forsok igen om nagra sekunder.");
+        if (!returnBlob) notifyWarn("PDF-motorn laddar fortfarande, försök igen om några sekunder.");
         return null;
     }
     const { jsPDF } = window.jspdf;
@@ -112,7 +112,7 @@ export function generatePDF(state, summaryData, returnBlob = false) {
     doc.setFontSize(10);
     doc.setTextColor(...darkText);
 
-    doc.text(`Malmo ${state.customerInfo.date || new Date().toLocaleDateString('sv-SE')}`, 18, currentY);
+    doc.text(`Malmö ${state.customerInfo.date || new Date().toLocaleDateString('sv-SE')}`, 18, currentY);
     currentY += 6;
     doc.setTextColor(...grayText);
     doc.text("Ca kostnad enligt diskussion.", 18, currentY);
@@ -445,7 +445,7 @@ export function generatePDF(state, summaryData, returnBlob = false) {
         doc.setFont("helvetica", "normal");
         doc.setFontSize(7.5);
         doc.setTextColor(180, 180, 190);
-        doc.text("BRIXX EUROPE | Dockplatsen 1 | SE 211 19 Malmo | SWEDEN", pageWidth / 2, footerY, { align: "center" });
+        doc.text("BRIXX EUROPE | Dockplatsen 1 | SE 211 19 Malmö | SWEDEN", pageWidth / 2, footerY, { align: "center" });
 
         footerY += 4;
         doc.setFontSize(7);
@@ -471,7 +471,7 @@ export function generatePDF(state, summaryData, returnBlob = false) {
     } catch (err) {
         console.error("PDF export failed:", err);
         if (!returnBlob) {
-            notifyError("Kunde inte skapa PDF. Kontrollera att PDF-biblioteken ar laddade och forsok igen.");
+            notifyError("Kunde inte skapa PDF. Kontrollera att PDF-biblioteken är laddade och försök igen.");
         }
         return null;
     }

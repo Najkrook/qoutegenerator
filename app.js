@@ -18,7 +18,7 @@ import {
 import { generatePDF } from "./features/pdfExport.js?v=20260302-5";
 import { generateExcel } from "./features/excelExport.js";
 import { parseLocalFloat, formatLocalFloat } from "./features/utils.js";
-import { LEGAL_TEMPLATES, DEFAULT_TEMPLATE_ID, getTemplateById, isLegalTemplateId } from './features/legalTemplates.js';
+import { LEGAL_TEMPLATES, DEFAULT_TEMPLATE_ID, getTemplateById, isLegalTemplateId } from './config/legalTemplates.shared.js';
 import { renderProductLines as _renderProductLines } from "./features/stepProductLines.js";
 import { renderConfigStep as _renderConfigStep, addNewBuilderItem as _addNewBuilderItem } from "./features/stepConfig.js";
 import { renderPricingStep as _renderPricingStep, renderCustomCosts as _renderCustomCosts } from "./features/stepPricing.js";

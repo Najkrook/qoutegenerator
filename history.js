@@ -249,7 +249,7 @@ async function openLatestQuote(quoteId) {
         await openRevisionPayload(quoteId, payload.revision);
     } catch (err) {
         console.error('Failed to open quote:', err);
-        notifyError('Kunde inte oppna offerten: ' + err.message);
+        notifyError('Kunde inte öppna offerten: ' + err.message);
     }
 }
 
@@ -296,7 +296,7 @@ async function toggleRevisions(quoteId) {
 async function deleteQuote(quoteId) {
     const ok = await confirmAction({
         title: 'Ta bort offert',
-        message: 'Ar du saker pa att du vill ta bort den har offerten och alla revisioner?',
+        message: 'Är du säker på att du vill ta bort den här offerten och alla revisioner?',
         confirmText: 'Ta bort',
         cancelText: 'Avbryt',
         tone: 'danger'

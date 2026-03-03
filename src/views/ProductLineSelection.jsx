@@ -9,21 +9,21 @@ export function ProductLineSelection({ onNext }) {
     const toggleLine = (lineId) => {
         let newSelection;
         if (selectedLines.includes(lineId)) {
-            newSelection = selectedLines.filter(id => id !== lineId);
+            newSelection = selectedLines.filter((id) => id !== lineId);
         } else {
             newSelection = [...selectedLines, lineId];
         }
         dispatch({ type: 'SET_SELECTED_LINES', payload: newSelection });
     };
 
-    const productLines = Object.keys(catalogData).map(key => ({
+    const productLines = Object.keys(catalogData).map((key) => ({
         id: key,
         name: catalogData[key].name,
         description: key === 'BaHaMa'
-            ? 'Stora kommersiella parasoller (max 10x10m).'
+            ? 'Premium Parasoller'
             : key === 'ClickitUP'
                 ? 'Höj- och sänkbara glaspartier.'
-                : 'Övriga premiumprodukter.'
+                : 'Premium Biogas'
     }));
 
     return (
@@ -36,7 +36,7 @@ export function ProductLineSelection({ onNext }) {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
-                {productLines.map(line => (
+                {productLines.map((line) => (
                     <label
                         key={line.id}
                         className={`flex items-start gap-4 p-6 border rounded-lg bg-panel-bg cursor-pointer transition-all hover:-translate-y-0.5 ${selectedLines.includes(line.id) ? 'border-primary ring-1 ring-primary' : 'border-panel-border hover:border-primary'

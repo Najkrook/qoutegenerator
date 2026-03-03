@@ -4,7 +4,7 @@ import { catalogData } from '../../data/catalog';
 
 export function GridConfig({ lineId }) {
     const { state, dispatch } = useQuote();
-    const { gridSelections } = state;
+    const { gridSelections, globalDiscountPct } = state;
 
     const lineData = catalogData[lineId];
     const selections = gridSelections[lineId] || { items: {}, addons: {} };
@@ -18,7 +18,10 @@ export function GridConfig({ lineId }) {
         const key = `${model}|${size}`;
         const newItems = { ...selections.items };
         if (qty > 0) {
-            newItems[key] = { ...newItems[key], qty };
+            const existing = newItems[key];
+            newItems[key] = existing
+                ? { ...existing, qty }
+                : { qty, discountPct: globalDiscountPct };
         } else {
             delete newItems[key];
         }
@@ -28,7 +31,10 @@ export function GridConfig({ lineId }) {
     const setAddonQty = (addonId, qty) => {
         const newAddons = { ...selections.addons };
         if (qty > 0) {
-            newAddons[addonId] = { ...newAddons[addonId], qty };
+            const existing = newAddons[addonId];
+            newAddons[addonId] = existing
+                ? { ...existing, qty }
+                : { qty, discountPct: globalDiscountPct };
         } else {
             delete newAddons[addonId];
         }
@@ -57,7 +63,7 @@ export function GridConfig({ lineId }) {
     return (
         <div className="bg-panel-bg border border-panel-border rounded-lg p-6 mb-8 bg-black/5 animate-fade-in">
             <h3 className="text-lg font-semibold mb-2">Grid View: {lineData.name}</h3>
-            <p className="text-sm text-text-secondary mb-6 italic">Fyll i antal för de artiklar som ska ingå i offerten.</p>
+            <p className="text-sm text-text-secondary mb-6 italic">Fyll i antal f\u00F6r de artiklar som ska ing\u00E5 i offerten.</p>
 
             <div className="overflow-x-auto">
                 <table className="w-full text-left border-collapse min-w-[800px]">

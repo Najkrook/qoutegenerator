@@ -4,13 +4,13 @@ import { catalogData } from '../../data/catalog';
 
 export function BuilderItem({ item, index, onRemove }) {
     const { state, dispatch } = useQuote();
-    const { exchangeRate } = state;
+    const { exchangeRate, globalDiscountPct } = state;
 
     const lineData = catalogData[item.line];
     const modelData = lineData?.models?.[item.model];
 
     const updateItem = (updates) => {
-        const newItems = state.builderItems.map(i => i.id === item.id ? { ...i, ...updates } : i);
+        const newItems = state.builderItems.map((i) => (i.id === item.id ? { ...i, ...updates } : i));
         dispatch({ type: 'SET_BUILDER_ITEMS', payload: newItems });
     };
 
@@ -35,21 +35,21 @@ export function BuilderItem({ item, index, onRemove }) {
     };
 
     const handleQtyChange = (e) => {
-        updateItem({ qty: parseInt(e.target.value) || 1 });
+        updateItem({ qty: parseInt(e.target.value, 10) || 1 });
     };
 
     const toggleAddon = (addonId, isChecked) => {
         let newAddons = [...item.addons];
         if (isChecked) {
-            newAddons.push({ id: addonId, qty: 1 });
+            newAddons.push({ id: addonId, qty: 1, discountPct: globalDiscountPct });
         } else {
-            newAddons = newAddons.filter(a => a.id !== addonId);
+            newAddons = newAddons.filter((a) => a.id !== addonId);
         }
         updateItem({ addons: newAddons });
     };
 
     const updateAddonQty = (addonId, qty) => {
-        const newAddons = item.addons.map(a => a.id === addonId ? { ...a, qty: parseInt(qty) || 1 } : a);
+        const newAddons = item.addons.map((a) => (a.id === addonId ? { ...a, qty: parseInt(qty, 10) || 1 } : a));
         updateItem({ addons: newAddons });
     };
 
@@ -62,13 +62,12 @@ export function BuilderItem({ item, index, onRemove }) {
         const groups = {};
         const noGroup = [];
 
-        Object.keys(sizesObj).forEach(s => {
+        Object.keys(sizesObj).forEach((s) => {
             let matchedGroup = null;
-            if (s.toLowerCase().includes('kvadrat') || s.includes('x') && s.split(' ')[1] === 'Kvadrat') matchedGroup = 'Kvadrat';
+            if (s.toLowerCase().includes('kvadrat') || (s.includes('x') && s.split(' ')[1] === 'Kvadrat')) matchedGroup = 'Kvadrat';
             else if (s.toLowerCase().includes('runda') || s.includes('*')) matchedGroup = 'Runda';
             else if (s.toLowerCase().includes('rektangel')) matchedGroup = 'Rektangel';
 
-            // Explicit overrides based on standard BaHaMa catalog naming conventions
             if (s.includes('Kvadrat')) matchedGroup = 'Kvadrat';
             if (s.includes('Runda')) matchedGroup = 'Runda';
             if (s.includes('Rektangel')) matchedGroup = 'Rektangel';
@@ -82,15 +81,21 @@ export function BuilderItem({ item, index, onRemove }) {
         });
 
         const elements = [];
-        noGroup.forEach(s => {
-            elements.push(<option key={s} value={s} className="bg-panel-bg text-text-primary">{s}</option>);
+        noGroup.forEach((s) => {
+            elements.push(
+                <option key={s} value={s} className="bg-panel-bg text-text-primary">
+                    {s}
+                </option>
+            );
         });
 
-        Object.keys(groups).forEach(gName => {
+        Object.keys(groups).forEach((gName) => {
             elements.push(
                 <optgroup key={gName} label={`--- ${gName.toUpperCase()} ---`} className="bg-panel-bg text-primary font-bold italic">
-                    {groups[gName].map(s => (
-                        <option key={s} value={s} className="bg-panel-bg text-text-primary font-normal not-italic">{s}</option>
+                    {groups[gName].map((s) => (
+                        <option key={s} value={s} className="bg-panel-bg text-text-primary font-normal not-italic">
+                            {s}
+                        </option>
                     ))}
                 </optgroup>
             );
@@ -104,22 +109,23 @@ export function BuilderItem({ item, index, onRemove }) {
     const itemBaseTotal = itemUnitPrice * item.qty;
 
     let addonsTotal = 0;
-    item.addons.forEach(addon => {
+    item.addons.forEach((addon) => {
         let addonPrice = 0;
         if (modelData.addonCategories) {
-            modelData.addonCategories.forEach(cat => {
-                const found = cat.items.find(i => i.id === addon.id);
+            modelData.addonCategories.forEach((cat) => {
+                const found = cat.items.find((i) => i.id === addon.id);
                 if (found) addonPrice = found.price;
             });
         }
         if (modelData.addons) {
-            const found = modelData.addons.find(i => i.id === addon.id);
+            const found = modelData.addons.find((i) => i.id === addon.id);
             if (found) addonPrice = found.price;
         }
-        addonsTotal += getPriceSEK(addonPrice, item.line) * (parseInt(addon.qty) || 1);
+        addonsTotal += getPriceSEK(addonPrice, item.line) * (parseInt(addon.qty, 10) || 1);
     });
 
     const itemGrandTotal = itemBaseTotal + addonsTotal;
+    const selectedAddonCount = item.addons.length;
 
     return (
         <div className="bg-panel-bg border border-panel-border rounded-lg p-6 mb-6 relative animate-slide-in">
@@ -144,8 +150,10 @@ export function BuilderItem({ item, index, onRemove }) {
                         onChange={handleLineChange}
                         className="bg-input-bg border border-panel-border text-text-primary p-2 rounded-md outline-none focus:border-primary"
                     >
-                        {Array.from(new Set([...state.selectedLines.filter(l => catalogData[l].type === 'builder'), item.line])).map(l => (
-                            <option key={l} value={l} className="bg-panel-bg text-text-primary">{catalogData[l] ? catalogData[l].name : l}</option>
+                        {Array.from(new Set([...state.selectedLines.filter((l) => catalogData[l].type === 'builder'), item.line])).map((l) => (
+                            <option key={l} value={l} className="bg-panel-bg text-text-primary">
+                                {catalogData[l] ? catalogData[l].name : l}
+                            </option>
                         ))}
                     </select>
                 </div>
@@ -157,8 +165,10 @@ export function BuilderItem({ item, index, onRemove }) {
                         onChange={handleModelChange}
                         className="bg-input-bg border border-panel-border text-text-primary p-2 rounded-md outline-none focus:border-primary"
                     >
-                        {Object.keys(lineData.models).map(m => (
-                            <option key={m} value={m} className="bg-panel-bg text-text-primary">{lineData.models[m].name}</option>
+                        {Object.keys(lineData.models).map((m) => (
+                            <option key={m} value={m} className="bg-panel-bg text-text-primary">
+                                {lineData.models[m].name}
+                            </option>
                         ))}
                     </select>
                 </div>
@@ -187,28 +197,30 @@ export function BuilderItem({ item, index, onRemove }) {
 
                 <div className="flex flex-col gap-1.5">
                     <label className="text-xs font-semibold text-text-secondary uppercase">Summa</label>
-                    <div className="font-bold text-lg text-text-primary flex items-center h-10">
-                        {itemBaseTotal.toLocaleString('sv-SE')} SEK
-                    </div>
+                    <div className="font-bold text-lg text-text-primary flex items-center h-10">{itemBaseTotal.toLocaleString('sv-SE')} SEK</div>
                 </div>
             </div>
 
-            {/* Addons */}
             {(modelData.addonCategories?.length > 0 || modelData.addons?.length > 0) && (
-                <div className="mt-6 pt-6 border-t border-panel-border">
-                    <label className="text-xs font-semibold text-text-secondary uppercase mb-4 block">Tillval</label>
-                    <div className="space-y-4">
+                <details className="mt-6 pt-6 border-t border-panel-border group">
+                    <summary className="cursor-pointer list-none select-none flex items-center justify-between rounded-md border border-panel-border bg-black/10 px-4 py-3 hover:bg-black/20 transition-colors">
+                        <span className="text-sm font-semibold uppercase tracking-wide text-text-primary">Tillägg</span>
+                        <span className="flex items-center gap-3 text-xs text-text-secondary">
+                            {selectedAddonCount > 0 ? `${selectedAddonCount} valda` : 'Inga valda'}
+                            <span className="transition-transform group-open:rotate-180">▼</span>
+                        </span>
+                    </summary>
 
-                        {/* Categorized Addons (BaHaMa, etc.) */}
-                        {modelData.addonCategories?.map(cat => (
+                    <div className="mt-4 space-y-4">
+                        {modelData.addonCategories?.map((cat) => (
                             <details key={cat.name} className="bg-black/10 border border-panel-border rounded-md overflow-hidden group">
                                 <summary className="p-3 text-sm font-semibold text-primary uppercase cursor-pointer list-none flex justify-between items-center group-open:border-b group-open:border-panel-border">
                                     {cat.name}
                                     <span className="text-xs transition-transform group-open:rotate-180">▼</span>
                                 </summary>
                                 <div className="p-4 space-y-3">
-                                    {cat.items.map(addon => {
-                                        const existing = item.addons.find(a => a.id === addon.id);
+                                    {cat.items.map((addon) => {
+                                        const existing = item.addons.find((a) => a.id === addon.id);
                                         const isChecked = !!existing;
                                         const priceSEK = getPriceSEK(addon.price, item.line);
                                         return (
@@ -222,9 +234,7 @@ export function BuilderItem({ item, index, onRemove }) {
                                                     />
                                                     {addon.name}
                                                 </label>
-                                                <span className="text-sm text-text-secondary whitespace-nowrap">
-                                                    {priceSEK.toLocaleString('sv-SE')} SEK
-                                                </span>
+                                                <span className="text-sm text-text-secondary whitespace-nowrap">{priceSEK.toLocaleString('sv-SE')} SEK</span>
                                                 <input
                                                     type="number"
                                                     min="1"
@@ -234,7 +244,7 @@ export function BuilderItem({ item, index, onRemove }) {
                                                     className="bg-input-bg border border-panel-border text-text-primary p-1.5 rounded-md outline-none focus:border-primary w-16 text-sm disabled:opacity-50"
                                                 />
                                                 <span className="text-sm font-semibold min-w-[100px] text-right">
-                                                    {isChecked ? `= ${(priceSEK * (parseInt(existing.qty) || 1)).toLocaleString('sv-SE')} SEK` : ''}
+                                                    {isChecked ? `= ${(priceSEK * (parseInt(existing.qty, 10) || 1)).toLocaleString('sv-SE')} SEK` : ''}
                                                 </span>
                                             </div>
                                         );
@@ -243,11 +253,10 @@ export function BuilderItem({ item, index, onRemove }) {
                             </details>
                         ))}
 
-                        {/* Uncategorized Addons (Fiesta, etc.) */}
                         {modelData.addons?.length > 0 && (
                             <div className="bg-black/10 border border-panel-border rounded-md p-4 space-y-3">
-                                {modelData.addons.map(addon => {
-                                    const existing = item.addons.find(a => a.id === addon.id);
+                                {modelData.addons.map((addon) => {
+                                    const existing = item.addons.find((a) => a.id === addon.id);
                                     const isChecked = !!existing;
                                     const priceSEK = getPriceSEK(addon.price, item.line);
                                     return (
@@ -261,9 +270,7 @@ export function BuilderItem({ item, index, onRemove }) {
                                                 />
                                                 {addon.name}
                                             </label>
-                                            <span className="text-sm text-text-secondary whitespace-nowrap">
-                                                {priceSEK.toLocaleString('sv-SE')} SEK
-                                            </span>
+                                            <span className="text-sm text-text-secondary whitespace-nowrap">{priceSEK.toLocaleString('sv-SE')} SEK</span>
                                             <input
                                                 type="number"
                                                 min="1"
@@ -273,16 +280,15 @@ export function BuilderItem({ item, index, onRemove }) {
                                                 className="bg-input-bg border border-panel-border text-text-primary p-1.5 rounded-md outline-none focus:border-primary w-16 text-sm disabled:opacity-50"
                                             />
                                             <span className="text-sm font-semibold min-w-[100px] text-right">
-                                                {isChecked ? `= ${(priceSEK * (parseInt(existing.qty) || 1)).toLocaleString('sv-SE')} SEK` : ''}
+                                                {isChecked ? `= ${(priceSEK * (parseInt(existing.qty, 10) || 1)).toLocaleString('sv-SE')} SEK` : ''}
                                             </span>
                                         </div>
                                     );
                                 })}
                             </div>
                         )}
-
                     </div>
-                </div>
+                </details>
             )}
 
             <div className="mt-6 pt-4 border-t border-panel-border flex justify-end items-center gap-4">
