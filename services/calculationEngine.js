@@ -96,7 +96,8 @@ export function computeQuoteTotals({ state, catalogData }) {
             discountPct,
             discountSek,
             net,
-            isAddon: false
+            isAddon: false,
+            source: { type: 'builder', itemId: item.id }
         });
 
         for (const addon of item?.addons || []) {
@@ -122,7 +123,8 @@ export function computeQuoteTotals({ state, catalogData }) {
                 discountPct: addonDiscountPct,
                 discountSek: addonDiscountSek,
                 net: addonNet,
-                isAddon: true
+                isAddon: true,
+                source: { type: 'builder-addon', itemId: item.id, addonId: addon.id }
             });
         }
     }
@@ -155,7 +157,8 @@ export function computeQuoteTotals({ state, catalogData }) {
                 discountPct,
                 discountSek,
                 net,
-                isAddon: false
+                isAddon: false,
+                source: { type: 'grid', lineId: line, key }
             });
         }
 
@@ -182,7 +185,8 @@ export function computeQuoteTotals({ state, catalogData }) {
                 discountPct,
                 discountSek,
                 net,
-                isAddon: true
+                isAddon: true,
+                source: { type: 'grid-addon', lineId: line, addonId }
             });
         }
     }
@@ -204,7 +208,8 @@ export function computeQuoteTotals({ state, catalogData }) {
             discountSek: 0,
             net: gross,
             isAddon: false,
-            isCustom: true
+            isCustom: true,
+            source: { type: 'custom' }
         });
     }
 
