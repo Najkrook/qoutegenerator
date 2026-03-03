@@ -1,18 +1,64 @@
 import React from 'react';
 
-export function SketchBom({ counts, totalGlassLength, slimlineCount, stodbenCount, onExport, onExportPdf }) {
-    const sortedKeys = Object.keys(counts).sort((a, b) => {
-        if (String(a).includes('Dörr')) return -1;
-        if (String(b).includes('Dörr')) return 1;
-        return parseFloat(b) - parseFloat(a);
-    });
+const EDGE_LABELS = {
+    front: 'Fram',
+    left: 'Vänster',
+    right: 'Höger',
+    back: 'Bak'
+};
+
+export function SketchBom({
+    counts,
+    totalGlassLength,
+    slimlineCount,
+    stodbenCount,
+    hasInvalidEdges,
+    invalidEdges,
+    autoAdjustedEdges,
+    onExport,
+    onExportPdf
+}) {
+    const keys = Object.keys(counts);
+    const doorKeys = keys.filter((key) => String(key).includes('Dörr')).sort((a, b) => Number.parseInt(b, 10) - Number.parseInt(a, 10));
+    const sectionKeys = keys
+        .filter((key) => !String(key).includes('Dörr'))
+        .sort((a, b) => Number.parseFloat(b) - Number.parseFloat(a));
+
+    const sortedKeys = [...doorKeys, ...sectionKeys];
+    const exportDisabled = sortedKeys.length === 0;
 
     return (
         <div className="bg-panel-bg border border-panel-border rounded-xl p-5">
-            <h3 className="text-lg font-semibold text-text-primary m-0 mb-4">📋 Materialförteckning</h3>
+            <div className="flex items-center justify-between gap-2 mb-4">
+                <h3 className="text-lg font-semibold text-text-primary m-0">📋 Materialförteckning</h3>
+                <span
+                    className={`text-xs px-2 py-1 rounded-full border ${
+                        hasInvalidEdges
+                            ? 'border-danger/50 text-danger bg-danger/10'
+                            : 'border-success/40 text-success bg-success/10'
+                    }`}
+                >
+                    {hasInvalidEdges ? 'Kräver kontroll' : 'Redo'}
+                </span>
+            </div>
+
+            {hasInvalidEdges && (
+                <div className="mb-4 p-3 rounded-lg border border-danger/40 bg-danger/10 text-danger text-xs">
+                    Ogiltig kant: {invalidEdges.map(([edge]) => EDGE_LABELS[edge] || edge).join(', ')}. Export kräver bekräftelse.
+                </div>
+            )}
+
+            {autoAdjustedEdges.length > 0 && (
+                <div className="mb-4 p-3 rounded-lg border border-amber-400/40 bg-amber-500/10 text-amber-200 text-xs">
+                    Autojustering:{' '}
+                    {autoAdjustedEdges
+                        .map(([edge, diag]) => `${EDGE_LABELS[edge] || edge} ${diag.requestedDoorSize} -> ${diag.resolvedDoorSize} mm`)
+                        .join(', ')}
+                </div>
+            )}
 
             <ul className="list-none p-0 m-0 space-y-0">
-                {sortedKeys.map(size => {
+                {sortedKeys.map((size) => {
                     const isDoor = String(size).includes('Dörr');
                     return (
                         <li key={size} className="py-2.5 border-b border-panel-border flex justify-between items-center text-sm">
@@ -50,10 +96,10 @@ export function SketchBom({ counts, totalGlassLength, slimlineCount, stodbenCoun
             <div className="mt-5 flex flex-col gap-3">
                 <button
                     onClick={onExport}
-                    disabled={sortedKeys.length === 0}
+                    disabled={exportDisabled}
                     className="w-full py-3 bg-primary text-white border-none rounded-lg font-semibold cursor-pointer hover:brightness-110 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
                 >
-                    Exportera till Offert
+                    {hasInvalidEdges ? 'Exportera till Offert (bekräfta varningar)' : 'Exportera till Offert'}
                 </button>
                 <button
                     onClick={onExportPdf}

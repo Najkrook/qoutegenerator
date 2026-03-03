@@ -1,35 +1,132 @@
 import React from 'react';
+import { DOOR_SIZES, MIN_DIMENSION_MM, SECTION_SIZES, STEP_MM } from '../../utils/sectionCalculator';
 
 const PRIO_DESCRIPTIONS = {
-    target: 'Maximerar antalet sektioner av den valda storleken.',
-    convenient: 'Använder störst möjliga sektioner för minsta antal delar.',
-    symmetrical: 'Alla sektioner får samma storlek för jämn symmetri.'
+    target: 'Fördelar sektioner så nära målstorleken som möjligt med standardstorlekar.',
+    convenient: 'Använder större sektioner för färre totala delar.',
+    symmetrical: 'Prioriterar jämn sektionstorlek för symmetri.'
 };
 
-export function SketchConfig({ config, onChange }) {
-    const { width, depth, includeBack, prioMode, targetLength, doorEdges, doorSize } = config;
+const EDGE_META = [
+    { key: 'front', label: 'Fram', dimension: 'width' },
+    { key: 'left', label: 'Vänster', dimension: 'depth' },
+    { key: 'right', label: 'Höger', dimension: 'depth' },
+    { key: 'back', label: 'Bak', dimension: 'width' }
+];
+
+function roundToStep(value) {
+    return Math.round(value / STEP_MM) * STEP_MM;
+}
+
+function clamp(value, min, max) {
+    if (value < min) return min;
+    if (value > max) return max;
+    return value;
+}
+
+function nearestFromList(value, list) {
+    return list.reduce((best, current) => {
+        const bestDiff = Math.abs(best - value);
+        const currentDiff = Math.abs(current - value);
+        if (currentDiff < bestDiff) return current;
+        if (currentDiff === bestDiff && current > best) return current;
+        return best;
+    }, list[0]);
+}
+
+function normalizeDimension(rawValue, fallback) {
+    const parsed = Number(rawValue);
+    const base = Number.isFinite(parsed) ? parsed : fallback;
+    const rounded = roundToStep(base);
+    return clamp(rounded, MIN_DIMENSION_MM, 50000);
+}
+
+function normalizeTarget(rawValue, fallback) {
+    const parsed = Number(rawValue);
+    const base = Number.isFinite(parsed) ? parsed : fallback;
+    const rounded = roundToStep(base);
+    const clamped = clamp(rounded, 700, 2000);
+    return nearestFromList(clamped, SECTION_SIZES);
+}
+
+function normalizeDoorSize(rawValue) {
+    const parsed = Number(rawValue);
+    const base = Number.isFinite(parsed) ? parsed : 1000;
+    return nearestFromList(base, DOOR_SIZES);
+}
+
+export function SketchConfig({ config, onChange, selectedEdge, onSelectEdge }) {
+    const {
+        width,
+        depth,
+        includeBack,
+        prioMode,
+        targetLength,
+        doorEdges,
+        doorSizeByEdge = {}
+    } = config;
+
+    const visibleEdges = EDGE_META.filter(({ key }) => key !== 'back' || includeBack);
+    const activeEdge = visibleEdges.find((edge) => edge.key === selectedEdge) || visibleEdges[0];
 
     const toggleDoor = (edge) => {
         const newDoors = new Set(doorEdges);
-        if (newDoors.has(edge)) newDoors.delete(edge);
-        else newDoors.add(edge);
-        onChange({ doorEdges: newDoors });
+        const nextDoorSizeByEdge = { ...doorSizeByEdge };
+
+        if (newDoors.has(edge)) {
+            newDoors.delete(edge);
+            delete nextDoorSizeByEdge[edge];
+        } else {
+            newDoors.add(edge);
+            nextDoorSizeByEdge[edge] = normalizeDoorSize(nextDoorSizeByEdge[edge] ?? 1000);
+        }
+
+        onChange({ doorEdges: newDoors, doorSizeByEdge: nextDoorSizeByEdge });
+    };
+
+    const visibleDoorEdges = visibleEdges.filter(({ key }) => doorEdges.has(key));
+
+    const resetActiveEdgeDimension = () => {
+        if (!activeEdge) return;
+        if (activeEdge.dimension === 'width') {
+            onChange({ width: normalizeDimension(7000, width) });
+            return;
+        }
+        onChange({ depth: normalizeDimension(2300, depth) });
     };
 
     return (
         <div className="bg-panel-bg border border-panel-border rounded-xl p-5 space-y-5">
             <h3 className="text-lg font-semibold text-text-primary m-0">⚙️ Konfiguration</h3>
 
-            {/* Dimensions */}
+            <div className="space-y-2">
+                <label className="text-xs font-semibold text-text-secondary uppercase">Aktiv kant</label>
+                <div className="flex flex-wrap gap-2">
+                    {visibleEdges.map((edge) => (
+                        <button
+                            key={edge.key}
+                            onClick={() => onSelectEdge?.(edge.key)}
+                            className={`px-3 py-1.5 rounded-md text-sm border transition-colors ${
+                                edge.key === activeEdge?.key
+                                    ? 'bg-primary border-primary text-white'
+                                    : 'bg-input-bg border-panel-border text-text-secondary hover:text-text-primary'
+                            }`}
+                        >
+                            {edge.label}
+                        </button>
+                    ))}
+                </div>
+            </div>
+
             <div className="grid grid-cols-2 gap-4">
                 <div className="flex flex-col gap-1.5">
                     <label className="text-xs font-semibold text-text-secondary uppercase">Bredd (mm)</label>
                     <input
                         type="number"
                         value={width}
-                        step={100}
-                        min={1000}
-                        onChange={(e) => onChange({ width: parseInt(e.target.value) || 1000 })}
+                        step={STEP_MM}
+                        min={MIN_DIMENSION_MM}
+                        onChange={(e) => onChange({ width: normalizeDimension(e.target.value, width) })}
                         className="bg-input-bg border border-panel-border text-text-primary p-2.5 rounded-lg outline-none focus:border-primary text-sm"
                     />
                 </div>
@@ -38,15 +135,33 @@ export function SketchConfig({ config, onChange }) {
                     <input
                         type="number"
                         value={depth}
-                        step={100}
-                        min={1000}
-                        onChange={(e) => onChange({ depth: parseInt(e.target.value) || 1000 })}
+                        step={STEP_MM}
+                        min={MIN_DIMENSION_MM}
+                        onChange={(e) => onChange({ depth: normalizeDimension(e.target.value, depth) })}
                         className="bg-input-bg border border-panel-border text-text-primary p-2.5 rounded-lg outline-none focus:border-primary text-sm"
                     />
                 </div>
             </div>
 
-            {/* Include back wall */}
+            <div className="flex flex-wrap gap-2">
+                {activeEdge && (
+                    <button
+                        onClick={() => toggleDoor(activeEdge.key)}
+                        className="px-3 py-1.5 rounded-md text-sm border border-panel-border bg-input-bg text-text-secondary hover:text-text-primary"
+                    >
+                        {doorEdges.has(activeEdge.key) ? 'Ta bort dörr på aktiv kant' : 'Lägg till dörr på aktiv kant'}
+                    </button>
+                )}
+                {activeEdge && (
+                    <button
+                        onClick={resetActiveEdgeDimension}
+                        className="px-3 py-1.5 rounded-md text-sm border border-panel-border bg-input-bg text-text-secondary hover:text-text-primary"
+                    >
+                        Återställ {activeEdge.dimension === 'width' ? 'bredd' : 'djup'}
+                    </button>
+                )}
+            </div>
+
             <label className="flex items-center gap-3 cursor-pointer">
                 <input
                     type="checkbox"
@@ -56,9 +171,11 @@ export function SketchConfig({ config, onChange }) {
                         if (!newBack) {
                             const newDoors = new Set(doorEdges);
                             newDoors.delete('back');
-                            onChange({ includeBack: newBack, doorEdges: newDoors });
+                            const nextDoorSizeByEdge = { ...doorSizeByEdge };
+                            delete nextDoorSizeByEdge.back;
+                            onChange({ includeBack: false, doorEdges: newDoors, doorSizeByEdge: nextDoorSizeByEdge });
                         } else {
-                            onChange({ includeBack: newBack });
+                            onChange({ includeBack: true });
                         }
                     }}
                     className="accent-primary w-4 h-4"
@@ -66,7 +183,6 @@ export function SketchConfig({ config, onChange }) {
                 <span className="text-sm text-text-primary">Inkludera bakvägg</span>
             </label>
 
-            {/* Priority mode */}
             <div className="flex flex-col gap-1.5">
                 <label className="text-xs font-semibold text-text-secondary uppercase">Prioritering</label>
                 <select
@@ -75,71 +191,81 @@ export function SketchConfig({ config, onChange }) {
                     className="bg-input-bg border border-panel-border text-text-primary p-2.5 rounded-lg outline-none focus:border-primary text-sm"
                 >
                     <option value="symmetrical">Symmetrisk</option>
-                    <option value="convenient">Bekväm (färst delar)</option>
+                    <option value="convenient">Bekväm (färre delar)</option>
                     <option value="target">Målstorlek</option>
                 </select>
                 <p className="text-xs text-text-secondary m-0">{PRIO_DESCRIPTIONS[prioMode]}</p>
             </div>
 
-            {/* Target length (only in target mode) */}
             {prioMode === 'target' && (
                 <div className="flex flex-col gap-1.5">
                     <label className="text-xs font-semibold text-text-secondary uppercase">Målstorlek (mm)</label>
                     <select
                         value={targetLength}
-                        onChange={(e) => onChange({ targetLength: parseInt(e.target.value) })}
+                        onChange={(e) => onChange({ targetLength: normalizeTarget(e.target.value, targetLength) })}
                         className="bg-input-bg border border-panel-border text-text-primary p-2.5 rounded-lg outline-none focus:border-primary text-sm"
                     >
-                        {[2000, 1900, 1800, 1700, 1600, 1500, 1400, 1300, 1200, 1100, 1000].map(sz => (
-                            <option key={sz} value={sz}>{sz} mm</option>
+                        {SECTION_SIZES.map((size) => (
+                            <option key={size} value={size}>
+                                {size} mm
+                            </option>
                         ))}
                     </select>
                 </div>
             )}
 
-            {/* Door placement */}
             <div className="flex flex-col gap-2">
-                <label className="text-xs font-semibold text-text-secondary uppercase">Dörr-placering</label>
+                <label className="text-xs font-semibold text-text-secondary uppercase">Dörrplacering</label>
                 <div className="flex flex-wrap gap-3">
-                    {['front', 'left', 'right'].map(edge => (
-                        <label key={edge} className="flex items-center gap-2 cursor-pointer">
+                    {visibleEdges.map(({ key, label }) => (
+                        <label key={key} className="flex items-center gap-2 cursor-pointer">
                             <input
                                 type="checkbox"
-                                checked={doorEdges.has(edge)}
-                                onChange={() => toggleDoor(edge)}
+                                checked={doorEdges.has(key)}
+                                onChange={() => toggleDoor(key)}
                                 className="accent-primary w-4 h-4"
                             />
-                            <span className="text-sm text-text-primary capitalize">
-                                {edge === 'front' ? 'Fram' : edge === 'left' ? 'Vänster' : 'Höger'}
-                            </span>
+                            <span className="text-sm text-text-primary">{label}</span>
                         </label>
                     ))}
-                    {includeBack && (
-                        <label className="flex items-center gap-2 cursor-pointer">
-                            <input
-                                type="checkbox"
-                                checked={doorEdges.has('back')}
-                                onChange={() => toggleDoor('back')}
-                                className="accent-primary w-4 h-4"
-                            />
-                            <span className="text-sm text-text-primary">Bak</span>
-                        </label>
-                    )}
                 </div>
             </div>
 
-            {/* Door size */}
-            {doorEdges.size > 0 && (
-                <div className="flex flex-col gap-1.5">
-                    <label className="text-xs font-semibold text-text-secondary uppercase">Dörrstorlek</label>
-                    <select
-                        value={doorSize}
-                        onChange={(e) => onChange({ doorSize: parseInt(e.target.value) })}
-                        className="bg-input-bg border border-panel-border text-text-primary p-2.5 rounded-lg outline-none focus:border-primary text-sm"
-                    >
-                        <option value={1000}>1000 mm</option>
-                        <option value={1100}>1100 mm</option>
-                    </select>
+            {visibleDoorEdges.length > 0 && (
+                <div className="space-y-2">
+                    <label className="text-xs font-semibold text-text-secondary uppercase">Dörrstorlek per kant</label>
+                    <div className="space-y-2">
+                        {visibleDoorEdges.map(({ key, label }) => (
+                            <div key={key} className="grid grid-cols-[1fr_140px] gap-3 items-center">
+                                <button
+                                    onClick={() => onSelectEdge?.(key)}
+                                    className={`text-sm text-left ${
+                                        selectedEdge === key ? 'text-primary font-semibold' : 'text-text-primary'
+                                    }`}
+                                >
+                                    {label}
+                                </button>
+                                <select
+                                    value={doorSizeByEdge[key] ?? 1000}
+                                    onChange={(e) =>
+                                        onChange({
+                                            doorSizeByEdge: {
+                                                ...doorSizeByEdge,
+                                                [key]: normalizeDoorSize(e.target.value)
+                                            }
+                                        })
+                                    }
+                                    className="bg-input-bg border border-panel-border text-text-primary p-2 rounded-lg outline-none focus:border-primary text-sm"
+                                >
+                                    {DOOR_SIZES.map((size) => (
+                                        <option key={size} value={size}>
+                                            {size} mm
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+                        ))}
+                    </div>
                 </div>
             )}
         </div>
