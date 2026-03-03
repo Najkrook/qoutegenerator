@@ -1,4 +1,5 @@
-import React from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import toast from 'react-hot-toast';
 import { useQuote } from '../store/QuoteContext';
 import { catalogData } from '../data/catalog';
 import { computeQuoteTotals } from '../../services/calculationEngine';
@@ -7,79 +8,222 @@ import { FinalSummaryTable } from '../components/features/FinalSummaryTable';
 import { generatePDF } from '../../features/pdfExport';
 import { generateExcel } from '../../features/excelExport';
 
+function sanitizeFileNamePart(value) {
+    return String(value || '')
+        .normalize('NFKD')
+        .replace(/[^\w\s-]/g, '')
+        .trim()
+        .replace(/\s+/g, '-')
+        .replace(/-+/g, '-')
+        .slice(0, 50);
+}
+
+function buildPdfFileName(customerInfo = {}) {
+    const rawRef = customerInfo.reference?.trim();
+    const rawName = customerInfo.name?.trim();
+    const date = customerInfo.date || new Date().toISOString().slice(0, 10);
+    const base = rawRef || rawName || 'Offert';
+    const safeBase = sanitizeFileNamePart(base);
+    return `${safeBase || 'Offert'}-${date}.pdf`;
+}
+
+function downloadBlob(blob, fileName) {
+    const downloadUrl = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = downloadUrl;
+    link.download = fileName;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    setTimeout(() => URL.revokeObjectURL(downloadUrl), 2000);
+}
+
+async function saveBlobWithPicker(blob, fileName) {
+    if (typeof window.showSaveFilePicker !== 'function') {
+        return 'unavailable';
+    }
+
+    try {
+        const handle = await window.showSaveFilePicker({
+            suggestedName: fileName,
+            types: [
+                {
+                    description: 'PDF Document',
+                    accept: { 'application/pdf': ['.pdf'] }
+                }
+            ]
+        });
+        const writable = await handle.createWritable();
+        await writable.write(blob);
+        await writable.close();
+        return 'saved';
+    } catch (err) {
+        if (err && err.name === 'AbortError') {
+            return 'canceled';
+        }
+        console.error('showSaveFilePicker failed, using download fallback:', err);
+        return 'failed';
+    }
+}
+
 export function SummaryExport() {
     const { state, dispatch } = useQuote();
-    const summaryData = computeQuoteTotals({ state, catalogData });
+    const summaryData = useMemo(() => computeQuoteTotals({ state, catalogData }), [state]);
+    const [previewUrl, setPreviewUrl] = useState('');
+    const [previewError, setPreviewError] = useState('');
+    const previewUrlRef = useRef('');
+
+    useEffect(() => {
+        const pdfBlob = generatePDF(state, summaryData, true);
+
+        if (!pdfBlob) {
+            if (previewUrlRef.current) {
+                URL.revokeObjectURL(previewUrlRef.current);
+                previewUrlRef.current = '';
+            }
+            setPreviewUrl('');
+            setPreviewError('Kunde inte skapa PDF-forhandsvisning. Kontrollera att PDF-motorn ar laddad.');
+            return;
+        }
+
+        const nextUrl = URL.createObjectURL(pdfBlob);
+        if (previewUrlRef.current) {
+            URL.revokeObjectURL(previewUrlRef.current);
+        }
+
+        previewUrlRef.current = nextUrl;
+        setPreviewUrl(nextUrl);
+        setPreviewError('');
+    }, [state, summaryData]);
+
+    useEffect(() => {
+        return () => {
+            if (previewUrlRef.current) {
+                URL.revokeObjectURL(previewUrlRef.current);
+                previewUrlRef.current = '';
+            }
+        };
+    }, []);
 
     const handleBack = () => {
         dispatch({ type: 'SET_STEP', payload: 3 });
     };
 
-    const handleExportPDF = () => {
-        generatePDF(state, summaryData);
+    const handleExportPDF = async () => {
+        const fileName = buildPdfFileName(state.customerInfo);
+        const pdfBlob = generatePDF(state, summaryData, true);
+        if (!pdfBlob) {
+            toast.error('Kunde inte skapa PDF.');
+            return;
+        }
+
+        const pickerResult = await saveBlobWithPicker(pdfBlob, fileName);
+        if (pickerResult === 'saved') {
+            toast.success(`PDF sparad: ${fileName}`);
+            return;
+        }
+
+        if (pickerResult === 'canceled') {
+            toast('PDF-export avbrots.', { icon: '!' });
+            return;
+        }
+
+        if (pickerResult === 'failed') {
+            toast('Kunde inte oppna spara-dialog. Anvander nedladdning i stallet.', { icon: '!' });
+        }
+
+        if (pickerResult === 'failed' || pickerResult === 'unavailable') {
+            downloadBlob(pdfBlob, fileName);
+            toast.success(`PDF nedladdad: ${fileName}`);
+        }
     };
 
     const handleExportExcel = () => {
+        if (!window.XLSX) {
+            toast.error('Excel-motorn laddar fortfarande. Forsok igen om nagra sekunder.');
+            return;
+        }
         generateExcel(state, summaryData);
     };
 
     const handleSaveQuote = () => {
-        // Firebase save logic would go here
-        alert('Offert sparad! (Firebase-integration kommer i nästa fas)');
+        toast.success('Offert sparad! (Firebase-integration kommer i nasta fas)');
     };
 
     return (
-        <div className="max-w-6xl mx-auto pb-20">
-            <div className="flex justify-between items-center mb-8">
+        <div className="max-w-[1400px] mx-auto pb-20">
+            <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_420px] gap-8 items-start">
                 <div>
-                    <h2 className="text-3xl font-black text-white tracking-tight uppercase">Offertsammanställning</h2>
-                    <p className="text-text-secondary mt-1">Granska kunduppgifter och slutgiltiga belopp före export.</p>
-                </div>
-                <div className="flex gap-3">
-                    <button
-                        onClick={handleSaveQuote}
-                        className="px-6 py-2.5 bg-panel-bg border border-panel-border text-text-primary rounded-lg font-bold hover:bg-white/5 transition-all text-sm uppercase tracking-wide"
-                    >
-                        Spara Offert
-                    </button>
-                </div>
-            </div>
-
-            <div className="grid grid-cols-1 gap-8">
-                <section>
-                    <CustomerInfoForm />
-                </section>
-
-                <section className="bg-panel-bg border border-panel-border rounded-lg p-6 shadow-sm">
-                    <h3 className="text-lg font-bold mb-6 flex items-center gap-2">
-                        <span className="text-primary text-xl">📋</span> Summering
-                    </h3>
-                    <FinalSummaryTable />
-                </section>
-
-                <section className="flex flex-col md:flex-row justify-between items-center gap-6 mt-4 p-8 bg-black/40 border border-panel-border rounded-xl">
-                    <button
-                        onClick={handleBack}
-                        className="text-text-secondary hover:text-white transition-colors flex items-center gap-2 group"
-                    >
-                        <span className="group-hover:-translate-x-1 transition-transform">←</span> Tillbaka för att ändra priser
-                    </button>
-
-                    <div className="flex flex-wrap gap-4">
-                        <button
-                            onClick={handleExportPDF}
-                            className="px-8 py-4 bg-primary text-white rounded-lg font-black hover:bg-primary-hover shadow-lg shadow-primary/20 transition-all uppercase tracking-wider flex items-center gap-3"
-                        >
-                            <span>📄</span> Exportera som PDF
-                        </button>
-                        <button
-                            onClick={handleExportExcel}
-                            className="px-8 py-4 bg-success text-white rounded-lg font-black hover:bg-success-hover shadow-lg shadow-success/20 transition-all uppercase tracking-wider flex items-center gap-3"
-                        >
-                            <span>📊</span> Exportera som Excel
-                        </button>
+                    <div className="flex justify-between items-center mb-8">
+                        <div>
+                            <h2 className="text-3xl font-black text-white tracking-tight uppercase">Offertsammanställning</h2>
+                            <p className="text-text-secondary mt-1">Granska kunduppgifter och slutgiltiga belopp före export.</p>
+                        </div>
+                        <div className="flex gap-3">
+                            <button
+                                onClick={handleSaveQuote}
+                                className="px-6 py-2.5 bg-panel-bg border border-panel-border text-text-primary rounded-lg font-bold hover:bg-white/5 transition-all text-sm uppercase tracking-wide"
+                            >
+                                Spara Offert
+                            </button>
+                        </div>
                     </div>
-                </section>
+
+                    <div className="grid grid-cols-1 gap-8">
+                        <section>
+                            <CustomerInfoForm />
+                        </section>
+
+                        <section className="bg-panel-bg border border-panel-border rounded-lg p-6 shadow-sm">
+                            <h3 className="text-lg font-bold mb-6 flex items-center gap-2">
+                                <span className="text-primary text-xl">📋</span> Summering
+                            </h3>
+                            <FinalSummaryTable />
+                        </section>
+
+                        <section className="flex flex-col md:flex-row justify-between items-center gap-6 mt-4 p-8 bg-black/40 border border-panel-border rounded-xl">
+                            <button
+                                onClick={handleBack}
+                                className="text-text-secondary hover:text-white transition-colors flex items-center gap-2 group"
+                            >
+                                <span className="group-hover:-translate-x-1 transition-transform">&larr;</span> Tillbaka för att ändra priser
+                            </button>
+
+                            <div className="flex flex-wrap gap-4">
+                                <button
+                                    onClick={handleExportPDF}
+                                    className="px-8 py-4 bg-primary text-white rounded-lg font-black hover:bg-primary-hover shadow-lg shadow-primary/20 transition-all uppercase tracking-wider flex items-center gap-3"
+                                >
+                                    <span>📄</span> Exportera som PDF
+                                </button>
+                                <button
+                                    onClick={handleExportExcel}
+                                    className="px-8 py-4 bg-success text-white rounded-lg font-black hover:bg-success-hover shadow-lg shadow-success/20 transition-all uppercase tracking-wider flex items-center gap-3"
+                                >
+                                    <span>📊</span> Exportera som Excel
+                                </button>
+                            </div>
+                        </section>
+                    </div>
+                </div>
+
+                <aside className="bg-panel-bg border border-panel-border rounded-lg p-4 xl:sticky xl:top-4 shadow-sm">
+                    <h3 className="text-base font-bold text-text-primary">PDF förhandsvisning</h3>
+                    <p className="text-xs text-text-secondary mt-1">Uppdateras automatiskt när offertdata ändras.</p>
+                    <div className="mt-3 h-[640px] bg-white border border-panel-border rounded-md overflow-hidden">
+                        {previewUrl ? (
+                            <iframe
+                                title="PDF förhandsvisning"
+                                src={`${previewUrl}#toolbar=0&navpanes=0&statusbar=0&view=FitH`}
+                                className="w-full h-full"
+                            />
+                        ) : (
+                            <div className="w-full h-full flex items-center justify-center p-6 text-center text-sm text-text-secondary bg-black/5">
+                                {previewError || 'Genererar PDF-forhandsvisning...'}
+                            </div>
+                        )}
+                    </div>
+                </aside>
             </div>
         </div>
     );

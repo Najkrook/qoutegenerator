@@ -1,5 +1,5 @@
 import { db, collection, query, orderBy, limit, startAfter, getDocs } from './services/firebase.js';
-import { requireAuth, onAuthChange, logout } from './services/authService.js';
+import { requireFullAccess, hasFullAccess, onAuthChange, logout } from './services/authService.js';
 import { initNotifications, notifyError } from './services/notificationService.js';
 
 const PAGE_SIZE = 50;
@@ -332,6 +332,10 @@ function bindAuthUi() {
             window.location.href = 'login.html';
             return;
         }
+        if (!hasFullAccess(user)) {
+            window.location.href = 'index.html';
+            return;
+        }
 
         if (DOM.badge && DOM.badgeEmail) {
             DOM.badgeEmail.textContent = user.email || '';
@@ -346,7 +350,7 @@ async function init() {
     bindAuthUi();
 
     try {
-        await requireAuth();
+        await requireFullAccess({ redirectTo: 'index.html' });
     } catch (err) {
         console.error('Auth check failed:', err);
         window.location.href = 'login.html';

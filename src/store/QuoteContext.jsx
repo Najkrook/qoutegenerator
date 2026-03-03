@@ -53,8 +53,15 @@ function quoteReducer(state, action) {
             return { ...state, step: action.payload };
         case 'UPDATE_STATE':
             return { ...state, ...action.payload };
+        case 'SET_CUSTOMER_INFO':
         case 'UPDATE_CUSTOMER_INFO':
             return { ...state, customerInfo: { ...state.customerInfo, ...action.payload } };
+        case 'SET_INCLUDES_VAT':
+            return { ...state, includesVat: Boolean(action.payload) };
+        case 'SET_GLOBAL_DISCOUNT':
+            return { ...state, globalDiscountPct: action.payload, prevGlobalDiscountPct: action.payload };
+        case 'SET_EXCHANGE_RATE':
+            return { ...state, exchangeRate: action.payload };
         case 'SET_SELECTED_LINES':
             return { ...state, selectedLines: action.payload };
         case 'SET_BUILDER_ITEMS':

@@ -13,7 +13,7 @@ import {
     writeBatch,
     runTransaction
 } from './services/firebase.js';
-import { currentUser, onAuthChange, logout } from './services/authService.js';
+import { currentUser, onAuthChange, logout, requireFullAccess, hasFullAccess } from './services/authService.js';
 import { createQuoteRepository, normalizeQuoteStatus } from './services/quoteRepository.js';
 import { escapeHtml } from './features/utils.js';
 import { initNotifications, notifyError, notifyInfo, notifySuccess, confirmAction } from './services/notificationService.js';
@@ -405,16 +405,30 @@ function bindFilters() {
     });
 }
 
-document.addEventListener('DOMContentLoaded', () => {
+onAuthChange((user) => {
+    if (!user) {
+        window.location.href = 'login.html';
+        return;
+    }
+
+    if (!hasFullAccess(user)) {
+        window.location.href = 'index.html';
+        return;
+    }
+
+    loadQuotes();
+});
+
+document.addEventListener('DOMContentLoaded', async () => {
+    try {
+        await requireFullAccess({ redirectTo: 'index.html' });
+    } catch (err) {
+        console.error('Full-access check failed:', err);
+        window.location.href = 'login.html';
+        return;
+    }
+
     initNotifications();
     bindFilters();
     document.body.addEventListener('click', handleHeaderAction);
-});
-
-onAuthChange((user) => {
-    if (user) {
-        loadQuotes();
-    } else {
-        window.location.href = 'login.html';
-    }
 });

@@ -13,8 +13,8 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
 
     <script type="module">
-        import { requireAuth, onAuthChange } from './services/authService.js';
-        requireAuth();
+        import { requireFullAccess, onAuthChange } from './services/authService.js';
+        requireFullAccess({ redirectTo: 'index.html' });
 
         onAuthChange((user) => {
             const badge = document.getElementById('userBadge');
