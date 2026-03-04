@@ -64,13 +64,26 @@ export function BuilderItem({ item, index, onRemove }) {
 
         Object.keys(sizesObj).forEach((s) => {
             let matchedGroup = null;
-            if (s.toLowerCase().includes('kvadrat') || (s.includes('x') && s.split(' ')[1] === 'Kvadrat')) matchedGroup = 'Kvadrat';
-            else if (s.toLowerCase().includes('runda') || s.includes('*')) matchedGroup = 'Runda';
-            else if (s.toLowerCase().includes('rektangel')) matchedGroup = 'Rektangel';
 
-            if (s.includes('Kvadrat')) matchedGroup = 'Kvadrat';
-            if (s.includes('Runda')) matchedGroup = 'Runda';
-            if (s.includes('Rektangel')) matchedGroup = 'Rektangel';
+            // Explicit shape in name
+            if (s.toLowerCase().includes('kvadrat') || s.includes('Kvadrat')) {
+                matchedGroup = 'Kvadrat';
+            } else if (s.toLowerCase().includes('runda') || s.includes('Runda') || s.includes('*') || s.includes('Ø')) {
+                matchedGroup = 'Runda';
+            } else if (s.toLowerCase().includes('rektangel') || s.includes('Rektangel')) {
+                matchedGroup = 'Rektangel';
+            }
+            // Implicit shape from dimensions (like 2x2 or 2,5x2)
+            else if (s.includes('x')) {
+                const parts = s.split('x').map(p => p.trim());
+                if (parts.length === 2) {
+                    if (parts[0] === parts[1]) {
+                        matchedGroup = 'Kvadrat';
+                    } else {
+                        matchedGroup = 'Rektangel';
+                    }
+                }
+            }
 
             if (matchedGroup) {
                 if (!groups[matchedGroup]) groups[matchedGroup] = [];

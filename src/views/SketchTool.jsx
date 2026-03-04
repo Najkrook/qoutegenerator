@@ -8,6 +8,7 @@ import {
     SECTION_SIZES,
     STEP_MM
 } from '../utils/sectionCalculator';
+import { downloadBlob, saveBlobWithPicker } from '../utils/fileUtils';
 import { SketchCanvas } from '../components/features/SketchCanvas';
 import { SketchConfig } from '../components/features/SketchConfig';
 import { SketchBom } from '../components/features/SketchBom';
@@ -407,8 +408,59 @@ export function SketchTool({ onBack }) {
         toast.success('ClickitUP-sektioner exporterade till offerten.');
     };
 
-    const handleExportPdf = () => {
-        toast('PDF-export är inte tillgänglig i React-versionen ännu.', { icon: '📄' });
+    const handleExportImage = async () => {
+        if (typeof window.html2canvas !== 'function') {
+            toast.error('Bildexport är inte tillgänglig just nu. Ladda om sidan och försök igen.');
+            return;
+        }
+
+        const element = document.getElementById('sketchCanvasContainer');
+        if (!element) {
+            toast.error('Kan inte hitta skissen att exportera.');
+            return;
+        }
+
+        // Temporarily hide drag handles
+        const handles = element.querySelectorAll('.sketch-drag-handle');
+        handles.forEach(h => h.style.display = 'none');
+
+        const originalBg = element.style.backgroundColor;
+        element.style.backgroundColor = '#0b1220';
+
+        const toastId = toast.loading('Genererar bild...');
+        const fileName = `Uteservering_Skiss_${config.width}x${config.depthLeft}.png`;
+
+        try {
+            const canvas = await window.html2canvas(element, {
+                scale: 2,
+                useCORS: true,
+                backgroundColor: '#0b1220'
+            });
+
+            canvas.toBlob(async (blob) => {
+                handles.forEach(h => h.style.display = '');
+                element.style.backgroundColor = originalBg;
+
+                const pickerResult = await saveBlobWithPicker(blob, fileName);
+
+                if (pickerResult === 'saved') {
+                    toast.success(`Skiss sparad: ${fileName}`, { id: toastId });
+                } else if (pickerResult === 'canceled') {
+                    toast.dismiss(toastId);
+                    toast('Bildexport avbröts.', { icon: '!' });
+                } else {
+                    if (pickerResult === 'failed') {
+                        toast('Kunde inte öppna spara-dialog. Använder nedladdning istället.', { icon: '!' });
+                    }
+                    downloadBlob(blob, fileName);
+                    toast.success(`Skiss nedladdad: ${fileName}`, { id: toastId });
+                }
+            }, 'image/png');
+        } catch (err) {
+            handles.forEach(h => h.style.display = '');
+            element.style.backgroundColor = originalBg;
+            toast.error('Kunde inte skapa bild: ' + (err?.message || 'okänt fel'), { id: toastId });
+        }
     };
 
     return (
@@ -520,7 +572,7 @@ export function SketchTool({ onBack }) {
                         invalidEdges={invalidEdges}
                         autoAdjustedEdges={autoAdjustedEdges}
                         onExport={handleExportClick}
-                        onExportPdf={handleExportPdf}
+                        onExportImage={handleExportImage}
                     />
                 </div>
 

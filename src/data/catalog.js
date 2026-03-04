@@ -489,7 +489,7 @@ export const catalogData = {
                 addons: [
                     { id: "fiesta_foderrör", name: "Rostfritt Foderrör + Markplatta", price: 2815 },
                     { id: "fiesta_passram", name: "Passram + Däxel", price: 3406 },
-                    { id: "fiesta_tipphylsa", name: "Tipphylsa - Demo exemplar", price: 2920 }
+                    { id: "fiesta_tipphylsa", name: "Tipphylsa", price: 2920 }
                 ]
             }
         }

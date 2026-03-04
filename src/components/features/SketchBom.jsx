@@ -16,7 +16,7 @@ export function SketchBom({
     invalidEdges,
     autoAdjustedEdges,
     onExport,
-    onExportPdf
+    onExportImage
 }) {
     const keys = Object.keys(counts);
     const doorKeys = keys.filter((key) => String(key).includes('Dörr')).sort((a, b) => Number.parseInt(b, 10) - Number.parseInt(a, 10));
@@ -32,11 +32,10 @@ export function SketchBom({
             <div className="flex items-center justify-between gap-2 mb-4">
                 <h3 className="text-lg font-semibold text-text-primary m-0">📋 Materialförteckning</h3>
                 <span
-                    className={`text-xs px-2 py-1 rounded-full border ${
-                        hasInvalidEdges
+                    className={`text-xs px-2 py-1 rounded-full border ${hasInvalidEdges
                             ? 'border-danger/50 text-danger bg-danger/10'
                             : 'border-success/40 text-success bg-success/10'
-                    }`}
+                        }`}
                 >
                     {hasInvalidEdges ? 'Kräver kontroll' : 'Redo'}
                 </span>
@@ -102,11 +101,11 @@ export function SketchBom({
                     {hasInvalidEdges ? 'Exportera till Offert (bekräfta varningar)' : 'Exportera till Offert'}
                 </button>
                 <button
-                    onClick={onExportPdf}
+                    onClick={onExportImage}
                     disabled={sortedKeys.length === 0}
                     className="w-full py-2.5 border border-panel-border bg-panel-bg text-text-primary rounded-lg cursor-pointer text-sm hover:bg-white/5 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
                 >
-                    📄 Ladda ner PDF
+                    🖼️ Ladda ner Bild
                 </button>
             </div>
         </div>

@@ -710,8 +710,8 @@ export function SketchCanvas({
     );
 
     return (
-        <div className="bg-panel-bg border border-panel-border rounded-xl p-4 space-y-3">
-            <div className="flex flex-wrap items-center justify-between gap-3 text-sm">
+        <div id="sketchCanvasContainer" className="bg-panel-bg border border-panel-border rounded-xl p-4 space-y-3 text-text-primary">
+            <div className="flex flex-wrap items-center justify-between gap-3 text-sm" data-html2canvas-ignore="true">
                 <div className="text-text-secondary">
                     Zoom: <b className="text-text-primary">{activeCamera.zoom.toFixed(2)}x</b>
                 </div>

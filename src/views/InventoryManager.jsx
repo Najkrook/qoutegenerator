@@ -13,8 +13,8 @@ export function InventoryManager({ onBack }) {
     const { state, dispatch } = useQuote();
     const { user } = useAuth();
     const [searchTerm, setSearchTerm] = useState('');
-    const [showBahama, setShowBahama] = useState(true);
-    const [showClickitup, setShowClickitup] = useState(true);
+    const [showBahama, setShowBahama] = useState(false);
+    const [showClickitup, setShowClickitup] = useState(false);
     const [modalState, setModalState] = useState({ open: false, index: -1, item: null });
     const [isSaving, setIsSaving] = useState(false);
     const [isLoading, setIsLoading] = useState(true);
@@ -269,14 +269,14 @@ export function InventoryManager({ onBack }) {
 
     return (
         <div className="animate-slide-in">
-            <div className="flex justify-between items-center mb-8">
+            <div className="flex justify-between items-center mb-8 gap-4 flex-wrap">
                 <div>
                     <h2 className="text-3xl font-semibold text-text-primary m-0">Hantera Lagersaldo</h2>
                     <p className="text-text-secondary mt-1 m-0">Uppdatera lagersaldon för BaHaMa och ClickitUP. Se loggar och historik.</p>
                 </div>
                 <button
                     onClick={onBack}
-                    className="px-5 py-2.5 border border-panel-border bg-panel-bg text-text-primary rounded-lg cursor-pointer hover:bg-white/5"
+                    className="px-5 py-2.5 border border-panel-border bg-panel-bg text-text-primary rounded-lg cursor-pointer hover:bg-white/5 transition-colors"
                 >
                     ← Tillbaka
                 </button>

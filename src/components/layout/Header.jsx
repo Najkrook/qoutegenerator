@@ -27,7 +27,7 @@ export function Header() {
         <header className="mb-8">
             <div className="flex items-center justify-between gap-4 flex-wrap mb-6">
                 <div className="flex items-center gap-3">
-                    {step > 0 && (
+                    {(step > 0 || typeof step === 'string') && (
                         <button
                             type="button"
                             onClick={resetToStart}

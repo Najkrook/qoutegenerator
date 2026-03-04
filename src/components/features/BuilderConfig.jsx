@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useCallback } from 'react';
 import { useQuote } from '../../store/QuoteContext';
 import { catalogData } from '../../data/catalog';
 import { BuilderItem } from './BuilderItem';
@@ -7,9 +7,10 @@ export function BuilderConfig() {
     const { state, dispatch } = useQuote();
     const { builderItems, selectedLines, globalDiscountPct } = state;
 
-    const builderLines = selectedLines.filter((l) => catalogData[l].type === 'builder');
+    const builderLines = selectedLines.filter((l) => catalogData[l]?.type === 'builder');
 
-    const addNewItem = () => {
+    const addNewItem = useCallback(() => {
+        if (builderLines.length === 0) return;
         const defaultLine = builderLines[0];
         const models = Object.keys(catalogData[defaultLine].models);
         const defaultModel = models[0];
@@ -27,7 +28,42 @@ export function BuilderConfig() {
         };
 
         dispatch({ type: 'SET_BUILDER_ITEMS', payload: [...builderItems, newItem] });
-    };
+    }, [builderLines, builderItems, globalDiscountPct, dispatch]);
+
+    // Auto-fill an item if there are none when the configuration loads
+    useEffect(() => {
+        if (builderItems.length === 0 && builderLines.length > 0) {
+            const defaultLine = builderLines[0];
+            const models = Object.keys(catalogData[defaultLine].models);
+
+            // To fulfill the user request "like Jumbrella 4x4", let's be smart about default selection
+            let defaultModel = models[0];
+            let defaultSize = Object.keys(catalogData[defaultLine].models[defaultModel].sizes)[0];
+
+            // If Bahama is chosen, explicitly prefer Jumbrella 4x4 as requested
+            if (defaultLine === 'bahama') {
+                if (models.includes('Jumbrella')) {
+                    defaultModel = 'Jumbrella';
+                    const jumbrellaSizes = Object.keys(catalogData['bahama'].models['Jumbrella'].sizes);
+                    if (jumbrellaSizes.includes('4X4')) {
+                        defaultSize = '4X4';
+                    }
+                }
+            }
+
+            const newItem = {
+                id: Math.random().toString(36).substr(2, 9),
+                line: defaultLine,
+                model: defaultModel,
+                size: defaultSize,
+                qty: 1,
+                addons: [],
+                discountPct: globalDiscountPct
+            };
+
+            dispatch({ type: 'SET_BUILDER_ITEMS', payload: [newItem] });
+        }
+    }, []); // Run only once on mount
 
     const removeItem = (id) => {
         dispatch({ type: 'SET_BUILDER_ITEMS', payload: builderItems.filter((i) => i.id !== id) });
