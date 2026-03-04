@@ -66,12 +66,19 @@ LEVERANS OCH RISK
 
 export const DEFAULT_TEMPLATE_ID = 'standard';
 
-export function isLegalTemplateId(id) {
-    return LEGAL_TEMPLATES.some((template) => template.id === id);
+export function isBuiltinTemplateId(id) {
+    return LEGAL_TEMPLATES.some((t) => t.id === id);
 }
 
-export function getTemplateById(id) {
-    const match = LEGAL_TEMPLATES.find((template) => template.id === id);
-    if (match) return match;
-    return LEGAL_TEMPLATES.find((template) => template.id === DEFAULT_TEMPLATE_ID) || LEGAL_TEMPLATES[0];
+export function isLegalTemplateId(id, customTemplates = []) {
+    return LEGAL_TEMPLATES.some((t) => t.id === id) ||
+        customTemplates.some((t) => t.id === id);
 }
+
+export function getTemplateById(id, customTemplates = []) {
+    const all = [...LEGAL_TEMPLATES, ...customTemplates];
+    const match = all.find((t) => t.id === id);
+    if (match) return match;
+    return LEGAL_TEMPLATES.find((t) => t.id === DEFAULT_TEMPLATE_ID) || LEGAL_TEMPLATES[0];
+}
+

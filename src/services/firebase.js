@@ -7,12 +7,14 @@ import {
     updateDoc,
     increment,
     collection,
+    collectionGroup,
     writeBatch,
     query,
     orderBy,
     limit,
     startAfter,
     getDocs,
+    addDoc,
     deleteDoc,
     runTransaction
 } from "firebase/firestore";
@@ -42,12 +44,14 @@ export {
     updateDoc,
     increment,
     collection,
+    collectionGroup,
     writeBatch,
     query,
     orderBy,
     limit,
     startAfter,
     getDocs,
+    addDoc,
     deleteDoc,
     runTransaction
 };

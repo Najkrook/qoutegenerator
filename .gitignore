@@ -17,6 +17,7 @@ venv/
 
 # JS / tooling
 node_modules/
+.vite/
 
 # Secrets / credentials
 .env

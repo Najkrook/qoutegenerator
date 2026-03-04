@@ -104,14 +104,14 @@ export function Pricing({ onNext, onPrev }) {
                             type="range"
                             min="0"
                             max="100"
-                            step="0.1"
+                            step="1"
                             value={globalDiscountPct}
                             onChange={handleGlobalDiscountChange}
                             className="flex-1 accent-primary"
                         />
                         <input
                             type="number"
-                            step="0.1"
+                            step="1"
                             min="0"
                             max="100"
                             value={globalDiscountPct}

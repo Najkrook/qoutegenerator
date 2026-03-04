@@ -1,107 +1,102 @@
-# QuoteGenerator
+﻿# QuoteGenerator
 
-Local quote/inventory tool for BRIXX. A Single Page Application (SPA) built with React and Vite, utilizing Firebase for authentication and database management.
+## What This Repo Is
+QuoteGenerator is an internal quote and inventory application for BRIXX.
 
-## Technical Overview
+The active application in `main` is a React + Vite SPA with Firebase integration (Auth + Firestore). Legacy files are still present for reference, but they are not the default development path.
 
-### Tech Stack
-- **Framework**: React (v19) via Vite
-- **Styling**: Tailwind CSS (v4) configured via Vite plugin
-- **Backend/Database**: Firebase (Authentication and Firestore)
-- **State Management**: Custom React Contexts with `useReducer` and `localStorage` persistence
+## Quick Start (Recommended: React + Vite)
+### Prerequisites
+- Node.js 20+ (LTS recommended)
+- npm 10+
 
-### Project Structure (`src/`)
-- `components/`: Reusable UI building blocks (`layout`, `modals`, `features`).
-- `config/`: Configuration files and shared utilities (e.g., terms templates).
-- `services/`: Interfaces with external services (`firebase.js`, `authService.js`).
-- `store/`: Application state management (`AuthContext.jsx`, `QuoteContext.jsx`).
-- `views/`: High-level page components representing different steps in the application flow.
-
-### Architecture & Workflows
-The application relies on global state for navigation rather than traditional URL-based routing.
-
-- **QuoteContext**: Uses a global `step` state to determine which view to render. Manages complex quote state (item selections, customer information, pricing modifiers) and actively syncs with `localStorage` (`offertverktyg_state`) to prevent data loss on page reloads.
-- **AuthContext**: Manages user sessions and enforces role-based access restrictions (e.g., hiding `inventory` and `sketch` views from unauthorized users).
-- **Core Workflow**:
-  - `Step 0`: Dashboard (Start a new quote, view quote history)
-  - `Step 1`: Product Line Selection
-  - `Step 2`: Configuration (Building the quote with items/grids)
-  - `Step 3`: Pricing (Reviewing costs, applying global discounts)
-  - `Step 4`: Summary Export (Final review, PDF/Terms generation)
-
----
-
-## 1) First-time GitHub publish
-
-Create an empty private repository on GitHub first (no README, no .gitignore, no license), then run:
-
+### Run locally
 ```powershell
 cd C:\Users\rooki\Documents\Antigravity\QuoteGenerator
-git remote add origin https://github.com/<your-user>/<repo-name>.git
-git push -u origin main
+npm install
+npm run dev
 ```
 
-If `origin` already exists:
+Default Vite dev URL:
+- `http://localhost:5173` (unless overridden by local config/port conflict)
 
-```powershell
-git remote set-url origin https://github.com/<your-user>/<repo-name>.git
-git push -u origin main
-```
+Firebase note:
+- The app expects valid Firebase project configuration in the codebase/runtime environment.
+- Never commit secrets or private credential files.
 
-## 2) Verify sensitive-file safety before push
+## Available Scripts
+From the repository root:
 
-Run:
+- `npm run dev`: Start local Vite dev server.
+- `npm run build`: Create production build in `dist/`.
+- `npm run preview`: Preview production build locally.
+- `npm run test`: Run Vitest in interactive mode.
+- `npm run test:watch`: Run Vitest in watch mode.
+- `npm run test:run`: Run Vitest once (basic reporter).
 
+## Environment & Secrets
+Do not commit secrets or local-only credentials.
+
+Common sensitive/local files include:
+- `.env`, `.env.*`, `*.env`
+- `API_keys.env`
+- `credentials.json`
+- `token.json`
+- `token.pickle`
+
+Before pushing, run:
 ```powershell
 git status
 git ls-files
 powershell -ExecutionPolicy Bypass -File .\scripts\verify-git-safety.ps1
 ```
 
-The script fails if common secret files are tracked.
+## Project Structure (Current App)
+Main runtime code lives under `src/`:
 
-## 3) Security baseline (public repo)
+- `src/views/`: Step-level application views.
+- `src/components/`: Reusable UI building blocks.
+- `src/store/`: Global app state/context (`AuthContext`, `QuoteContext`).
+- `src/services/`: Firebase and domain service integrations.
+- `src/utils/`: Shared helpers and calculation logic.
+- `src/data/`: Catalog and static data.
+- `src/config/`: Shared UI/config utilities.
 
-1. Never commit secrets or local-only runtime files.
-2. All changes must go through PRs into `main` (no direct pushes).
-3. Run the safety script before every push:
+Legacy files also exist in repository root (see Legacy section), but are not the primary app path.
+
+## Core Workflow
+The app uses state-driven navigation (not URL routing) and follows this quote flow:
+
+1. Dashboard
+2. Product Line Selection
+3. Configuration
+4. Pricing
+5. Summary Export
+
+## Testing and Build
+Recommended validation before opening or merging a PR:
+
+```powershell
+npm run test:run
+npm run build
+```
+
+Note:
+- Vite may warn about large chunk sizes during build. This is informational unless your release policy says otherwise.
+
+## Security and Git Safety
+Baseline team policy:
+
+1. Never commit secrets or local runtime files.
+2. Use PR-based changes into `main` (avoid direct pushes to `main`).
+3. Run the safety script before push:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\scripts\verify-git-safety.ps1
 ```
 
-## 4) Connect repository in Codex UI
-
-In Codex:
-
-1. `Select repository` -> `Configure Repositories on GitHub`
-2. Authorize Codex app
-3. Choose `Only select repositories`
-4. Select this repository
-5. Refresh repository list
-
-Then create environment with:
-
-- Startup command: `python server.py`
-- App URL: `http://localhost:8000/index.html`
-
-## 5) Daily workflow
-
-```powershell
-git checkout main
-git pull
-git checkout -b fix/<short-name>
-# make changes
-git add .
-git commit -m "Describe change"
-git push -u origin fix/<short-name>
-```
-
-Open a PR to `main` from GitHub.
-
-## 6) Firestore security rules
-
-This repository includes [`firestore.rules`](firestore.rules) with the intended baseline:
+## Firestore Rules and Deploy Notes
+This repository includes `firestore.rules` with the intended baseline:
 
 - Users can only access their own quotes: `/users/{uid}/quotes/*`
 - Users can only access their own quote revisions: `/users/{uid}/quotes/*/revisions/*`
@@ -110,14 +105,12 @@ This repository includes [`firestore.rules`](firestore.rules) with the intended 
 
 Before deploy:
 
-1. Replace `UID_ADMIN_1..3` in `firestore.rules` with your real Firebase Auth UIDs.
-2. Deploy rules from Firebase console or Firebase CLI.
+1. Replace `UID_ADMIN_1..3` values in `firestore.rules` with real Firebase Auth UIDs.
+2. Deploy rules via Firebase Console or Firebase CLI.
 
-## 7) Quote lifecycle rollout notes
-
-- Lifecycle is enabled by default. You can disable it locally by setting:
-  - `window.FEATURE_QUOTE_LIFECYCLE = false` (before app scripts run)
-- Legacy quote docs are still readable.
+Quote lifecycle notes:
+- Lifecycle is enabled by default.
+- You can disable locally with `window.FEATURE_QUOTE_LIFECYCLE = false` (set before app scripts run).
 - Optional metadata backfill script:
 
 ```powershell
@@ -126,8 +119,33 @@ node .\scripts\backfill-quote-metadata.mjs
 
 Requires Firebase Admin credentials (`GOOGLE_APPLICATION_CREDENTIALS` or `FIREBASE_SERVICE_ACCOUNT_JSON`).
 
-## 8) Scrive integration (currently disabled)
+Scrive integration notes:
+- Scrive UI/actions are currently disabled.
+- Existing Scrive metadata fields are retained for backward compatibility.
+- `integrations/scrive-proxy/` remains as reference scaffold.
 
-- Scrive UI/actions are disabled in the current release.
-- Existing Scrive metadata fields on quote documents are kept for backward compatibility.
-- The backend scaffold in `integrations/scrive-proxy/` is kept as inactive reference code.
+## Legacy/Reference Notes (Non-default)
+These are kept for reference, fallback, or historical context. They are not the default development workflow.
+
+- `server.py` and `start_server.bat`: legacy local server tooling.
+- `index_legacy.html`: legacy UI entrypoint retained for rollback/reference.
+- Some legacy modules under root `features/`/`services/` still exist alongside modern `src/` implementation.
+
+Use React + Vite (`npm run dev`) unless you are explicitly debugging legacy behavior.
+
+## Branch and Contribution Flow
+Typical workflow:
+
+```powershell
+git checkout main
+git pull
+git checkout -b fix/<short-name>
+# make changes
+npm run test:run
+npm run build
+git add .
+git commit -m "Describe change"
+git push -u origin fix/<short-name>
+```
+
+Then open a PR to `main` in GitHub.

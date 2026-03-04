@@ -1,5 +1,5 @@
 ﻿import React, { createContext, useContext, useReducer, useEffect } from 'react';
-import { DEFAULT_TEMPLATE_ID, getTemplateById, isLegalTemplateId } from '../../config/legalTemplates.shared.js';
+import { DEFAULT_TEMPLATE_ID, isBuiltinTemplateId, getTemplateById } from '../../config/legalTemplates.shared.js';
 
 const QuoteContext = createContext();
 
@@ -22,10 +22,9 @@ function formatValidityLabel(days) {
 }
 
 function normalizePdfOptions(state) {
-    const safeTemplateId = isLegalTemplateId(state.termsTemplateId)
-        ? state.termsTemplateId
-        : DEFAULT_TEMPLATE_ID;
-    const template = getTemplateById(safeTemplateId);
+    // Accept any template ID (built-in or custom Firestore ID) — fallback to default if empty
+    const safeTemplateId = state.termsTemplateId || DEFAULT_TEMPLATE_ID;
+    const template = isBuiltinTemplateId(safeTemplateId) ? getTemplateById(safeTemplateId) : null;
 
     const customerInfoSource = state.customerInfo || {};
     const validityFromCustomer = parseValidityDays(customerInfoSource.validity);
@@ -44,7 +43,7 @@ function normalizePdfOptions(state) {
         termsTemplateId: safeTemplateId,
         termsText: typeof state.termsText === 'string' && state.termsText.trim().length > 0
             ? state.termsText
-            : template.body,
+            : (template?.body || ''),
         termsCustomized: typeof state.termsCustomized === 'boolean' ? state.termsCustomized : false,
         includeSignatureBlock: state.includeSignatureBlock === true,
         includePaymentBox: state.includePaymentBox === true,
@@ -146,7 +145,7 @@ function quoteReducer(state, action) {
         case 'SET_TERMS_TEMPLATE_ID':
             return {
                 ...state,
-                termsTemplateId: isLegalTemplateId(action.payload) ? action.payload : DEFAULT_TEMPLATE_ID
+                termsTemplateId: action.payload || DEFAULT_TEMPLATE_ID
             };
         case 'SET_TERMS_CUSTOMIZED':
             return { ...state, termsCustomized: Boolean(action.payload) };

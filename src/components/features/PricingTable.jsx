@@ -88,7 +88,7 @@ export function PricingTable() {
                                 {!row.isCustom && (
                                     <input
                                         type="number"
-                                        step="0.1"
+                                        step="1"
                                         value={row.discountPct}
                                         onChange={(e) => handleDiscountChange(row.source, e.target.value)}
                                         className={`w-16 text-center bg-black/20 border border-panel-border rounded p-1 text-sm outline-none focus:border-primary ${row.discountPct > 0 ? 'text-primary' : ''}`}

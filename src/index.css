@@ -23,3 +23,19 @@ body {
   font-family: 'Inter', sans-serif;
   -webkit-font-smoothing: antialiased;
 }
+
+select,
+select option,
+select optgroup {
+  background-color: var(--color-panel-bg);
+  color: var(--color-text-primary);
+}
+
+select optgroup {
+  font-weight: 600;
+  font-style: normal;
+  color: var(--color-text-secondary);
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
