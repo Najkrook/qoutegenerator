@@ -15,9 +15,7 @@ export function Header() {
     ];
 
     const resetToStart = () => {
-        localStorage.removeItem('offertverktyg_state');
         dispatch({ type: 'RESET_STATE' });
-        window.location.assign('index.html');
     };
 
     const handleLogout = async () => {
@@ -27,39 +25,46 @@ export function Header() {
 
     return (
         <header className="mb-8">
-            <div className="flex justify-center items-center gap-4 flex-wrap mb-6">
-                <h1 className="text-2xl font-semibold m-0">Offertverktyg System</h1>
+            <div className="flex items-center justify-between gap-4 flex-wrap mb-6">
+                <div className="flex items-center gap-3">
+                    {step > 0 && (
+                        <button
+                            type="button"
+                            onClick={resetToStart}
+                            className="bg-danger border border-danger text-white text-sm font-medium px-4 py-2 rounded-lg cursor-pointer hover:bg-red-600 hover:border-red-600 transition-all shadow-sm flex items-center gap-2 group"
+                            title="Varning: Detta kommer att rensa din nuvarande offert!"
+                        >
+                            <span>🏠</span>
+                            <span className="inline-block group-hover:hidden whitespace-nowrap">Start</span>
+                            <span className="hidden group-hover:inline-block whitespace-nowrap">Rensa offert</span>
+                        </button>
+                    )}
+                    <h1 className="text-2xl font-semibold m-0">Offertverktyg System</h1>
+                </div>
 
-                {canViewEverything && (
-                    <a href="history.html" className="text-text-primary no-underline font-medium text-sm bg-panel-bg px-3 py-1.5 rounded-md border border-panel-border transition-colors hover:bg-panel-border">
-                        Mina Offerter
-                    </a>
-                )}
+                <div className="flex items-center gap-3">
+                    {canViewEverything && (
+                        <a href="history.html" className="text-text-primary no-underline font-medium text-sm bg-panel-bg px-3 py-1.5 rounded-md border border-panel-border transition-colors hover:bg-panel-border">
+                            Mina Offerter
+                        </a>
+                    )}
 
-                {canViewEverything && (
-                    <a href="inventory-logs.html" className="text-text-primary no-underline font-medium text-sm bg-panel-bg px-3 py-1.5 rounded-md border border-panel-border transition-colors hover:bg-panel-border">
-                        Lagerloggar
-                    </a>
-                )}
+                    {canViewEverything && (
+                        <a href="inventory-logs.html" className="text-text-primary no-underline font-medium text-sm bg-panel-bg px-3 py-1.5 rounded-md border border-panel-border transition-colors hover:bg-panel-border">
+                            Lagerloggar
+                        </a>
+                    )}
 
-                <button
-                    type="button"
-                    onClick={resetToStart}
-                    className="bg-danger border-danger text-white text-xs px-3 py-1.5 rounded-md cursor-pointer hover:opacity-90 transition-opacity"
-                    title="Rensar aktuell offert och återgår till startmenyn"
-                >
-                    Tillbaka till Start
-                </button>
-
-                <div className="flex items-center gap-2 bg-panel-bg px-3 py-1.5 rounded-md border border-panel-border text-sm">
-                    <span className="text-text-secondary">Användare:</span>
-                    <span className="text-text-primary font-medium">{user?.email || '-'}</span>
-                    <button
-                        onClick={handleLogout}
-                        className="bg-transparent border-none text-text-secondary cursor-pointer text-xs px-2 py-1 border-l border-panel-border ml-1 hover:text-text-primary"
-                    >
-                        Logga ut
-                    </button>
+                    <div className="flex items-center gap-2 bg-panel-bg px-3 py-1.5 rounded-md border border-panel-border text-sm">
+                        <span className="text-text-secondary">Användare:</span>
+                        <span className="text-text-primary font-medium">{user?.email || '-'}</span>
+                        <button
+                            onClick={handleLogout}
+                            className="bg-transparent border-none text-text-secondary cursor-pointer text-xs px-2 py-1 border-l border-panel-border ml-1 hover:text-text-primary"
+                        >
+                            Logga ut
+                        </button>
+                    </div>
                 </div>
             </div>
 

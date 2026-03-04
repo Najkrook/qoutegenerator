@@ -55,19 +55,22 @@ function normalizeDoorSize(rawValue) {
     return nearestFromList(base, DOOR_SIZES);
 }
 
-export function SketchConfig({ config, onChange, selectedEdge, onSelectEdge }) {
+export function SketchConfig({ config, onChange, selectedEdge, selectedSegmentIndex, onSelectEdge, onSetManualPin, onClearManualPins, edgeSummaries }) {
     const {
         width,
         depth,
+        depthLeft,
+        depthRight,
+        equalDepth,
         includeBack,
         prioMode,
         targetLength,
         doorEdges,
-        doorSizeByEdge = {}
+        doorSizeByEdge = {},
+        manualSectionsByEdge = {}
     } = config;
 
     const visibleEdges = EDGE_META.filter(({ key }) => key !== 'back' || includeBack);
-    const activeEdge = visibleEdges.find((edge) => edge.key === selectedEdge) || visibleEdges[0];
 
     const toggleDoor = (edge) => {
         const newDoors = new Set(doorEdges);
@@ -86,37 +89,20 @@ export function SketchConfig({ config, onChange, selectedEdge, onSelectEdge }) {
 
     const visibleDoorEdges = visibleEdges.filter(({ key }) => doorEdges.has(key));
 
-    const resetActiveEdgeDimension = () => {
-        if (!activeEdge) return;
-        if (activeEdge.dimension === 'width') {
-            onChange({ width: normalizeDimension(7000, width) });
-            return;
-        }
-        onChange({ depth: normalizeDimension(2300, depth) });
-    };
+    // Determine selected segment if any
+    const selectedEdgeSummary = edgeSummaries?.[selectedEdge];
+    const selectedSegment = (selectedSegmentIndex !== null && selectedSegmentIndex !== undefined)
+        ? selectedEdgeSummary?.segments?.find((s) => s.index === selectedSegmentIndex && !s.isDoor)
+        : null;
+
+    // Current manual pin for the selected segment (null = auto)
+    const existingPin = (manualSectionsByEdge[selectedEdge] || []).find((p) => p.index === selectedSegmentIndex);
+    const currentPinSize = existingPin?.size ?? null;
+    const hasAnyPins = (manualSectionsByEdge[selectedEdge] || []).length > 0;
 
     return (
         <div className="bg-panel-bg border border-panel-border rounded-xl p-5 space-y-5">
             <h3 className="text-lg font-semibold text-text-primary m-0">⚙️ Konfiguration</h3>
-
-            <div className="space-y-2">
-                <label className="text-xs font-semibold text-text-secondary uppercase">Aktiv kant</label>
-                <div className="flex flex-wrap gap-2">
-                    {visibleEdges.map((edge) => (
-                        <button
-                            key={edge.key}
-                            onClick={() => onSelectEdge?.(edge.key)}
-                            className={`px-3 py-1.5 rounded-md text-sm border transition-colors ${
-                                edge.key === activeEdge?.key
-                                    ? 'bg-primary border-primary text-white'
-                                    : 'bg-input-bg border-panel-border text-text-secondary hover:text-text-primary'
-                            }`}
-                        >
-                            {edge.label}
-                        </button>
-                    ))}
-                </div>
-            </div>
 
             <div className="grid grid-cols-2 gap-4">
                 <div className="flex flex-col gap-1.5">
@@ -130,37 +116,60 @@ export function SketchConfig({ config, onChange, selectedEdge, onSelectEdge }) {
                         className="bg-input-bg border border-panel-border text-text-primary p-2.5 rounded-lg outline-none focus:border-primary text-sm"
                     />
                 </div>
-                <div className="flex flex-col gap-1.5">
-                    <label className="text-xs font-semibold text-text-secondary uppercase">Djup (mm)</label>
-                    <input
-                        type="number"
-                        value={depth}
-                        step={STEP_MM}
-                        min={MIN_DIMENSION_MM}
-                        onChange={(e) => onChange({ depth: normalizeDimension(e.target.value, depth) })}
-                        className="bg-input-bg border border-panel-border text-text-primary p-2.5 rounded-lg outline-none focus:border-primary text-sm"
-                    />
-                </div>
+                {equalDepth ? (
+                    <div className="flex flex-col gap-1.5">
+                        <label className="text-xs font-semibold text-text-secondary uppercase">Djup (mm)</label>
+                        <input
+                            type="number"
+                            value={depth}
+                            step={STEP_MM}
+                            min={MIN_DIMENSION_MM}
+                            onChange={(e) => onChange({ depth: normalizeDimension(e.target.value, depth), depthLeft: normalizeDimension(e.target.value, depth), depthRight: normalizeDimension(e.target.value, depth) })}
+                            className="bg-input-bg border border-panel-border text-text-primary p-2.5 rounded-lg outline-none focus:border-primary text-sm"
+                        />
+                    </div>
+                ) : (
+                    <div />
+                )}
             </div>
 
-            <div className="flex flex-wrap gap-2">
-                {activeEdge && (
-                    <button
-                        onClick={() => toggleDoor(activeEdge.key)}
-                        className="px-3 py-1.5 rounded-md text-sm border border-panel-border bg-input-bg text-text-secondary hover:text-text-primary"
-                    >
-                        {doorEdges.has(activeEdge.key) ? 'Ta bort dörr på aktiv kant' : 'Lägg till dörr på aktiv kant'}
-                    </button>
-                )}
-                {activeEdge && (
-                    <button
-                        onClick={resetActiveEdgeDimension}
-                        className="px-3 py-1.5 rounded-md text-sm border border-panel-border bg-input-bg text-text-secondary hover:text-text-primary"
-                    >
-                        Återställ {activeEdge.dimension === 'width' ? 'bredd' : 'djup'}
-                    </button>
-                )}
-            </div>
+            {/* Lika djup toggle */}
+            <label className="flex items-center gap-3 cursor-pointer select-none">
+                <div
+                    className={`relative inline-flex h-5 w-9 rounded-full transition-colors ${equalDepth ? 'bg-primary' : 'bg-gray-600'}`}
+                    onClick={() => onChange({ equalDepth: !equalDepth })}
+                >
+                    <span className={`absolute top-0.5 left-0.5 h-4 w-4 rounded-full bg-white shadow transition-transform ${equalDepth ? 'translate-x-4' : 'translate-x-0'}`} />
+                </div>
+                <span className="text-sm text-text-primary">Lika djup</span>
+            </label>
+
+            {!equalDepth && (
+                <div className="grid grid-cols-2 gap-4">
+                    <div className="flex flex-col gap-1.5">
+                        <label className="text-xs font-semibold text-text-secondary uppercase">Vänster djup (mm)</label>
+                        <input
+                            type="number"
+                            value={depthLeft}
+                            step={STEP_MM}
+                            min={MIN_DIMENSION_MM}
+                            onChange={(e) => onChange({ depthLeft: normalizeDimension(e.target.value, depthLeft) })}
+                            className="bg-input-bg border border-panel-border text-text-primary p-2.5 rounded-lg outline-none focus:border-primary text-sm"
+                        />
+                    </div>
+                    <div className="flex flex-col gap-1.5">
+                        <label className="text-xs font-semibold text-text-secondary uppercase">Höger djup (mm)</label>
+                        <input
+                            type="number"
+                            value={depthRight}
+                            step={STEP_MM}
+                            min={MIN_DIMENSION_MM}
+                            onChange={(e) => onChange({ depthRight: normalizeDimension(e.target.value, depthRight) })}
+                            className="bg-input-bg border border-panel-border text-text-primary p-2.5 rounded-lg outline-none focus:border-primary text-sm"
+                        />
+                    </div>
+                </div>
+            )}
 
             <label className="flex items-center gap-3 cursor-pointer">
                 <input
@@ -214,6 +223,44 @@ export function SketchConfig({ config, onChange, selectedEdge, onSelectEdge }) {
                 </div>
             )}
 
+            {/* === Section override panel — shown when a pane is clicked === */}
+            {selectedSegment && (
+                <div className="border border-amber-500/40 bg-amber-500/10 rounded-xl p-4 space-y-3">
+                    <div className="flex justify-between items-center">
+                        <span className="text-xs font-semibold text-amber-400 uppercase">Manuell sektion</span>
+                        {currentPinSize !== null && (
+                            <button
+                                onClick={() => onSetManualPin?.(selectedEdge, selectedSegmentIndex, null)}
+                                className="text-xs text-amber-400 hover:text-amber-300 underline"
+                            >
+                                ↺ Auto
+                            </button>
+                        )}
+                    </div>
+                    <p className="text-xs text-text-secondary m-0">
+                        Sektion {selectedSegmentIndex + 1} &bull; Nuvarande: <b className="text-text-primary">{currentPinSize ?? selectedSegment.length} mm</b>
+                        {currentPinSize !== null && <span className="text-amber-400 ml-1">(Låst)</span>}
+                    </p>
+                    <select
+                        value={currentPinSize ?? selectedSegment.length}
+                        onChange={(e) => onSetManualPin?.(selectedEdge, selectedSegmentIndex, Number(e.target.value))}
+                        className="w-full bg-input-bg border border-amber-500/40 text-text-primary p-2.5 rounded-lg outline-none focus:border-amber-400 text-sm"
+                    >
+                        {SECTION_SIZES.map((size) => (
+                            <option key={size} value={size}>{size} mm</option>
+                        ))}
+                    </select>
+                    {hasAnyPins && (
+                        <button
+                            onClick={() => onClearManualPins?.(selectedEdge)}
+                            className="w-full px-3 py-1.5 rounded-md text-xs border border-amber-500/40 bg-amber-500/10 text-amber-400 hover:bg-amber-500/20 transition-colors"
+                        >
+                            Återställ alla manuella på denna kant
+                        </button>
+                    )}
+                </div>
+            )}
+
             <div className="flex flex-col gap-2">
                 <label className="text-xs font-semibold text-text-secondary uppercase">Dörrplacering</label>
                 <div className="flex flex-wrap gap-3">
@@ -239,9 +286,8 @@ export function SketchConfig({ config, onChange, selectedEdge, onSelectEdge }) {
                             <div key={key} className="grid grid-cols-[1fr_140px] gap-3 items-center">
                                 <button
                                     onClick={() => onSelectEdge?.(key)}
-                                    className={`text-sm text-left ${
-                                        selectedEdge === key ? 'text-primary font-semibold' : 'text-text-primary'
-                                    }`}
+                                    className={`text-sm text-left ${selectedEdge === key ? 'text-primary font-semibold' : 'text-text-primary'
+                                        }`}
                                 >
                                     {label}
                                 </button>

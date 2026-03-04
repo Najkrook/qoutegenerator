@@ -66,8 +66,24 @@ function normalizeDoorSize(rawValue) {
 
 function sanitizeConfig(config) {
     const next = { ...config };
-    next.width = normalizeDimension(next.width, 7000);
-    next.depth = normalizeDimension(next.depth, 2300);
+    next.width = normalizeDimension(next.width, 8000);
+    next.equalDepth = next.equalDepth !== false; // default true
+
+    const primaryDepth = normalizeDimension(next.depth ?? next.depthLeft ?? next.depthRight, 4000);
+    const normalizedDepthLeft = normalizeDimension(next.depthLeft, primaryDepth);
+    const normalizedDepthRight = normalizeDimension(next.depthRight, primaryDepth);
+
+    if (next.equalDepth) {
+        const sharedDepth = primaryDepth;
+        next.depth = sharedDepth;
+        next.depthLeft = sharedDepth;
+        next.depthRight = sharedDepth;
+    } else {
+        next.depthLeft = normalizedDepthLeft;
+        next.depthRight = normalizedDepthRight;
+        next.depth = Math.max(normalizedDepthLeft, normalizedDepthRight); // keep for backwards compat
+    }
+
     next.targetLength = normalizeTarget(next.targetLength, 1500);
     next.includeBack = !!next.includeBack;
     next.prioMode = ['symmetrical', 'convenient', 'target'].includes(next.prioMode) ? next.prioMode : 'symmetrical';
@@ -107,24 +123,28 @@ export function SketchTool({ onBack }) {
 
     const [config, setConfig] = useState(() =>
         sanitizeConfig({
-            width: 7000,
-            depth: 2300,
+            width: 8000,
+            depth: 4000,
+            depthLeft: 4000,
+            depthRight: 4000,
+            equalDepth: true,
             includeBack: false,
             prioMode: 'symmetrical',
             targetLength: 1500,
             doorEdges: new Set(),
-            doorSizeByEdge: {}
+            doorSizeByEdge: {},
+            manualSectionsByEdge: {}
         })
     );
 
     const [workspace, setWorkspace] = useState(() => ({
         camera: DEFAULT_CAMERA,
         selection: { edgeKey: 'front', segmentIndex: null },
-        interactionMode: 'select',
         uiDensity: getInitialDensity()
     }));
 
     const [showStockModal, setShowStockModal] = useState(false);
+    const [dragPreview, setDragPreview] = useState(null);
 
     const updateConfig = useCallback((partial) => {
         setConfig((prev) => {
@@ -134,13 +154,55 @@ export function SketchTool({ onBack }) {
                 doorSizeByEdge: {
                     ...(prev.doorSizeByEdge || {}),
                     ...(partial.doorSizeByEdge || {})
+                },
+                manualSectionsByEdge: {
+                    ...(prev.manualSectionsByEdge || {}),
+                    ...(partial.manualSectionsByEdge || {})
                 }
             };
             return sanitizeConfig(merged);
         });
     }, []);
 
+    const setManualPin = useCallback((edgeKey, segmentIndex, size) => {
+        setConfig((prev) => {
+            const prevPins = (prev.manualSectionsByEdge || {})[edgeKey] || [];
+            const filtered = prevPins.filter((p) => p.index !== segmentIndex);
+            const nextPins = size !== null
+                ? [...filtered, { index: segmentIndex, size }]
+                : filtered;
+            return {
+                ...prev,
+                manualSectionsByEdge: {
+                    ...(prev.manualSectionsByEdge || {}),
+                    [edgeKey]: nextPins
+                }
+            };
+        });
+    }, []);
+
+    const clearManualPins = useCallback((edgeKey) => {
+        setConfig((prev) => {
+            const next = { ...(prev.manualSectionsByEdge || {}) };
+            delete next[edgeKey];
+            return { ...prev, manualSectionsByEdge: next };
+        });
+    }, []);
+
     const layout = useMemo(() => computeLayout(config), [config]);
+    const previewConfig = useMemo(() => {
+        if (!dragPreview) return config;
+        return sanitizeConfig({
+            ...config,
+            ...dragPreview,
+            doorSizeByEdge: config.doorSizeByEdge,
+            manualSectionsByEdge: config.manualSectionsByEdge
+        });
+    }, [config, dragPreview]);
+    const previewLayout = useMemo(
+        () => (dragPreview ? computeLayout(previewConfig) : layout),
+        [dragPreview, previewConfig, layout]
+    );
 
     const invalidEdges = useMemo(
         () => Object.entries(layout.edgeDiagnostics || {}).filter(([, diag]) => !diag.valid),
@@ -164,9 +226,26 @@ export function SketchTool({ onBack }) {
 
     const canExport = layout.allSections.length > 0;
 
-    const handleResize = useCallback(
+    const handleResizePreview = useCallback((dims) => {
+        if (!dims || Object.keys(dims).length === 0) {
+            setDragPreview(null);
+            return;
+        }
+
+        setDragPreview((prev) => {
+            const base = prev || {};
+            const merged = { ...base, ...dims };
+            const changed = Object.entries(dims).some(([key, value]) => base[key] !== value);
+            return changed ? merged : base;
+        });
+    }, []);
+
+    const handleResizeCommit = useCallback(
         (dims) => {
-            updateConfig(dims);
+            setDragPreview(null);
+            if (dims && Object.keys(dims).length > 0) {
+                updateConfig(dims);
+            }
         },
         [updateConfig]
     );
@@ -185,12 +264,7 @@ export function SketchTool({ onBack }) {
         }));
     }, []);
 
-    const setInteractionMode = useCallback((interactionMode) => {
-        setWorkspace((prev) => ({
-            ...prev,
-            interactionMode
-        }));
-    }, []);
+
 
     const setUiDensity = useCallback((uiDensity) => {
         setWorkspace((prev) => ({
@@ -234,7 +308,17 @@ export function SketchTool({ onBack }) {
                 }
                 updateConfig({ doorEdges: nextDoors, doorSizeByEdge: nextDoorSizeByEdge });
             } else if (suggestion.type === 'setDimension') {
-                updateConfig({ [suggestion.dimension]: suggestion.value });
+                let nextDimensionUpdate = { [suggestion.dimension]: suggestion.value };
+                if (suggestion.dimension === 'depth') {
+                    nextDimensionUpdate = config.equalDepth
+                        ? { depth: suggestion.value }
+                        : suggestion.edge === 'left'
+                            ? { depthLeft: suggestion.value }
+                            : suggestion.edge === 'right'
+                                ? { depthRight: suggestion.value }
+                                : { depth: suggestion.value };
+                }
+                updateConfig(nextDimensionUpdate);
             }
 
             setWorkspace((prev) => ({
@@ -336,56 +420,37 @@ export function SketchTool({ onBack }) {
                         Skissa en rektangel och beräkna optimala ClickitUP-sektioner automatiskt.
                     </p>
                 </div>
-                <button
-                    onClick={onBack}
-                    className="px-5 py-2.5 border border-panel-border bg-panel-bg text-text-primary rounded-lg cursor-pointer hover:bg-white/5"
-                >
-                    ← Tillbaka
-                </button>
-            </div>
-
-            <div className="bg-panel-bg border border-panel-border rounded-xl p-4 flex flex-wrap items-center justify-between gap-3">
-                <div className="flex flex-wrap gap-2">
-                    {[
-                        { id: 'select', label: 'Välj' },
-                        { id: 'pan', label: 'Panorera' },
-                        { id: 'resize', label: 'Skala' }
-                    ].map((mode) => (
+                <div className="flex items-center gap-3">
+                    <div className="flex gap-2">
                         <button
-                            key={mode.id}
-                            onClick={() => setInteractionMode(mode.id)}
-                            className={`px-3 py-1.5 rounded-md text-sm border transition-colors ${
-                                workspace.interactionMode === mode.id
-                                    ? 'bg-primary border-primary text-white'
-                                    : 'bg-input-bg border-panel-border text-text-secondary hover:text-text-primary'
-                            }`}
+                            onClick={resetCamera}
+                            className="px-3 py-2 rounded-lg text-sm border border-panel-border bg-input-bg text-text-secondary hover:text-text-primary transition-colors"
                         >
-                            {mode.label}
+                            Återställ vy
                         </button>
-                    ))}
-                </div>
 
-                <div className="flex flex-wrap gap-2 items-center">
+                        <div className="flex rounded-lg border border-panel-border overflow-hidden bg-input-bg">
+                            {['desktop', 'touch'].map((density) => (
+                                <button
+                                    key={density}
+                                    onClick={() => setUiDensity(density)}
+                                    className={`px-4 py-2 text-sm transition-colors ${workspace.uiDensity === density
+                                        ? 'bg-primary text-white font-medium'
+                                        : 'text-text-secondary hover:text-text-primary hover:bg-white/5'
+                                        }`}
+                                >
+                                    {density === 'desktop' ? 'Desktop' : 'Touch'}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+
                     <button
-                        onClick={resetCamera}
-                        className="px-3 py-1.5 rounded-md text-sm border border-panel-border bg-input-bg text-text-secondary hover:text-text-primary"
+                        onClick={onBack}
+                        className="px-5 py-2 border border-panel-border bg-panel-bg text-text-primary rounded-lg cursor-pointer hover:bg-white/5 shadow-sm"
                     >
-                        Återställ vy
+                        ← Tillbaka
                     </button>
-
-                    {['desktop', 'touch'].map((density) => (
-                        <button
-                            key={density}
-                            onClick={() => setUiDensity(density)}
-                            className={`px-3 py-1.5 rounded-md text-sm border transition-colors ${
-                                workspace.uiDensity === density
-                                    ? 'bg-primary border-primary text-white'
-                                    : 'bg-input-bg border-panel-border text-text-secondary hover:text-text-primary'
-                            }`}
-                        >
-                            {density === 'desktop' ? 'Desktop' : 'Touch'}
-                        </button>
-                    ))}
                 </div>
             </div>
 
@@ -417,7 +482,11 @@ export function SketchTool({ onBack }) {
                         config={config}
                         onChange={updateConfig}
                         selectedEdge={workspace.selection.edgeKey}
+                        selectedSegmentIndex={workspace.selection.segmentIndex}
                         onSelectEdge={handleSelectEdge}
+                        onSetManualPin={setManualPin}
+                        onClearManualPins={clearManualPins}
+                        edgeSummaries={layout.edgeSummaries}
                     />
 
                     <div className="bg-panel-bg border border-panel-border rounded-xl p-5">
@@ -457,34 +526,48 @@ export function SketchTool({ onBack }) {
 
                 <div className="xl:sticky xl:top-4 xl:self-start space-y-4">
                     <SketchCanvas
-                        width={config.width}
-                        depth={config.depth}
-                        includeBack={config.includeBack}
-                        leftEdge={layout.leftEdge}
-                        rightEdge={layout.rightEdge}
-                        frontEdge={layout.frontEdge}
-                        backEdge={layout.backEdge}
-                        edgeDiagnostics={layout.edgeDiagnostics}
-                        edgeSummaries={layout.edgeSummaries}
-                        layoutWarnings={layout.layoutWarnings}
-                        suggestions={layout.suggestions}
+                        width={previewConfig.width}
+                        depth={previewConfig.depth}
+                        depthLeft={previewConfig.depthLeft}
+                        depthRight={previewConfig.depthRight}
+                        equalDepth={previewConfig.equalDepth}
+                        includeBack={previewConfig.includeBack}
+                        leftEdge={previewLayout.leftEdge}
+                        rightEdge={previewLayout.rightEdge}
+                        frontEdge={previewLayout.frontEdge}
+                        backEdge={previewLayout.backEdge}
+                        edgeDiagnostics={previewLayout.edgeDiagnostics}
+                        edgeSummaries={previewLayout.edgeSummaries}
+                        layoutWarnings={previewLayout.layoutWarnings}
+                        suggestions={previewLayout.suggestions}
                         camera={workspace.camera}
                         selection={workspace.selection}
-                        interactionMode={workspace.interactionMode}
                         uiDensity={workspace.uiDensity}
                         onSelectEdge={handleSelectEdge}
+                        onSelectSection={(edgeKey, segmentIndex) => {
+                            setWorkspace((prev) => ({
+                                ...prev,
+                                selection: { edgeKey, segmentIndex }
+                            }));
+                        }}
                         onApplySuggestion={applySuggestion}
                         onCameraChange={handleCameraChange}
-                        onResize={handleResize}
+                        onResizePreview={handleResizePreview}
+                        onResizeCommit={handleResizeCommit}
                     />
 
                     <div className="flex flex-wrap justify-center gap-4 text-sm text-text-secondary">
                         <span>
                             Bredd: <b className="text-text-primary">{config.width} mm</b>
                         </span>
-                        <span>
-                            Djup: <b className="text-text-primary">{config.depth} mm</b>
-                        </span>
+                        {config.equalDepth ? (
+                            <span>Djup: <b className="text-text-primary">{config.depth} mm</b></span>
+                        ) : (
+                            <>
+                                <span>Vänster: <b className="text-text-primary">{config.depthLeft} mm</b></span>
+                                <span>Höger: <b className="text-text-primary">{config.depthRight} mm</b></span>
+                            </>
+                        )}
                         <span>
                             Sektioner: <b className="text-text-primary">{layout.allSections.length} st</b>
                         </span>

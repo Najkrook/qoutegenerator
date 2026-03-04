@@ -3,20 +3,20 @@
  * Pure logic - no UI dependencies.
  */
 
-export const STEP_MM = 100;
-export const MIN_DIMENSION_MM = 1000;
-export const SECTION_SIZES = [2000, 1900, 1800, 1700, 1600, 1500, 1400, 1300, 1200, 1100, 1000, 700];
-export const DOOR_SIZES = [1100, 1000, 700];
-export const MIN_SECTION_SIZE = 700;
-export const STANDARD_SIZES = SECTION_SIZES;
-export const DOOR_LABEL = 'Dörr';
+const STEP_MM = 100;
+const MIN_DIMENSION_MM = 1000;
+const SECTION_SIZES = [2000, 1900, 1800, 1700, 1600, 1500, 1400, 1300, 1200, 1100, 1000, 700];
+const DOOR_SIZES = [1100, 1000, 700];
+const MIN_SECTION_SIZE = 700;
+const STANDARD_SIZES = SECTION_SIZES;
+const DOOR_LABEL = 'Dörr';
 
 const EDGE_KEYS = ['front', 'left', 'right', 'back'];
 const EDGE_TO_DIMENSION = {
     front: 'width',
     back: 'width',
-    left: 'depthLeft',
-    right: 'depthRight'
+    left: 'depth',
+    right: 'depth'
 };
 const EDGE_LENGTH_LABEL = {
     front: 'framkant',
@@ -90,7 +90,6 @@ function isBetterCandidate(candidate, incumbent, mode, target) {
     }
 
     if (mode === 'symmetrical') {
-        if (cand.targetPenalty !== best.targetPenalty) return cand.targetPenalty < best.targetPenalty;
         if (cand.spread !== best.spread) return cand.spread < best.spread;
         if (cand.count !== best.count) return cand.count < best.count;
         return isLexicographicallyBetter(candidate, incumbent);
@@ -130,7 +129,20 @@ function solveExactFill(total, mode, targetLength) {
             if (!tail) continue;
 
             const candidate = [size, ...tail];
-            if (isBetterCandidate(candidate, best, mode, normalizedTarget)) {
+            
+    if (remaining === 5900 && startIdx === 0) {
+        console.log("TOP LEVEL evaluating candidate:", candidate, "vs best:", best);
+        const candM = buildMetrics(candidate, mode, normalizedTarget);
+        const bestM = best ? buildMetrics(best, mode, normalizedTarget) : null;
+        console.log("  CAND metrics:", candM);
+        console.log("  BEST metrics:", bestM);
+        if (isBetterCandidate(candidate, best, mode, normalizedTarget)) {
+            console.log("  -> CANDIDATE WINS!");
+        } else {
+            console.log("  -> BEST WINS!");
+        }
+    }
+if (isBetterCandidate(candidate, best, mode, normalizedTarget)) {
                 best = candidate;
             }
         }
@@ -230,68 +242,8 @@ function solveEdge(totalLength, needsDoor, options = {}) {
  * Calculates the best combination of glass sections to fill a given length.
  * Preserved for compatibility: returns only section output.
  */
-export function calculateSectionsForEdge(totalLength, needsDoor = false, options = {}) {
+function calculateSectionsForEdge(totalLength, needsDoor = false, options = {}) {
     return solveEdge(totalLength, needsDoor, options).sections;
-}
-
-/**
- * Resolves a section array for an edge given a set of manually pinned sections.
- * Each pin is { index: number, size: number }.
- * Returns a new sections array with pinned sizes honoured and the remaining
- * budget re-distributed using the standard DP solver.
- * Returns null if the pinned sizes exceed the edge length or leave a gap that
- * cannot be solved.
- */
-export function resolveEdgeWithPins(totalLength, existingSections, pins, options = {}) {
-    if (!pins || pins.length === 0) {
-        // No overrides — just re-solve normally
-        return solveEdge(totalLength, false, options).sections;
-    }
-
-    const mode = normalizeMode(options.prioMode);
-    const targetLength = normalizeNumber(options.targetLength, { fallback: 1500, min: 700, max: 2000 });
-    const normalizedTotal = Math.max(0, roundToStep(totalLength, STEP_MM));
-
-    // Build the pinned size map
-    const pinnedMap = new Map();
-    pins.forEach(({ index, size }) => pinnedMap.set(index, size));
-
-    // The total number of sections we expect (keep same count as before)
-    const existingCount = existingSections.filter((s) => !String(s).includes(DOOR_LABEL)).length;
-    const totalPinnedSize = [...pinnedMap.values()].reduce((sum, s) => sum + s, 0);
-    const remainingBudget = normalizedTotal - totalPinnedSize;
-
-    // Number of free slots we need to fill
-    const freeSlotsCount = existingCount - pinnedMap.size;
-
-    if (freeSlotsCount < 0 || remainingBudget < 0) return null;
-
-    // If all slots are pinned, just splice them together
-    if (freeSlotsCount === 0) {
-        if (remainingBudget !== 0) return null;
-        const result = [];
-        for (let i = 0; i < existingCount; i++) {
-            result.push(pinnedMap.get(i) ?? 0);
-        }
-        return result;
-    }
-
-    // Solve the remaining budget for the free slots
-    const solvedFree = solveExactFill(remainingBudget, mode, targetLength);
-    if (!solvedFree || solvedFree.length !== freeSlotsCount) return null;
-
-    // Splice pinned and free sections back together in order
-    const result = [];
-    let freeIdx = 0;
-    for (let i = 0; i < existingCount; i++) {
-        if (pinnedMap.has(i)) {
-            result.push(pinnedMap.get(i));
-        } else {
-            result.push(solvedFree[freeIdx++]);
-        }
-    }
-
-    return result;
 }
 
 function normalizeDoorEdges(rawDoorEdges, includeBack) {
@@ -475,20 +427,15 @@ function buildEdgeSummary(edgeKey, length, enabled, sections, diagnostics) {
 /**
  * Compute edges, BOM counts, and totals from sketch configuration.
  */
-export function computeLayout(config) {
+function computeLayout(config) {
     const includeBack = !!config.includeBack;
-    const width = normalizeNumber(config.width, { fallback: 8000, min: MIN_DIMENSION_MM, max: 50000 });
-    const sharedDepth = normalizeNumber(config.depth, { fallback: 4000, min: MIN_DIMENSION_MM, max: 50000 });
-    const depthLeft = normalizeNumber(config.depthLeft ?? config.depth, { fallback: sharedDepth, min: MIN_DIMENSION_MM, max: 50000 });
-    const depthRight = normalizeNumber(config.depthRight ?? config.depth, { fallback: sharedDepth, min: MIN_DIMENSION_MM, max: 50000 });
+    const width = normalizeNumber(config.width, { fallback: 7000, min: MIN_DIMENSION_MM, max: 50000 });
+    const depth = normalizeNumber(config.depth, { fallback: 2300, min: MIN_DIMENSION_MM, max: 50000 });
     const prioMode = normalizeMode(config.prioMode);
     const targetLength = normalizeNumber(config.targetLength, { fallback: 1500, min: 700, max: 2000 });
     const doorEdges = normalizeDoorEdges(config.doorEdges, includeBack);
     const fallbackDoorSize = normalizeDoorSize(config.doorSize ?? 1000);
     const doorSizeByEdge = normalizeDoorSizeByEdge(config.doorSizeByEdge, doorEdges, fallbackDoorSize);
-    const manualSectionsByEdge = config.manualSectionsByEdge || {};
-
-    const solveOptions = { prioMode, targetLength };
 
     function solveNamedEdge(edgeKey, length, enabled) {
         if (!enabled) {
@@ -511,16 +458,8 @@ export function computeLayout(config) {
             doorSize: doorSizeByEdge[edgeKey] ?? fallbackDoorSize
         });
 
-        // Apply manual section pins if any exist for this edge
-        const pins = manualSectionsByEdge[edgeKey];
-        let finalSections = edgeResult.sections;
-        if (pins && pins.length > 0 && edgeResult.valid && !needsDoor) {
-            const overridden = resolveEdgeWithPins(length, edgeResult.sections, pins, solveOptions);
-            if (overridden) finalSections = overridden;
-        }
-
         return {
-            sections: finalSections,
+            sections: edgeResult.sections,
             diagnostics: {
                 valid: edgeResult.valid,
                 requestedDoorSize: edgeResult.requestedDoorSize,
@@ -531,8 +470,8 @@ export function computeLayout(config) {
         };
     }
 
-    const left = solveNamedEdge('left', depthLeft, true);
-    const right = solveNamedEdge('right', depthRight, true);
+    const left = solveNamedEdge('left', depth, true);
+    const right = solveNamedEdge('right', depth, true);
     const front = solveNamedEdge('front', width, true);
     const back = solveNamedEdge('back', width, includeBack);
 
@@ -550,8 +489,8 @@ export function computeLayout(config) {
     const hasInvalidEdges = Object.values(edgeDiagnostics).some((diag) => !diag.valid);
 
     const edgeSummaries = {
-        left: buildEdgeSummary('left', depthLeft, true, leftEdge, left.diagnostics),
-        right: buildEdgeSummary('right', depthRight, true, rightEdge, right.diagnostics),
+        left: buildEdgeSummary('left', depth, true, leftEdge, left.diagnostics),
+        right: buildEdgeSummary('right', depth, true, rightEdge, right.diagnostics),
         front: buildEdgeSummary('front', width, true, frontEdge, front.diagnostics),
         back: buildEdgeSummary('back', width, includeBack, backEdge, back.diagnostics)
     };
@@ -560,8 +499,7 @@ export function computeLayout(config) {
     const suggestions = [];
     EDGE_KEYS.forEach((edgeKey) => {
         if (edgeKey === 'back' && !includeBack) return;
-        const edgeLength = edgeKey === 'front' || edgeKey === 'back' ? width
-            : edgeKey === 'left' ? depthLeft : depthRight;
+        const edgeLength = edgeKey === 'front' || edgeKey === 'back' ? width : depth;
         const needsDoor = doorEdges.has(edgeKey);
         const info = buildEdgeWarningsAndSuggestions(
             edgeKey,
@@ -591,9 +529,7 @@ export function computeLayout(config) {
 
     return {
         width,
-        depth: sharedDepth,
-        depthLeft,
-        depthRight,
+        depth,
         targetLength,
         doorSizeByEdge,
         leftEdge,
@@ -613,3 +549,5 @@ export function computeLayout(config) {
         hasInvalidEdges
     };
 }
+
+console.log("Result:", solveExactFill(5900, "symmetrical", 1500));

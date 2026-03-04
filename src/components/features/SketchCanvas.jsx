@@ -59,6 +59,9 @@ function sectionSegmentsFromArray(sections, edgeKey) {
 export function SketchCanvas({
     width,
     depth,
+    depthLeft: propDepthLeft,
+    depthRight: propDepthRight,
+    equalDepth = true,
     includeBack,
     leftEdge,
     rightEdge,
@@ -70,27 +73,42 @@ export function SketchCanvas({
     suggestions = [],
     camera = DEFAULT_CAMERA,
     selection,
-    interactionMode = 'select',
     uiDensity = 'desktop',
     onResize,
+    onResizePreview,
+    onResizeCommit,
     onSelectEdge,
+    onSelectSection,
     onApplySuggestion,
     onCameraChange
 }) {
     const svgRef = useRef(null);
     const [activeDrag, setActiveDrag] = useState(null);
-    const dragRef = useRef({ startX: 0, startY: 0, initialW: 0, initialD: 0 });
+    const dragRef = useRef({ startX: 0, startY: 0, initialW: 0, initialD: 0, initialDLeft: 0, initialDRight: 0 });
+    const [dragWidth, setDragWidth] = useState(null);
+    const [dragDepth, setDragDepth] = useState(null);
+    const [dragDepthLeft, setDragDepthLeft] = useState(null);
+    const [dragDepthRight, setDragDepthRight] = useState(null);
+    const dragWidthRef = useRef(null);
+    const dragDepthRef = useRef(null);
+    const dragDepthLeftRef = useRef(null);
+    const dragDepthRightRef = useRef(null);
     const panRef = useRef(null);
     const touchRef = useRef({ pinch: null, singlePan: null });
 
+    const currentWidth = dragWidth ?? width;
+    const currentDepthLeft = dragDepthLeft ?? (equalDepth ? (dragDepth ?? propDepthLeft ?? depth) : (propDepthLeft ?? depth));
+    const currentDepthRight = dragDepthRight ?? (equalDepth ? (dragDepth ?? propDepthRight ?? depth) : (propDepthRight ?? depth));
+    const currentMaxDepth = Math.max(currentDepthLeft, currentDepthRight);
+
     const padding = uiDensity === 'touch' ? 2000 : 1500;
     const activeCamera = useMemo(
-        () => normalizeCamera(camera, width, depth, padding),
-        [camera, width, depth, padding]
+        () => normalizeCamera(camera, currentWidth, currentMaxDepth, padding),
+        [camera, currentWidth, currentMaxDepth, padding]
     );
 
-    const totalWidth = width + padding * 2;
-    const totalHeight = depth + padding * 2;
+    const totalWidth = currentWidth + padding * 2;
+    const totalHeight = currentMaxDepth + padding * 2;
     const viewWidth = totalWidth / activeCamera.zoom;
     const viewHeight = totalHeight / activeCamera.zoom;
     const viewBox = `${activeCamera.panX} ${activeCamera.panY} ${viewWidth} ${viewHeight}`;
@@ -123,10 +141,10 @@ export function SketchCanvas({
 
     const emitCamera = useCallback(
         (nextCamera) => {
-            const normalized = normalizeCamera(nextCamera, width, depth, padding);
+            const normalized = normalizeCamera(nextCamera, currentWidth, currentMaxDepth, padding);
             onCameraChange?.(normalized);
         },
-        [onCameraChange, width, depth, padding]
+        [onCameraChange, currentWidth, currentMaxDepth, padding]
     );
 
     const handleWheel = useCallback(
@@ -161,18 +179,19 @@ export function SketchCanvas({
 
     const beginResize = useCallback(
         (edgeId, event) => {
-            if (interactionMode !== 'resize') return;
             event.preventDefault();
             event.stopPropagation();
             dragRef.current = {
                 startX: event.clientX,
                 startY: event.clientY,
                 initialW: width,
-                initialD: depth
+                initialD: depth, // This is the original shared depth prop
+                initialDLeft: propDepthLeft ?? depth,
+                initialDRight: propDepthRight ?? depth
             };
             setActiveDrag(edgeId);
         },
-        [depth, interactionMode, width]
+        [depth, width, propDepthLeft, propDepthRight]
     );
 
     useEffect(() => {
@@ -191,18 +210,80 @@ export function SketchCanvas({
             const deltaY = (event.clientY - dragRef.current.startY) * worldPerPixelY;
 
             if (activeDrag === 'front') {
-                const newDepth = Math.max(MIN_DIMENSION_MM, snapToGrid(dragRef.current.initialD + deltaY));
-                onResize?.({ depth: newDepth });
+                if (equalDepth) {
+                    const newDepth = Math.max(MIN_DIMENSION_MM, snapToGrid(dragRef.current.initialD + deltaY));
+                    dragDepthRef.current = newDepth;
+                    dragDepthLeftRef.current = newDepth;
+                    dragDepthRightRef.current = newDepth;
+                    setDragDepth(newDepth);
+                    setDragDepthLeft(newDepth);
+                    setDragDepthRight(newDepth);
+                    onResizePreview?.({ depth: newDepth, depthLeft: newDepth, depthRight: newDepth });
+                } else {
+                    const nextLeft = Math.max(MIN_DIMENSION_MM, snapToGrid(dragRef.current.initialDLeft + deltaY));
+                    const nextRight = Math.max(MIN_DIMENSION_MM, snapToGrid(dragRef.current.initialDRight + deltaY));
+                    dragDepthLeftRef.current = nextLeft;
+                    dragDepthRightRef.current = nextRight;
+                    setDragDepthLeft(nextLeft);
+                    setDragDepthRight(nextRight);
+                    onResizePreview?.({ depthLeft: nextLeft, depthRight: nextRight });
+                }
             } else if (activeDrag === 'right') {
                 const newWidth = Math.max(MIN_DIMENSION_MM, snapToGrid(dragRef.current.initialW + deltaX));
-                onResize?.({ width: newWidth });
+                dragWidthRef.current = newWidth;
+                setDragWidth(newWidth);
+                onResizePreview?.({ width: newWidth });
             } else if (activeDrag === 'left') {
                 const newWidth = Math.max(MIN_DIMENSION_MM, snapToGrid(dragRef.current.initialW - deltaX));
-                onResize?.({ width: newWidth });
+                dragWidthRef.current = newWidth;
+                setDragWidth(newWidth);
+                onResizePreview?.({ width: newWidth });
+            } else if (activeDrag === 'depthLeft') {
+                const next = Math.max(MIN_DIMENSION_MM, snapToGrid(dragRef.current.initialDLeft + deltaY));
+                dragDepthLeftRef.current = next;
+                setDragDepthLeft(next);
+                onResizePreview?.({ depthLeft: next });
+            } else if (activeDrag === 'depthRight') {
+                const next = Math.max(MIN_DIMENSION_MM, snapToGrid(dragRef.current.initialDRight + deltaY));
+                dragDepthRightRef.current = next;
+                setDragDepthRight(next);
+                onResizePreview?.({ depthRight: next });
             }
         };
 
-        const handleUp = () => setActiveDrag(null);
+        const handleUp = () => {
+            setActiveDrag(null);
+            const finalUpdate = {};
+            const resizeCommit = onResizeCommit || onResize;
+
+            if (dragWidthRef.current !== null && dragWidthRef.current !== dragRef.current.initialW) {
+                finalUpdate.width = snapToGrid(dragWidthRef.current);
+            }
+            if (equalDepth && dragDepthRef.current !== null && dragDepthRef.current !== dragRef.current.initialD) {
+                finalUpdate.depth = snapToGrid(dragDepthRef.current);
+            }
+            if (dragDepthLeftRef.current !== null && dragDepthLeftRef.current !== dragRef.current.initialDLeft) {
+                finalUpdate.depthLeft = snapToGrid(dragDepthLeftRef.current);
+            }
+            if (dragDepthRightRef.current !== null && dragDepthRightRef.current !== dragRef.current.initialDRight) {
+                finalUpdate.depthRight = snapToGrid(dragDepthRightRef.current);
+            }
+
+            if (Object.keys(finalUpdate).length > 0) {
+                resizeCommit?.(finalUpdate);
+            } else {
+                onResizePreview?.(null);
+            }
+
+            dragWidthRef.current = null;
+            dragDepthRef.current = null;
+            dragDepthLeftRef.current = null;
+            dragDepthRightRef.current = null;
+            setDragWidth(null);
+            setDragDepth(null);
+            setDragDepthLeft(null);
+            setDragDepthRight(null);
+        };
 
         window.addEventListener('mousemove', handleMove);
         window.addEventListener('mouseup', handleUp);
@@ -211,11 +292,11 @@ export function SketchCanvas({
             window.removeEventListener('mousemove', handleMove);
             window.removeEventListener('mouseup', handleUp);
         };
-    }, [activeDrag, onResize, viewHeight, viewWidth]);
+    }, [activeDrag, onResize, onResizePreview, onResizeCommit, viewHeight, viewWidth, equalDepth]);
 
     const startPan = useCallback(
         (event) => {
-            if (interactionMode !== 'pan') return;
+            if (activeDrag) return;
             if (event.button !== 0 && event.button !== 1) return;
             event.preventDefault();
 
@@ -226,7 +307,7 @@ export function SketchCanvas({
                 panY: activeCamera.panY
             };
         },
-        [activeCamera.panX, activeCamera.panY, interactionMode]
+        [activeCamera.panX, activeCamera.panY, activeDrag]
     );
 
     useEffect(() => {
@@ -263,7 +344,7 @@ export function SketchCanvas({
 
     const handleTouchStart = useCallback(
         (event) => {
-            if (interactionMode !== 'pan') return;
+            if (activeDrag) return;
             if (!svgRef.current) return;
 
             if (event.touches.length === 2) {
@@ -291,12 +372,12 @@ export function SketchCanvas({
                 touchRef.current.pinch = null;
             }
         },
-        [activeCamera, interactionMode]
+        [activeCamera, activeDrag]
     );
 
     const handleTouchMove = useCallback(
         (event) => {
-            if (interactionMode !== 'pan') return;
+            if (activeDrag) return;
             const svg = svgRef.current;
             if (!svg) return;
             const rect = svg.getBoundingClientRect();
@@ -346,7 +427,7 @@ export function SketchCanvas({
                 });
             }
         },
-        [emitCamera, interactionMode, totalHeight, totalWidth, viewHeight, viewWidth]
+        [emitCamera, activeDrag, totalHeight, totalWidth, viewHeight, viewWidth]
     );
 
     const handleTouchEnd = useCallback((event) => {
@@ -399,24 +480,34 @@ export function SketchCanvas({
         return lines;
     };
 
-    const renderSegment = (edgeKey, segment, geometry, isSelectedEdge) => {
+    const renderSegment = (edgeKey, segment, geometry, isSelectedEdge, isSelectedSection) => {
         const fill = segment.isDoor
             ? 'rgba(16,185,129,0.30)'
-            : isSelectedEdge
-                ? 'rgba(59,130,246,0.30)'
-                : 'rgba(56,189,248,0.20)';
+            : isSelectedSection
+                ? 'rgba(245,158,11,0.40)'
+                : isSelectedEdge
+                    ? 'rgba(59,130,246,0.30)'
+                    : 'rgba(56,189,248,0.20)';
 
         const stroke = segment.isDoor
             ? 'rgba(16,185,129,0.9)'
-            : isSelectedEdge
-                ? 'rgba(59,130,246,0.95)'
-                : 'rgba(148,163,184,0.65)';
+            : isSelectedSection
+                ? 'rgba(245,158,11,0.95)'
+                : isSelectedEdge
+                    ? 'rgba(59,130,246,0.95)'
+                    : 'rgba(148,163,184,0.65)';
 
         return (
             <g
                 key={segment.key}
-                style={{ cursor: interactionMode === 'select' ? 'pointer' : 'default' }}
-                onClick={() => interactionMode === 'select' && onSelectEdge?.(edgeKey)}
+                style={{ cursor: 'pointer' }}
+                onClick={(e) => {
+                    e.stopPropagation();
+                    onSelectEdge?.(edgeKey);
+                    if (!segment.isDoor) {
+                        onSelectSection?.(edgeKey, segment.index);
+                    }
+                }}
             >
                 <rect
                     x={geometry.x}
@@ -425,13 +516,13 @@ export function SketchCanvas({
                     height={geometry.h}
                     fill={fill}
                     stroke={stroke}
-                    strokeWidth={isSelectedEdge ? 28 : 20}
+                    strokeWidth={isSelectedSection ? 36 : isSelectedEdge ? 28 : 20}
                     rx="18"
                 />
                 <text
                     x={geometry.tx}
                     y={geometry.ty}
-                    fill={isSelectedEdge ? '#ffffff' : '#e2e8f0'}
+                    fill={isSelectedSection ? '#fbbf24' : isSelectedEdge ? '#ffffff' : '#e2e8f0'}
                     fontSize={labelFont}
                     fontFamily="Inter, sans-serif"
                     textAnchor="middle"
@@ -488,7 +579,8 @@ export function SketchCanvas({
                     ty: cy + len / 2
                 };
 
-            objects.push(renderSegment(edgeKey, segment, geometry, isSelected));
+            const isSelectedSection = isSelected && selection?.segmentIndex === segment.index;
+            objects.push(renderSegment(edgeKey, segment, geometry, isSelected, isSelectedSection));
 
             if (direction === 'E') {
                 cx += len;
@@ -510,7 +602,7 @@ export function SketchCanvas({
         });
 
         if (isInvalid) {
-            const tx = direction === 'E' ? startX + (edgeKey === 'front' || edgeKey === 'back' ? width / 2 : 550) : startX - 400;
+            const tx = direction === 'E' ? startX + (edgeKey === 'front' || edgeKey === 'back' ? currentWidth / 2 : 550) : startX - 400;
             const ty = direction === 'E' ? startY + 320 : startY + 400;
             objects.push(
                 <g key={`invalid-${edgeKey}`}>
@@ -534,44 +626,74 @@ export function SketchCanvas({
         return objects;
     };
 
-    const renderDimensions = () => (
-        <>
-            <line x1={0} y1={depth + 360} x2={width} y2={depth + 360} stroke="rgba(148,163,184,0.8)" strokeWidth="18" />
-            <line x1={0} y1={depth + 280} x2={0} y2={depth + 440} stroke="rgba(148,163,184,0.8)" strokeWidth="18" />
-            <line x1={width} y1={depth + 280} x2={width} y2={depth + 440} stroke="rgba(148,163,184,0.8)" strokeWidth="18" />
-            <text
-                x={width / 2}
-                y={depth + 560}
-                fill="#cbd5e1"
-                fontSize="180"
-                textAnchor="middle"
-                fontWeight="700"
-                fontFamily="Inter, sans-serif"
-            >
-                {width} mm
-            </text>
+    const renderDimensions = () => {
+        const leftStartY = currentMaxDepth - currentDepthLeft;
+        const rightStartY = currentMaxDepth - currentDepthRight;
+        const sideDimOffset = sectionThickness + (uiDensity === 'touch' ? 620 : 520);
+        const sideDimTick = uiDensity === 'touch' ? 90 : 80;
+        const sideDimLabelOffset = uiDensity === 'touch' ? 260 : 220;
+        const bottomDimY = currentMaxDepth + sectionThickness + (uiDensity === 'touch' ? 560 : 520);
+        const bottomTick = uiDensity === 'touch' ? 100 : 90;
+        const bottomLabelY = bottomDimY + (uiDensity === 'touch' ? 260 : 220);
 
-            <line x1={width + 360} y1={0} x2={width + 360} y2={depth} stroke="rgba(148,163,184,0.8)" strokeWidth="18" />
-            <line x1={width + 280} y1={0} x2={width + 440} y2={0} stroke="rgba(148,163,184,0.8)" strokeWidth="18" />
-            <line x1={width + 280} y1={depth} x2={width + 440} y2={depth} stroke="rgba(148,163,184,0.8)" strokeWidth="18" />
-            <text
-                x={width + 560}
-                y={depth / 2}
-                fill="#cbd5e1"
-                fontSize="180"
-                fontWeight="700"
-                fontFamily="Inter, sans-serif"
-                transform={`rotate(90 ${width + 560} ${depth / 2})`}
-                textAnchor="middle"
-            >
-                {depth} mm
-            </text>
-        </>
-    );
+        return (
+            <>
+                {/* ── Width dimension (bottom) ── */}
+                <line x1={0} y1={bottomDimY} x2={currentWidth} y2={bottomDimY} stroke="rgba(148,163,184,0.8)" strokeWidth="18" />
+                <line x1={0} y1={bottomDimY - bottomTick} x2={0} y2={bottomDimY + bottomTick} stroke="rgba(148,163,184,0.8)" strokeWidth="18" />
+                <line x1={currentWidth} y1={bottomDimY - bottomTick} x2={currentWidth} y2={bottomDimY + bottomTick} stroke="rgba(148,163,184,0.8)" strokeWidth="18" />
+                <text
+                    x={currentWidth / 2}
+                    y={bottomLabelY}
+                    fill="#cbd5e1"
+                    fontSize="180"
+                    textAnchor="middle"
+                    fontWeight="700"
+                    fontFamily="Inter, sans-serif"
+                >
+                    {Math.round(currentWidth)} mm
+                </text>
+
+                {/* ── Left depth dimension ── */}
+                <line x1={-sideDimOffset} y1={leftStartY} x2={-sideDimOffset} y2={currentMaxDepth} stroke="rgba(148,163,184,0.8)" strokeWidth="18" />
+                <line x1={-(sideDimOffset + sideDimTick)} y1={leftStartY} x2={-(sideDimOffset - sideDimTick)} y2={leftStartY} stroke="rgba(148,163,184,0.8)" strokeWidth="18" />
+                <line x1={-(sideDimOffset + sideDimTick)} y1={currentMaxDepth} x2={-(sideDimOffset - sideDimTick)} y2={currentMaxDepth} stroke="rgba(148,163,184,0.8)" strokeWidth="18" />
+                <text
+                    x={-(sideDimOffset + sideDimLabelOffset)}
+                    y={leftStartY + currentDepthLeft / 2}
+                    fill="#cbd5e1"
+                    fontSize="180"
+                    fontWeight="700"
+                    fontFamily="Inter, sans-serif"
+                    transform={`rotate(-90 ${-(sideDimOffset + sideDimLabelOffset)} ${leftStartY + currentDepthLeft / 2})`}
+                    textAnchor="middle"
+                >
+                    {Math.round(currentDepthLeft)} mm
+                </text>
+
+                {/* ── Right depth dimension ── */}
+                <line x1={currentWidth + sideDimOffset} y1={rightStartY} x2={currentWidth + sideDimOffset} y2={currentMaxDepth} stroke="rgba(148,163,184,0.8)" strokeWidth="18" />
+                <line x1={currentWidth + sideDimOffset - sideDimTick} y1={rightStartY} x2={currentWidth + sideDimOffset + sideDimTick} y2={rightStartY} stroke="rgba(148,163,184,0.8)" strokeWidth="18" />
+                <line x1={currentWidth + sideDimOffset - sideDimTick} y1={currentMaxDepth} x2={currentWidth + sideDimOffset + sideDimTick} y2={currentMaxDepth} stroke="rgba(148,163,184,0.8)" strokeWidth="18" />
+                <text
+                    x={currentWidth + sideDimOffset + sideDimLabelOffset}
+                    y={rightStartY + currentDepthRight / 2}
+                    fill="#cbd5e1"
+                    fontSize="180"
+                    fontWeight="700"
+                    fontFamily="Inter, sans-serif"
+                    transform={`rotate(90 ${currentWidth + sideDimOffset + sideDimLabelOffset} ${rightStartY + currentDepthRight / 2})`}
+                    textAnchor="middle"
+                >
+                    {Math.round(currentDepthRight)} mm
+                </text>
+            </>
+        );
+    };
 
     const DragHandle = ({ x, y, edgeId, cursor }) => (
         <g
-            style={{ cursor: interactionMode === 'resize' ? cursor : 'default', pointerEvents: 'all' }}
+            style={{ cursor, pointerEvents: 'all' }}
             onMouseDown={(event) => beginResize(edgeId, event)}
         >
             <circle cx={x} cy={y} r={handleHit} fill="transparent" />
@@ -582,7 +704,7 @@ export function SketchCanvas({
                 fill={activeDrag === edgeId ? '#2563eb' : '#3b82f6'}
                 stroke="#ffffff"
                 strokeWidth="30"
-                opacity={interactionMode === 'resize' ? 1 : 0.35}
+                opacity={1}
             />
         </g>
     );
@@ -605,7 +727,7 @@ export function SketchCanvas({
                 ref={svgRef}
                 viewBox={viewBox}
                 className="w-full h-auto border border-panel-border rounded-lg bg-[#0b1220]"
-                style={{ minHeight: '500px', maxHeight: '760px', touchAction: interactionMode === 'pan' ? 'none' : 'manipulation' }}
+                style={{ minHeight: '500px', maxHeight: '760px', touchAction: 'none' }}
                 onWheel={handleWheel}
                 onMouseDown={startPan}
                 onTouchStart={handleTouchStart}
@@ -613,39 +735,36 @@ export function SketchCanvas({
                 onTouchEnd={handleTouchEnd}
             >
                 {renderGrid()}
-                <line x1={-padding} y1={0} x2={width + padding} y2={0} stroke="rgba(30,64,175,0.4)" strokeWidth="18" />
-                <line x1={0} y1={-padding} x2={0} y2={depth + padding} stroke="rgba(30,64,175,0.4)" strokeWidth="18" />
+                <line x1={-padding} y1={0} x2={currentWidth + padding} y2={0} stroke="rgba(30,64,175,0.4)" strokeWidth="18" />
+                <line x1={0} y1={-padding} x2={0} y2={currentMaxDepth + padding} stroke="rgba(30,64,175,0.4)" strokeWidth="18" />
 
-                <rect
-                    x={0}
-                    y={0}
-                    width={width}
-                    height={depth}
+                <polygon
+                    points={`0,${currentMaxDepth} ${currentWidth},${currentMaxDepth} ${currentWidth},${currentMaxDepth - currentDepthRight} 0,${currentMaxDepth - currentDepthLeft}`}
                     fill="rgba(15,23,42,0.22)"
                     stroke="rgba(59,130,246,0.55)"
                     strokeWidth="26"
                     strokeDasharray="100 70"
                 />
 
-                {renderEdge('front', 0, depth, 'E')}
-                {renderEdge('left', 0, 0, 'S')}
-                {renderEdge('right', width, 0, 'S')}
+                {renderEdge('front', 0, currentMaxDepth, 'E')}
+                {renderEdge('left', 0, currentMaxDepth - currentDepthLeft, 'S')}
+                {renderEdge('right', currentWidth, currentMaxDepth - currentDepthRight, 'S')}
 
                 {includeBack ? (
                     renderEdge('back', 0, 0, 'E')
                 ) : (
-                    <>
+                    <g>
                         <line
                             x1={-500}
                             y1={0}
-                            x2={width + 500}
+                            x2={currentWidth + 500}
                             y2={0}
                             stroke="rgba(203,213,225,0.55)"
                             strokeWidth="40"
                             strokeDasharray="180 120"
                         />
                         <text
-                            x={width / 2}
+                            x={currentWidth / 2}
                             y={-120}
                             fill="rgba(148,163,184,0.9)"
                             fontSize="190"
@@ -655,14 +774,24 @@ export function SketchCanvas({
                         >
                             Befintlig vägg / fasad
                         </text>
-                    </>
+                    </g>
                 )}
 
                 {renderDimensions()}
 
-                <DragHandle x={width / 2} y={depth} edgeId="front" cursor="ns-resize" />
-                <DragHandle x={0} y={depth / 2} edgeId="left" cursor="ew-resize" />
-                <DragHandle x={width} y={depth / 2} edgeId="right" cursor="ew-resize" />
+                <DragHandle x={currentWidth / 2} y={currentMaxDepth} edgeId="front" cursor="ns-resize" />
+                <DragHandle
+                    x={0}
+                    y={currentMaxDepth - currentDepthLeft + currentDepthLeft / 2}
+                    edgeId={equalDepth ? "left" : "depthLeft"}
+                    cursor={equalDepth ? "ew-resize" : "ns-resize"}
+                />
+                <DragHandle
+                    x={currentWidth}
+                    y={currentMaxDepth - currentDepthRight + currentDepthRight / 2}
+                    edgeId={equalDepth ? "right" : "depthRight"}
+                    cursor={equalDepth ? "ew-resize" : "ns-resize"}
+                />
             </svg>
 
             {selectedEdgeSuggestions.length > 0 && (

@@ -1,6 +1,35 @@
 # QuoteGenerator
 
-Local quote/inventory tool for BRIXX.
+Local quote/inventory tool for BRIXX. A Single Page Application (SPA) built with React and Vite, utilizing Firebase for authentication and database management.
+
+## Technical Overview
+
+### Tech Stack
+- **Framework**: React (v19) via Vite
+- **Styling**: Tailwind CSS (v4) configured via Vite plugin
+- **Backend/Database**: Firebase (Authentication and Firestore)
+- **State Management**: Custom React Contexts with `useReducer` and `localStorage` persistence
+
+### Project Structure (`src/`)
+- `components/`: Reusable UI building blocks (`layout`, `modals`, `features`).
+- `config/`: Configuration files and shared utilities (e.g., terms templates).
+- `services/`: Interfaces with external services (`firebase.js`, `authService.js`).
+- `store/`: Application state management (`AuthContext.jsx`, `QuoteContext.jsx`).
+- `views/`: High-level page components representing different steps in the application flow.
+
+### Architecture & Workflows
+The application relies on global state for navigation rather than traditional URL-based routing.
+
+- **QuoteContext**: Uses a global `step` state to determine which view to render. Manages complex quote state (item selections, customer information, pricing modifiers) and actively syncs with `localStorage` (`offertverktyg_state`) to prevent data loss on page reloads.
+- **AuthContext**: Manages user sessions and enforces role-based access restrictions (e.g., hiding `inventory` and `sketch` views from unauthorized users).
+- **Core Workflow**:
+  - `Step 0`: Dashboard (Start a new quote, view quote history)
+  - `Step 1`: Product Line Selection
+  - `Step 2`: Configuration (Building the quote with items/grids)
+  - `Step 3`: Pricing (Reviewing costs, applying global discounts)
+  - `Step 4`: Summary Export (Final review, PDF/Terms generation)
+
+---
 
 ## 1) First-time GitHub publish
 
