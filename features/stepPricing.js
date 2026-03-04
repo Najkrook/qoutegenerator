@@ -1,7 +1,7 @@
-// features/stepPricing.js — Step 3: Pricing & Discounts
+// features/stepPricing.js - Step 3: Pricing & Discounts
 
 import { state } from '../services/stateManager.js';
-import { parseLocalFloat, formatLocalFloat, getUnitSekPrice } from './utils.js';
+import { parseLocalFloat, formatLocalFloat, getUnitSekPrice, escapeHtml } from './utils.js';
 
 /**
  * Render the pricing table in Step 3.
@@ -45,8 +45,8 @@ export function renderPricingStep(DOM) {
         let reklUtpris = baseSek * item.qty;
 
         tr.innerHTML = `
-            <td><strong>${item.line}:</strong> ${item.model}</td>
-            <td>${item.size}</td>
+            <td><strong>${escapeHtml(item.line)}:</strong> ${escapeHtml(item.model)}</td>
+            <td>${escapeHtml(item.size)}</td>
             <td class="text-right">${fmt(baseSek)}</td>
             <td>${item.qty}</td>
             <td class="text-right">${fmt(reklUtpris)}</td>
@@ -93,7 +93,7 @@ export function renderPricingStep(DOM) {
                 if (addon.discountPct === undefined) addon.discountPct = 0;
 
                 subTr.innerHTML = `
-                    <td style="padding-left: 2rem;">+ ${addonDef ? addonDef.name : addon.id}</td>
+                    <td style="padding-left: 2rem;">+ ${escapeHtml(addonDef ? addonDef.name : addon.id)}</td>
                     <td>-</td>
                     <td class="text-right" style="font-size: 0.875rem;">${fmt(aBaseSek)}</td>
                     <td style="font-size: 0.875rem;">${addon.qty}</td>
@@ -141,8 +141,8 @@ export function renderPricingStep(DOM) {
 
             const tr = document.createElement('tr');
             tr.innerHTML = `
-                <td><strong>${line}:</strong> ${model}</td>
-                <td>${size}</td>
+                <td><strong>${escapeHtml(line)}:</strong> ${escapeHtml(model)}</td>
+                <td>${escapeHtml(size)}</td>
                 <td class="text-right">${fmt(baseSek)}</td>
                 <td>${gItem.qty}</td>
                 <td class="text-right">${fmt(rekUtpris)}</td>
@@ -179,7 +179,7 @@ export function renderPricingStep(DOM) {
             const tr = document.createElement('tr');
             tr.style.background = 'rgba(255,255,255,0.02)';
             tr.innerHTML = `
-                <td style="padding-left: 2rem;">+ ${name}</td>
+                <td style="padding-left: 2rem;">+ ${escapeHtml(name)}</td>
                 <td>-</td>
                 <td class="text-right" style="font-size: 0.875rem;">${fmt(baseSek)}</td>
                 <td style="font-size: 0.875rem;">${gAddon.qty}</td>
@@ -215,7 +215,7 @@ export function renderCustomCosts(DOM) {
     DOM.customCostsContainer.innerHTML = '';
 
     if (state.customCosts.length === 0) {
-        DOM.customCostsContainer.innerHTML = '<p style="color:var(--text-secondary);font-size:0.875rem;">Inga övriga kostnader tillagda.</p>';
+        DOM.customCostsContainer.innerHTML = '<p style="color:var(--text-secondary);font-size:0.875rem;">Inga ovriga kostnader tillagda.</p>';
         return;
     }
 
@@ -230,15 +230,15 @@ export function renderCustomCosts(DOM) {
             <div style="cursor:grab; padding-bottom: 0.8rem; margin-right: 0.5rem; color:var(--text-secondary);">≡</div>
             <div class="form-group flex-1" style="margin-bottom:0;">
                 <label>Beskrivning</label>
-                <input type="text" value="${cost.description}" class="cc-desc" placeholder="T.ex. Frakt">
+                <input type="text" value="${escapeHtml(cost.description)}" class="cc-desc" placeholder="T.ex. Frakt">
             </div>
             <div class="form-group" style="width:120px; margin-bottom:0;">
                 <label>Pris (SEK)</label>
-                <input type="text" value="${cost.price}" class="cc-price">
+                <input type="text" value="${escapeHtml(cost.price)}" class="cc-price">
             </div>
             <div class="form-group" style="width:80px; margin-bottom:0;">
                 <label>Antal</label>
-                <input type="number" value="${cost.qty}" min="1" class="cc-qty">
+                <input type="number" value="${escapeHtml(cost.qty)}" min="1" class="cc-qty">
             </div>
             <button class="btn-remove-cost" style="background:transparent; border:1px solid var(--danger-color); color:var(--danger-color); padding:0.75rem; border-radius:8px; cursor:pointer; height:46px;">X</button>
         `;

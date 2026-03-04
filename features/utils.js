@@ -1,4 +1,4 @@
-// features/utils.js — Pure utility functions shared across step modules
+// features/utils.js - Pure utility functions shared across step modules
 
 import { state } from '../services/stateManager.js';
 
@@ -37,4 +37,18 @@ export function getUnitSekPrice(eurPrice, line) {
         return eurPrice * state.exchangeRate;
     }
     return eurPrice;
+}
+
+/**
+ * Escape text for safe HTML interpolation.
+ * @param {unknown} value
+ * @returns {string}
+ */
+export function escapeHtml(value) {
+    return String(value ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
 }

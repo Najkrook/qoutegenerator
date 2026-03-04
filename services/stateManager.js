@@ -1,4 +1,15 @@
-﻿export const state = {
+import { DEFAULT_TEMPLATE_ID, getTemplateById, isLegalTemplateId } from '../features/legalTemplates.js';
+
+const DEFAULT_TERMS_TEXT = getTemplateById(DEFAULT_TEMPLATE_ID).body;
+const VALID_QUOTE_STATUSES = ['draft', 'sent', 'won', 'lost', 'archived'];
+const VALID_SCRIVE_STATUSES = ['not_sent', 'preparation', 'pending', 'closed', 'rejected', 'canceled', 'timedout', 'failed'];
+
+function normalizePositiveInt(value, fallback) {
+    const parsed = Number.parseInt(value, 10);
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+}
+
+export const state = {
     step: 0,
     selectedLines: [],
     builderItems: [],
@@ -11,6 +22,7 @@
     customerInfo: {
         name: '',
         company: '',
+        email: '',
         reference: '',
         date: '',
         validity: '30 dagar'
@@ -18,28 +30,26 @@
     inventoryData: { bahama: [], clickitup: {} },
     cloudInventoryData: { bahama: [], clickitup: {} },
     inventoryBasket: [],
+    activeQuoteId: null,
+    activeQuoteVersion: 0,
+    quoteStatus: 'draft',
     includeTerms: true,
-    termsText: `BETALNINGSVILLKOR
-- Betalning sker mot faktura med 30 dagars netto.
-- Vid forsenad betalning debiteras drojsmalsranta enligt rantelagen.
-
-LEVERANS
-- Leveranstid ca 4-6 veckor efter orderbekraftelse.
-- Fraktkostnad tillkommer enligt offert.
-- Leverans sker fritt vart lager om ej annat anges.
-
-GARANTI & REKLAMATION
-- Garanti enligt gallande konsumentkoplag.
-- Reklamation ska ske skriftligt senast 14 dagar efter leverans.
-
-MONTERING
-- Montering ingar ej om ej annat avtalats.
-- Vid montering av BRIXX ansvarar kunden for att underlaget ar plant och stabilt.
-
-OVRIGT
-- Alla priser ar exklusive moms om ej annat anges.
-- Offerten ar giltig enligt angiven giltighetstid.
-- BRIXX Europe AB forbehaller sig ratten till prisandringar och tryckfel.`
+    termsText: DEFAULT_TERMS_TEXT,
+    termsTemplateId: DEFAULT_TEMPLATE_ID,
+    termsCustomized: false,
+    includeSignatureBlock: true,
+    includePaymentBox: true,
+    paymentTermsDays: 30,
+    quoteValidityDays: 14,
+    scriveEnabled: false,
+    scriveStatus: 'not_sent',
+    scriveDocumentId: null,
+    scriveSignerName: '',
+    scriveSignerEmail: '',
+    scriveLastError: null,
+    scriveSentAtMs: null,
+    scriveLastEventAtMs: null,
+    scriveCompletedAtMs: null
 };
 
 let saveDebounceMs = 750;
@@ -87,6 +97,57 @@ export function loadState() {
         if (saved) {
             const parsed = JSON.parse(saved);
             Object.assign(state, parsed);
+            if (!state.customerInfo || typeof state.customerInfo !== 'object') {
+                state.customerInfo = {};
+            }
+            state.customerInfo.name = String(state.customerInfo.name || '');
+            state.customerInfo.company = String(state.customerInfo.company || '');
+            state.customerInfo.email = String(state.customerInfo.email || '');
+            state.customerInfo.reference = String(state.customerInfo.reference || '');
+            state.customerInfo.date = String(state.customerInfo.date || '');
+            state.customerInfo.validity = String(state.customerInfo.validity || '30 dagar');
+            if (!state.activeQuoteId) state.activeQuoteId = null;
+            if (!Number.isFinite(Number(state.activeQuoteVersion))) state.activeQuoteVersion = 0;
+            if (!VALID_QUOTE_STATUSES.includes(String(state.quoteStatus || '').toLowerCase())) {
+                state.quoteStatus = 'draft';
+            }
+            if (typeof state.includeTerms !== 'boolean') state.includeTerms = true;
+            if (typeof state.includeSignatureBlock !== 'boolean') state.includeSignatureBlock = true;
+            if (typeof state.includePaymentBox !== 'boolean') state.includePaymentBox = true;
+            state.paymentTermsDays = normalizePositiveInt(state.paymentTermsDays, 30);
+            state.quoteValidityDays = normalizePositiveInt(state.quoteValidityDays, 14);
+            if (typeof state.scriveEnabled !== 'boolean') state.scriveEnabled = false;
+            const normalizedScriveStatus = String(state.scriveStatus || '').toLowerCase();
+            if (!VALID_SCRIVE_STATUSES.includes(normalizedScriveStatus)) {
+                state.scriveStatus = 'not_sent';
+            } else {
+                state.scriveStatus = normalizedScriveStatus;
+            }
+            state.scriveDocumentId = state.scriveDocumentId ? String(state.scriveDocumentId) : null;
+            state.scriveSignerName = String(state.scriveSignerName || state.customerInfo?.name || '');
+            state.scriveSignerEmail = String(state.scriveSignerEmail || state.customerInfo?.email || '');
+            state.scriveLastError = state.scriveLastError ? String(state.scriveLastError) : null;
+            state.scriveSentAtMs = Number.isFinite(Number(state.scriveSentAtMs)) ? Number(state.scriveSentAtMs) : null;
+            state.scriveLastEventAtMs = Number.isFinite(Number(state.scriveLastEventAtMs)) ? Number(state.scriveLastEventAtMs) : null;
+            state.scriveCompletedAtMs = Number.isFinite(Number(state.scriveCompletedAtMs)) ? Number(state.scriveCompletedAtMs) : null;
+
+            const hasSavedTerms = typeof state.termsText === 'string' && state.termsText.trim().length > 0;
+            if (!hasSavedTerms) {
+                state.termsText = DEFAULT_TERMS_TEXT;
+            }
+
+            const parsedTemplateId = typeof parsed.termsTemplateId === 'string' ? parsed.termsTemplateId : '';
+            const normalizedTemplate = isLegalTemplateId(state.termsTemplateId) ? state.termsTemplateId : DEFAULT_TEMPLATE_ID;
+            state.termsTemplateId = normalizedTemplate;
+
+            if (typeof parsed.termsCustomized === 'boolean') {
+                state.termsCustomized = parsed.termsCustomized;
+            } else if (!parsedTemplateId && hasSavedTerms) {
+                state.termsCustomized = true;
+            } else {
+                const template = getTemplateById(state.termsTemplateId);
+                state.termsCustomized = Boolean(template && state.termsText.trim() !== String(template.body || '').trim());
+            }
         }
     } catch (e) {
         // Ignore parse errors
@@ -108,8 +169,33 @@ export function clearState() {
     state.includesVat = false;
     state.globalDiscountPct = 0;
     state.prevGlobalDiscountPct = 0;
+    state.customerInfo = {
+        name: '',
+        company: '',
+        email: '',
+        reference: '',
+        date: '',
+        validity: '30 dagar'
+    };
+    state.activeQuoteId = null;
+    state.activeQuoteVersion = 0;
+    state.quoteStatus = 'draft';
+    state.includeTerms = true;
+    state.termsText = DEFAULT_TERMS_TEXT;
+    state.termsTemplateId = DEFAULT_TEMPLATE_ID;
+    state.termsCustomized = false;
+    state.includeSignatureBlock = true;
+    state.includePaymentBox = true;
+    state.paymentTermsDays = 30;
+    state.quoteValidityDays = 14;
+    state.scriveEnabled = false;
+    state.scriveStatus = 'not_sent';
+    state.scriveDocumentId = null;
+    state.scriveSignerName = '';
+    state.scriveSignerEmail = '';
+    state.scriveLastError = null;
+    state.scriveSentAtMs = null;
+    state.scriveLastEventAtMs = null;
+    state.scriveCompletedAtMs = null;
     location.reload();
 }
-
-
-

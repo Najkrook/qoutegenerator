@@ -1,9 +1,38 @@
-﻿import { BRIXX_LOGO_BASE64 } from '../assets/logoData.js';
+import { BRIXX_LOGO_BASE64 } from '../assets/logoData.js';
 import { notifyWarn, notifyError } from '../services/notificationService.js';
+import { buildPdfTableData, buildExportSummary } from '../services/exportDataBuilders.js';
+
+function normalizePositiveInt(value, fallback) {
+    const parsed = Number.parseInt(value, 10);
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+}
+
+export function computeValidUntilDateString(quoteDateValue, quoteValidityDays, nowDate = new Date()) {
+    const validityDays = normalizePositiveInt(quoteValidityDays, 14);
+    let baseDate = null;
+
+    if (typeof quoteDateValue === 'string' && quoteDateValue.trim()) {
+        const rawDate = quoteDateValue.trim();
+        const parsed = rawDate.includes('T')
+            ? new Date(rawDate)
+            : new Date(`${rawDate}T00:00:00`);
+        if (!Number.isNaN(parsed.getTime())) {
+            baseDate = parsed;
+        }
+    }
+
+    if (!baseDate) {
+        baseDate = new Date(nowDate.getTime());
+    }
+
+    const validUntil = new Date(baseDate.getTime());
+    validUntil.setDate(validUntil.getDate() + validityDays);
+    return validUntil.toLocaleDateString('sv-SE');
+}
 
 export function generatePDF(state, summaryData, returnBlob = false) {
     if (!window.jspdf || !window.jspdf.jsPDF) {
-        if (!returnBlob) notifyWarn("PDF-motorn laddar fortfarande, forsok igen om nagra sekunder.");
+        if (!returnBlob) notifyWarn("PDF-motorn laddar fortfarande, försök igen om några sekunder.");
         return null;
     }
     const { jsPDF } = window.jspdf;
@@ -18,20 +47,25 @@ export function generatePDF(state, summaryData, returnBlob = false) {
     };
     try {
         const formatSEK = (val) => new Intl.NumberFormat('sv-SE', { minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(val);
+        const pdfLegalTemplatesEnabled = typeof window === 'undefined'
+            ? true
+            : window.FEATURE_PDF_LEGAL_TEMPLATES !== false;
+        const shouldRenderPaymentBox = pdfLegalTemplatesEnabled && state.includePaymentBox !== false;
+        const shouldRenderSignatureBlock = pdfLegalTemplatesEnabled && state.includeSignatureBlock !== false;
 
     const pageWidth = doc.internal.pageSize.width;
     const pageHeight = doc.internal.pageSize.height;
 
-    // â”€â”€ Brand Colors â”€â”€
+//
     const brandOrange = [243, 156, 18];   // #f39c12
     const darkText = [30, 30, 30];
     const grayText = [120, 120, 120];
     const lightGray = [230, 230, 230];
     const accentGreen = [46, 174, 96];     // For "Ert Pris" highlight
 
-    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+//
     //  HEADER: Logo + Title + Date/Ref
-    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+//
 
     // Logo (left side)
     try {
@@ -64,9 +98,9 @@ export function generatePDF(state, summaryData, returnBlob = false) {
     doc.setLineWidth(0.8);
     doc.line(14, 32, pageWidth - 14, 32);
 
-    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+//
     //  CUSTOMER INFO BLOCK
-    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+//
 
     let currentY = 42;
 
@@ -101,33 +135,11 @@ export function generatePDF(state, summaryData, returnBlob = false) {
 
     currentY = 70;
 
-    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+//
     //  ITEMS TABLE
-    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+//
 
-    const tableData = [];
-
-    summaryData.totals.forEach(t => {
-        tableData.push([
-            t.model,
-            t.size || "-",
-            `${formatSEK(t.unitPrice)} SEK`,
-            `${t.qty}`,
-            `${formatSEK(t.net)} SEK`,
-            `${formatSEK(t.gross)} SEK`,
-            `${formatSEK(t.discountSek)} SEK`,
-            `${t.discountPct}%`
-        ]);
-    });
-
-    if (summaryData.globalDiscountAmt > 0) {
-        tableData.push([
-            `Övergripande Rabatt (${state.globalDiscountPct}%)`,
-            "", "", "",
-            `-${formatSEK(summaryData.globalDiscountAmt)} SEK`,
-            "", "", "-"
-        ]);
-    }
+    const tableData = buildPdfTableData(state, summaryData, formatSEK);
 
     const autoTableResult = runAutoTable({
         startY: currentY,
@@ -198,9 +210,9 @@ export function generatePDF(state, summaryData, returnBlob = false) {
         finalY = y + 6;
     }
 
-    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+//
     //  TOTALS SECTION
-    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+//
 
     doc.setFontSize(10);
     let rightColX = pageWidth - 90;
@@ -217,39 +229,116 @@ export function generatePDF(state, summaryData, returnBlob = false) {
         doc.text(value, pageWidth - 14, y, { align: "right" });
     };
 
-    drawTotalLine("Totalt Rek Utpris:", `${formatSEK(summaryData.grossTotalSek)} SEK`, finalY);
+    const renderPaymentInfoBox = (startY) => {
+        const boxX = 14;
+        let boxY = Math.max(startY - 2, 84);
+        const boxWidth = Math.max(74, rightColX - boxX - 8);
+        const lines = [
+            `Betalningsvillkor: ${normalizePositiveInt(state.paymentTermsDays, 30)} dagar`,
+            `Giltig till: ${computeValidUntilDateString(state.customerInfo?.date, state.quoteValidityDays)}`
+        ];
+        if (state.customerInfo?.reference) {
+            lines.push(`Referens: ${state.customerInfo.reference}`);
+        }
+
+        const boxHeight = 14 + (lines.length * 5);
+        if (boxY + boxHeight > pageHeight - 35) {
+            doc.addPage();
+            boxY = 34;
+        }
+        doc.setFillColor(...lightGray);
+        doc.roundedRect(boxX, boxY, boxWidth, boxHeight, 1.5, 1.5, 'F');
+
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(9);
+        doc.setTextColor(...darkText);
+        doc.text("BETALNING & GILTIGHET", boxX + 3, boxY + 5);
+
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(8.5);
+        let lineY = boxY + 10;
+        lines.forEach((line) => {
+            const wrapped = doc.splitTextToSize(line, boxWidth - 6);
+            wrapped.forEach((chunk) => {
+                doc.text(chunk, boxX + 3, lineY);
+                lineY += 4;
+            });
+            lineY += 1;
+        });
+    };
+
+    const renderSignatureBlock = (preferredY = finalY + 12) => {
+        const blockHeight = 31;
+        const footerZone = pageHeight - 35;
+        let y = preferredY;
+
+        if (y + blockHeight > footerZone) {
+            doc.addPage();
+            y = 34;
+        }
+
+        const boxX = 14;
+        const boxWidth = pageWidth - 28;
+        doc.setDrawColor(190, 190, 190);
+        doc.setLineWidth(0.4);
+        doc.roundedRect(boxX, y, boxWidth, blockHeight, 2, 2, 'S');
+
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(10);
+        doc.setTextColor(...darkText);
+        doc.text("Godkännande", boxX + 4, y + 6);
+
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(8.5);
+        doc.text("Namnförtydligande", boxX + 4, y + 13);
+        doc.text("Datum", boxX + 110, y + 13);
+        doc.text("Signatur", boxX + 145, y + 13);
+
+        doc.setDrawColor(140, 140, 140);
+        doc.line(boxX + 4, y + 21, boxX + 104, y + 21);
+        doc.line(boxX + 110, y + 21, boxX + 140, y + 21);
+        doc.line(boxX + 145, y + 21, boxX + boxWidth - 4, y + 21);
+
+        return y + blockHeight + 4;
+    };
+
+    const exportSummary = buildExportSummary(state, summaryData);
+    drawTotalLine("Totalt Rek Utpris:", `${formatSEK(exportSummary.grossTotalSek)} SEK`, finalY);
     finalY += 6;
 
     doc.setTextColor(...grayText);
-    drawTotalLine("Total Rabatt:", `-${formatSEK(summaryData.totalDiscountSek)} SEK`, finalY);
+    drawTotalLine("Total Rabatt:", `-${formatSEK(exportSummary.totalDiscountSek)} SEK`, finalY);
     finalY += 10;
 
     // Green bar for final total
-    drawTotalLine("Totalt Exkl. moms:", `${formatSEK(summaryData.finalTotalSek)} SEK`, finalY, true, accentGreen);
+    drawTotalLine("Totalt Exkl. moms:", `${formatSEK(exportSummary.finalTotalSek)} SEK`, finalY, true, accentGreen);
     doc.setTextColor(255, 255, 255);
     doc.setFont("helvetica", "bold");
     doc.text("Totalt Exkl. moms:", rightColX, finalY);
-    doc.text(`${formatSEK(summaryData.finalTotalSek)} SEK`, pageWidth - 14, finalY, { align: "right" });
+    doc.text(`${formatSEK(exportSummary.finalTotalSek)} SEK`, pageWidth - 14, finalY, { align: "right" });
     doc.setTextColor(...darkText);
     finalY += 10;
 
     if (state.includesVat) {
-        const vatAmount = summaryData.finalTotalSek * 0.25;
-        const totalWithVat = summaryData.finalTotalSek + vatAmount;
-        drawTotalLine("Moms 25%:", `${formatSEK(vatAmount)} SEK`, finalY);
+        drawTotalLine("Moms 25%:", `${formatSEK(exportSummary.vatAmount)} SEK`, finalY);
         finalY += 8;
-        drawTotalLine("Totalt inkl. moms:", `${formatSEK(totalWithVat)} SEK`, finalY, true, [35, 35, 45]);
+        drawTotalLine("Totalt inkl. moms:", `${formatSEK(exportSummary.totalWithVat)} SEK`, finalY, true, [35, 35, 45]);
         doc.setTextColor(255, 255, 255);
         doc.setFont("helvetica", "bold");
         doc.text("Totalt inkl. moms:", rightColX, finalY);
-        doc.text(`${formatSEK(totalWithVat)} SEK`, pageWidth - 14, finalY, { align: "right" });
+        doc.text(`${formatSEK(exportSummary.totalWithVat)} SEK`, pageWidth - 14, finalY, { align: "right" });
         doc.setTextColor(...darkText);
     }
 
-    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-    //  TERMS & CONDITIONS PAGE (optional)
-    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+    if (shouldRenderPaymentBox) {
+        renderPaymentInfoBox(finalY);
+    }
 
+//
+    //  TERMS & CONDITIONS PAGE (optional)
+//
+
+    let termsPageEndY = null;
     if (state.includeTerms && state.termsText) {
         doc.addPage();
 
@@ -285,7 +374,7 @@ export function generatePDF(state, summaryData, returnBlob = false) {
 
         termsLines.forEach(line => {
             if (termsY > footerZone) {
-                // Would overflow into footer â€” skip (could add page break logic later)
+//
                 return;
             }
 
@@ -295,7 +384,7 @@ export function generatePDF(state, summaryData, returnBlob = false) {
             }
 
             // Check if this is a heading (ALL CAPS line)
-            const isHeading = line === line.toUpperCase() && line.trim().length > 2 && !line.startsWith('•');
+            const isHeading = line === line.toUpperCase() && line.trim().length > 2 && !line.startsWith('-');
             if (isHeading) {
                 termsY += 3;
                 doc.setFont("helvetica", "bold");
@@ -315,11 +404,21 @@ export function generatePDF(state, summaryData, returnBlob = false) {
                 });
             }
         });
+        termsPageEndY = termsY + 6;
     }
 
-    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+    if (shouldRenderSignatureBlock) {
+        if (termsPageEndY !== null) {
+            doc.setPage(doc.internal.getNumberOfPages());
+            renderSignatureBlock(termsPageEndY);
+        } else {
+            renderSignatureBlock(finalY + 12);
+        }
+    }
+
+//
     //  FOOTER (all pages)
-    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+//
 
     const pageCount = doc.internal.getNumberOfPages();
     for (let i = 1; i <= pageCount; i++) {
@@ -340,13 +439,13 @@ export function generatePDF(state, summaryData, returnBlob = false) {
         doc.setFont("helvetica", "bold");
         doc.setFontSize(8);
         doc.setTextColor(255, 255, 255);
-        doc.text("Parasoll    ·    Värme    ·    Vindskydd    ·    Miljö", pageWidth / 2, footerY, { align: "center" });
+        doc.text("Parasoll | Varme | Vindskydd | Miljo", pageWidth / 2, footerY, { align: "center" });
 
         footerY += 5;
         doc.setFont("helvetica", "normal");
         doc.setFontSize(7.5);
         doc.setTextColor(180, 180, 190);
-        doc.text("BRIXX EUROPE  |  Dockplatsen 1  |  SE 211 19 Malmö  |  SWEDEN", pageWidth / 2, footerY, { align: "center" });
+        doc.text("BRIXX EUROPE | Dockplatsen 1 | SE 211 19 Malmö | SWEDEN", pageWidth / 2, footerY, { align: "center" });
 
         footerY += 4;
         doc.setFontSize(7);
@@ -372,14 +471,8 @@ export function generatePDF(state, summaryData, returnBlob = false) {
     } catch (err) {
         console.error("PDF export failed:", err);
         if (!returnBlob) {
-            notifyError("Kunde inte skapa PDF. Kontrollera att PDF-biblioteken ar laddade och forsok igen.");
+            notifyError("Kunde inte skapa PDF. Kontrollera att PDF-biblioteken är laddade och försök igen.");
         }
         return null;
     }
 }
-
-
-
-
-
-

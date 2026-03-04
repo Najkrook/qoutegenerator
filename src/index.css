@@ -1,0 +1,25 @@
+@import "tailwindcss";
+
+/* 
+  We extract variables from the legacy 'main.css' to keep the exact color scheme 
+  while giving us full Tailwind utility class power.
+*/
+@theme {
+  --color-primary: #3b82f6;
+  --color-primary-hover: #2563eb;
+  --color-bg: #0f0f1a;
+  --color-panel-bg: #1e1e2e;
+  --color-panel-border: #333344;
+  --color-text-primary: #ffffff;
+  --color-text-secondary: #a0aec0;
+  --color-success: #10b981;
+  --color-danger: #ef4444;
+  --color-warning: #f59e0b;
+}
+
+body {
+  background-color: var(--color-bg);
+  color: var(--color-text-primary);
+  font-family: 'Inter', sans-serif;
+  -webkit-font-smoothing: antialiased;
+}

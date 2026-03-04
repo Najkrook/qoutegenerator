@@ -1,6 +1,35 @@
 # QuoteGenerator
 
-Local quote/inventory tool for BRIXX.
+Local quote/inventory tool for BRIXX. A Single Page Application (SPA) built with React and Vite, utilizing Firebase for authentication and database management.
+
+## Technical Overview
+
+### Tech Stack
+- **Framework**: React (v19) via Vite
+- **Styling**: Tailwind CSS (v4) configured via Vite plugin
+- **Backend/Database**: Firebase (Authentication and Firestore)
+- **State Management**: Custom React Contexts with `useReducer` and `localStorage` persistence
+
+### Project Structure (`src/`)
+- `components/`: Reusable UI building blocks (`layout`, `modals`, `features`).
+- `config/`: Configuration files and shared utilities (e.g., terms templates).
+- `services/`: Interfaces with external services (`firebase.js`, `authService.js`).
+- `store/`: Application state management (`AuthContext.jsx`, `QuoteContext.jsx`).
+- `views/`: High-level page components representing different steps in the application flow.
+
+### Architecture & Workflows
+The application relies on global state for navigation rather than traditional URL-based routing.
+
+- **QuoteContext**: Uses a global `step` state to determine which view to render. Manages complex quote state (item selections, customer information, pricing modifiers) and actively syncs with `localStorage` (`offertverktyg_state`) to prevent data loss on page reloads.
+- **AuthContext**: Manages user sessions and enforces role-based access restrictions (e.g., hiding `inventory` and `sketch` views from unauthorized users).
+- **Core Workflow**:
+  - `Step 0`: Dashboard (Start a new quote, view quote history)
+  - `Step 1`: Product Line Selection
+  - `Step 2`: Configuration (Building the quote with items/grids)
+  - `Step 3`: Pricing (Reviewing costs, applying global discounts)
+  - `Step 4`: Summary Export (Final review, PDF/Terms generation)
+
+---
 
 ## 1) First-time GitHub publish
 
@@ -75,6 +104,7 @@ Open a PR to `main` from GitHub.
 This repository includes [`firestore.rules`](firestore.rules) with the intended baseline:
 
 - Users can only access their own quotes: `/users/{uid}/quotes/*`
+- Users can only access their own quote revisions: `/users/{uid}/quotes/*/revisions/*`
 - Inventory and inventory logs are admin-only: `/stock/*`, `/inventory_logs/*`
 - All other document paths are denied
 
@@ -82,3 +112,22 @@ Before deploy:
 
 1. Replace `UID_ADMIN_1..3` in `firestore.rules` with your real Firebase Auth UIDs.
 2. Deploy rules from Firebase console or Firebase CLI.
+
+## 7) Quote lifecycle rollout notes
+
+- Lifecycle is enabled by default. You can disable it locally by setting:
+  - `window.FEATURE_QUOTE_LIFECYCLE = false` (before app scripts run)
+- Legacy quote docs are still readable.
+- Optional metadata backfill script:
+
+```powershell
+node .\scripts\backfill-quote-metadata.mjs
+```
+
+Requires Firebase Admin credentials (`GOOGLE_APPLICATION_CREDENTIALS` or `FIREBASE_SERVICE_ACCOUNT_JSON`).
+
+## 8) Scrive integration (currently disabled)
+
+- Scrive UI/actions are disabled in the current release.
+- Existing Scrive metadata fields on quote documents are kept for backward compatibility.
+- The backend scaffold in `integrations/scrive-proxy/` is kept as inactive reference code.

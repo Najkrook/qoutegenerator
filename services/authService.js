@@ -5,6 +5,7 @@ import {
     signOut,
     onAuthStateChanged
 } from 'https://www.gstatic.com/firebasejs/10.9.0/firebase-auth.js';
+import { isFullAccessUser } from '../config/accessControl.shared.js';
 
 /**
  * Get the currently signed-in user (or null).
@@ -50,6 +51,36 @@ export function requireAuth() {
             } else {
                 window.location.href = 'login.html';
             }
+        });
+    });
+}
+
+/**
+ * True when user has full/admin access.
+ */
+export function hasFullAccess(user) {
+    return isFullAccessUser(user);
+}
+
+/**
+ * Full-access gate: redirects to login.html if signed out,
+ * and to redirectTo if signed in without full access.
+ */
+export function requireFullAccess({ redirectTo = 'index.html' } = {}) {
+    return new Promise((resolve) => {
+        const unsubscribe = onAuthStateChanged(auth, (user) => {
+            unsubscribe();
+            if (!user) {
+                window.location.href = 'login.html';
+                return;
+            }
+
+            if (!hasFullAccess(user)) {
+                window.location.href = redirectTo;
+                return;
+            }
+
+            resolve(user);
         });
     });
 }

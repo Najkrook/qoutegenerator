@@ -7,13 +7,17 @@ service cloud.firestore {
 
     function isAdmin() {
       return isSignedIn() && request.auth.uid in [
-        "UID_ADMIN_1",
-        "UID_ADMIN_2",
-        "UID_ADMIN_3"
+        "ZPxZusAiyfY6cf2LSn1ynP5A7rG3",
+        "XolYJ2aOCdZPgiTg4WKVSOcRPmO2",
+        "cNXpQsFClscsPGURl0gedehYcFo2"
       ];
     }
 
     match /users/{userId}/quotes/{quoteId} {
+      allow read, create, update, delete: if isSignedIn() && request.auth.uid == userId;
+    }
+
+    match /users/{userId}/quotes/{quoteId}/revisions/{revisionId} {
       allow read, create, update, delete: if isSignedIn() && request.auth.uid == userId;
     }
 

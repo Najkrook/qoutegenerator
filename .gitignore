@@ -32,5 +32,6 @@ inventory_db.json
 cloudflared.exe
 
 # Build / exported artifacts
+dist/
 *.pdf
 *.xlsx
