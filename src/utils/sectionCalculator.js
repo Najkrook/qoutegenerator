@@ -261,10 +261,10 @@ export function resolveEdgeWithPins(totalLength, existingSections, pins, options
     const totalPinnedSize = [...pinnedMap.values()].reduce((sum, s) => sum + s, 0);
     const remainingBudget = normalizedTotal - totalPinnedSize;
 
-    // Number of free slots we need to fill
+    // Number of free slots we originally had
     const freeSlotsCount = existingCount - pinnedMap.size;
 
-    if (freeSlotsCount < 0 || remainingBudget < 0) return null;
+    if (remainingBudget < 0) return null;
 
     // If all slots are pinned, just splice them together
     if (freeSlotsCount === 0) {
@@ -276,19 +276,33 @@ export function resolveEdgeWithPins(totalLength, existingSections, pins, options
         return result;
     }
 
-    // Solve the remaining budget for the free slots
+    // Solve the remaining budget for the free slots without forcing count
     const solvedFree = solveExactFill(remainingBudget, mode, targetLength);
-    if (!solvedFree || solvedFree.length !== freeSlotsCount) return null;
+    if (!solvedFree) return null;
 
-    // Splice pinned and free sections back together in order
+    // Splice pinned and free sections back together. 
+    // We place pins at their exact index if possible. Extra free slots are 
+    // distributed where free slots used to be.
     const result = [];
     let freeIdx = 0;
+
+    // Create an array mapping each original index to a type: 'pin' or 'free'
     for (let i = 0; i < existingCount; i++) {
         if (pinnedMap.has(i)) {
+            // Before placing the pin, if we are short on remaining original free slots
+            // to place all solvedFree, we might need to dump some solvedFree now.
             result.push(pinnedMap.get(i));
         } else {
-            result.push(solvedFree[freeIdx++]);
+            if (freeIdx < solvedFree.length) {
+                result.push(solvedFree[freeIdx++]);
+            }
         }
+    }
+
+    // If there are leftover free sections because the new solution has more sections
+    // than the original count, append them at the end.
+    while (freeIdx < solvedFree.length) {
+        result.push(solvedFree[freeIdx++]);
     }
 
     return result;

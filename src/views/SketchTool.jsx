@@ -108,6 +108,7 @@ function sanitizeConfig(config) {
     });
     next.doorSizeByEdge = normalizedDoorSizes;
 
+    next.manualSectionsByEdge = config.manualSectionsByEdge || {};
     return next;
 }
 
@@ -173,29 +174,21 @@ export function SketchTool({ onBack }) {
     }, []);
 
     const setManualPin = useCallback((edgeKey, segmentIndex, size) => {
-        setConfig((prev) => {
-            const prevPins = (prev.manualSectionsByEdge || {})[edgeKey] || [];
-            const filtered = prevPins.filter((p) => p.index !== segmentIndex);
-            const nextPins = size !== null
-                ? [...filtered, { index: segmentIndex, size }]
-                : filtered;
-            return {
-                ...prev,
-                manualSectionsByEdge: {
-                    ...(prev.manualSectionsByEdge || {}),
-                    [edgeKey]: nextPins
-                }
-            };
+        updateConfig({
+            manualSectionsByEdge: {
+                ...(config.manualSectionsByEdge || {}),
+                [edgeKey]: size !== null
+                    ? [...((config.manualSectionsByEdge || {})[edgeKey] || []).filter(p => p.index !== segmentIndex), { index: segmentIndex, size }]
+                    : ((config.manualSectionsByEdge || {})[edgeKey] || []).filter(p => p.index !== segmentIndex)
+            }
         });
-    }, []);
+    }, [config.manualSectionsByEdge, updateConfig]);
 
     const clearManualPins = useCallback((edgeKey) => {
-        setConfig((prev) => {
-            const next = { ...(prev.manualSectionsByEdge || {}) };
-            delete next[edgeKey];
-            return { ...prev, manualSectionsByEdge: next };
-        });
-    }, []);
+        const next = { ...(config.manualSectionsByEdge || {}) };
+        delete next[edgeKey];
+        updateConfig({ manualSectionsByEdge: next });
+    }, [config.manualSectionsByEdge, updateConfig]);
 
     const layout = useMemo(() => computeLayout(config), [config]);
     const previewConfig = useMemo(() => {
