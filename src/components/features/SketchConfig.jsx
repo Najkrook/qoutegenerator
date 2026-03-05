@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { DOOR_SIZES, MIN_DIMENSION_MM, SECTION_SIZES, STEP_MM } from '../../utils/sectionCalculator';
 
 const PRIO_DESCRIPTIONS = {
@@ -41,6 +41,14 @@ function normalizeDimension(rawValue, fallback) {
     return clamp(rounded, MIN_DIMENSION_MM, 50000);
 }
 
+function normalizeDepth(rawValue, fallback) {
+    const parsed = Number(rawValue);
+    const base = Number.isFinite(parsed) ? parsed : fallback;
+    const rounded = roundToStep(base);
+    // Allow 0mm for depth only
+    return clamp(rounded, 0, 50000);
+}
+
 function normalizeTarget(rawValue, fallback) {
     const parsed = Number(rawValue);
     const base = Number.isFinite(parsed) ? parsed : fallback;
@@ -53,6 +61,39 @@ function normalizeDoorSize(rawValue) {
     const parsed = Number(rawValue);
     const base = Number.isFinite(parsed) ? parsed : 1000;
     return nearestFromList(base, DOOR_SIZES);
+}
+
+function DelayedInput({ value, min, step, onValueCommit, className }) {
+    const [localValue, setLocalValue] = useState(value);
+
+    useEffect(() => {
+        setLocalValue(value);
+    }, [value]);
+
+    const handleBlur = () => {
+        if (String(localValue) !== String(value)) {
+            onValueCommit(localValue);
+        }
+    };
+
+    const handleKeyDown = (e) => {
+        if (e.key === 'Enter') {
+            e.target.blur();
+        }
+    };
+
+    return (
+        <input
+            type="number"
+            value={localValue}
+            step={step}
+            min={min}
+            onChange={(e) => setLocalValue(e.target.value)}
+            onBlur={handleBlur}
+            onKeyDown={handleKeyDown}
+            className={className}
+        />
+    );
 }
 
 export function SketchConfig({ config, onChange, selectedEdge, selectedSegmentIndex, onSelectEdge, onSetManualPin, onClearManualPins, edgeSummaries }) {
@@ -107,24 +148,22 @@ export function SketchConfig({ config, onChange, selectedEdge, selectedSegmentIn
             <div className="grid grid-cols-2 gap-4">
                 <div className="flex flex-col gap-1.5">
                     <label className="text-xs font-semibold text-text-secondary uppercase">Bredd (mm)</label>
-                    <input
-                        type="number"
+                    <DelayedInput
                         value={width}
                         step={STEP_MM}
                         min={MIN_DIMENSION_MM}
-                        onChange={(e) => onChange({ width: normalizeDimension(e.target.value, width) })}
+                        onValueCommit={(val) => onChange({ width: normalizeDimension(val, width) })}
                         className="bg-input-bg border border-panel-border text-text-primary p-2.5 rounded-lg outline-none focus:border-primary text-sm"
                     />
                 </div>
                 {equalDepth ? (
                     <div className="flex flex-col gap-1.5">
                         <label className="text-xs font-semibold text-text-secondary uppercase">Djup (mm)</label>
-                        <input
-                            type="number"
+                        <DelayedInput
                             value={depth}
                             step={STEP_MM}
-                            min={MIN_DIMENSION_MM}
-                            onChange={(e) => onChange({ depth: normalizeDimension(e.target.value, depth), depthLeft: normalizeDimension(e.target.value, depth), depthRight: normalizeDimension(e.target.value, depth) })}
+                            min={0}
+                            onValueCommit={(val) => onChange({ depth: normalizeDepth(val, depth), depthLeft: normalizeDepth(val, depth), depthRight: normalizeDepth(val, depth) })}
                             className="bg-input-bg border border-panel-border text-text-primary p-2.5 rounded-lg outline-none focus:border-primary text-sm"
                         />
                     </div>
@@ -148,23 +187,21 @@ export function SketchConfig({ config, onChange, selectedEdge, selectedSegmentIn
                 <div className="grid grid-cols-2 gap-4">
                     <div className="flex flex-col gap-1.5">
                         <label className="text-xs font-semibold text-text-secondary uppercase">Vänster djup (mm)</label>
-                        <input
-                            type="number"
+                        <DelayedInput
                             value={depthLeft}
                             step={STEP_MM}
-                            min={MIN_DIMENSION_MM}
-                            onChange={(e) => onChange({ depthLeft: normalizeDimension(e.target.value, depthLeft) })}
+                            min={0}
+                            onValueCommit={(val) => onChange({ depthLeft: normalizeDepth(val, depthLeft) })}
                             className="bg-input-bg border border-panel-border text-text-primary p-2.5 rounded-lg outline-none focus:border-primary text-sm"
                         />
                     </div>
                     <div className="flex flex-col gap-1.5">
                         <label className="text-xs font-semibold text-text-secondary uppercase">Höger djup (mm)</label>
-                        <input
-                            type="number"
+                        <DelayedInput
                             value={depthRight}
                             step={STEP_MM}
-                            min={MIN_DIMENSION_MM}
-                            onChange={(e) => onChange({ depthRight: normalizeDimension(e.target.value, depthRight) })}
+                            min={0}
+                            onValueCommit={(val) => onChange({ depthRight: normalizeDepth(val, depthRight) })}
                             className="bg-input-bg border border-panel-border text-text-primary p-2.5 rounded-lg outline-none focus:border-primary text-sm"
                         />
                     </div>

@@ -168,11 +168,11 @@ function solveEdge(totalLength, needsDoor, options = {}) {
     if (normalizedTotal === 0) {
         return {
             sections: [],
-            valid: false,
+            valid: true,
             requestedDoorSize: null,
             resolvedDoorSize: null,
             autoAdjusted: false,
-            errorCode: 'NON_POSITIVE_EDGE'
+            errorCode: null
         };
     }
 
@@ -478,9 +478,9 @@ function buildEdgeSummary(edgeKey, length, enabled, sections, diagnostics) {
 export function computeLayout(config) {
     const includeBack = !!config.includeBack;
     const width = normalizeNumber(config.width, { fallback: 8000, min: MIN_DIMENSION_MM, max: 50000 });
-    const sharedDepth = normalizeNumber(config.depth, { fallback: 4000, min: MIN_DIMENSION_MM, max: 50000 });
-    const depthLeft = normalizeNumber(config.depthLeft ?? config.depth, { fallback: sharedDepth, min: MIN_DIMENSION_MM, max: 50000 });
-    const depthRight = normalizeNumber(config.depthRight ?? config.depth, { fallback: sharedDepth, min: MIN_DIMENSION_MM, max: 50000 });
+    const sharedDepth = normalizeNumber(config.depth, { fallback: 4000, min: 0, max: 50000 });
+    const depthLeft = normalizeNumber(config.depthLeft ?? config.depth, { fallback: sharedDepth, min: 0, max: 50000 });
+    const depthRight = normalizeNumber(config.depthRight ?? config.depth, { fallback: sharedDepth, min: 0, max: 50000 });
     const prioMode = normalizeMode(config.prioMode);
     const targetLength = normalizeNumber(config.targetLength, { fallback: 1500, min: 700, max: 2000 });
     const doorEdges = normalizeDoorEdges(config.doorEdges, includeBack);

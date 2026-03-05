@@ -11,6 +11,11 @@ function toInt(value, fallback = 1) {
     return Number.isFinite(parsed) ? parsed : fallback;
 }
 
+function formatSizeDisplay(sizeStr) {
+    if (!sizeStr || sizeStr === '-') return '-';
+    return String(sizeStr).replace(/\s*(Rekt angel|Rektangel|Kvadrat|Rund|Runda|Rektangulär)\s*/ig, '').trim() || '-';
+}
+
 function getUnitSekPrice(basePrice, lineKey, catalogData, exchangeRate) {
     const lineCurrency = catalogData?.[lineKey]?.currency;
     if (lineCurrency === 'EUR') {
@@ -89,7 +94,7 @@ export function computeQuoteTotals({ state, catalogData }) {
 
         totals.push({
             model: `${item?.line || ''} ${item?.model || ''}`.trim(),
-            size: item?.size || '-',
+            size: formatSizeDisplay(item?.size),
             unitPrice,
             qty,
             gross,
@@ -150,7 +155,7 @@ export function computeQuoteTotals({ state, catalogData }) {
 
             totals.push({
                 model: model || '',
-                size: size || '-',
+                size: formatSizeDisplay(size),
                 unitPrice,
                 qty,
                 gross,

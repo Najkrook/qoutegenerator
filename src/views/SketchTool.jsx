@@ -52,6 +52,13 @@ function normalizeDimension(rawValue, fallback) {
     return clamp(rounded, MIN_DIMENSION_MM, 50000);
 }
 
+function normalizeDepth(rawValue, fallback) {
+    const parsed = Number(rawValue);
+    const base = Number.isFinite(parsed) ? parsed : fallback;
+    const rounded = roundToStep(base);
+    return clamp(rounded, 0, 50000);
+}
+
 function normalizeTarget(rawValue, fallback) {
     const parsed = Number(rawValue);
     const base = Number.isFinite(parsed) ? parsed : fallback;
@@ -70,9 +77,9 @@ function sanitizeConfig(config) {
     next.width = normalizeDimension(next.width, 8000);
     next.equalDepth = next.equalDepth !== false; // default true
 
-    const primaryDepth = normalizeDimension(next.depth ?? next.depthLeft ?? next.depthRight, 4000);
-    const normalizedDepthLeft = normalizeDimension(next.depthLeft, primaryDepth);
-    const normalizedDepthRight = normalizeDimension(next.depthRight, primaryDepth);
+    const primaryDepth = normalizeDepth(next.depth ?? next.depthLeft ?? next.depthRight, 4000);
+    const normalizedDepthLeft = normalizeDepth(next.depthLeft, primaryDepth);
+    const normalizedDepthRight = normalizeDepth(next.depthRight, primaryDepth);
 
     if (next.equalDepth) {
         const sharedDepth = primaryDepth;

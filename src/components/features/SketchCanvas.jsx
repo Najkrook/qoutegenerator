@@ -211,7 +211,7 @@ export function SketchCanvas({
 
             if (activeDrag === 'front') {
                 if (equalDepth) {
-                    const newDepth = Math.max(MIN_DIMENSION_MM, snapToGrid(dragRef.current.initialD + deltaY));
+                    const newDepth = Math.max(0, snapToGrid(dragRef.current.initialD + deltaY));
                     dragDepthRef.current = newDepth;
                     dragDepthLeftRef.current = newDepth;
                     dragDepthRightRef.current = newDepth;
@@ -220,8 +220,8 @@ export function SketchCanvas({
                     setDragDepthRight(newDepth);
                     onResizePreview?.({ depth: newDepth, depthLeft: newDepth, depthRight: newDepth });
                 } else {
-                    const nextLeft = Math.max(MIN_DIMENSION_MM, snapToGrid(dragRef.current.initialDLeft + deltaY));
-                    const nextRight = Math.max(MIN_DIMENSION_MM, snapToGrid(dragRef.current.initialDRight + deltaY));
+                    const nextLeft = Math.max(0, snapToGrid(dragRef.current.initialDLeft + deltaY));
+                    const nextRight = Math.max(0, snapToGrid(dragRef.current.initialDRight + deltaY));
                     dragDepthLeftRef.current = nextLeft;
                     dragDepthRightRef.current = nextRight;
                     setDragDepthLeft(nextLeft);
@@ -239,12 +239,12 @@ export function SketchCanvas({
                 setDragWidth(newWidth);
                 onResizePreview?.({ width: newWidth });
             } else if (activeDrag === 'depthLeft') {
-                const next = Math.max(MIN_DIMENSION_MM, snapToGrid(dragRef.current.initialDLeft + deltaY));
+                const next = Math.max(0, snapToGrid(dragRef.current.initialDLeft + deltaY));
                 dragDepthLeftRef.current = next;
                 setDragDepthLeft(next);
                 onResizePreview?.({ depthLeft: next });
             } else if (activeDrag === 'depthRight') {
-                const next = Math.max(MIN_DIMENSION_MM, snapToGrid(dragRef.current.initialDRight + deltaY));
+                const next = Math.max(0, snapToGrid(dragRef.current.initialDRight + deltaY));
                 dragDepthRightRef.current = next;
                 setDragDepthRight(next);
                 onResizePreview?.({ depthRight: next });
