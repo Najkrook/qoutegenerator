@@ -1,4 +1,4 @@
-import React from 'react';
+﻿import React from 'react';
 import { useQuote } from '../../store/QuoteContext';
 import { useAuth } from '../../store/AuthContext';
 
@@ -6,6 +6,7 @@ export function Header() {
     const { state, dispatch } = useQuote();
     const { user, logout, canViewEverything } = useAuth();
     const { step } = state;
+    const showQuoteStepper = typeof step === 'number' && step >= 1 && step <= 4;
 
     const steps = [
         '1. Produktlinje',
@@ -39,7 +40,7 @@ export function Header() {
                             <span className="hidden group-hover:inline-block whitespace-nowrap">Rensa offert</span>
                         </button>
                     )}
-                    <h1 className="text-2xl font-semibold m-0">Offertverktyg System</h1>
+                    <h1 className="text-2xl font-semibold m-0">Brixx portal</h1>
                 </div>
 
                 <div className="flex items-center gap-3">
@@ -68,20 +69,23 @@ export function Header() {
                 </div>
             </div>
 
-            <div className="flex justify-between items-center bg-panel-bg border border-panel-border rounded-lg p-2 overflow-x-auto gap-2">
-                {steps.map((label, index) => {
-                    const stepNumber = index + 1;
-                    const isActive = step === stepNumber;
-                    return (
-                        <div
-                            key={label}
-                            className={`flex-1 text-center py-2 px-4 rounded-md text-sm font-medium whitespace-nowrap transition-colors ${isActive ? 'bg-primary text-white' : 'text-text-secondary'}`}
-                        >
-                            {label}
-                        </div>
-                    );
-                })}
-            </div>
+            {showQuoteStepper && (
+                <div className="flex justify-between items-center bg-panel-bg border border-panel-border rounded-lg p-2 overflow-x-auto gap-2">
+                    {steps.map((label, index) => {
+                        const stepNumber = index + 1;
+                        const isActive = step === stepNumber;
+                        return (
+                            <div
+                                key={label}
+                                className={`flex-1 text-center py-2 px-4 rounded-md text-sm font-medium whitespace-nowrap transition-colors ${isActive ? 'bg-primary text-white' : 'text-text-secondary'}`}
+                            >
+                                {label}
+                            </div>
+                        );
+                    })}
+                </div>
+            )}
         </header>
     );
 }
+

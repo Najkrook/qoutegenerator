@@ -95,6 +95,24 @@ Baseline team policy:
 powershell -ExecutionPolicy Bypass -File .\scripts\verify-git-safety.ps1
 ```
 
+## Access Roles (UID Based)
+Role mapping is currently maintained in code via Firebase Auth UID allowlists in `config/accessControl.shared.js`.
+
+- `full`: admin access to all app areas.
+- `quote-only`: default signed-in access to quote flow only.
+- `sketch-only`: dashboard + `Rita Uteservering` only.
+
+Role precedence:
+
+1. No UID -> `guest`
+2. UID in `ADMIN_UIDS` -> `full`
+3. UID in `SKETCH_ONLY_UIDS` -> `sketch-only`
+4. Otherwise -> `quote-only`
+
+Notes:
+- `sketch-only` users cannot export sketch data into quote flow (`Exportera till Offert` is disabled).
+- Keep UID lists minimal and review them regularly.
+
 ## Firestore Rules and Deploy Notes
 This repository includes `firestore.rules` with the intended baseline:
 

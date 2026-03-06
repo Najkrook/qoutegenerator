@@ -15,6 +15,9 @@ export function SketchBom({
     hasInvalidEdges,
     invalidEdges,
     autoAdjustedEdges,
+    parasols = [],
+    parasolWarnings = [],
+    canExportToQuote = true,
     onExport,
     onExportImage
 }) {
@@ -25,7 +28,18 @@ export function SketchBom({
         .sort((a, b) => Number.parseFloat(b) - Number.parseFloat(a));
 
     const sortedKeys = [...doorKeys, ...sectionKeys];
-    const exportDisabled = sortedKeys.length === 0;
+
+    const parasolCounts = parasols.reduce((acc, p) => {
+        acc[p.label] = (acc[p.label] || 0) + 1;
+        return acc;
+    }, {});
+    const parasolKeys = Object.keys(parasolCounts).sort();
+
+    const hasExportableLayout = sortedKeys.length > 0 || parasols.length > 0;
+    const exportDisabled = !hasExportableLayout || !canExportToQuote;
+    const exportButtonTitle = !canExportToQuote
+        ? 'Du har inte behörighet att exportera till offert.'
+        : undefined;
 
     return (
         <div className="bg-panel-bg border border-panel-border rounded-xl p-5">
@@ -33,8 +47,8 @@ export function SketchBom({
                 <h3 className="text-lg font-semibold text-text-primary m-0">📋 Materialförteckning</h3>
                 <span
                     className={`text-xs px-2 py-1 rounded-full border ${hasInvalidEdges
-                            ? 'border-danger/50 text-danger bg-danger/10'
-                            : 'border-success/40 text-success bg-success/10'
+                        ? 'border-danger/50 text-danger bg-danger/10'
+                        : 'border-success/40 text-success bg-success/10'
                         }`}
                 >
                     {hasInvalidEdges ? 'Kräver kontroll' : 'Redo'}
@@ -53,6 +67,12 @@ export function SketchBom({
                     {autoAdjustedEdges
                         .map(([edge, diag]) => `${EDGE_LABELS[edge] || edge} ${diag.requestedDoorSize} -> ${diag.resolvedDoorSize} mm`)
                         .join(', ')}
+                </div>
+            )}
+
+            {parasolWarnings.length > 0 && (
+                <div className="mb-4 p-3 rounded-lg border border-amber-400/40 bg-amber-500/10 text-amber-200 text-xs">
+                    <b>Varning (Parasoll):</b> {parasolWarnings.map((warning) => warning.text).join(', ')}
                 </div>
             )}
 
@@ -82,9 +102,18 @@ export function SketchBom({
                         <span className="font-bold">{stodbenCount} st</span>
                     </li>
                 )}
+
+                {parasolKeys.map((label) => (
+                    <li key={`parasol-${label}`} className="py-2.5 border-b border-panel-border flex justify-between items-center text-sm">
+                        <span className="text-text-primary">
+                            Parasoll <b>{label}</b>
+                        </span>
+                        <span className="font-bold text-text-primary">{parasolCounts[label]} st</span>
+                    </li>
+                ))}
             </ul>
 
-            {sortedKeys.length === 0 && (
+            {sortedKeys.length === 0 && parasols.length === 0 && (
                 <p className="text-text-secondary text-center text-sm py-4 m-0 italic">Inga sektioner beräknade.</p>
             )}
 
@@ -96,9 +125,12 @@ export function SketchBom({
                 <button
                     onClick={onExport}
                     disabled={exportDisabled}
+                    title={exportButtonTitle}
                     className="w-full py-3 bg-primary text-white border-none rounded-lg font-semibold cursor-pointer hover:brightness-110 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
                 >
-                    {hasInvalidEdges ? 'Exportera till Offert (bekräfta varningar)' : 'Exportera till Offert'}
+                    {!canExportToQuote
+                        ? 'Export till Offert ej tillgänglig'
+                        : (hasInvalidEdges ? 'Exportera till Offert (bekräfta varningar)' : 'Exportera till Offert')}
                 </button>
                 <button
                     onClick={onExportImage}

@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useCallback } from 'react';
 import { useQuote } from '../store/QuoteContext';
+import { useAuth } from '../store/AuthContext';
 import {
     computeLayout,
     DOOR_LABEL,
@@ -8,6 +9,13 @@ import {
     SECTION_SIZES,
     STEP_MM
 } from '../utils/sectionCalculator';
+import {
+    PARASOL_PRESETS,
+    getAreaPolygon,
+    pointInPolygon,
+    snapToStep100,
+    computeParasolOverlapWarnings
+} from '../utils/parasolGeometry';
 import { downloadBlob, saveBlobWithPicker } from '../utils/fileUtils';
 import { SketchCanvas } from '../components/features/SketchCanvas';
 import { SketchConfig } from '../components/features/SketchConfig';
@@ -96,7 +104,13 @@ function sanitizeConfig(config) {
     next.includeBack = !!next.includeBack;
     next.prioMode = ['symmetrical', 'convenient', 'target'].includes(next.prioMode) ? next.prioMode : 'symmetrical';
 
-    const doors = next.doorEdges instanceof Set ? new Set(next.doorEdges) : new Set(next.doorEdges || []);
+    const rawDoorEdges = next.doorEdges;
+    const normalizedDoorEdges = rawDoorEdges instanceof Set
+        ? [...rawDoorEdges]
+        : Array.isArray(rawDoorEdges)
+            ? rawDoorEdges
+            : [];
+    const doors = new Set(normalizedDoorEdges);
     if (!next.includeBack) doors.delete('back');
     next.doorEdges = doors;
 
@@ -109,6 +123,10 @@ function sanitizeConfig(config) {
     next.doorSizeByEdge = normalizedDoorSizes;
 
     next.manualSectionsByEdge = config.manualSectionsByEdge || {};
+    next.activeMode = config.activeMode || 'clickitup';
+    next.parasols = config.parasols || [];
+    next.selectedParasolId = config.selectedParasolId || null;
+    next.selectedParasolPresetId = config.selectedParasolPresetId || 'parasol_3x3';
     return next;
 }
 
@@ -127,11 +145,19 @@ function getInitialDensity() {
     return coarse ? 'touch' : 'desktop';
 }
 
+function serializeSketchConfig(config) {
+    return {
+        ...config,
+        doorEdges: Array.from(config?.doorEdges || [])
+    };
+}
+
 export function SketchTool({ onBack }) {
     const { state, dispatch } = useQuote();
+    const { canExportSketchToQuote } = useAuth();
 
-    const [config, setConfig] = useState(() =>
-        sanitizeConfig({
+    const [config, setConfig] = useState(() => {
+        const defaultConfig = {
             width: 8000,
             depth: 4000,
             depthLeft: 4000,
@@ -142,15 +168,26 @@ export function SketchTool({ onBack }) {
             targetLength: 1500,
             doorEdges: new Set(),
             doorSizeByEdge: {},
-            manualSectionsByEdge: {}
-        })
-    );
+            manualSectionsByEdge: {},
+            activeMode: 'clickitup',
+            parasols: [],
+            selectedParasolId: null,
+            selectedParasolPresetId: 'parasol_3x3'
+        };
+        return sanitizeConfig(state.sketchDraft?.config || defaultConfig);
+    });
 
-    const [workspace, setWorkspace] = useState(() => ({
-        camera: DEFAULT_CAMERA,
-        selection: { edgeKey: 'front', segmentIndex: null },
-        uiDensity: getInitialDensity()
-    }));
+    const [workspace, setWorkspace] = useState(() => {
+        const saved = state.sketchDraft?.workspace || {};
+        return {
+            camera: { ...DEFAULT_CAMERA, ...(saved.camera || {}) },
+            selection: {
+                edgeKey: saved.selection?.edgeKey || 'front',
+                segmentIndex: saved.selection?.segmentIndex ?? null
+            },
+            uiDensity: saved.uiDensity || getInitialDensity()
+        };
+    });
 
     const [showStockModal, setShowStockModal] = useState(false);
     const [dragPreview, setDragPreview] = useState(null);
@@ -225,7 +262,7 @@ export function SketchTool({ onBack }) {
         [layout.layoutWarnings]
     );
 
-    const canExport = layout.allSections.length > 0;
+    const canExport = layout.allSections.length > 0 || (config.parasols || []).length > 0;
 
     const handleResizePreview = useCallback((dims) => {
         if (!dims || Object.keys(dims).length === 0) {
@@ -332,7 +369,88 @@ export function SketchTool({ onBack }) {
         [config.doorEdges, config.doorSizeByEdge, layout.suggestions, updateConfig]
     );
 
+    const parasolWarnings = useMemo(
+        () => computeParasolOverlapWarnings(config.parasols || []),
+        [config.parasols]
+    );
+
+    const parasolAreaPolygon = useMemo(
+        () => getAreaPolygon(config),
+        [config.width, config.depth, config.depthLeft, config.depthRight, config.equalDepth]
+    );
+
+    const handleChangeMode = useCallback((mode) => {
+        updateConfig({
+            activeMode: mode,
+            selectedParasolId: mode === 'parasol' ? config.selectedParasolId : null
+        });
+    }, [config.selectedParasolId, updateConfig]);
+
+    const handlePlaceParasol = useCallback((xMm, yMm) => {
+        if (config.activeMode !== 'parasol') return;
+        const preset = PARASOL_PRESETS.find(p => p.id === config.selectedParasolPresetId);
+        if (!preset) return;
+
+        const snappedX = snapToStep100(xMm);
+        const snappedY = snapToStep100(yMm);
+
+        if (!pointInPolygon(snappedX, snappedY, parasolAreaPolygon)) {
+            toast.error('Parasollens centrum måste vara inom ytan.');
+            return;
+        }
+
+        const newId = `parasol-${Date.now()}`;
+        const newParasol = {
+            id: newId,
+            presetId: preset.id,
+            label: preset.label,
+            widthMm: preset.widthMm,
+            depthMm: preset.depthMm,
+            xMm: snappedX,
+            yMm: snappedY,
+            exportLine: preset.exportLine,
+            exportModel: preset.exportModel,
+            exportSize: preset.exportSize
+        };
+
+        updateConfig({
+            parasols: [...(config.parasols || []), newParasol],
+            selectedParasolId: newId
+        });
+    }, [config.activeMode, config.selectedParasolPresetId, config.parasols, parasolAreaPolygon, updateConfig]);
+
+    const handleSelectParasol = useCallback((id) => {
+        updateConfig({ selectedParasolId: id });
+    }, [updateConfig]);
+
+    const handleMoveParasol = useCallback((id, xMm, yMm) => {
+        const snappedX = snapToStep100(xMm);
+        const snappedY = Math.max(0, snapToStep100(yMm));
+
+        if (!pointInPolygon(snappedX, snappedY, parasolAreaPolygon)) {
+            return; // Don't allow drag outside
+        }
+
+        updateConfig({
+            parasols: (config.parasols || []).map(p =>
+                p.id === id ? { ...p, xMm: snappedX, yMm: snappedY } : p
+            )
+        });
+    }, [config.parasols, parasolAreaPolygon, updateConfig]);
+
+    const handleDeleteParasol = useCallback((id) => {
+        updateConfig({
+            parasols: (config.parasols || []).filter(p => p.id !== id),
+            selectedParasolId: config.selectedParasolId === id ? null : config.selectedParasolId
+        });
+    }, [config.parasols, config.selectedParasolId, updateConfig]);
+
     const handleExportClick = () => {
+        if (!canExportSketchToQuote) {
+            toast.error('Du har inte behorighet att exportera till offert.');
+            return;
+        }
+
         if (!canExport) {
             toast.error('Ingen layout att exportera ännu.');
             return;
@@ -350,21 +468,40 @@ export function SketchTool({ onBack }) {
     };
 
     const commitExport = () => {
+        if (!canExportSketchToQuote) {
+            setShowStockModal(false);
+            return;
+        }
+
         setShowStockModal(false);
 
-        const newSelectedLines = state.selectedLines.includes('ClickitUP')
+        const hasParasols = config.parasols && config.parasols.length > 0;
+        const hadSketchBahamaLine = Boolean(state.sketchMeta?.addedBahamaLine);
+
+        let newSelectedLines = state.selectedLines.includes('ClickitUP')
             ? [...state.selectedLines]
             : [...state.selectedLines, 'ClickitUP'];
 
-        const gridSelections = { ...state.gridSelections };
-        if (!gridSelections.ClickitUP) {
-            gridSelections.ClickitUP = { items: {}, addons: {} };
+        let nextSketchAddedBahamaLine = hadSketchBahamaLine;
+
+        if (hasParasols) {
+            if (!newSelectedLines.includes('BaHaMa')) {
+                newSelectedLines.push('BaHaMa');
+            }
+            nextSketchAddedBahamaLine = true;
+        } else if (hadSketchBahamaLine) {
+            const hasNonSketchBahamaBuilder = (state.builderItems || []).some(
+                (item) => item.line === 'BaHaMa' && !(item.source === 'sketch' && item.sourceType === 'parasol')
+            );
+            if (!hasNonSketchBahamaBuilder) {
+                newSelectedLines = newSelectedLines.filter((line) => line !== 'BaHaMa');
+            }
+            nextSketchAddedBahamaLine = false;
         }
 
-        const cuGrid = {
-            items: { ...gridSelections.ClickitUP.items },
-            addons: { ...gridSelections.ClickitUP.addons }
-        };
+        const gridSelections = { ...state.gridSelections };
+        // Build from scratch so each export reflects only the current sketch.
+        const cuGrid = { items: {}, addons: {} };
 
         layout.allSections.forEach((section) => {
             const doorSize = parseDoorSize(section);
@@ -393,6 +530,58 @@ export function SketchTool({ onBack }) {
 
         dispatch({ type: 'SET_SELECTED_LINES', payload: newSelectedLines });
         dispatch({ type: 'SET_GRID_SELECTIONS', payload: gridSelections });
+
+        // Legacy untagged parasol rows are intentionally left untouched.
+        const baseBuilderItems = (state.builderItems || []).filter(
+            (item) => !(item.source === 'sketch' && item.sourceType === 'parasol')
+        );
+        const newBuilderItems = [...baseBuilderItems];
+
+        if (hasParasols) {
+            const groupedParasols = (config.parasols || []).reduce((acc, p) => {
+                const key = `${p.exportLine}|${p.exportModel}|${p.exportSize}`;
+                if (!acc[key]) {
+                    acc[key] = {
+                        line: p.exportLine,
+                        model: p.exportModel,
+                        size: p.exportSize,
+                        qty: 0
+                    };
+                }
+                acc[key].qty += 1;
+                return acc;
+            }, {});
+
+            Object.values(groupedParasols).forEach((grouped) => {
+                newBuilderItems.push({
+                    id: Math.random().toString(36).substr(2, 9),
+                    line: grouped.line,
+                    model: grouped.model,
+                    size: grouped.size,
+                    qty: grouped.qty,
+                    addons: [],
+                    discountPct: state.globalDiscountPct || 0,
+                    source: 'sketch',
+                    sourceType: 'parasol'
+                });
+            });
+        }
+
+        dispatch({ type: 'SET_BUILDER_ITEMS', payload: newBuilderItems });
+        dispatch({
+            type: 'UPDATE_STATE',
+            payload: {
+                sketchDraft: {
+                    config: serializeSketchConfig(config),
+                    workspace
+                },
+                sketchMeta: {
+                    ...(state.sketchMeta || {}),
+                    addedBahamaLine: nextSketchAddedBahamaLine
+                }
+            }
+        });
+
         dispatch({ type: 'SET_STEP', payload: 2 });
 
         if (autoAdjustedEdges.length > 0) {
@@ -405,7 +594,10 @@ export function SketchTool({ onBack }) {
             toast('Dörrstorlek justerades automatiskt: ' + adjusted, { icon: '⚠️' });
         }
 
-        toast.success('ClickitUP-sektioner exporterade till offerten.');
+        const successMsg = hasParasols
+            ? `Exporterade skissen och ${config.parasols.length} st parasoller till offerten.`
+            : 'ClickitUP-sektioner exporterade till offerten.';
+        toast.success(successMsg);
     };
 
     const handleExportImage = async () => {
@@ -463,6 +655,19 @@ export function SketchTool({ onBack }) {
         }
     };
 
+    const handleBackClick = useCallback(() => {
+        dispatch({
+            type: 'UPDATE_STATE',
+            payload: {
+                sketchDraft: {
+                    config: serializeSketchConfig(config),
+                    workspace
+                }
+            }
+        });
+        onBack?.();
+    }, [config, dispatch, onBack, workspace]);
+
     return (
         <div className="animate-slide-in space-y-6">
             <div className="flex justify-between items-center">
@@ -498,7 +703,7 @@ export function SketchTool({ onBack }) {
                     </div>
 
                     <button
-                        onClick={onBack}
+                        onClick={handleBackClick}
                         className="px-5 py-2 border border-panel-border bg-panel-bg text-text-primary rounded-lg cursor-pointer hover:bg-white/5 shadow-sm"
                     >
                         ← Tillbaka
@@ -539,6 +744,7 @@ export function SketchTool({ onBack }) {
                         onSetManualPin={setManualPin}
                         onClearManualPins={clearManualPins}
                         edgeSummaries={layout.edgeSummaries}
+                        onDeleteParasol={handleDeleteParasol}
                     />
 
                     <div className="bg-panel-bg border border-panel-border rounded-xl p-5">
@@ -571,6 +777,9 @@ export function SketchTool({ onBack }) {
                         hasInvalidEdges={layout.hasInvalidEdges}
                         invalidEdges={invalidEdges}
                         autoAdjustedEdges={autoAdjustedEdges}
+                        parasols={config.parasols}
+                        parasolWarnings={parasolWarnings}
+                        canExportToQuote={canExportSketchToQuote}
                         onExport={handleExportClick}
                         onExportImage={handleExportImage}
                     />
@@ -578,6 +787,13 @@ export function SketchTool({ onBack }) {
 
                 <div className="xl:sticky xl:top-4 xl:self-start space-y-4">
                     <SketchCanvas
+                        activeMode={config.activeMode}
+                        parasols={config.parasols}
+                        selectedParasolId={config.selectedParasolId}
+                        onPlaceParasol={handlePlaceParasol}
+                        onSelectParasol={handleSelectParasol}
+                        onMoveParasol={handleMoveParasol}
+                        onChangeMode={handleChangeMode}
                         width={previewConfig.width}
                         depth={previewConfig.depth}
                         depthLeft={previewConfig.depthLeft}
@@ -640,3 +856,7 @@ export function SketchTool({ onBack }) {
         </div>
     );
 }
+
+
+
+

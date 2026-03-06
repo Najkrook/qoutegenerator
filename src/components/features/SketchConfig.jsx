@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { DOOR_SIZES, MIN_DIMENSION_MM, SECTION_SIZES, STEP_MM } from '../../utils/sectionCalculator';
+import { PARASOL_PRESETS } from '../../utils/parasolGeometry';
 
 const PRIO_DESCRIPTIONS = {
     target: 'Fördelar sektioner så nära målstorleken som möjligt med standardstorlekar.',
@@ -96,8 +97,22 @@ function DelayedInput({ value, min, step, onValueCommit, className }) {
     );
 }
 
-export function SketchConfig({ config, onChange, selectedEdge, selectedSegmentIndex, onSelectEdge, onSetManualPin, onClearManualPins, edgeSummaries }) {
+export function SketchConfig({
+    config,
+    onChange,
+    selectedEdge,
+    selectedSegmentIndex,
+    onSelectEdge,
+    onSetManualPin,
+    onClearManualPins,
+    edgeSummaries,
+    onDeleteParasol
+}) {
     const {
+        activeMode = 'clickitup',
+        parasols = [],
+        selectedParasolId = null,
+        selectedParasolPresetId = 'parasol_3x3',
         width,
         depth,
         depthLeft,
@@ -140,6 +155,50 @@ export function SketchConfig({ config, onChange, selectedEdge, selectedSegmentIn
     const existingPin = (manualSectionsByEdge[selectedEdge] || []).find((p) => p.index === selectedSegmentIndex);
     const currentPinSize = existingPin?.size ?? null;
     const hasAnyPins = (manualSectionsByEdge[selectedEdge] || []).length > 0;
+    const selectedParasol = selectedParasolId
+        ? parasols.find((parasol) => parasol.id === selectedParasolId) || null
+        : null;
+
+    if (activeMode === 'parasol') {
+        return (
+            <div className="bg-panel-bg border border-panel-border rounded-xl p-5 space-y-5">
+                <h3 className="text-lg font-semibold text-text-primary m-0">⛱️ Parasollkonfiguration</h3>
+
+                <div className="flex flex-col gap-1.5">
+                    <label className="text-xs font-semibold text-text-secondary uppercase">Lägg till parasoll</label>
+                    <select
+                        value={selectedParasolPresetId}
+                        onChange={(e) => onChange({ selectedParasolPresetId: e.target.value })}
+                        className="bg-input-bg border border-panel-border text-text-primary p-2.5 rounded-lg outline-none focus:border-primary text-sm"
+                    >
+                        {PARASOL_PRESETS.map((preset) => (
+                            <option key={preset.id} value={preset.id}>
+                                {preset.label} ({preset.widthMm}x{preset.depthMm} mm)
+                            </option>
+                        ))}
+                    </select>
+                    <p className="text-xs text-text-secondary mt-1">Klicka i den ritade ytan för att placera ett parasoll med denna storlek.</p>
+                </div>
+
+                {selectedParasolId && (
+                    <div className="border border-amber-500/40 bg-amber-500/10 rounded-xl p-4 space-y-3">
+                        <div className="flex justify-between items-center">
+                            <span className="text-xs font-semibold text-amber-400 uppercase">Valt Parasoll</span>
+                        </div>
+                        <p className="text-xs text-text-secondary m-0">
+                            Storlek: <b className="text-text-primary">{selectedParasol?.label || 'Okänd'}</b>
+                        </p>
+                        <button
+                            onClick={() => onDeleteParasol?.(selectedParasolId)}
+                            className="w-full px-3 py-1.5 rounded-md text-xs border border-red-500/40 bg-red-500/10 text-red-400 hover:bg-red-500/20 transition-colors"
+                        >
+                            Ta bort markerat parasoll
+                        </button>
+                    </div>
+                )}
+            </div>
+        );
+    }
 
     return (
         <div className="bg-panel-bg border border-panel-border rounded-xl p-5 space-y-5">

@@ -74,13 +74,20 @@ export function SketchCanvas({
     camera = DEFAULT_CAMERA,
     selection,
     uiDensity = 'desktop',
+    activeMode = 'clickitup',
+    parasols = [],
+    selectedParasolId = null,
     onResize,
     onResizePreview,
     onResizeCommit,
     onSelectEdge,
     onSelectSection,
     onApplySuggestion,
-    onCameraChange
+    onCameraChange,
+    onChangeMode,
+    onPlaceParasol,
+    onSelectParasol,
+    onMoveParasol
 }) {
     const svgRef = useRef(null);
     const [activeDrag, setActiveDrag] = useState(null);
@@ -293,6 +300,83 @@ export function SketchCanvas({
             window.removeEventListener('mouseup', handleUp);
         };
     }, [activeDrag, onResize, onResizePreview, onResizeCommit, viewHeight, viewWidth, equalDepth]);
+
+    const [activeParasolDrag, setActiveParasolDrag] = useState(null);
+    const parasolDragRef = useRef(null);
+
+    const handlePolygonClick = useCallback((event) => {
+        if (activeMode !== 'parasol' || !onPlaceParasol) return;
+
+        if (panRef.current) {
+            const dx = Math.abs(event.clientX - panRef.current.startX);
+            const dy = Math.abs(event.clientY - panRef.current.startY);
+            if (dx > 5 || dy > 5) return;
+        }
+
+        const svg = svgRef.current;
+        if (!svg) return;
+
+        const rect = svg.getBoundingClientRect();
+        const pointerX = (event.clientX - rect.left) / rect.width;
+        const pointerY = (event.clientY - rect.top) / rect.height;
+
+        const worldX = activeCamera.panX + pointerX * viewWidth;
+        const worldY = activeCamera.panY + pointerY * viewHeight;
+
+        onPlaceParasol(worldX, Math.max(0, worldY));
+    }, [activeMode, onPlaceParasol, activeCamera, viewWidth, viewHeight]);
+
+    const beginParasolDrag = useCallback((id, event) => {
+        if (activeMode !== 'parasol') return;
+        event.preventDefault();
+        event.stopPropagation();
+
+        const parasol = parasols.find(p => p.id === id);
+        if (!parasol) return;
+
+        parasolDragRef.current = {
+            id,
+            startX: event.clientX,
+            startY: event.clientY,
+            initialX: parasol.xMm,
+            initialY: parasol.yMm
+        };
+        setActiveParasolDrag(id);
+    }, [activeMode, parasols]);
+
+    useEffect(() => {
+        if (!activeParasolDrag) return undefined;
+
+        const handleMove = (event) => {
+            const svg = svgRef.current;
+            if (!svg || !parasolDragRef.current || !onMoveParasol) return;
+            const rect = svg.getBoundingClientRect();
+            if (!rect.width || !rect.height) return;
+
+            const worldPerPixelX = viewWidth / rect.width;
+            const worldPerPixelY = viewHeight / rect.height;
+            const deltaX = (event.clientX - parasolDragRef.current.startX) * worldPerPixelX;
+            const deltaY = (event.clientY - parasolDragRef.current.startY) * worldPerPixelY;
+
+            const nextX = parasolDragRef.current.initialX + deltaX;
+            const nextY = parasolDragRef.current.initialY + deltaY;
+
+            onMoveParasol(activeParasolDrag, nextX, nextY);
+        };
+
+        const handleUp = () => {
+            setActiveParasolDrag(null);
+            parasolDragRef.current = null;
+        };
+
+        window.addEventListener('mousemove', handleMove);
+        window.addEventListener('mouseup', handleUp);
+
+        return () => {
+            window.removeEventListener('mousemove', handleMove);
+            window.removeEventListener('mouseup', handleUp);
+        };
+    }, [activeParasolDrag, viewWidth, viewHeight, onMoveParasol]);
 
     const startPan = useCallback(
         (event) => {
@@ -629,12 +713,36 @@ export function SketchCanvas({
     const renderDimensions = () => {
         const leftStartY = currentMaxDepth - currentDepthLeft;
         const rightStartY = currentMaxDepth - currentDepthRight;
-        const sideDimOffset = sectionThickness + (uiDensity === 'touch' ? 620 : 520);
+        const sideDimOffset = sectionThickness + (uiDensity === 'touch' ? 760 : 640);
         const sideDimTick = uiDensity === 'touch' ? 90 : 80;
-        const sideDimLabelOffset = uiDensity === 'touch' ? 260 : 220;
-        const bottomDimY = currentMaxDepth + sectionThickness + (uiDensity === 'touch' ? 560 : 520);
+        const sideDimLabelOffset = uiDensity === 'touch' ? 360 : 320;
+        const bottomDimY = currentMaxDepth + sectionThickness + (uiDensity === 'touch' ? 660 : 620);
         const bottomTick = uiDensity === 'touch' ? 100 : 90;
-        const bottomLabelY = bottomDimY + (uiDensity === 'touch' ? 260 : 220);
+        const bottomLabelY = bottomDimY + (uiDensity === 'touch' ? 340 : 300);
+        const dimFontSize = uiDensity === 'touch' ? 180 : 170;
+
+        const renderDimensionLabel = ({ x, y, text, rotate = 0 }) => {
+            return (
+                <g transform={rotate ? `rotate(${rotate} ${x} ${y})` : undefined}>
+                    <text
+                        x={x}
+                        y={y}
+                        fill="#e2e8f0"
+                        stroke="rgba(2,6,23,0.88)"
+                        strokeWidth={uiDensity === 'touch' ? 30 : 24}
+                        paintOrder="stroke"
+                        strokeLinejoin="round"
+                        fontSize={dimFontSize}
+                        textAnchor="middle"
+                        dominantBaseline="middle"
+                        fontWeight="700"
+                        fontFamily="Inter, sans-serif"
+                    >
+                        {text}
+                    </text>
+                </g>
+            );
+        };
 
         return (
             <>
@@ -642,51 +750,33 @@ export function SketchCanvas({
                 <line x1={0} y1={bottomDimY} x2={currentWidth} y2={bottomDimY} stroke="rgba(148,163,184,0.8)" strokeWidth="18" />
                 <line x1={0} y1={bottomDimY - bottomTick} x2={0} y2={bottomDimY + bottomTick} stroke="rgba(148,163,184,0.8)" strokeWidth="18" />
                 <line x1={currentWidth} y1={bottomDimY - bottomTick} x2={currentWidth} y2={bottomDimY + bottomTick} stroke="rgba(148,163,184,0.8)" strokeWidth="18" />
-                <text
-                    x={currentWidth / 2}
-                    y={bottomLabelY}
-                    fill="#cbd5e1"
-                    fontSize="180"
-                    textAnchor="middle"
-                    fontWeight="700"
-                    fontFamily="Inter, sans-serif"
-                >
-                    {Math.round(currentWidth)} mm
-                </text>
+                {renderDimensionLabel({
+                    x: currentWidth / 2,
+                    y: bottomLabelY,
+                    text: `${Math.round(currentWidth)} mm`
+                })}
 
                 {/* ── Left depth dimension ── */}
                 <line x1={-sideDimOffset} y1={leftStartY} x2={-sideDimOffset} y2={currentMaxDepth} stroke="rgba(148,163,184,0.8)" strokeWidth="18" />
                 <line x1={-(sideDimOffset + sideDimTick)} y1={leftStartY} x2={-(sideDimOffset - sideDimTick)} y2={leftStartY} stroke="rgba(148,163,184,0.8)" strokeWidth="18" />
                 <line x1={-(sideDimOffset + sideDimTick)} y1={currentMaxDepth} x2={-(sideDimOffset - sideDimTick)} y2={currentMaxDepth} stroke="rgba(148,163,184,0.8)" strokeWidth="18" />
-                <text
-                    x={-(sideDimOffset + sideDimLabelOffset)}
-                    y={leftStartY + currentDepthLeft / 2}
-                    fill="#cbd5e1"
-                    fontSize="180"
-                    fontWeight="700"
-                    fontFamily="Inter, sans-serif"
-                    transform={`rotate(-90 ${-(sideDimOffset + sideDimLabelOffset)} ${leftStartY + currentDepthLeft / 2})`}
-                    textAnchor="middle"
-                >
-                    {Math.round(currentDepthLeft)} mm
-                </text>
+                {renderDimensionLabel({
+                    x: -(sideDimOffset + sideDimLabelOffset),
+                    y: leftStartY + currentDepthLeft / 2,
+                    text: `${Math.round(currentDepthLeft)} mm`,
+                    rotate: -90
+                })}
 
                 {/* ── Right depth dimension ── */}
                 <line x1={currentWidth + sideDimOffset} y1={rightStartY} x2={currentWidth + sideDimOffset} y2={currentMaxDepth} stroke="rgba(148,163,184,0.8)" strokeWidth="18" />
                 <line x1={currentWidth + sideDimOffset - sideDimTick} y1={rightStartY} x2={currentWidth + sideDimOffset + sideDimTick} y2={rightStartY} stroke="rgba(148,163,184,0.8)" strokeWidth="18" />
                 <line x1={currentWidth + sideDimOffset - sideDimTick} y1={currentMaxDepth} x2={currentWidth + sideDimOffset + sideDimTick} y2={currentMaxDepth} stroke="rgba(148,163,184,0.8)" strokeWidth="18" />
-                <text
-                    x={currentWidth + sideDimOffset + sideDimLabelOffset}
-                    y={rightStartY + currentDepthRight / 2}
-                    fill="#cbd5e1"
-                    fontSize="180"
-                    fontWeight="700"
-                    fontFamily="Inter, sans-serif"
-                    transform={`rotate(90 ${currentWidth + sideDimOffset + sideDimLabelOffset} ${rightStartY + currentDepthRight / 2})`}
-                    textAnchor="middle"
-                >
-                    {Math.round(currentDepthRight)} mm
-                </text>
+                {renderDimensionLabel({
+                    x: currentWidth + sideDimOffset + sideDimLabelOffset,
+                    y: rightStartY + currentDepthRight / 2,
+                    text: `${Math.round(currentDepthRight)} mm`,
+                    rotate: 90
+                })}
             </>
         );
     };
@@ -709,15 +799,81 @@ export function SketchCanvas({
         </g>
     );
 
+    const renderParasols = () => {
+        return parasols.map((p) => {
+            const isSelected = p.id === selectedParasolId;
+            const px = p.xMm - p.widthMm / 2;
+            const py = p.yMm - p.depthMm / 2;
+
+            return (
+                <rect
+                    key={p.id}
+                    x={px}
+                    y={py}
+                    width={p.widthMm}
+                    height={p.depthMm}
+                    fill={isSelected ? 'rgba(59,130,246,0.3)' : 'rgba(241,245,249,0.1)'}
+                    stroke={isSelected ? '#3b82f6' : 'rgba(203,213,225,0.4)'}
+                    strokeWidth={isSelected ? 30 : 20}
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        if (activeMode === 'parasol' && onSelectParasol) {
+                            onSelectParasol(p.id);
+                        }
+                    }}
+                    onMouseDown={(e) => {
+                        if (activeMode !== 'parasol') return;
+                        e.stopPropagation();
+                        if (onSelectParasol && p.id !== selectedParasolId) {
+                            onSelectParasol(p.id);
+                        }
+                        beginParasolDrag(p.id, e);
+                    }}
+                    style={{ cursor: activeMode === 'parasol' ? 'move' : 'default', pointerEvents: activeMode === 'parasol' ? 'all' : 'none' }}
+                />
+            );
+        });
+    };
+
     return (
         <div id="sketchCanvasContainer" className="bg-panel-bg border border-panel-border rounded-xl p-4 space-y-3 text-text-primary">
             <div className="flex flex-wrap items-center justify-between gap-3 text-sm" data-html2canvas-ignore="true">
-                <div className="text-text-secondary">
-                    Zoom: <b className="text-text-primary">{activeCamera.zoom.toFixed(2)}x</b>
+                <div className="flex items-center gap-4">
+                    <div className="text-text-secondary">
+                        Zoom: <b className="text-text-primary">{activeCamera.zoom.toFixed(2)}x</b>
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <button
+                            type="button"
+                            aria-pressed={activeMode === 'clickitup'}
+                            onClick={() => onChangeMode && onChangeMode('clickitup')}
+                            className={`h-8 px-3.5 rounded-md border text-xs font-semibold tracking-wide transition-all ${activeMode === 'clickitup'
+                                ? 'bg-primary/95 text-white border-blue-200/60 shadow-[0_0_0_1px_rgba(191,219,254,0.55),0_8px_18px_rgba(37,99,235,0.35)]'
+                                : 'bg-input-bg text-slate-300 border-panel-border hover:text-white hover:border-slate-400/60 hover:bg-slate-800/60'
+                                }`}
+                        >
+                            ClickitUP
+                        </button>
+                        <button
+                            type="button"
+                            aria-pressed={activeMode === 'parasol'}
+                            onClick={() => onChangeMode && onChangeMode('parasol')}
+                            className={`h-8 px-3.5 rounded-md border text-xs font-semibold tracking-wide transition-all ${activeMode === 'parasol'
+                                ? 'bg-primary/95 text-white border-blue-200/60 shadow-[0_0_0_1px_rgba(191,219,254,0.55),0_8px_18px_rgba(37,99,235,0.35)]'
+                                : 'bg-input-bg text-slate-300 border-panel-border hover:text-white hover:border-slate-400/60 hover:bg-slate-800/60'
+                                }`}
+                        >
+                            Parasoll
+                        </button>
+                    </div>
                 </div>
-                <div className="text-text-secondary">
-                    Aktiv kant: <b className="text-text-primary">{selectedEdge || 'Ingen'}</b>
+
+                <div className="flex items-center gap-4">
+                    <div className="text-text-secondary">
+                        Aktiv kant: <b className="text-text-primary">{selectedEdge || 'Ingen'}</b>
+                    </div>
                 </div>
+
                 <div className="text-text-secondary">
                     Kritiska varningar: <b className="text-text-primary">{criticalWarnings.length}</b>
                 </div>
@@ -744,6 +900,8 @@ export function SketchCanvas({
                     stroke="rgba(59,130,246,0.55)"
                     strokeWidth="26"
                     strokeDasharray="100 70"
+                    onMouseUp={handlePolygonClick}
+                    style={{ pointerEvents: activeMode === 'parasol' ? 'all' : 'none' }}
                 />
 
                 {renderEdge('front', 0, currentMaxDepth, 'E')}
@@ -777,21 +935,26 @@ export function SketchCanvas({
                     </g>
                 )}
 
+                {renderParasols()}
                 {renderDimensions()}
 
-                <DragHandle x={currentWidth / 2} y={currentMaxDepth} edgeId="front" cursor="ns-resize" />
-                <DragHandle
-                    x={0}
-                    y={currentMaxDepth - currentDepthLeft + currentDepthLeft / 2}
-                    edgeId={equalDepth ? "left" : "depthLeft"}
-                    cursor={equalDepth ? "ew-resize" : "ns-resize"}
-                />
-                <DragHandle
-                    x={currentWidth}
-                    y={currentMaxDepth - currentDepthRight + currentDepthRight / 2}
-                    edgeId={equalDepth ? "right" : "depthRight"}
-                    cursor={equalDepth ? "ew-resize" : "ns-resize"}
-                />
+                {activeMode === 'clickitup' && (
+                    <>
+                        <DragHandle x={currentWidth / 2} y={currentMaxDepth} edgeId="front" cursor="ns-resize" />
+                        <DragHandle
+                            x={0}
+                            y={currentMaxDepth - currentDepthLeft + currentDepthLeft / 2}
+                            edgeId={equalDepth ? "left" : "depthLeft"}
+                            cursor={equalDepth ? "ew-resize" : "ns-resize"}
+                        />
+                        <DragHandle
+                            x={currentWidth}
+                            y={currentMaxDepth - currentDepthRight + currentDepthRight / 2}
+                            edgeId={equalDepth ? "right" : "depthRight"}
+                            cursor={equalDepth ? "ew-resize" : "ns-resize"}
+                        />
+                    </>
+                )}
             </svg>
 
             {selectedEdgeSuggestions.length > 0 && (
@@ -813,3 +976,4 @@ export function SketchCanvas({
         </div>
     );
 }
+

@@ -72,6 +72,8 @@ const initialState = normalizePdfOptions({
     },
     inventoryData: { bahama: [], clickitup: {} },
     cloudInventoryData: { bahama: [], clickitup: {} },
+    sketchDraft: null,
+    sketchMeta: { addedBahamaLine: false },
     inventoryBasket: [],
     activeQuoteId: null,
     activeQuoteVersion: 0,

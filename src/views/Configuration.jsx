@@ -4,7 +4,7 @@ import { catalogData } from '../data/catalog';
 import { BuilderConfig } from '../components/features/BuilderConfig';
 import { GridConfig } from '../components/features/GridConfig';
 
-export function Configuration({ onNext, onPrev }) {
+export function Configuration({ onNext, onPrev, onBackToSketch }) {
     const { state } = useQuote();
     const { selectedLines, builderItems, gridSelections } = state;
 
@@ -56,17 +56,27 @@ export function Configuration({ onNext, onPrev }) {
             </div>
 
             <div className="fixed bottom-0 left-0 right-0 bg-panel-bg/80 backdrop-blur-md border-t border-panel-border p-4 z-50">
-                <div className="max-w-[1200px] mx-auto flex justify-between items-center">
+                <div className="max-w-[1200px] mx-auto grid grid-cols-1 gap-2 md:grid-cols-3 md:items-center">
                     <button
                         onClick={onPrev}
-                        className="px-6 py-2.5 rounded-md font-medium text-text-primary bg-panel-bg border border-panel-border hover:bg-panel-border transition-colors flex items-center gap-2"
+                        className="w-full md:w-auto md:justify-self-start px-6 py-2.5 rounded-md font-medium text-text-primary bg-panel-bg border border-panel-border hover:bg-panel-border transition-colors flex items-center justify-center gap-2"
                     >
                         &laquo; Tillbaka till Produktlinjer
                     </button>
+                    {onBackToSketch ? (
+                        <button
+                            onClick={onBackToSketch}
+                            className="w-full md:w-auto md:justify-self-center px-6 py-2.5 rounded-md font-medium text-text-primary bg-panel-bg border border-panel-border hover:bg-panel-border transition-colors flex items-center justify-center gap-2"
+                        >
+                            &laquo; Tillbaka till Rita
+                        </button>
+                    ) : (
+                        <div className="hidden md:block" aria-hidden="true" />
+                    )}
                     <button
                         onClick={onNext}
                         disabled={!hasSelections}
-                        className={`px-8 py-2.5 rounded-md font-bold text-base transition-all shadow shadow-primary/20 ${!hasSelections
+                        className={`w-full md:w-auto md:justify-self-end px-8 py-2.5 rounded-md font-bold text-base transition-all shadow shadow-primary/20 ${!hasSelections
                                 ? 'bg-gray-600 cursor-not-allowed text-gray-400'
                                 : 'bg-primary hover:bg-primary-hover text-white scale-105 shadow-lg shadow-primary/30'
                             }`}

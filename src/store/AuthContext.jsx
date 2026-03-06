@@ -28,8 +28,23 @@ export function AuthProvider({ children }) {
         return firebaseLogout();
     };
 
+    const canViewEverything = accessLevel === 'full';
+    const canStartQuote = accessLevel === 'full' || accessLevel === 'quote-only';
+    const canAccessSketch = accessLevel === 'full' || accessLevel === 'sketch-only';
+    const canExportSketchToQuote = accessLevel === 'full';
+
     return (
-        <AuthContext.Provider value={{ user, loading, accessLevel, canViewEverything: accessLevel === 'full', login, logout }}>
+        <AuthContext.Provider value={{
+            user,
+            loading,
+            accessLevel,
+            canViewEverything,
+            canStartQuote,
+            canAccessSketch,
+            canExportSketchToQuote,
+            login,
+            logout
+        }}>
             {children}
         </AuthContext.Provider>
     );

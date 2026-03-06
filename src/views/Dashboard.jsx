@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+﻿import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../store/AuthContext';
 import { db, collection, query, orderBy, limit, getDocs } from '../services/firebase';
 
@@ -16,7 +16,7 @@ function getLogVisual(entry) {
 }
 
 export function Dashboard({ onStartQuote, onOpenInventory, onOpenSketch }) {
-    const { canViewEverything } = useAuth();
+    const { canViewEverything, canStartQuote, canAccessSketch } = useAuth();
     const [logs, setLogs] = useState([]);
     const [logsLoading, setLogsLoading] = useState(false);
 
@@ -58,20 +58,22 @@ export function Dashboard({ onStartQuote, onOpenInventory, onOpenSketch }) {
     return (
         <div className="flex flex-col items-center animate-slide-in">
             <h2 className="text-center mb-12 text-4xl font-semibold tracking-tight text-text-primary">
-                Välkommen till Offertverktyg Pro
+                Välkommen till Brixx portal
             </h2>
 
             <div className="flex gap-8 justify-center flex-wrap w-full max-w-5xl">
-                <button
-                    onClick={onStartQuote}
-                    className="flex-1 min-w-[300px] max-w-[400px] bg-panel-bg border border-panel-border rounded-xl p-12 cursor-pointer text-center transition-all hover:-translate-y-1 hover:shadow-lg hover:border-primary group"
-                >
-                    <div className="text-5xl mb-4 group-hover:scale-110 transition-transform">📄</div>
-                    <h3 className="text-2xl font-semibold text-text-primary mb-2">Skapa Ny Offert</h3>
-                    <p className="text-text-secondary leading-relaxed m-0">
-                        Starta ett nytt offertflöde för kund. Konfigurera produkter, priser och generera PDF.
-                    </p>
-                </button>
+                {canStartQuote && (
+                    <button
+                        onClick={onStartQuote}
+                        className="flex-1 min-w-[300px] max-w-[400px] bg-panel-bg border border-panel-border rounded-xl p-12 cursor-pointer text-center transition-all hover:-translate-y-1 hover:shadow-lg hover:border-primary group"
+                    >
+                        <div className="text-5xl mb-4 group-hover:scale-110 transition-transform">📄</div>
+                        <h3 className="text-2xl font-semibold text-text-primary mb-2">Skapa Ny Offert</h3>
+                        <p className="text-text-secondary leading-relaxed m-0">
+                            Starta ett nytt offertflöde för kund. Konfigurera produkter, priser och generera PDF.
+                        </p>
+                    </button>
+                )}
 
                 {canViewEverything && (
                     <button
@@ -86,7 +88,7 @@ export function Dashboard({ onStartQuote, onOpenInventory, onOpenSketch }) {
                     </button>
                 )}
 
-                {canViewEverything && (
+                {canAccessSketch && (
                     <button
                         onClick={onOpenSketch}
                         className="flex-1 min-w-[250px] max-w-[350px] bg-panel-bg border border-panel-border rounded-xl p-12 cursor-pointer text-center transition-all hover:-translate-y-1 hover:shadow-lg hover:border-primary group"
@@ -99,6 +101,14 @@ export function Dashboard({ onStartQuote, onOpenInventory, onOpenSketch }) {
                     </button>
                 )}
             </div>
+
+            {!canStartQuote && !canAccessSketch && (
+                <div className="mt-8 w-full max-w-3xl bg-panel-bg border border-panel-border rounded-xl p-8 text-center">
+                    <p className="m-0 text-text-secondary">
+                        Ditt konto har för närvarande ingen tilldelad arbetsyta. Kontakta administratör.
+                    </p>
+                </div>
+            )}
 
             {canViewEverything && (
                 <div className="mt-16 w-full max-w-[800px]">
