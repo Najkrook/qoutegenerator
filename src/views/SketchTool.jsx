@@ -10,7 +10,8 @@ import {
     STEP_MM
 } from '../utils/sectionCalculator';
 import {
-    PARASOL_PRESETS,
+    DEFAULT_PARASOL_PRESET_ID,
+    getParasolPresetById,
     getAreaPolygon,
     pointInPolygon,
     snapToStep100,
@@ -126,7 +127,9 @@ function sanitizeConfig(config) {
     next.activeMode = config.activeMode || 'clickitup';
     next.parasols = config.parasols || [];
     next.selectedParasolId = config.selectedParasolId || null;
-    next.selectedParasolPresetId = config.selectedParasolPresetId || 'parasol_3x3';
+    next.selectedParasolPresetId = getParasolPresetById(config.selectedParasolPresetId)
+        ? config.selectedParasolPresetId
+        : DEFAULT_PARASOL_PRESET_ID;
     return next;
 }
 
@@ -172,7 +175,7 @@ export function SketchTool({ onBack }) {
             activeMode: 'clickitup',
             parasols: [],
             selectedParasolId: null,
-            selectedParasolPresetId: 'parasol_3x3'
+            selectedParasolPresetId: DEFAULT_PARASOL_PRESET_ID
         };
         return sanitizeConfig(state.sketchDraft?.config || defaultConfig);
     });
@@ -316,7 +319,11 @@ export function SketchTool({ onBack }) {
             ...prev,
             camera: DEFAULT_CAMERA
         }));
-    }, []);
+        updateConfig({
+            parasols: [],
+            selectedParasolId: null
+        });
+    }, [updateConfig]);
 
     const applySuggestion = useCallback(
         (suggestionId) => {
@@ -388,7 +395,7 @@ export function SketchTool({ onBack }) {
 
     const handlePlaceParasol = useCallback((xMm, yMm) => {
         if (config.activeMode !== 'parasol') return;
-        const preset = PARASOL_PRESETS.find(p => p.id === config.selectedParasolPresetId);
+        const preset = getParasolPresetById(config.selectedParasolPresetId);
         if (!preset) return;
 
         const snappedX = snapToStep100(xMm);

@@ -60,6 +60,24 @@ export function GridConfig({ lineId }) {
         return total;
     };
 
+    const getItemsSubtotal = () => {
+        let total = 0;
+        Object.entries(selections.items).forEach(([key, val]) => {
+            const [model, size] = key.split('|');
+            const group = lineData.gridItems.find(g => g.model === model);
+            const price = group?.sizes.find(s => s.size === size)?.price || 0;
+            total += price * val.qty;
+        });
+        return total;
+    };
+
+    const getItemsQtyTotal = () => {
+        return Object.values(selections.items).reduce((sum, entry) => sum + (Number(entry?.qty) || 0), 0);
+    };
+
+    const itemsSubtotal = getItemsSubtotal();
+    const itemsQtyTotal = getItemsQtyTotal();
+
     return (
         <div className="bg-panel-bg border border-panel-border rounded-lg p-6 mb-8 bg-black/5 animate-fade-in">
             <h3 className="text-lg font-semibold mb-2">Grid View: {lineData.name}</h3>
@@ -123,6 +141,21 @@ export function GridConfig({ lineId }) {
                                 })}
                             </React.Fragment>
                         ))}
+
+                        <tr className="bg-white/[0.035] border-y border-panel-border">
+                            <td colSpan="3" className="px-4 py-4 pl-5 text-sm font-semibold uppercase tracking-[0.08em] text-text-secondary">
+                                Delsumma sektioner
+                            </td>
+                            <td className="px-4 py-4 text-sm text-center font-semibold text-text-primary">
+                                {itemsQtyTotal > 0 ? `${itemsQtyTotal} st` : ''}
+                            </td>
+                            <td className="px-4 py-4 text-sm text-right font-bold text-text-primary">
+                                {itemsSubtotal > 0 ? `${itemsSubtotal.toLocaleString('sv-SE')} SEK` : ''}
+                            </td>
+                        </tr>
+                        <tr aria-hidden="true">
+                            <td colSpan="5" className="h-4 p-0 border-0 bg-transparent" />
+                        </tr>
 
                         {/* Addons for Grid */}
                         {lineData.addonCategories.map(cat => (

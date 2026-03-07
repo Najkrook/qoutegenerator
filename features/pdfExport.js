@@ -55,6 +55,13 @@ export function generatePDF(state, summaryData, returnBlob = false) {
 
         const pageWidth = doc.internal.pageSize.width;
         const pageHeight = doc.internal.pageSize.height;
+        const PAGE_MARGIN_X = 10;
+        const HEADER_TOP_Y = 16;
+        const HEADER_LINE_Y = 28;
+        const CUSTOMER_BOX_Y = 31;
+        const CONTENT_BOTTOM_SAFE = 36;
+        const customerInfo = state.customerInfo || {};
+        const quoteDate = customerInfo.date || new Date().toLocaleDateString('sv-SE');
 
         //
         const brandOrange = [243, 156, 18];   // #f39c12
@@ -69,71 +76,76 @@ export function generatePDF(state, summaryData, returnBlob = false) {
 
         // Logo (left side)
         try {
-            doc.addImage(BRIXX_LOGO_BASE64, 'PNG', 14, 10, 50, 16);
+            doc.addImage(BRIXX_LOGO_BASE64, 'PNG', PAGE_MARGIN_X, 8, 50, 16);
         } catch (e) {
             // Fallback: text logo if image fails
             doc.setFont("helvetica", "bold");
             doc.setFontSize(22);
             doc.setTextColor(...brandOrange);
-            doc.text("BRIXX", 14, 22);
+            doc.text("BRIXX", PAGE_MARGIN_X, 20);
         }
 
         // Title (right side)
         doc.setFont("helvetica", "bold");
         doc.setFontSize(20);
         doc.setTextColor(...darkText);
-        doc.text("OFFERT", pageWidth - 14, 18, { align: "right" });
+        doc.text("OFFERT", pageWidth - PAGE_MARGIN_X, HEADER_TOP_Y, { align: "right" });
 
         // Date & Reference below title
         doc.setFont("helvetica", "normal");
         doc.setFontSize(9);
         doc.setTextColor(...grayText);
-        doc.text(`Datum: ${state.customerInfo.date || new Date().toLocaleDateString('sv-SE')}`, pageWidth - 14, 24, { align: "right" });
-        if (state.customerInfo.reference) {
-            doc.text(`Ref: ${state.customerInfo.reference}`, pageWidth - 14, 29, { align: "right" });
+        doc.text(`Datum: ${quoteDate}`, pageWidth - PAGE_MARGIN_X, 22, { align: "right" });
+        if (customerInfo.reference) {
+            doc.text(`Ref: ${customerInfo.reference}`, pageWidth - PAGE_MARGIN_X, 26, { align: "right" });
         }
 
         // Orange accent line under header
         doc.setDrawColor(...brandOrange);
         doc.setLineWidth(0.8);
-        doc.line(14, 32, pageWidth - 14, 32);
+        doc.line(PAGE_MARGIN_X, HEADER_LINE_Y, pageWidth - PAGE_MARGIN_X, HEADER_LINE_Y);
 
         //
         //  CUSTOMER INFO BLOCK
         //
 
-        let currentY = 42;
-
-        // Light background box for customer info
-        doc.setFillColor(250, 250, 250);
-        doc.roundedRect(14, 36, pageWidth - 28, 28, 2, 2, 'F');
-
-        doc.setFont("helvetica", "normal");
-        doc.setFontSize(10);
-        doc.setTextColor(...darkText);
-
-        doc.text(`Malmö ${state.customerInfo.date || new Date().toLocaleDateString('sv-SE')}`, 18, currentY);
-        currentY += 6;
-        doc.setTextColor(...grayText);
-        doc.text("Ca kostnad enligt diskussion.", 18, currentY);
-        currentY += 6;
-
-        if (state.customerInfo.name || state.customerInfo.company) {
-            doc.setTextColor(...darkText);
-            doc.setFont("helvetica", "bold");
-            doc.text("Till:", 18, currentY);
-            doc.setFont("helvetica", "normal");
-            let toText = [state.customerInfo.company, state.customerInfo.name].filter(Boolean).join(" / ");
-            doc.text(toText, 28, currentY);
-            currentY += 6;
+        const customerLines = [];
+        const recipient = [customerInfo.company, customerInfo.name].filter(Boolean).join(" / ");
+        if (recipient) {
+            customerLines.push({ type: 'recipient', value: recipient });
+        }
+        if (customerInfo.validity) {
+            customerLines.push({ type: 'muted', value: `Giltighetstid: ${customerInfo.validity}` });
         }
 
-        if (state.customerInfo.validity) {
-            doc.setTextColor(...grayText);
-            doc.text(`Giltighetstid: ${state.customerInfo.validity}`, 18, currentY);
-        }
+        let currentY = 35;
+        if (customerLines.length > 0) {
+            const customerBoxHeight = Math.max(14, 8 + (customerLines.length * 5));
+            const customerBoxWidth = pageWidth - (PAGE_MARGIN_X * 2);
+            const customerTextX = PAGE_MARGIN_X + 4;
+            let customerTextY = CUSTOMER_BOX_Y + 7;
 
-        currentY = 70;
+            doc.setFillColor(250, 250, 250);
+            doc.roundedRect(PAGE_MARGIN_X, CUSTOMER_BOX_Y, customerBoxWidth, customerBoxHeight, 2, 2, 'F');
+            doc.setFontSize(10);
+
+            customerLines.forEach((line) => {
+                if (line.type === 'recipient') {
+                    doc.setTextColor(...darkText);
+                    doc.setFont("helvetica", "bold");
+                    doc.text("Till:", customerTextX, customerTextY);
+                    doc.setFont("helvetica", "normal");
+                    doc.text(line.value, customerTextX + 10, customerTextY);
+                } else {
+                    doc.setTextColor(...grayText);
+                    doc.setFont("helvetica", "normal");
+                    doc.text(line.value, customerTextX, customerTextY);
+                }
+                customerTextY += 5;
+            });
+
+            currentY = CUSTOMER_BOX_Y + customerBoxHeight + 6;
+        }
 
         //
         //  ITEMS TABLE
@@ -165,13 +177,13 @@ export function generatePDF(state, summaryData, returnBlob = false) {
                 fillColor: [248, 249, 250]
             },
             columnStyles: {
-                0: { halign: 'left', fontStyle: 'bold', cellWidth: 38 },
-                1: { halign: 'center', cellWidth: 14 },
-                2: { halign: 'right', cellWidth: 26 },
+                0: { halign: 'left', fontStyle: 'bold', cellWidth: 44 },
+                1: { halign: 'center', cellWidth: 16 },
+                2: { halign: 'right', cellWidth: 27 },
                 3: { halign: 'center', fontStyle: 'bold', cellWidth: 14 },
-                4: { halign: 'right', fontStyle: 'bold', cellWidth: 25 },
-                5: { halign: 'right', cellWidth: 25 },
-                6: { halign: 'right', cellWidth: 22 },
+                4: { halign: 'right', fontStyle: 'bold', cellWidth: 27 },
+                5: { halign: 'right', cellWidth: 27 },
+                6: { halign: 'right', cellWidth: 23 },
                 7: { halign: 'center', cellWidth: 14 }
             },
             didParseCell: function (data) {
@@ -184,7 +196,7 @@ export function generatePDF(state, summaryData, returnBlob = false) {
                     data.cell.styles.fillColor = [235, 250, 240];
                 }
             },
-            margin: { left: 14, right: 14, top: 20, bottom: 45 },
+            margin: { left: PAGE_MARGIN_X, right: PAGE_MARGIN_X, top: 14, bottom: CONTENT_BOTTOM_SAFE },
             pageBreak: 'auto',
             rowPageBreak: 'avoid'
         });
@@ -196,17 +208,17 @@ export function generatePDF(state, summaryData, returnBlob = false) {
             }
             doc.setFont("helvetica", "bold");
             doc.setFontSize(10);
-            doc.text("Offertdetaljer", 14, currentY);
+            doc.text("Offertdetaljer", PAGE_MARGIN_X, currentY);
             doc.setFont("helvetica", "normal");
             doc.setFontSize(8);
             let y = currentY + 6;
             summaryData.totals.forEach((t) => {
-                if (y > pageHeight - 42) {
+                if (y > pageHeight - (CONTENT_BOTTOM_SAFE - 3)) {
                     doc.addPage();
                     y = 20;
                 }
                 const row = `${t.model} | ${t.size || '-'} | x${t.qty} | ${formatSEK(t.net)} SEK`;
-                doc.text(row, 14, y);
+                doc.text(row, PAGE_MARGIN_X, y);
                 y += 4.5;
             });
             finalY = y + 6;
@@ -230,24 +242,24 @@ export function generatePDF(state, summaryData, returnBlob = false) {
         const drawTotalLine = (label, value, y, isBold = false, bgColor = null) => {
             if (bgColor) {
                 doc.setFillColor(...bgColor);
-                doc.roundedRect(rightColX - 4, y - 5, (pageWidth - 14) - rightColX + 8, 8, 1, 1, 'F');
+                doc.roundedRect(rightColX - 4, y - 5, (pageWidth - PAGE_MARGIN_X) - rightColX + 8, 8, 1, 1, 'F');
             }
             doc.setFont("helvetica", isBold ? "bold" : "normal");
             doc.setTextColor(...darkText);
             doc.text(label, rightColX, y);
-            doc.text(value, pageWidth - 14, y, { align: "right" });
+            doc.text(value, pageWidth - PAGE_MARGIN_X, y, { align: "right" });
         };
 
         const renderPaymentInfoBox = (startY) => {
-            const boxX = 14;
+            const boxX = PAGE_MARGIN_X;
             let boxY = Math.max(startY - 2, 84);
             const boxWidth = Math.max(74, rightColX - boxX - 8);
             const lines = [
                 `Betalningsvillkor: ${normalizePositiveInt(state.paymentTermsDays, 30)} dagar`,
-                `Giltig till: ${computeValidUntilDateString(state.customerInfo?.date, state.quoteValidityDays)}`
+                `Giltig till: ${computeValidUntilDateString(customerInfo.date, state.quoteValidityDays)}`
             ];
-            if (state.customerInfo?.reference) {
-                lines.push(`Referens: ${state.customerInfo.reference}`);
+            if (customerInfo.reference) {
+                lines.push(`Referens: ${customerInfo.reference}`);
             }
 
             const boxHeight = 14 + (lines.length * 5);
@@ -286,8 +298,8 @@ export function generatePDF(state, summaryData, returnBlob = false) {
                 y = 34;
             }
 
-            const boxX = 14;
-            const boxWidth = pageWidth - 28;
+            const boxX = PAGE_MARGIN_X;
+            const boxWidth = pageWidth - (PAGE_MARGIN_X * 2);
             doc.setDrawColor(190, 190, 190);
             doc.setLineWidth(0.4);
             doc.roundedRect(boxX, y, boxWidth, blockHeight, 2, 2, 'S');
@@ -324,7 +336,7 @@ export function generatePDF(state, summaryData, returnBlob = false) {
         doc.setTextColor(255, 255, 255);
         doc.setFont("helvetica", "bold");
         doc.text("Totalt Exkl. moms:", rightColX, finalY);
-        doc.text(`${formatSEK(exportSummary.finalTotalSek)} SEK`, pageWidth - 14, finalY, { align: "right" });
+        doc.text(`${formatSEK(exportSummary.finalTotalSek)} SEK`, pageWidth - PAGE_MARGIN_X, finalY, { align: "right" });
         doc.setTextColor(...darkText);
         finalY += 10;
 
@@ -335,7 +347,7 @@ export function generatePDF(state, summaryData, returnBlob = false) {
             doc.setTextColor(255, 255, 255);
             doc.setFont("helvetica", "bold");
             doc.text("Totalt inkl. moms:", rightColX, finalY);
-            doc.text(`${formatSEK(exportSummary.totalWithVat)} SEK`, pageWidth - 14, finalY, { align: "right" });
+            doc.text(`${formatSEK(exportSummary.totalWithVat)} SEK`, pageWidth - PAGE_MARGIN_X, finalY, { align: "right" });
             doc.setTextColor(...darkText);
         }
 
@@ -353,32 +365,32 @@ export function generatePDF(state, summaryData, returnBlob = false) {
 
             // Mini header with logo
             try {
-                doc.addImage(BRIXX_LOGO_BASE64, 'PNG', 14, 10, 35, 11);
+                doc.addImage(BRIXX_LOGO_BASE64, 'PNG', PAGE_MARGIN_X, 8, 35, 11);
             } catch (e) {
                 doc.setFont("helvetica", "bold");
                 doc.setFontSize(16);
                 doc.setTextColor(...brandOrange);
-                doc.text("BRIXX", 14, 18);
+                doc.text("BRIXX", PAGE_MARGIN_X, 16);
             }
 
             doc.setFont("helvetica", "bold");
             doc.setFontSize(16);
             doc.setTextColor(...darkText);
-            doc.text("VILLKOR", pageWidth - 14, 18, { align: "right" });
+            doc.text("VILLKOR", pageWidth - PAGE_MARGIN_X, 16, { align: "right" });
 
             // Orange line
             doc.setDrawColor(...brandOrange);
             doc.setLineWidth(0.6);
-            doc.line(14, 26, pageWidth - 14, 26);
+            doc.line(PAGE_MARGIN_X, 24, pageWidth - PAGE_MARGIN_X, 24);
 
             // Render terms text with auto-wrapping
-            let termsY = 34;
+            let termsY = 31;
             doc.setFont("helvetica", "normal");
             doc.setFontSize(9);
             doc.setTextColor(...darkText);
 
             const termsLines = state.termsText.split('\n');
-            const maxWidth = pageWidth - 28;
+            const maxWidth = pageWidth - (PAGE_MARGIN_X * 2);
             const footerZone = pageHeight - 35; // Don't go below footer area
 
             termsLines.forEach(line => {
@@ -399,7 +411,7 @@ export function generatePDF(state, summaryData, returnBlob = false) {
                     doc.setFont("helvetica", "bold");
                     doc.setFontSize(10);
                     doc.setTextColor(...darkText);
-                    doc.text(line, 14, termsY);
+                    doc.text(line, PAGE_MARGIN_X, termsY);
                     termsY += 6;
                     doc.setFont("helvetica", "normal");
                     doc.setFontSize(9);
@@ -408,7 +420,7 @@ export function generatePDF(state, summaryData, returnBlob = false) {
                     const wrapped = doc.splitTextToSize(line, maxWidth);
                     wrapped.forEach(wl => {
                         if (termsY > footerZone) return;
-                        doc.text(wl, 14, termsY);
+                        doc.text(wl, PAGE_MARGIN_X, termsY);
                         termsY += 4.5;
                     });
                 }
@@ -441,7 +453,7 @@ export function generatePDF(state, summaryData, returnBlob = false) {
             // Orange accent line above footer
             doc.setDrawColor(...brandOrange);
             doc.setLineWidth(0.6);
-            doc.line(14, footerBandY, pageWidth - 14, footerBandY);
+            doc.line(PAGE_MARGIN_X, footerBandY, pageWidth - PAGE_MARGIN_X, footerBandY);
 
             // Footer text - white on dark
             let footerY = footerBandY + 7;
@@ -469,7 +481,7 @@ export function generatePDF(state, summaryData, returnBlob = false) {
             // Page number (bottom right, orange)
             doc.setTextColor(...brandOrange);
             doc.setFontSize(7);
-            doc.text(`${i} / ${pageCount}`, pageWidth - 14, pageHeight - 5, { align: "right" });
+            doc.text(`${i} / ${pageCount}`, pageWidth - PAGE_MARGIN_X, pageHeight - 5, { align: "right" });
         }
 
         const pdfBlob = doc.output('blob');

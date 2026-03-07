@@ -1,6 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { DOOR_SIZES, MIN_DIMENSION_MM, SECTION_SIZES, STEP_MM } from '../../utils/sectionCalculator';
-import { PARASOL_PRESETS } from '../../utils/parasolGeometry';
+import {
+    DEFAULT_PARASOL_PRESET_ID,
+    PARASOL_PRESETS,
+    groupParasolPresetsByCategory
+} from '../../utils/parasolGeometry';
 
 const PRIO_DESCRIPTIONS = {
     target: 'Fördelar sektioner så nära målstorleken som möjligt med standardstorlekar.',
@@ -112,7 +116,7 @@ export function SketchConfig({
         activeMode = 'clickitup',
         parasols = [],
         selectedParasolId = null,
-        selectedParasolPresetId = 'parasol_3x3',
+        selectedParasolPresetId = DEFAULT_PARASOL_PRESET_ID,
         width,
         depth,
         depthLeft,
@@ -159,6 +163,8 @@ export function SketchConfig({
         ? parasols.find((parasol) => parasol.id === selectedParasolId) || null
         : null;
 
+    const groupedParasolPresets = groupParasolPresetsByCategory(PARASOL_PRESETS);
+
     if (activeMode === 'parasol') {
         return (
             <div className="bg-panel-bg border border-panel-border rounded-xl p-5 space-y-5">
@@ -171,10 +177,14 @@ export function SketchConfig({
                         onChange={(e) => onChange({ selectedParasolPresetId: e.target.value })}
                         className="bg-input-bg border border-panel-border text-text-primary p-2.5 rounded-lg outline-none focus:border-primary text-sm"
                     >
-                        {PARASOL_PRESETS.map((preset) => (
-                            <option key={preset.id} value={preset.id}>
-                                {preset.label} ({preset.widthMm}x{preset.depthMm} mm)
-                            </option>
+                        {groupedParasolPresets.map((group) => (
+                            <optgroup key={group.category} label={group.category}>
+                                {group.presets.map((preset) => (
+                                    <option key={preset.id} value={preset.id}>
+                                        {preset.label} ({preset.widthMm}x{preset.depthMm} mm)
+                                    </option>
+                                ))}
+                            </optgroup>
                         ))}
                     </select>
                     <p className="text-xs text-text-secondary mt-1">Klicka i den ritade ytan för att placera ett parasoll med denna storlek.</p>

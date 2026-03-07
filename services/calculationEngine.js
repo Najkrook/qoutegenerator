@@ -60,6 +60,95 @@ function findGridAddon(lineData, addonId) {
     return null;
 }
 
+function parseSortableMetric(part) {
+    const cleaned = String(part || '').trim().replace(',', '.');
+    const parsed = Number.parseFloat(cleaned);
+    return Number.isFinite(parsed) ? parsed : null;
+}
+
+function parseSortableSize(sizeValue) {
+    const raw = String(sizeValue ?? '').trim();
+    if (!raw || raw === '-') {
+        return { sortKind: 'empty', sortDimensions: [] };
+    }
+
+    if (/^\d+(?:[.,]\d+)?$/.test(raw)) {
+        const value = parseSortableMetric(raw);
+        return value === null
+            ? { sortKind: 'text', sortDimensions: [] }
+            : { sortKind: 'number', sortDimensions: [value] };
+    }
+
+    if (raw.toLowerCase().includes('x')) {
+        const parts = raw.split(/x/i).map(parseSortableMetric);
+        if (parts.every((value) => value !== null)) {
+            return { sortKind: 'dimension', sortDimensions: parts };
+        }
+    }
+
+    return { sortKind: 'text', sortDimensions: [] };
+}
+
+function compareDimensionArrays(a = [], b = []) {
+    const maxLength = Math.max(a.length, b.length);
+    for (let index = 0; index < maxLength; index += 1) {
+        const aValue = a[index];
+        const bValue = b[index];
+
+        if (aValue === undefined && bValue === undefined) return 0;
+        if (aValue === undefined) return -1;
+        if (bValue === undefined) return 1;
+        if (aValue !== bValue) return aValue - bValue;
+    }
+    return 0;
+}
+
+function sortQuoteTotalsRows(rows) {
+    const mainRows = rows.filter((row) => !row.isAddon && !row.isCustom);
+    const addonRows = rows.filter((row) => row.isAddon);
+    const customRows = rows.filter((row) => row.isCustom);
+
+    const modelOrder = new Map();
+    mainRows.forEach((row) => {
+        if (!modelOrder.has(row.sortModel)) {
+            modelOrder.set(row.sortModel, modelOrder.size);
+        }
+    });
+
+    const sortPriority = {
+        number: 0,
+        dimension: 1,
+        text: 2,
+        empty: 3
+    };
+
+    const sortedMainRows = [...mainRows].sort((left, right) => {
+        const modelRank = (modelOrder.get(left.sortModel) ?? Number.MAX_SAFE_INTEGER) - (modelOrder.get(right.sortModel) ?? Number.MAX_SAFE_INTEGER);
+        if (modelRank !== 0) return modelRank;
+
+        const kindRank = (sortPriority[left.sortKind] ?? sortPriority.text) - (sortPriority[right.sortKind] ?? sortPriority.text);
+        if (kindRank !== 0) return kindRank;
+
+        if (left.sortKind === 'number' || left.sortKind === 'dimension') {
+            const dimensionCompare = compareDimensionArrays(left.sortDimensions, right.sortDimensions);
+            if (dimensionCompare !== 0) return dimensionCompare;
+        }
+
+        if (left.sortKind === 'text' || right.sortKind === 'text') {
+            const textCompare = String(left.sortSizeRaw || left.size || '').localeCompare(
+                String(right.sortSizeRaw || right.size || ''),
+                'sv',
+                { numeric: true, sensitivity: 'base' }
+            );
+            if (textCompare !== 0) return textCompare;
+        }
+
+        return left.originalIndex - right.originalIndex;
+    });
+
+    return [...sortedMainRows, ...addonRows, ...customRows];
+}
+
 /**
  * Pure quote total computation used by summary and export flows.
  * @param {{state: object, catalogData: object}} params
@@ -73,6 +162,7 @@ export function computeQuoteTotals({ state, catalogData }) {
     const totals = [];
     let grossTotalSek = 0;
     let totalDiscountSek = 0;
+    let originalIndex = 0;
 
     for (const item of safeState.builderItems || []) {
         let basePrice = 0;
@@ -88,13 +178,15 @@ export function computeQuoteTotals({ state, catalogData }) {
         const discountPct = toFloat(item?.discountPct || 0);
         const discountSek = gross * (discountPct / 100);
         const net = gross - discountSek;
+        const formattedSize = formatSizeDisplay(item?.size);
+        const sizeMeta = parseSortableSize(formattedSize);
 
         grossTotalSek += gross;
         totalDiscountSek += discountSek;
 
         totals.push({
             model: `${item?.line || ''} ${item?.model || ''}`.trim(),
-            size: formatSizeDisplay(item?.size),
+            size: formattedSize,
             unitPrice,
             qty,
             gross,
@@ -102,7 +194,12 @@ export function computeQuoteTotals({ state, catalogData }) {
             discountSek,
             net,
             isAddon: false,
-            source: { type: 'builder', itemId: item.id }
+            source: { type: 'builder', itemId: item.id },
+            sortModel: `${item?.line || ''} ${item?.model || ''}`.trim(),
+            sortSizeRaw: item?.size || formattedSize,
+            sortKind: sizeMeta.sortKind,
+            sortDimensions: sizeMeta.sortDimensions,
+            originalIndex: originalIndex++
         });
 
         for (const addon of item?.addons || []) {
@@ -129,7 +226,12 @@ export function computeQuoteTotals({ state, catalogData }) {
                 discountSek: addonDiscountSek,
                 net: addonNet,
                 isAddon: true,
-                source: { type: 'builder-addon', itemId: item.id, addonId: addon.id }
+                source: { type: 'builder-addon', itemId: item.id, addonId: addon.id },
+                sortModel: `${item?.line || ''} ${item?.model || ''}`.trim(),
+                sortSizeRaw: '-',
+                sortKind: 'empty',
+                sortDimensions: [],
+                originalIndex: originalIndex++
             });
         }
     }
@@ -149,13 +251,15 @@ export function computeQuoteTotals({ state, catalogData }) {
             const discountPct = toFloat(gridItem.discountPct || 0);
             const discountSek = gross * (discountPct / 100);
             const net = gross - discountSek;
+            const formattedSize = formatSizeDisplay(size);
+            const sizeMeta = parseSortableSize(formattedSize);
 
             grossTotalSek += gross;
             totalDiscountSek += discountSek;
 
             totals.push({
                 model: model || '',
-                size: formatSizeDisplay(size),
+                size: formattedSize,
                 unitPrice,
                 qty,
                 gross,
@@ -163,7 +267,12 @@ export function computeQuoteTotals({ state, catalogData }) {
                 discountSek,
                 net,
                 isAddon: false,
-                source: { type: 'grid', lineId: line, key }
+                source: { type: 'grid', lineId: line, key },
+                sortModel: model || '',
+                sortSizeRaw: size || formattedSize,
+                sortKind: sizeMeta.sortKind,
+                sortDimensions: sizeMeta.sortDimensions,
+                originalIndex: originalIndex++
             });
         }
 
@@ -191,7 +300,12 @@ export function computeQuoteTotals({ state, catalogData }) {
                 discountSek,
                 net,
                 isAddon: true,
-                source: { type: 'grid-addon', lineId: line, addonId }
+                source: { type: 'grid-addon', lineId: line, addonId },
+                sortModel: line,
+                sortSizeRaw: '-',
+                sortKind: 'empty',
+                sortDimensions: [],
+                originalIndex: originalIndex++
             });
         }
     }
@@ -214,16 +328,22 @@ export function computeQuoteTotals({ state, catalogData }) {
             net: gross,
             isAddon: false,
             isCustom: true,
-            source: { type: 'custom' }
+            source: { type: 'custom' },
+            sortModel: `Ovrigt: ${cost?.description || 'Kostnad'}`,
+            sortSizeRaw: '-',
+            sortKind: 'empty',
+            sortDimensions: [],
+            originalIndex: originalIndex++
         });
     }
 
     // Global discount is an editing helper and must not be applied a second time.
     const globalDiscountAmt = 0;
     const finalTotalSek = grossTotalSek - totalDiscountSek;
+    const sortedTotals = sortQuoteTotalsRows(totals);
 
     return {
-        totals,
+        totals: sortedTotals,
         grossTotalSek,
         totalDiscountSek,
         finalTotalSek,

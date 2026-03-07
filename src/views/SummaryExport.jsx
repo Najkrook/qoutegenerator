@@ -115,8 +115,8 @@ export function SummaryExport() {
     };
 
     return (
-        <div className="max-w-[1600px] mx-auto pb-20">
-            <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_520px] gap-8 items-start">
+        <div className="max-w-[1760px] mx-auto pb-20">
+            <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_620px] gap-8 items-start">
                 <div>
                     <div className="flex justify-between items-center mb-8">
                         <div>
@@ -179,7 +179,7 @@ export function SummaryExport() {
                 <aside className="bg-panel-bg border border-panel-border rounded-lg p-4 xl:sticky xl:top-4 shadow-sm">
                     <h3 className="text-base font-bold text-text-primary">PDF förhandsvisning</h3>
                     <p className="text-xs text-text-secondary mt-1">Uppdateras automatiskt när offertdata ändras.</p>
-                    <div className="mt-3 h-[760px] bg-white border border-panel-border rounded-md overflow-hidden">
+                    <div className="mt-3 h-[860px] bg-white border border-panel-border rounded-md overflow-hidden">
                         {previewUrl ? (
                             <iframe
                                 title="PDF förhandsvisning"

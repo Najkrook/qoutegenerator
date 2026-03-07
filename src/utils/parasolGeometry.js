@@ -1,3 +1,5 @@
+import { catalogData } from '../data/catalog';
+
 /**
  * @typedef {Object} Polygon
  * @property {Array<{x: number, y: number}>} points
@@ -103,47 +105,124 @@ export function computeParasolOverlapWarnings(parasols) {
     return [];
 }
 
+export const DEFAULT_PARASOL_PRESET_ID = 'parasol_3x3';
+
+const LEGACY_PRESET_IDS = {
+    '3x3 Kvadrat': 'parasol_3x3',
+    '4x4 Kvadrat': 'parasol_4x4',
+    '5x5 Kvadrat': 'parasol_5x5',
+    '4x3 Rektangel': 'parasol_4x3'
+};
+
+const CATEGORY_ORDER = ['Kvadrat', 'Rektangel', 'Övrigt'];
+
+function slugifyPresetLabel(label) {
+    return label
+        .toLowerCase()
+        .normalize('NFKD')
+        .replace(/[^\w\s,.*-]/g, '')
+        .replace(/\*/g, 'runda')
+        .replace(/,/g, '')
+        .replace(/\s+/g, '_')
+        .replace(/x/g, 'x');
+}
+
+export function parseMetricToken(token) {
+    const normalized = String(token || '').trim().replace(',', '.');
+    const parsed = Number.parseFloat(normalized);
+    if (!Number.isFinite(parsed)) return null;
+    return Math.round(parsed * 1000);
+}
+
+export function parseJumbrellaSize(sizeLabel) {
+    const label = String(sizeLabel || '').trim();
+    if (!label) return null;
+
+    const roundMatch = label.match(/^([\d,]+)\*\s+Runda$/i);
+    if (roundMatch) {
+        const diameterMm = parseMetricToken(roundMatch[1]);
+        if (!diameterMm) return null;
+        return {
+            widthMm: diameterMm,
+            depthMm: diameterMm,
+            shapeCategory: 'Runda'
+        };
+    }
+
+    const rectMatch = label.match(/^([\d,]+)x([\d,]+)\s+(Kvadrat|Rektangel)$/i);
+    if (!rectMatch) return null;
+
+    const widthMm = parseMetricToken(rectMatch[1]);
+    const depthMm = parseMetricToken(rectMatch[2]);
+    if (!widthMm || !depthMm) return null;
+
+    return {
+        widthMm,
+        depthMm,
+        shapeCategory: rectMatch[3][0].toUpperCase() + rectMatch[3].slice(1).toLowerCase()
+    };
+}
+
+function buildPresetId(label) {
+    return LEGACY_PRESET_IDS[label] || `jumbrella_${slugifyPresetLabel(label)}`;
+}
+
+export function buildJumbrellaParasolPresets() {
+    const jumbrellaSizes = catalogData?.BaHaMa?.models?.Jumbrella?.sizes || {};
+
+    return Object.keys(jumbrellaSizes).reduce((presets, sizeLabel) => {
+        const parsed = parseJumbrellaSize(sizeLabel);
+
+        if (!parsed) {
+            console.warn(`[parasolGeometry] Could not parse Jumbrella size "${sizeLabel}" for sketch presets.`);
+            return presets;
+        }
+
+        if (parsed.shapeCategory === 'Runda') {
+            return presets;
+        }
+
+        presets.push({
+            id: buildPresetId(sizeLabel),
+            label: sizeLabel,
+            widthMm: parsed.widthMm,
+            depthMm: parsed.depthMm,
+            shapeCategory: parsed.shapeCategory,
+            exportLine: 'BaHaMa',
+            exportModel: 'Jumbrella',
+            exportSize: sizeLabel
+        });
+
+        return presets;
+    }, []);
+}
+
+export function groupParasolPresetsByCategory(presets) {
+    const grouped = presets.reduce((acc, preset) => {
+        const category = CATEGORY_ORDER.includes(preset.shapeCategory) ? preset.shapeCategory : 'Övrigt';
+        if (!acc[category]) {
+            acc[category] = [];
+        }
+        acc[category].push(preset);
+        return acc;
+    }, {});
+
+    return CATEGORY_ORDER
+        .filter((category) => (grouped[category] || []).length > 0)
+        .map((category) => ({
+            category,
+            presets: grouped[category]
+        }));
+}
+
 /**
  * Core configuration for available parasol presets
  */
-export const PARASOL_PRESETS = [
-    {
-        id: 'parasol_3x3',
-        label: '3x3 Kvadrat',
-        widthMm: 3000,
-        depthMm: 3000,
-        exportLine: 'BaHaMa',
-        exportModel: 'Jumbrella',
-        exportSize: '3x3 Kvadrat'
-    },
-    {
-        id: 'parasol_4x4',
-        label: '4x4 Kvadrat',
-        widthMm: 4000,
-        depthMm: 4000,
-        exportLine: 'BaHaMa',
-        exportModel: 'Jumbrella',
-        exportSize: '4x4 Kvadrat'
-    },
-    {
-        id: 'parasol_5x5',
-        label: '5x5 Kvadrat',
-        widthMm: 5000,
-        depthMm: 5000,
-        exportLine: 'BaHaMa',
-        exportModel: 'Jumbrella',
-        exportSize: '5x5 Kvadrat'
-    },
-    {
-        id: 'parasol_4x3',
-        label: '4x3 Rektangel',
-        widthMm: 4000,
-        depthMm: 3000,
-        exportLine: 'BaHaMa',
-        exportModel: 'Jumbrella',
-        exportSize: '4x3 Rektangel'
-    }
-];
+export const PARASOL_PRESETS = buildJumbrellaParasolPresets();
+
+export function getParasolPresetById(presetId) {
+    return PARASOL_PRESETS.find((preset) => preset.id === presetId) || null;
+}
 
 export function snapToStep100(value) {
     return Math.round(value / 100) * 100;

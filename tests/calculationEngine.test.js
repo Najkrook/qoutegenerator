@@ -97,4 +97,149 @@ describe('computeQuoteTotals', () => {
         expect(summary.finalTotalSek).toBe(0);
         expect(summary.globalDiscountAmt).toBe(0);
     });
+
+    it('sorts grid main rows by model order then ascending size', () => {
+        const state = createStateFixture({
+            builderItems: [],
+            customCosts: [],
+            gridSelections: {
+                ClickitUP: {
+                    items: {
+                        'ClickitUP Section|2000': { qty: 1, discountPct: 0 },
+                        'ClickitUP Section|1400': { qty: 1, discountPct: 0 },
+                        'ClickitUP Section|1700': { qty: 1, discountPct: 0 },
+                        'ClickitUP Hane|1100': { qty: 1, discountPct: 0 },
+                        'ClickitUP Hane|1000': { qty: 1, discountPct: 0 },
+                        'ClickitUP Dörr|1100': { qty: 1, discountPct: 0 },
+                        'ClickitUP Dörr|700': { qty: 1, discountPct: 0 }
+                    },
+                    addons: {}
+                }
+            }
+        });
+
+        const catalogData = createCatalogFixture();
+        catalogData.ClickitUP.gridItems = [
+            {
+                model: 'ClickitUP Section',
+                sizes: [
+                    { size: '1400', price: 1400 },
+                    { size: '1700', price: 1700 },
+                    { size: '2000', price: 2000 }
+                ]
+            },
+            {
+                model: 'ClickitUP Hane',
+                sizes: [
+                    { size: '1000', price: 1000 },
+                    { size: '1100', price: 1100 }
+                ]
+            },
+            {
+                model: 'ClickitUP Dörr',
+                sizes: [
+                    { size: '700', price: 700 },
+                    { size: '1100', price: 1100 }
+                ]
+            }
+        ];
+
+        const summary = computeQuoteTotals({ state, catalogData });
+
+        expect(summary.totals.filter((row) => !row.isAddon && !row.isCustom).map((row) => `${row.model}|${row.size}`)).toEqual([
+            'ClickitUP Section|1400',
+            'ClickitUP Section|1700',
+            'ClickitUP Section|2000',
+            'ClickitUP Hane|1000',
+            'ClickitUP Hane|1100',
+            'ClickitUP Dörr|700',
+            'ClickitUP Dörr|1100'
+        ]);
+    });
+
+    it('keeps addons after main rows and custom rows last', () => {
+        const state = createStateFixture({
+            builderItems: [
+                {
+                    line: 'BaHaMa',
+                    model: 'Jumbrella',
+                    size: '4x4 Kvadrat',
+                    qty: 1,
+                    discountPct: 0,
+                    addons: [{ id: 'heater', qty: 1, discountPct: 0 }]
+                }
+            ],
+            gridSelections: {
+                ClickitUP: {
+                    items: {
+                        'ClickitUP Section|1200': { qty: 1, discountPct: 0 }
+                    },
+                    addons: {
+                        'door-right': { qty: 1, discountPct: 0 }
+                    }
+                }
+            },
+            customCosts: [
+                { description: 'Montering', price: 1000, qty: 1 }
+            ]
+        });
+
+        const summary = computeQuoteTotals({
+            state,
+            catalogData: createCatalogFixture()
+        });
+
+        expect(summary.totals.map((row) => row.source.type)).toEqual([
+            'builder',
+            'grid',
+            'builder-addon',
+            'grid-addon',
+            'custom'
+        ]);
+    });
+
+    it('sorts builder dimensions with Swedish decimal parsing', () => {
+        const state = createStateFixture({
+            gridSelections: {},
+            customCosts: [],
+            builderItems: [
+                { line: 'BaHaMa', model: 'Jumbrella', size: '6x4,5 Rektangel', qty: 1, discountPct: 0, addons: [] },
+                { line: 'BaHaMa', model: 'Jumbrella', size: '3,5x3,5 Kvadrat', qty: 1, discountPct: 0, addons: [] },
+                { line: 'BaHaMa', model: 'Jumbrella', size: '4x4 Kvadrat', qty: 1, discountPct: 0, addons: [] }
+            ]
+        });
+
+        const catalogData = createCatalogFixture();
+        catalogData.BaHaMa.models.Jumbrella.sizes = {
+            '6x4,5 Rektangel': { price: 60000 },
+            '3,5x3,5 Kvadrat': { price: 35000 },
+            '4x4 Kvadrat': { price: 40000 }
+        };
+
+        const summary = computeQuoteTotals({ state, catalogData });
+
+        expect(summary.totals.filter((row) => !row.isAddon && !row.isCustom).map((row) => row.size)).toEqual([
+            '3,5x3,5',
+            '4x4',
+            '6x4,5'
+        ]);
+    });
+
+    it('keeps stable order for equal sizes', () => {
+        const state = createStateFixture({
+            builderItems: [
+                { line: 'BaHaMa', model: 'Jumbrella', size: '4x4 Kvadrat', qty: 1, discountPct: 0, addons: [] },
+                { line: 'BaHaMa', model: 'Jumbrella', size: '4x4 Kvadrat', qty: 2, discountPct: 0, addons: [] }
+            ],
+            gridSelections: {},
+            customCosts: []
+        });
+
+        const summary = computeQuoteTotals({
+            state,
+            catalogData: createCatalogFixture()
+        });
+
+        expect(summary.totals.filter((row) => !row.isAddon && !row.isCustom).map((row) => row.qty)).toEqual([1, 2]);
+    });
 });
