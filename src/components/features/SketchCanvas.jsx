@@ -621,6 +621,9 @@ export function SketchCanvas({
 
     const renderEdge = (edgeKey, startX, startY, direction) => {
         const summary = summaryByEdge[edgeKey] || { segments: [] };
+        if (summary.enabled === false) {
+            return [];
+        }
         const segments = summary.segments || [];
         const diagnostics = edgeDiagnostics[edgeKey];
         const isInvalid = diagnostics?.valid === false;
@@ -685,6 +688,27 @@ export function SketchCanvas({
             );
         });
 
+        if (summary.leadingPostMm > 0 && !isInvalid) {
+            const postLen = summary.leadingPostMm;
+            const postGeo = direction === 'E'
+                ? { x: cx, y: cy - sectionThickness / 2, w: postLen, h: sectionThickness }
+                : { x: cx - sectionThickness / 2, y: cy, w: sectionThickness, h: postLen };
+
+            objects.push(
+                <rect
+                    key={`leading-post-${edgeKey}`}
+                    x={postGeo.x}
+                    y={postGeo.y}
+                    width={postGeo.w}
+                    height={postGeo.h}
+                    fill="rgba(100,116,139,0.5)"
+                    stroke="rgba(148,163,184,0.65)"
+                    strokeWidth={20}
+                    rx="10"
+                />
+            );
+        }
+
         if (isInvalid) {
             const tx = direction === 'E' ? startX + (edgeKey === 'front' || edgeKey === 'back' ? currentWidth / 2 : 550) : startX - 400;
             const ty = direction === 'E' ? startY + 320 : startY + 400;
@@ -744,39 +768,53 @@ export function SketchCanvas({
             );
         };
 
+        const leftEffective = summaryByEdge.left?.effectiveLength ?? currentDepthLeft;
+        const rightEffective = summaryByEdge.right?.effectiveLength ?? currentDepthRight;
+        const frontEffective = summaryByEdge.front?.effectiveLength ?? currentWidth;
+        const showLeftDepth = (summaryByEdge.left?.enabled ?? true) && leftEffective > 0;
+        const showRightDepth = (summaryByEdge.right?.enabled ?? true) && rightEffective > 0;
+
         return (
             <>
                 {/* ── Width dimension (bottom) ── */}
-                <line x1={0} y1={bottomDimY} x2={currentWidth} y2={bottomDimY} stroke="rgba(148,163,184,0.8)" strokeWidth="18" />
+                <line x1={0} y1={bottomDimY} x2={frontEffective} y2={bottomDimY} stroke="rgba(148,163,184,0.8)" strokeWidth="18" />
                 <line x1={0} y1={bottomDimY - bottomTick} x2={0} y2={bottomDimY + bottomTick} stroke="rgba(148,163,184,0.8)" strokeWidth="18" />
-                <line x1={currentWidth} y1={bottomDimY - bottomTick} x2={currentWidth} y2={bottomDimY + bottomTick} stroke="rgba(148,163,184,0.8)" strokeWidth="18" />
+                <line x1={frontEffective} y1={bottomDimY - bottomTick} x2={frontEffective} y2={bottomDimY + bottomTick} stroke="rgba(148,163,184,0.8)" strokeWidth="18" />
                 {renderDimensionLabel({
-                    x: currentWidth / 2,
+                    x: frontEffective / 2,
                     y: bottomLabelY,
-                    text: `${Math.round(currentWidth)} mm`
+                    text: `${Math.round(frontEffective)} mm`
                 })}
 
                 {/* ── Left depth dimension ── */}
-                <line x1={-sideDimOffset} y1={leftStartY} x2={-sideDimOffset} y2={currentMaxDepth} stroke="rgba(148,163,184,0.8)" strokeWidth="18" />
-                <line x1={-(sideDimOffset + sideDimTick)} y1={leftStartY} x2={-(sideDimOffset - sideDimTick)} y2={leftStartY} stroke="rgba(148,163,184,0.8)" strokeWidth="18" />
-                <line x1={-(sideDimOffset + sideDimTick)} y1={currentMaxDepth} x2={-(sideDimOffset - sideDimTick)} y2={currentMaxDepth} stroke="rgba(148,163,184,0.8)" strokeWidth="18" />
-                {renderDimensionLabel({
-                    x: -(sideDimOffset + sideDimLabelOffset),
-                    y: leftStartY + currentDepthLeft / 2,
-                    text: `${Math.round(currentDepthLeft)} mm`,
-                    rotate: -90
-                })}
+                {showLeftDepth && (
+                    <>
+                        <line x1={-sideDimOffset} y1={leftStartY} x2={-sideDimOffset} y2={leftStartY + leftEffective} stroke="rgba(148,163,184,0.8)" strokeWidth="18" />
+                        <line x1={-(sideDimOffset + sideDimTick)} y1={leftStartY} x2={-(sideDimOffset - sideDimTick)} y2={leftStartY} stroke="rgba(148,163,184,0.8)" strokeWidth="18" />
+                        <line x1={-(sideDimOffset + sideDimTick)} y1={leftStartY + leftEffective} x2={-(sideDimOffset - sideDimTick)} y2={leftStartY + leftEffective} stroke="rgba(148,163,184,0.8)" strokeWidth="18" />
+                        {renderDimensionLabel({
+                            x: -(sideDimOffset + sideDimLabelOffset),
+                            y: leftStartY + leftEffective / 2,
+                            text: `${Math.round(leftEffective)} mm`,
+                            rotate: -90
+                        })}
+                    </>
+                )}
 
                 {/* ── Right depth dimension ── */}
-                <line x1={currentWidth + sideDimOffset} y1={rightStartY} x2={currentWidth + sideDimOffset} y2={currentMaxDepth} stroke="rgba(148,163,184,0.8)" strokeWidth="18" />
-                <line x1={currentWidth + sideDimOffset - sideDimTick} y1={rightStartY} x2={currentWidth + sideDimOffset + sideDimTick} y2={rightStartY} stroke="rgba(148,163,184,0.8)" strokeWidth="18" />
-                <line x1={currentWidth + sideDimOffset - sideDimTick} y1={currentMaxDepth} x2={currentWidth + sideDimOffset + sideDimTick} y2={currentMaxDepth} stroke="rgba(148,163,184,0.8)" strokeWidth="18" />
-                {renderDimensionLabel({
-                    x: currentWidth + sideDimOffset + sideDimLabelOffset,
-                    y: rightStartY + currentDepthRight / 2,
-                    text: `${Math.round(currentDepthRight)} mm`,
-                    rotate: 90
-                })}
+                {showRightDepth && (
+                    <>
+                        <line x1={currentWidth + sideDimOffset} y1={rightStartY} x2={currentWidth + sideDimOffset} y2={rightStartY + rightEffective} stroke="rgba(148,163,184,0.8)" strokeWidth="18" />
+                        <line x1={currentWidth + sideDimOffset - sideDimTick} y1={rightStartY} x2={currentWidth + sideDimOffset + sideDimTick} y2={rightStartY} stroke="rgba(148,163,184,0.8)" strokeWidth="18" />
+                        <line x1={currentWidth + sideDimOffset - sideDimTick} y1={rightStartY + rightEffective} x2={currentWidth + sideDimOffset + sideDimTick} y2={rightStartY + rightEffective} stroke="rgba(148,163,184,0.8)" strokeWidth="18" />
+                        {renderDimensionLabel({
+                            x: currentWidth + sideDimOffset + sideDimLabelOffset,
+                            y: rightStartY + rightEffective / 2,
+                            text: `${Math.round(rightEffective)} mm`,
+                            rotate: 90
+                        })}
+                    </>
+                )}
             </>
         );
     };
@@ -905,10 +943,10 @@ export function SketchCanvas({
                 />
 
                 {renderEdge('front', 0, currentMaxDepth, 'E')}
-                {renderEdge('left', 0, currentMaxDepth - currentDepthLeft, 'S')}
-                {renderEdge('right', currentWidth, currentMaxDepth - currentDepthRight, 'S')}
+                {(summaryByEdge.left?.enabled ?? true) && renderEdge('left', 0, currentMaxDepth - currentDepthLeft, 'S')}
+                {(summaryByEdge.right?.enabled ?? true) && renderEdge('right', currentWidth, currentMaxDepth - currentDepthRight, 'S')}
 
-                {includeBack ? (
+                {(includeBack && (summaryByEdge.back?.enabled ?? true)) ? (
                     renderEdge('back', 0, 0, 'E')
                 ) : (
                     <g>

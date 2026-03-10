@@ -103,6 +103,12 @@ function sanitizeConfig(config) {
 
     next.targetLength = normalizeTarget(next.targetLength, 1500);
     next.includeBack = !!next.includeBack;
+    const hasLeftDepth = next.depthLeft > 0;
+    const hasRightDepth = next.depthRight > 0;
+    const hasAnySideDepth = hasLeftDepth || hasRightDepth;
+    if (!hasAnySideDepth) {
+        next.includeBack = false;
+    }
     next.prioMode = ['symmetrical', 'convenient', 'target'].includes(next.prioMode) ? next.prioMode : 'symmetrical';
 
     const rawDoorEdges = next.doorEdges;
@@ -113,6 +119,8 @@ function sanitizeConfig(config) {
             : [];
     const doors = new Set(normalizedDoorEdges);
     if (!next.includeBack) doors.delete('back');
+    if (!hasLeftDepth) doors.delete('left');
+    if (!hasRightDepth) doors.delete('right');
     next.doorEdges = doors;
 
     const sourceDoorSizes = next.doorSizeByEdge || {};
@@ -833,14 +841,14 @@ export function SketchTool({ onBack }) {
 
                     <div className="flex flex-wrap justify-center gap-4 text-sm text-text-secondary">
                         <span>
-                            Bredd: <b className="text-text-primary">{config.width} mm</b>
+                            Bredd: <b className="text-text-primary">{layout.edgeSummaries?.front?.effectiveLength ?? config.width} mm</b>
                         </span>
                         {config.equalDepth ? (
-                            <span>Djup: <b className="text-text-primary">{config.depth} mm</b></span>
+                            <span>Djup: <b className="text-text-primary">{layout.edgeSummaries?.left?.effectiveLength ?? config.depth} mm</b></span>
                         ) : (
                             <>
-                                <span>Vänster: <b className="text-text-primary">{config.depthLeft} mm</b></span>
-                                <span>Höger: <b className="text-text-primary">{config.depthRight} mm</b></span>
+                                <span>Vänster: <b className="text-text-primary">{layout.edgeSummaries?.left?.effectiveLength ?? config.depthLeft} mm</b></span>
+                                <span>Höger: <b className="text-text-primary">{layout.edgeSummaries?.right?.effectiveLength ?? config.depthRight} mm</b></span>
                             </>
                         )}
                         <span>

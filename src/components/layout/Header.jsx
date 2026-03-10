@@ -1,10 +1,10 @@
-﻿import React from 'react';
+import React from 'react';
 import { useQuote } from '../../store/QuoteContext';
 import { useAuth } from '../../store/AuthContext';
 
 export function Header() {
     const { state, dispatch } = useQuote();
-    const { user, logout, canViewEverything } = useAuth();
+    const { user, logout, canViewEverything, canAccessQuoteHistory } = useAuth();
     const { step } = state;
     const showQuoteStepper = typeof step === 'number' && step >= 1 && step <= 4;
 
@@ -29,22 +29,35 @@ export function Header() {
             <div className="flex items-center justify-between gap-4 flex-wrap mb-6">
                 <div className="flex items-center gap-3">
                     {(step > 0 || typeof step === 'string') && (
-                        <button
-                            type="button"
-                            onClick={resetToStart}
-                            className="bg-danger border border-danger text-white text-sm font-medium px-4 py-2 rounded-lg cursor-pointer hover:bg-red-600 hover:border-red-600 transition-all shadow-sm flex items-center gap-2 group"
-                            title="Varning: Detta kommer att rensa din nuvarande offert!"
-                        >
-                            <span>🏠</span>
-                            <span className="inline-block group-hover:hidden whitespace-nowrap">Start</span>
-                            <span className="hidden group-hover:inline-block whitespace-nowrap">Rensa offert</span>
-                        </button>
+                        <div className="flex items-center gap-2">
+                            <button
+                                type="button"
+                                onClick={() => dispatch({ type: 'SET_STEP', payload: 0 })}
+                                className="bg-panel-bg border border-panel-border text-text-primary text-sm font-medium px-4 py-2 rounded-lg cursor-pointer hover:bg-panel-border transition-colors shadow-sm flex items-center gap-2"
+                                title="Tillbaka till startskärmen"
+                            >
+                                <span>🏠</span>
+                                <span>Start</span>
+                            </button>
+                            
+                            {showQuoteStepper && (
+                                <button
+                                    type="button"
+                                    onClick={resetToStart}
+                                    className="bg-danger border border-danger text-white text-sm font-medium px-4 py-2 rounded-lg cursor-pointer hover:bg-red-600 hover:border-red-600 transition-all shadow-sm flex items-center gap-2 group"
+                                    title="Varning: Detta kommer att rensa din nuvarande offert!"
+                                >
+                                    <span>🗑️</span>
+                                    <span>Rensa offert</span>
+                                </button>
+                            )}
+                        </div>
                     )}
                     <h1 className="text-2xl font-semibold m-0">Brixx portal</h1>
                 </div>
 
                 <div className="flex items-center gap-3">
-                    {canViewEverything && (
+                    {canAccessQuoteHistory && (
                         <a href="history.html" className="text-text-primary no-underline font-medium text-sm bg-panel-bg px-3 py-1.5 rounded-md border border-panel-border transition-colors hover:bg-panel-border">
                             Mina Offerter
                         </a>

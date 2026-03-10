@@ -1,4 +1,4 @@
-﻿function roundSek(value) {
+function roundSek(value) {
     return Math.round(Number(value) || 0);
 }
 
@@ -100,10 +100,10 @@ export function buildExcelSheetData(state = {}, summaryData = {}) {
     return wsData;
 }
 
-export function buildPdfTableData(state = {}, summaryData = {}, formatSEK = (v) => String(v)) {
+export function buildPdfTableData(totalsArray = [], formatSEK = (v) => String(v)) {
     const tableData = [];
 
-    (summaryData.totals || []).forEach((row) => {
+    totalsArray.forEach((row) => {
         tableData.push([
             row.model,
             row.size || '-',
@@ -115,19 +115,6 @@ export function buildPdfTableData(state = {}, summaryData = {}, formatSEK = (v) 
             `${row.discountPct}%`
         ]);
     });
-
-    if ((summaryData.globalDiscountAmt || 0) > 0) {
-        tableData.push([
-            `Overgripande Rabatt (${state.globalDiscountPct}%)`,
-            '',
-            '',
-            '',
-            `-${formatSEK(summaryData.globalDiscountAmt)} SEK`,
-            '',
-            '',
-            '-'
-        ]);
-    }
 
     return tableData;
 }

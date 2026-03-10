@@ -27,3 +27,10 @@ export function resolveAccessLevelFromUser(user) {
     return 'quote-only';
 }
 
+export function canAccessQuoteHistoryLevel(accessLevel) {
+    return accessLevel === 'full' || accessLevel === 'quote-only';
+}
+
+export function canAccessQuoteHistoryUser(user) {
+    return canAccessQuoteHistoryLevel(resolveAccessLevelFromUser(user));
+}

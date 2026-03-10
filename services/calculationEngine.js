@@ -1,4 +1,4 @@
-﻿function toFloat(value) {
+function toFloat(value) {
     if (typeof value === 'number') return Number.isFinite(value) ? value : 0;
     if (value === null || value === undefined) return 0;
     const cleaned = String(value).replace(/,/g, '.').replace(/[^\d.-]/g, '');
@@ -195,6 +195,7 @@ export function computeQuoteTotals({ state, catalogData }) {
             net,
             isAddon: false,
             source: { type: 'builder', itemId: item.id },
+            line: item?.line || 'Övrigt',
             sortModel: `${item?.line || ''} ${item?.model || ''}`.trim(),
             sortSizeRaw: item?.size || formattedSize,
             sortKind: sizeMeta.sortKind,
@@ -227,6 +228,7 @@ export function computeQuoteTotals({ state, catalogData }) {
                 net: addonNet,
                 isAddon: true,
                 source: { type: 'builder-addon', itemId: item.id, addonId: addon.id },
+                line: item?.line || 'Övrigt',
                 sortModel: `${item?.line || ''} ${item?.model || ''}`.trim(),
                 sortSizeRaw: '-',
                 sortKind: 'empty',
@@ -268,6 +270,7 @@ export function computeQuoteTotals({ state, catalogData }) {
                 net,
                 isAddon: false,
                 source: { type: 'grid', lineId: line, key },
+                line: line || 'Övrigt',
                 sortModel: model || '',
                 sortSizeRaw: size || formattedSize,
                 sortKind: sizeMeta.sortKind,
@@ -301,6 +304,7 @@ export function computeQuoteTotals({ state, catalogData }) {
                 net,
                 isAddon: true,
                 source: { type: 'grid-addon', lineId: line, addonId },
+                line: line || 'Övrigt',
                 sortModel: line,
                 sortSizeRaw: '-',
                 sortKind: 'empty',
@@ -329,6 +333,7 @@ export function computeQuoteTotals({ state, catalogData }) {
             isAddon: false,
             isCustom: true,
             source: { type: 'custom' },
+            line: 'Övrigt',
             sortModel: `Ovrigt: ${cost?.description || 'Kostnad'}`,
             sortSizeRaw: '-',
             sortKind: 'empty',

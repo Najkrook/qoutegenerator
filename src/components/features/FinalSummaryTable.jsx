@@ -26,7 +26,7 @@ export function FinalSummaryTable() {
                 </label>
             </div>
 
-            <div className="overflow-x-auto md:overflow-visible bg-panel-bg border border-panel-border rounded-lg shadow-inner">
+            <div className="overflow-x-auto bg-panel-bg border border-panel-border rounded-lg shadow-inner w-full">
                 <table className="w-full text-left border-collapse min-w-0">
                     <thead>
                         <tr className="bg-black/20 text-[10px] uppercase font-bold text-text-secondary tracking-wider">
@@ -66,7 +66,7 @@ export function FinalSummaryTable() {
                             <td colSpan="2" className="p-4 text-right text-xs uppercase font-bold text-text-secondary">Totalt exkl. moms</td>
                             <td className="p-4 text-right font-bold text-primary text-3xl whitespace-nowrap">{fmt(finalTotalSek)} SEK</td>
                             <td colSpan="2" className="p-4 text-right text-xs uppercase font-bold text-text-secondary whitespace-nowrap">Brutto: {fmt(grossTotalSek)} SEK</td>
-                            <td className="p-4 text-right text-danger font-bold text-xs whitespace-nowrap">Total rabatt: -{fmt(totalDiscountSek)} SEK</td>
+                            <td className="p-4 text-right text-danger font-bold text-xs">Total rabatt:<br/>-{fmt(totalDiscountSek)} SEK</td>
                         </tr>
                         {state.includesVat && (
                             <>

@@ -71,39 +71,42 @@ export function generatePDF(state, summaryData, returnBlob = false) {
         const accentGreen = [46, 174, 96];     // For "Ert Pris" highlight
 
         //
-        //  HEADER: Logo + Title + Date/Ref
+        //  HEADER HELPER
         //
+        const drawHeader = () => {
+            // Logo (left side)
+            try {
+                doc.addImage(BRIXX_LOGO_BASE64, 'PNG', PAGE_MARGIN_X, 8, 50, 16);
+            } catch (e) {
+                doc.setFont("helvetica", "bold");
+                doc.setFontSize(22);
+                doc.setTextColor(...brandOrange);
+                doc.text("BRIXX", PAGE_MARGIN_X, 20);
+            }
 
-        // Logo (left side)
-        try {
-            doc.addImage(BRIXX_LOGO_BASE64, 'PNG', PAGE_MARGIN_X, 8, 50, 16);
-        } catch (e) {
-            // Fallback: text logo if image fails
+            // Title (right side)
             doc.setFont("helvetica", "bold");
-            doc.setFontSize(22);
-            doc.setTextColor(...brandOrange);
-            doc.text("BRIXX", PAGE_MARGIN_X, 20);
-        }
+            doc.setFontSize(20);
+            doc.setTextColor(...darkText);
+            doc.text("OFFERT", pageWidth - PAGE_MARGIN_X, HEADER_TOP_Y, { align: "right" });
 
-        // Title (right side)
-        doc.setFont("helvetica", "bold");
-        doc.setFontSize(20);
-        doc.setTextColor(...darkText);
-        doc.text("OFFERT", pageWidth - PAGE_MARGIN_X, HEADER_TOP_Y, { align: "right" });
+            // Date & Reference below title
+            doc.setFont("helvetica", "normal");
+            doc.setFontSize(9);
+            doc.setTextColor(...grayText);
+            doc.text(`Datum: ${quoteDate}`, pageWidth - PAGE_MARGIN_X, 22, { align: "right" });
+            if (customerInfo.reference) {
+                doc.text(`Ref: ${customerInfo.reference}`, pageWidth - PAGE_MARGIN_X, 26, { align: "right" });
+            }
 
-        // Date & Reference below title
-        doc.setFont("helvetica", "normal");
-        doc.setFontSize(9);
-        doc.setTextColor(...grayText);
-        doc.text(`Datum: ${quoteDate}`, pageWidth - PAGE_MARGIN_X, 22, { align: "right" });
-        if (customerInfo.reference) {
-            doc.text(`Ref: ${customerInfo.reference}`, pageWidth - PAGE_MARGIN_X, 26, { align: "right" });
-        }
+            // Orange accent line under header
+            doc.setDrawColor(...brandOrange);
+            doc.setLineWidth(0.8);
+            doc.line(PAGE_MARGIN_X, HEADER_LINE_Y, pageWidth - PAGE_MARGIN_X, HEADER_LINE_Y);
+        };
 
-        // Orange accent line under header
-        doc.setDrawColor(...brandOrange);
-        doc.setLineWidth(0.8);
-        doc.line(PAGE_MARGIN_X, HEADER_LINE_Y, pageWidth - PAGE_MARGIN_X, HEADER_LINE_Y);
+        // Draw header on first page
+        drawHeader();
 
         //
         //  CUSTOMER INFO BLOCK
@@ -148,61 +151,162 @@ export function generatePDF(state, summaryData, returnBlob = false) {
         }
 
         //
-        //  ITEMS TABLE
+        //  ITEMS TABLES (Grouped by Line)
         //
 
-        const tableData = buildPdfTableData(state, summaryData, formatSEK);
+        // Group the items safely
+        const totals = summaryData.totals || [];
+        const groupedTotals = totals.reduce((acc, item) => {
+            const line = item.line || 'Övrigt';
+            if (!acc[line]) acc[line] = [];
+            acc[line].push(item);
+            return acc;
+        }, {});
 
-        const autoTableResult = runAutoTable({
-            startY: currentY,
-            head: [['Modell', 'Storlek', 'Pris/enhet\nExkl. moms', 'Antal', 'Ert Pris\nExkl. moms', 'Rek Utpris\nExkl. moms', 'Rabatt\ni SEK', 'Rabatt\ni %']],
-            body: tableData,
-            theme: 'striped',
-            styles: {
-                fontSize: 8.5,
-                cellPadding: 2.5,
-                valign: 'middle',
-                textColor: darkText,
-                lineColor: [220, 220, 220],
-                lineWidth: 0.1
-            },
-            headStyles: {
-                fillColor: [35, 35, 45],
-                textColor: [255, 255, 255],
-                fontStyle: 'bold',
-                halign: 'center',
-                fontSize: 8
-            },
-            alternateRowStyles: {
-                fillColor: [248, 249, 250]
-            },
-            columnStyles: {
-                0: { halign: 'left', fontStyle: 'bold', cellWidth: 44 },
-                1: { halign: 'center', cellWidth: 16 },
-                2: { halign: 'right', cellWidth: 27 },
-                3: { halign: 'center', fontStyle: 'bold', cellWidth: 14 },
-                4: { halign: 'right', fontStyle: 'bold', cellWidth: 27 },
-                5: { halign: 'right', cellWidth: 27 },
-                6: { halign: 'right', cellWidth: 23 },
-                7: { halign: 'center', cellWidth: 14 }
-            },
-            didParseCell: function (data) {
-                // "Ert Pris" column: green accent
-                if (data.section === 'head' && data.column.index === 4) {
-                    data.cell.styles.fillColor = accentGreen;
-                    data.cell.styles.textColor = [255, 255, 255];
-                }
-                if (data.section === 'body' && data.column.index === 4) {
-                    data.cell.styles.fillColor = [235, 250, 240];
-                }
-            },
-            margin: { left: PAGE_MARGIN_X, right: PAGE_MARGIN_X, top: 14, bottom: CONTENT_BOTTOM_SAFE },
-            pageBreak: 'auto',
-            rowPageBreak: 'avoid'
+        // Sort groups (optional, but nice to have order: ClickitUP, BaHaMa, others)
+        const groupKeys = Object.keys(groupedTotals).sort((a, b) => {
+            if (a === 'ClickitUP') return -1;
+            if (b === 'ClickitUP') return 1;
+            if (a === 'BaHaMa') return -1;
+            if (b === 'BaHaMa') return 1;
+            if (a === 'Övrigt') return 1;
+            if (b === 'Övrigt') return -1;
+            return a.localeCompare(b);
         });
 
-        let finalY = doc.lastAutoTable?.finalY || autoTableResult?.finalY || 45;
-        if (!autoTableResult && !doc.lastAutoTable) {
+        let finalY = currentY;
+
+        for (let i = 0; i < groupKeys.length; i++) {
+            const lineKey = groupKeys[i];
+            const lineItems = groupedTotals[lineKey];
+
+            // If not the first group, add a new page and draw header
+            if (i > 0) {
+                doc.addPage();
+                drawHeader();
+                currentY = 35;
+                
+                doc.setFont("helvetica", "bold");
+                doc.setFontSize(14);
+                doc.setTextColor(...darkText);
+                doc.text(`Produkter - ${lineKey}`, PAGE_MARGIN_X, currentY);
+                currentY += 8;
+            } else if (groupKeys.length > 1 && lineKey !== 'Övrigt') {
+                 // Even on page 1, if there are multiple lines, a subtitle helps
+                 doc.setFont("helvetica", "bold");
+                 doc.setFontSize(12);
+                 doc.setTextColor(...darkText);
+                 doc.text(`Produkter - ${lineKey}`, PAGE_MARGIN_X, currentY);
+                 currentY += 6;
+            }
+
+            const tableData = buildPdfTableData(lineItems, formatSEK);
+
+            const autoTableResult = runAutoTable({
+                startY: currentY,
+                head: [['Modell', 'Storlek', 'Pris/enhet\nExkl. moms', 'Antal', 'Ert Pris\nExkl. moms', 'Rek Utpris\nExkl. moms', 'Rabatt\ni SEK', 'Rabatt\ni %']],
+                body: tableData,
+                theme: 'striped',
+                styles: {
+                    fontSize: 8.5,
+                    cellPadding: 2.5,
+                    valign: 'middle',
+                    textColor: darkText,
+                    lineColor: [220, 220, 220],
+                    lineWidth: 0.1
+                },
+                headStyles: {
+                    fillColor: [35, 35, 45],
+                    textColor: [255, 255, 255],
+                    fontStyle: 'bold',
+                    halign: 'center',
+                    fontSize: 8
+                },
+                alternateRowStyles: {
+                    fillColor: [248, 249, 250]
+                },
+                columnStyles: {
+                    0: { halign: 'left', fontStyle: 'bold', cellWidth: 44 },
+                    1: { halign: 'center', cellWidth: 16 },
+                    2: { halign: 'right', cellWidth: 27 },
+                    3: { halign: 'center', fontStyle: 'bold', cellWidth: 14 },
+                    4: { halign: 'right', fontStyle: 'bold', cellWidth: 27 },
+                    5: { halign: 'right', cellWidth: 27 },
+                    6: { halign: 'right', cellWidth: 23 },
+                    7: { halign: 'center', cellWidth: 14 }
+                },
+                didParseCell: function (data) {
+                    if (data.section === 'head' && data.column.index === 4) {
+                        data.cell.styles.fillColor = accentGreen;
+                        data.cell.styles.textColor = [255, 255, 255];
+                    }
+                    if (data.section === 'body' && data.column.index === 4) {
+                        data.cell.styles.fillColor = [235, 250, 240];
+                    }
+                },
+                margin: { left: PAGE_MARGIN_X, right: PAGE_MARGIN_X, top: 14, bottom: CONTENT_BOTTOM_SAFE },
+                pageBreak: 'auto',
+                rowPageBreak: 'avoid'
+            });
+
+            currentY = doc.lastAutoTable?.finalY || autoTableResult?.finalY || (currentY + 20);
+            // --- Per-group subtotal (only when multiple product lines) ---
+            if (groupKeys.length > 1) {
+                const baseItems = lineItems.filter(r => !r.isAddon);
+                const addonItems = lineItems.filter(r => r.isAddon);
+                const baseNet = baseItems.reduce((s, r) => s + (r.net || 0), 0);
+                const addonNet = addonItems.reduce((s, r) => s + (r.net || 0), 0);
+                const groupNet = baseNet + addonNet;
+
+                // Need ~30px for 3 rows; check page space
+                if (currentY > pageHeight - (CONTENT_BOTTOM_SAFE + 32)) {
+                    doc.addPage();
+                    drawHeader();
+                    currentY = 35;
+                }
+
+                const barX = PAGE_MARGIN_X;
+                const barW = pageWidth - (PAGE_MARGIN_X * 2);
+                const rowH = 7;
+
+                // Row 1: Base products (light gray)
+                doc.setFillColor(245, 245, 245);
+                doc.rect(barX, currentY, barW, rowH, 'F');
+                doc.setFont("helvetica", "normal");
+                doc.setFontSize(8);
+                doc.setTextColor(...grayText);
+                doc.text(`Produkter`, barX + 4, currentY + 5);
+                doc.text(`${formatSEK(baseNet)} SEK`, pageWidth - PAGE_MARGIN_X - 4, currentY + 5, { align: "right" });
+                currentY += rowH;
+
+                // Row 2: Tillval (light gray)
+                if (addonItems.length > 0) {
+                    doc.setFillColor(250, 250, 250);
+                    doc.rect(barX, currentY, barW, rowH, 'F');
+                    doc.text(`Tillval`, barX + 4, currentY + 5);
+                    doc.text(`${formatSEK(addonNet)} SEK`, pageWidth - PAGE_MARGIN_X - 4, currentY + 5, { align: "right" });
+                    currentY += rowH;
+                }
+
+                // Row 3: Total bar (dark)
+                const totBarH = 9;
+                doc.setFillColor(50, 50, 60);
+                doc.rect(barX, currentY, barW, totBarH, 'F');
+                doc.setFont("helvetica", "bold");
+                doc.setFontSize(9);
+                doc.setTextColor(255, 255, 255);
+                doc.text(`Delsumma ${lineKey} (Ert Pris)`, barX + 4, currentY + 6);
+                doc.text(`${formatSEK(groupNet)} SEK`, pageWidth - PAGE_MARGIN_X - 4, currentY + 6, { align: "right" });
+                doc.setTextColor(...darkText);
+
+                currentY += totBarH + 6;
+            }
+
+            finalY = currentY;
+        }
+
+        // Handle simple fallback if autotable isn't loaded and everything failed
+        if (groupKeys.length === 0 || (!doc.lastAutoTable)) {
             if (!returnBlob) {
                 notifyWarn("Avancerad PDF-tabell saknas. Exporterar med enkel layout.");
             }
@@ -460,7 +564,7 @@ export function generatePDF(state, summaryData, returnBlob = false) {
             doc.setFont("helvetica", "bold");
             doc.setFontSize(8);
             doc.setTextColor(255, 255, 255);
-            doc.text("Parasoll | Varme | Vindskydd | Miljo", pageWidth / 2, footerY, { align: "center" });
+            doc.text("Parasoll | Värme | Vindskydd | Miljö", pageWidth / 2, footerY, { align: "center" });
 
             footerY += 5;
             doc.setFont("helvetica", "normal");

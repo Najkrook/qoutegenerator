@@ -1,6 +1,7 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+﻿import React, { useEffect, useMemo, useRef, useState } from 'react';
 import toast from 'react-hot-toast';
 import { useQuote } from '../store/QuoteContext';
+import { useAuth } from '../store/AuthContext';
 import { catalogData } from '../data/catalog';
 import { computeQuoteTotals } from '../../services/calculationEngine';
 import { CustomerInfoForm } from '../components/features/CustomerInfoForm';
@@ -9,6 +10,8 @@ import { TermsAndPaymentPanel } from '../components/features/TermsAndPaymentPane
 import { generatePDF } from '../../features/pdfExport';
 import { generateExcel } from '../../features/excelExport';
 import { downloadBlob, saveBlobWithPicker } from '../utils/fileUtils';
+import { quoteRepository } from '../services/quoteRepositoryClient';
+import { saveQuoteToRepository } from '../services/quoteSaveService';
 
 function sanitizeFileNamePart(value) {
     return String(value || '')
@@ -29,12 +32,13 @@ function buildPdfFileName(customerInfo = {}) {
     return `${safeBase || 'Offert'}-${date}.pdf`;
 }
 
-
 export function SummaryExport() {
     const { state, dispatch } = useQuote();
+    const { user } = useAuth();
     const summaryData = useMemo(() => computeQuoteTotals({ state, catalogData }), [state]);
     const [previewUrl, setPreviewUrl] = useState('');
     const [previewError, setPreviewError] = useState('');
+    const [isSavingQuote, setIsSavingQuote] = useState(false);
     const previewUrlRef = useRef('');
 
     useEffect(() => {
@@ -110,8 +114,34 @@ export function SummaryExport() {
         generateExcel(state, summaryData);
     };
 
-    const handleSaveQuote = () => {
-        toast.success('Offert sparad! (Firebase-integration kommer i nästa fas)');
+    const handleSaveQuote = async () => {
+        if (isSavingQuote) return;
+
+        setIsSavingQuote(true);
+        try {
+            const { isNewQuote, statePatch } = await saveQuoteToRepository({
+                quoteRepository,
+                user,
+                state,
+                summary: summaryData
+            });
+
+            dispatch({
+                type: 'UPDATE_STATE',
+                payload: statePatch
+            });
+
+            if (isNewQuote) {
+                toast.success('Offerten sparades i Mina Offerter.');
+            } else {
+                toast.success(`Offerten sparades som version ${statePatch.activeQuoteVersion}.`);
+            }
+        } catch (err) {
+            console.error('Failed to save quote:', err);
+            toast.error(`Kunde inte spara offerten: ${err.message}`);
+        } finally {
+            setIsSavingQuote(false);
+        }
     };
 
     return (
@@ -126,9 +156,10 @@ export function SummaryExport() {
                         <div className="flex gap-3">
                             <button
                                 onClick={handleSaveQuote}
-                                className="px-6 py-2.5 bg-panel-bg border border-panel-border text-text-primary rounded-lg font-bold hover:bg-white/5 transition-all text-sm uppercase tracking-wide"
+                                disabled={isSavingQuote}
+                                className="px-6 py-2.5 bg-panel-bg border border-panel-border text-text-primary rounded-lg font-bold hover:bg-white/5 transition-all text-sm uppercase tracking-wide disabled:opacity-60 disabled:cursor-not-allowed"
                             >
-                                Spara offert
+                                {isSavingQuote ? 'Sparar...' : 'Spara offert'}
                             </button>
                         </div>
                     </div>

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { DOOR_SIZES, MIN_DIMENSION_MM, SECTION_SIZES, STEP_MM } from '../../utils/sectionCalculator';
 import {
     DEFAULT_PARASOL_PRESET_ID,
@@ -129,6 +129,23 @@ export function SketchConfig({
         doorSizeByEdge = {},
         manualSectionsByEdge = {}
     } = config;
+    const hasLeftDepth = depthLeft > 0;
+    const hasRightDepth = depthRight > 0;
+    const hasAnySideDepth = hasLeftDepth || hasRightDepth;
+    const isStraightEqualDepth = equalDepth && depth === 0;
+    const doorAvailability = {
+        front: true,
+        left: hasLeftDepth,
+        right: hasRightDepth,
+        back: includeBack && hasAnySideDepth
+    };
+    const lastNonZeroEqualDepthRef = useRef(MIN_DIMENSION_MM);
+
+    useEffect(() => {
+        if (equalDepth && depth > 0) {
+            lastNonZeroEqualDepthRef.current = depth;
+        }
+    }, [equalDepth, depth]);
 
     const visibleEdges = EDGE_META.filter(({ key }) => key !== 'back' || includeBack);
 
@@ -148,6 +165,29 @@ export function SketchConfig({
     };
 
     const visibleDoorEdges = visibleEdges.filter(({ key }) => doorEdges.has(key));
+
+    const toggleStraightLayout = () => {
+        if (isStraightEqualDepth) {
+            const restoredDepth = normalizeDepth(lastNonZeroEqualDepthRef.current, MIN_DIMENSION_MM);
+            onChange({
+                depth: restoredDepth,
+                depthLeft: restoredDepth,
+                depthRight: restoredDepth
+            });
+            return;
+        }
+
+        if (equalDepth && depth > 0) {
+            lastNonZeroEqualDepthRef.current = depth;
+        }
+
+        onChange({
+            depth: 0,
+            depthLeft: 0,
+            depthRight: 0,
+            includeBack: false
+        });
+    };
 
     // Determine selected segment if any
     const selectedEdgeSummary = edgeSummaries?.[selectedEdge];
@@ -241,16 +281,31 @@ export function SketchConfig({
                 )}
             </div>
 
-            {/* Lika djup toggle */}
-            <label className="flex items-center gap-3 cursor-pointer select-none">
-                <div
-                    className={`relative inline-flex h-5 w-9 rounded-full transition-colors ${equalDepth ? 'bg-primary' : 'bg-gray-600'}`}
-                    onClick={() => onChange({ equalDepth: !equalDepth })}
-                >
-                    <span className={`absolute top-0.5 left-0.5 h-4 w-4 rounded-full bg-white shadow transition-transform ${equalDepth ? 'translate-x-4' : 'translate-x-0'}`} />
-                </div>
-                <span className="text-sm text-text-primary">Lika djup</span>
-            </label>
+            <div className="flex items-center justify-between gap-4 flex-wrap">
+                <label className="flex items-center gap-3 cursor-pointer select-none">
+                    <div
+                        className={`relative inline-flex h-5 w-9 rounded-full transition-colors ${equalDepth ? 'bg-primary' : 'bg-gray-600'}`}
+                        onClick={() => onChange({ equalDepth: !equalDepth })}
+                    >
+                        <span className={`absolute top-0.5 left-0.5 h-4 w-4 rounded-full bg-white shadow transition-transform ${equalDepth ? 'translate-x-4' : 'translate-x-0'}`} />
+                    </div>
+                    <span className="text-sm text-text-primary">Lika djup</span>
+                </label>
+
+                {equalDepth && (
+                    <div className="flex items-center gap-2 select-none">
+                        <button
+                            type="button"
+                            aria-pressed={isStraightEqualDepth}
+                            className={`relative inline-flex h-4 w-8 rounded-full transition-colors ${isStraightEqualDepth ? 'bg-primary' : 'bg-gray-600'}`}
+                            onClick={toggleStraightLayout}
+                        >
+                            <span className={`absolute top-0.5 left-0.5 h-3 w-3 rounded-full bg-white shadow transition-transform ${isStraightEqualDepth ? 'translate-x-4' : 'translate-x-0'}`} />
+                        </button>
+                        <span className="text-xs text-text-secondary">Rak 0 mm</span>
+                    </div>
+                )}
+            </div>
 
             {!equalDepth && (
                 <div className="grid grid-cols-2 gap-4">
@@ -281,6 +336,7 @@ export function SketchConfig({
                 <input
                     type="checkbox"
                     checked={includeBack}
+                    disabled={!hasAnySideDepth}
                     onChange={(e) => {
                         const newBack = e.target.checked;
                         if (!newBack) {
@@ -297,6 +353,10 @@ export function SketchConfig({
                 />
                 <span className="text-sm text-text-primary">Inkludera bakvägg</span>
             </label>
+
+            {!hasAnySideDepth && (
+                <p className="text-xs text-text-secondary m-0">Rak layout (0 mm djup) kan inte ha bakvÃ¤gg.</p>
+            )}
 
             <div className="flex flex-col gap-1.5">
                 <label className="text-xs font-semibold text-text-secondary uppercase">Prioritering</label>
@@ -371,10 +431,14 @@ export function SketchConfig({
                 <label className="text-xs font-semibold text-text-secondary uppercase">Dörrplacering</label>
                 <div className="flex flex-wrap gap-3">
                     {visibleEdges.map(({ key, label }) => (
-                        <label key={key} className="flex items-center gap-2 cursor-pointer">
+                        <label
+                            key={key}
+                            className={`flex items-center gap-2 ${doorAvailability[key] ? 'cursor-pointer' : 'cursor-not-allowed opacity-50'}`}
+                        >
                             <input
                                 type="checkbox"
                                 checked={doorEdges.has(key)}
+                                disabled={!doorAvailability[key]}
                                 onChange={() => toggleDoor(key)}
                                 className="accent-primary w-4 h-4"
                             />

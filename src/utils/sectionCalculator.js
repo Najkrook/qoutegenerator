@@ -11,6 +11,10 @@ export const MIN_SECTION_SIZE = 700;
 export const STANDARD_SIZES = SECTION_SIZES;
 export const DOOR_LABEL = 'Dörr';
 
+export const SIDE_CORNER_OVERLAP_MM = 100;
+export const CORNER_POST_BUILD_MM = 80;
+export const SIDE_NET_REDUCTION_MM = SIDE_CORNER_OVERLAP_MM - CORNER_POST_BUILD_MM;
+
 const EDGE_KEYS = ['front', 'left', 'right', 'back'];
 const EDGE_TO_DIMENSION = {
     front: 'width',
@@ -24,6 +28,44 @@ const EDGE_LENGTH_LABEL = {
     left: 'vänsterkant',
     right: 'högerkant'
 };
+
+function getEdgeRequestedMin(edgeKey) {
+    return edgeKey === 'left' || edgeKey === 'right' ? 0 : MIN_DIMENSION_MM;
+}
+
+export function computeEdgeRequestedLength(edgeKey, config) {
+    switch (edgeKey) {
+        case 'front': return normalizeNumber(config.width, { fallback: 4000, min: MIN_DIMENSION_MM, max: 20000 });
+        case 'back': return normalizeNumber(config.width, { fallback: 4000, min: MIN_DIMENSION_MM, max: 20000 });
+        case 'left': return normalizeNumber(config.depthLeft ?? config.depth, { fallback: 3000, min: 0, max: 10000 });
+        case 'right': return normalizeNumber(config.depthRight ?? config.depth, { fallback: 3000, min: 0, max: 10000 });
+        default: return 0;
+    }
+}
+
+export function computeEdgeEffectiveLength(edgeKey, requestedLength) {
+    if (edgeKey === 'left' || edgeKey === 'right') {
+        return Math.max(0, requestedLength - SIDE_NET_REDUCTION_MM);
+    }
+    return requestedLength;
+}
+
+export function computeEdgeSolverLength(edgeKey, effectiveLength) {
+    if (edgeKey === 'left' || edgeKey === 'right') {
+        return Math.floor(effectiveLength / STEP_MM) * STEP_MM;
+    }
+    return roundToStep(effectiveLength, STEP_MM);
+}
+
+export function computeEdgeGeometry(edgeKey, requestedLength, effectiveLength, solverLength) {
+    if (edgeKey === 'left' || edgeKey === 'right') {
+        return {
+            setbackMm: Math.max(0, requestedLength - effectiveLength),
+            leadingPostMm: Math.max(0, effectiveLength - solverLength)
+        };
+    }
+    return { setbackMm: 0, leadingPostMm: 0 };
+}
 
 function clamp(value, min, max) {
     if (value < min) return min;
@@ -350,21 +392,25 @@ function determineWarningLevel(diagnostics) {
     return 'none';
 }
 
-function buildNearestLengthSuggestion(length, needsDoor, diagnostics, mode, targetLength) {
+function buildNearestLengthSuggestion(requestedLength, needsDoor, diagnostics, mode, targetLength, edgeKey) {
     const requestedDoorSize = diagnostics.requestedDoorSize;
     const maxDelta = 5000;
+    const minRequestedLength = getEdgeRequestedMin(edgeKey);
 
     for (let delta = STEP_MM; delta <= maxDelta; delta += STEP_MM) {
-        const candidates = [length - delta, length + delta];
-        for (const candidateLength of candidates) {
-            if (candidateLength < MIN_DIMENSION_MM) continue;
+        const candidates = [requestedLength - delta, requestedLength + delta];
+        for (const candidateRequested of candidates) {
+            if (candidateRequested < minRequestedLength) continue;
+
+            const candidateEffective = computeEdgeEffectiveLength(edgeKey, candidateRequested);
+            const candidateSolver = computeEdgeSolverLength(edgeKey, candidateEffective);
 
             const solved = needsDoor
-                ? (requestedDoorSize ? solveEdgeWithFixedDoor(candidateLength, requestedDoorSize, mode, targetLength) : null)
-                : solveExactFill(candidateLength, mode, targetLength);
+                ? (requestedDoorSize ? solveEdgeWithFixedDoor(candidateSolver, requestedDoorSize, mode, targetLength) : null)
+                : solveExactFill(candidateSolver, mode, targetLength);
 
             if (solved) {
-                return candidateLength;
+                return candidateRequested;
             }
         }
     }
@@ -372,7 +418,10 @@ function buildNearestLengthSuggestion(length, needsDoor, diagnostics, mode, targ
     return null;
 }
 
-function buildEdgeWarningsAndSuggestions(edgeKey, edgeLength, needsDoor, diagnostics, mode, targetLength) {
+function buildEdgeWarningsAndSuggestions(edgeKey, lengths, needsDoor, diagnostics, mode, targetLength) {
+    const edgeRequestedLength = lengths.requested;
+    const edgeSolverLength = lengths.solver;
+
     const warnings = [];
     const suggestions = [];
     const warningLevel = determineWarningLevel(diagnostics);
@@ -390,9 +439,9 @@ function buildEdgeWarningsAndSuggestions(edgeKey, edgeLength, needsDoor, diagnos
             text: errorText
         });
 
-        const nearestLength = buildNearestLengthSuggestion(edgeLength, needsDoor, diagnostics, mode, targetLength);
+        const nearestLength = buildNearestLengthSuggestion(edgeRequestedLength, needsDoor, diagnostics, mode, targetLength, edgeKey);
         const dimensionKey = EDGE_TO_DIMENSION[edgeKey];
-        if (Number.isFinite(nearestLength) && nearestLength !== edgeLength) {
+        if (Number.isFinite(nearestLength) && nearestLength !== edgeRequestedLength) {
             suggestions.push({
                 id: `suggestion-${edgeKey}-set-length-${nearestLength}`,
                 type: 'setDimension',
@@ -408,7 +457,7 @@ function buildEdgeWarningsAndSuggestions(edgeKey, edgeLength, needsDoor, diagnos
             const requestedDoorSize = diagnostics.requestedDoorSize || normalizeDoorSize(1000);
             const viableDoorSize = DOOR_SIZES
                 .filter((size) => size < requestedDoorSize)
-                .find((size) => !!solveEdgeWithFixedDoor(edgeLength, size, mode, targetLength));
+                .find((size) => !!solveEdgeWithFixedDoor(edgeSolverLength, size, mode, targetLength));
 
             if (Number.isFinite(viableDoorSize)) {
                 suggestions.push({
@@ -456,7 +505,7 @@ function buildEdgeWarningsAndSuggestions(edgeKey, edgeLength, needsDoor, diagnos
     };
 }
 
-function buildEdgeSummary(edgeKey, length, enabled, sections, diagnostics) {
+function buildEdgeSummary(edgeKey, lengths, geometry, enabled, sections, diagnostics) {
     const segmentData = sections.map((segment, index) => {
         const parsed = parseSection(segment);
         const isDoor = parsed.kind === 'door';
@@ -473,7 +522,11 @@ function buildEdgeSummary(edgeKey, length, enabled, sections, diagnostics) {
     return {
         edge: edgeKey,
         enabled,
-        length,
+        requestedLength: lengths.requested,
+        effectiveLength: lengths.effective,
+        solverLength: lengths.solver,
+        setbackMm: geometry.setbackMm,
+        leadingPostMm: geometry.leadingPostMm,
         valid: diagnostics.valid,
         warningLevel: determineWarningLevel(diagnostics),
         requestedDoorSize: diagnostics.requestedDoorSize,
@@ -486,15 +539,8 @@ function buildEdgeSummary(edgeKey, length, enabled, sections, diagnostics) {
     };
 }
 
-/**
- * Compute edges, BOM counts, and totals from sketch configuration.
- */
-export function computeLayout(config) {
+export function computeLayout(config = {}) {
     const includeBack = !!config.includeBack;
-    const width = normalizeNumber(config.width, { fallback: 8000, min: MIN_DIMENSION_MM, max: 50000 });
-    const sharedDepth = normalizeNumber(config.depth, { fallback: 4000, min: 0, max: 50000 });
-    const depthLeft = normalizeNumber(config.depthLeft ?? config.depth, { fallback: sharedDepth, min: 0, max: 50000 });
-    const depthRight = normalizeNumber(config.depthRight ?? config.depth, { fallback: sharedDepth, min: 0, max: 50000 });
     const prioMode = normalizeMode(config.prioMode);
     const targetLength = normalizeNumber(config.targetLength, { fallback: 1500, min: 700, max: 2000 });
     const doorEdges = normalizeDoorEdges(config.doorEdges, includeBack);
@@ -502,9 +548,21 @@ export function computeLayout(config) {
     const doorSizeByEdge = normalizeDoorSizeByEdge(config.doorSizeByEdge, doorEdges, fallbackDoorSize);
     const manualSectionsByEdge = config.manualSectionsByEdge || {};
 
+    const requestedDimensions = {
+        width: computeEdgeRequestedLength('front', config),
+        depthLeft: computeEdgeRequestedLength('left', config),
+        depthRight: computeEdgeRequestedLength('right', config)
+    };
+    requestedDimensions.depth = config.equalDepth ? requestedDimensions.depthLeft : config.depth;
+
+    const width = requestedDimensions.width;
+    const depthLeft = requestedDimensions.depthLeft;
+    const depthRight = config.equalDepth ? requestedDimensions.depthLeft : requestedDimensions.depthRight;
+    const sideEdgesPresent = Math.max(depthLeft, depthRight) > 0;
+
     const solveOptions = { prioMode, targetLength };
 
-    function solveNamedEdge(edgeKey, length, enabled) {
+    function solveNamedEdge(edgeKey, lengths, enabled) {
         if (!enabled) {
             return {
                 sections: [],
@@ -519,7 +577,7 @@ export function computeLayout(config) {
         }
 
         const needsDoor = doorEdges.has(edgeKey);
-        const edgeResult = solveEdge(length, needsDoor, {
+        const edgeResult = solveEdge(lengths.solver, needsDoor, {
             prioMode,
             targetLength,
             doorSize: doorSizeByEdge[edgeKey] ?? fallbackDoorSize
@@ -529,26 +587,64 @@ export function computeLayout(config) {
         const pins = manualSectionsByEdge[edgeKey];
         let finalSections = edgeResult.sections;
         if (pins && pins.length > 0 && edgeResult.valid && !needsDoor) {
-            const overridden = resolveEdgeWithPins(length, edgeResult.sections, pins, solveOptions);
+            const overridden = resolveEdgeWithPins(lengths.solver, edgeResult.sections, pins, solveOptions);
             if (overridden) finalSections = overridden;
         }
 
+        const diagnostics = {
+            valid: edgeResult.valid,
+            requestedDoorSize: edgeResult.requestedDoorSize,
+            resolvedDoorSize: edgeResult.resolvedDoorSize,
+            autoAdjusted: edgeResult.autoAdjusted,
+            errorCode: edgeResult.errorCode
+        };
+
+        const { warningLevel, warnings, suggestions } = buildEdgeWarningsAndSuggestions(
+            edgeKey,
+            lengths,
+            needsDoor,
+            diagnostics,
+            prioMode,
+            targetLength
+        );
+
         return {
             sections: finalSections,
-            diagnostics: {
-                valid: edgeResult.valid,
-                requestedDoorSize: edgeResult.requestedDoorSize,
-                resolvedDoorSize: edgeResult.resolvedDoorSize,
-                autoAdjusted: edgeResult.autoAdjusted,
-                errorCode: edgeResult.errorCode
-            }
+            diagnostics,
+            warningLevel,
+            warnings,
+            suggestions
         };
     }
 
-    const left = solveNamedEdge('left', depthLeft, true);
-    const right = solveNamedEdge('right', depthRight, true);
-    const front = solveNamedEdge('front', width, true);
-    const back = solveNamedEdge('back', width, includeBack);
+    const edges = {};
+    EDGE_KEYS.forEach(edgeKey => {
+        const requestedLength =
+            edgeKey === 'front' || edgeKey === 'back' ? width :
+                edgeKey === 'left' ? depthLeft : depthRight;
+
+        const effectiveLength = computeEdgeEffectiveLength(edgeKey, requestedLength);
+        const solverLength = computeEdgeSolverLength(edgeKey, effectiveLength);
+        const geometry = computeEdgeGeometry(edgeKey, requestedLength, effectiveLength, solverLength);
+
+        edges[edgeKey] = {
+            requestedLength,
+            effectiveLength,
+            solverLength,
+            geometry,
+            enabled:
+                edgeKey === 'front'
+                    ? true
+                    : edgeKey === 'back'
+                        ? includeBack && sideEdgesPresent
+                        : requestedLength > 0
+        };
+    });
+
+    const left = solveNamedEdge('left', { requested: edges.left.requestedLength, effective: edges.left.effectiveLength, solver: edges.left.solverLength }, edges.left.enabled);
+    const right = solveNamedEdge('right', { requested: edges.right.requestedLength, effective: edges.right.effectiveLength, solver: edges.right.solverLength }, edges.right.enabled);
+    const front = solveNamedEdge('front', { requested: edges.front.requestedLength, effective: edges.front.effectiveLength, solver: edges.front.solverLength }, edges.front.enabled);
+    const back = solveNamedEdge('back', { requested: edges.back.requestedLength, effective: edges.back.effectiveLength, solver: edges.back.solverLength }, edges.back.enabled);
 
     const leftEdge = left.sections;
     const rightEdge = right.sections;
@@ -564,22 +660,27 @@ export function computeLayout(config) {
     const hasInvalidEdges = Object.values(edgeDiagnostics).some((diag) => !diag.valid);
 
     const edgeSummaries = {
-        left: buildEdgeSummary('left', depthLeft, true, leftEdge, left.diagnostics),
-        right: buildEdgeSummary('right', depthRight, true, rightEdge, right.diagnostics),
-        front: buildEdgeSummary('front', width, true, frontEdge, front.diagnostics),
-        back: buildEdgeSummary('back', width, includeBack, backEdge, back.diagnostics)
+        left: buildEdgeSummary('left', { requested: depthLeft, effective: edges.left.effectiveLength, solver: edges.left.solverLength }, edges.left.geometry, edges.left.enabled, leftEdge, left.diagnostics),
+        right: buildEdgeSummary('right', { requested: depthRight, effective: edges.right.effectiveLength, solver: edges.right.solverLength }, edges.right.geometry, edges.right.enabled, rightEdge, right.diagnostics),
+        front: buildEdgeSummary('front', { requested: width, effective: edges.front.effectiveLength, solver: edges.front.solverLength }, edges.front.geometry, edges.front.enabled, frontEdge, front.diagnostics),
+        back: buildEdgeSummary('back', { requested: width, effective: edges.back.effectiveLength, solver: edges.back.solverLength }, edges.back.geometry, edges.back.enabled, backEdge, back.diagnostics)
     };
 
     const layoutWarnings = [];
     const suggestions = [];
     EDGE_KEYS.forEach((edgeKey) => {
-        if (edgeKey === 'back' && !includeBack) return;
-        const edgeLength = edgeKey === 'front' || edgeKey === 'back' ? width
-            : edgeKey === 'left' ? depthLeft : depthRight;
+        if (!edges[edgeKey].enabled) return;
         const needsDoor = doorEdges.has(edgeKey);
+        const lengths = {
+            requested: edges[edgeKey].requestedLength,
+            effective: edges[edgeKey].effectiveLength,
+            solver: edges[edgeKey].solverLength
+        };
+
+        // build warnings using the solver dimension logic wrapper inside to properly reflect actual solution boundaries
         const info = buildEdgeWarningsAndSuggestions(
             edgeKey,
-            edgeLength,
+            lengths,
             needsDoor,
             edgeDiagnostics[edgeKey],
             prioMode,
@@ -604,8 +705,27 @@ export function computeLayout(config) {
     });
 
     return {
+        requestedDimensions,
+        effectiveDimensions: {
+            front: edges.front.effectiveLength,
+            back: edges.back.effectiveLength,
+            left: edges.left.effectiveLength,
+            right: edges.right.effectiveLength,
+        },
+        solverDimensions: {
+            front: edges.front.solverLength,
+            back: edges.back.solverLength,
+            left: edges.left.solverLength,
+            right: edges.right.solverLength,
+        },
+        edgeGeometry: {
+            front: edges.front.geometry,
+            back: edges.back.geometry,
+            left: edges.left.geometry,
+            right: edges.right.geometry,
+        },
         width,
-        depth: sharedDepth,
+        depth: config.depth, // Raw config depth for backcompat in some parts of UI
         depthLeft,
         depthRight,
         targetLength,

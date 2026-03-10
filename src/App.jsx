@@ -7,6 +7,7 @@ import { Pricing } from './views/Pricing';
 import { SummaryExport } from './views/SummaryExport';
 import { InventoryManager } from './views/InventoryManager';
 import { SketchTool } from './views/SketchTool';
+import { Planner } from './views/Planner';
 import { useQuote } from './store/QuoteContext';
 import { useAuth } from './store/AuthContext';
 
@@ -63,7 +64,7 @@ function App() {
 
     return (
         <div className="min-h-screen bg-bg text-text-primary p-4 md:p-8 font-sans antialiased">
-            <div className="max-w-[1400px] mx-auto relative">
+            <div className={`${step === 4 ? 'max-w-[1920px]' : 'max-w-[1400px]'} mx-auto relative`}>
                 <Header currentStep={step} />
 
                 <main>
@@ -79,6 +80,7 @@ function App() {
                                     }
                                     : undefined
                             }
+                            onOpenPlanner={canViewEverything ? () => setStep('planner') : undefined}
                         />
                     )}
                     {canStartQuote && step === 1 && <ProductLineSelection onNext={() => setStep(2)} />}
@@ -124,6 +126,7 @@ function App() {
                     {canStartQuote && step === 4 && <SummaryExport onPrev={() => setStep(3)} />}
                     {canViewEverything && step === 'inventory' && <InventoryManager onBack={() => setStep(0)} />}
                     {canAccessSketch && step === 'sketch' && <SketchTool onBack={() => setStep(sketchBackStep)} />}
+                    {canViewEverything && step === 'planner' && <Planner onBack={() => setStep(0)} />}
                 </main>
             </div>
         </div>

@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { onAuthChange, login as firebaseLogin, logout as firebaseLogout } from '../services/authService';
-import { resolveAccessLevelFromUser } from '../../config/accessControl.shared.js';
+import { canAccessQuoteHistoryLevel, resolveAccessLevelFromUser } from '../../config/accessControl.shared.js';
 
 const AuthContext = createContext();
 
@@ -31,6 +31,7 @@ export function AuthProvider({ children }) {
     const canViewEverything = accessLevel === 'full';
     const canStartQuote = accessLevel === 'full' || accessLevel === 'quote-only';
     const canAccessSketch = accessLevel === 'full' || accessLevel === 'sketch-only';
+    const canAccessQuoteHistory = canAccessQuoteHistoryLevel(accessLevel);
     const canExportSketchToQuote = accessLevel === 'full';
 
     return (
@@ -41,6 +42,7 @@ export function AuthProvider({ children }) {
             canViewEverything,
             canStartQuote,
             canAccessSketch,
+            canAccessQuoteHistory,
             canExportSketchToQuote,
             login,
             logout

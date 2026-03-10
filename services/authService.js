@@ -5,7 +5,7 @@ import {
     signOut,
     onAuthStateChanged
 } from 'https://www.gstatic.com/firebasejs/10.9.0/firebase-auth.js';
-import { isFullAccessUser } from '../config/accessControl.shared.js';
+import { canAccessQuoteHistoryUser, isFullAccessUser } from '../config/accessControl.shared.js';
 
 /**
  * Get the currently signed-in user (or null).
@@ -63,6 +63,13 @@ export function hasFullAccess(user) {
 }
 
 /**
+ * True when user may access quote history (admins + quote-only users).
+ */
+export function hasQuoteHistoryAccess(user) {
+    return canAccessQuoteHistoryUser(user);
+}
+
+/**
  * Full-access gate: redirects to login.html if signed out,
  * and to redirectTo if signed in without full access.
  */
@@ -76,6 +83,29 @@ export function requireFullAccess({ redirectTo = 'index.html' } = {}) {
             }
 
             if (!hasFullAccess(user)) {
+                window.location.href = redirectTo;
+                return;
+            }
+
+            resolve(user);
+        });
+    });
+}
+
+/**
+ * Quote-history gate: redirects to login.html if signed out,
+ * and to redirectTo if signed in without quote-history access.
+ */
+export function requireQuoteHistoryAccess({ redirectTo = 'index.html' } = {}) {
+    return new Promise((resolve) => {
+        const unsubscribe = onAuthStateChanged(auth, (user) => {
+            unsubscribe();
+            if (!user) {
+                window.location.href = 'login.html';
+                return;
+            }
+
+            if (!hasQuoteHistoryAccess(user)) {
                 window.location.href = redirectTo;
                 return;
             }

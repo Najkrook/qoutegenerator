@@ -33,6 +33,10 @@ service cloud.firestore {
       allow read, create, delete: if isSignedIn() && request.auth.uid == userId;
     }
 
+    match /planner_projects/{projectId} {
+      allow read, write: if isAdmin();
+    }
+
     // Allow admins to read all templates via collectionGroup queries
     match /{path=**}/templates/{templateId} {
       allow read: if isAdmin();

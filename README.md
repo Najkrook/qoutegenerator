@@ -1,71 +1,94 @@
-﻿# QuoteGenerator
+# QuoteGenerator
 
 ## What This Repo Is
-QuoteGenerator is an internal quote and inventory application for BRIXX.
+QuoteGenerator is an internal quote, sketch, and inventory application for BRIXX.
 
-The active application in `main` is a React + Vite SPA with Firebase integration (Auth + Firestore). Legacy files are still present for reference, but they are not the default development path.
+The primary UI is a React + Vite app under `src/`, but the current runtime is still hybrid:
 
-## Quick Start (Recommended: React + Vite)
+- `src/` contains the main SPA entrypoint, views, context providers, and client-facing services.
+- Shared root-level modules under `features/`, `services/`, and `config/` are still part of the active app.
+- `login.html`, `history.html`, and `inventory-logs.html` remain active entrypoints.
+- `index_legacy.html` and the older root app shell are the true legacy/reference layer.
+
+This repository should not be treated as a fully isolated `src/`-only app yet.
+
+## Quick Start
 ### Prerequisites
 - Node.js 20+ (LTS recommended)
 - npm 10+
 
 ### Run locally
+From `QuoteGenerator/`, run:
+
 ```powershell
-cd C:\Users\rooki\Documents\Antigravity\QuoteGenerator
+cd .\QuoteGenerator
 npm install
 npm run dev
 ```
 
-Default Vite dev URL:
-- `http://localhost:5173` (unless overridden by local config/port conflict)
+If PowerShell execution policy blocks `npm.ps1`, use `cmd /c npm ...` instead:
 
-Firebase note:
-- The app expects valid Firebase project configuration in the codebase/runtime environment.
-- Never commit secrets or private credential files.
+```powershell
+cd .\QuoteGenerator
+cmd /c npm install
+cmd /c npm run dev
+```
+
+Default Vite dev URL:
+- `http://localhost:5173` unless Vite selects a different port
+
+## Firebase Setup
+The Firebase web app client config is currently checked into `src/services/firebase.js`.
+
+- This client-side config is not the same thing as Firebase Admin credentials.
+- Admin or service-account credentials are only required for admin scripts such as `scripts/backfill-quote-metadata.mjs`.
+- Do not commit secrets or private credential files.
 
 ## Available Scripts
-From the repository root:
+From `QuoteGenerator/`:
 
-- `npm run dev`: Start local Vite dev server.
-- `npm run build`: Create production build in `dist/`.
-- `npm run preview`: Preview production build locally.
+- `npm run dev`: Start the local Vite dev server.
+- `npm run build`: Create a production build in `dist/`.
+- `npm run preview`: Preview the production build locally.
 - `npm run test`: Run Vitest in interactive mode.
 - `npm run test:watch`: Run Vitest in watch mode.
-- `npm run test:run`: Run Vitest once (basic reporter).
+- `npm run test:run`: Run Vitest once with the basic reporter.
 
 ## Environment & Secrets
 Do not commit secrets or local-only credentials.
 
 Common sensitive/local files include:
-- `.env`, `.env.*`, `*.env`
+- `.env`
+- `.env.*`
+- `*.env`
 - `API_keys.env`
 - `credentials.json`
 - `token.json`
 - `token.pickle`
 
 Before pushing, run:
+
 ```powershell
 git status
 git ls-files
 powershell -ExecutionPolicy Bypass -File .\scripts\verify-git-safety.ps1
 ```
 
-## Project Structure (Current App)
-Main runtime code lives under `src/`:
+## Project Structure
+Current active directories:
 
-- `src/views/`: Step-level application views.
-- `src/components/`: Reusable UI building blocks.
-- `src/store/`: Global app state/context (`AuthContext`, `QuoteContext`).
-- `src/services/`: Firebase and domain service integrations.
-- `src/utils/`: Shared helpers and calculation logic.
-- `src/data/`: Catalog and static data.
-- `src/config/`: Shared UI/config utilities.
+- `src/`: React app entrypoint, views, contexts, client-side services, utilities, and catalog data.
+- `features/`: Shared export and legacy-interoperability modules still used by the React app.
+- `services/`: Shared domain and data modules used by current app code and tests.
+- `config/`: Shared access-control and template configuration.
+- `tests/`: Vitest coverage for calculations, repositories, exports, and UI text.
+- `scripts/`: Maintenance and safety scripts.
+- `integrations/scrive-proxy/`: Disabled/reference Scrive integration scaffold.
 
-Legacy files also exist in repository root (see Legacy section), but are not the primary app path.
+The active application still pulls code from both `src/` and selected root-level modules.
 
 ## Core Workflow
-The app uses state-driven navigation (not URL routing) and follows this quote flow:
+The quote flow uses state-driven navigation rather than URL routing:
 
 1. Dashboard
 2. Product Line Selection
@@ -73,8 +96,14 @@ The app uses state-driven navigation (not URL routing) and follows this quote fl
 4. Pricing
 5. Summary Export
 
-## Testing and Build
-Recommended validation before opening or merging a PR:
+Other active paths:
+
+- Inventory management is an admin-only branch from the dashboard.
+- Sketch mode is a separate branch from the dashboard.
+- Quote history and inventory logs are accessed through dedicated HTML pages and header links, not the main stepper.
+
+## Useful Local Checks
+Useful local validation commands:
 
 ```powershell
 npm run test:run
@@ -82,25 +111,26 @@ npm run build
 ```
 
 Note:
-- Vite may warn about large chunk sizes during build. This is informational unless your release policy says otherwise.
+- Vite may warn about large chunk sizes during build. Treat that as informational unless a release decision depends on it.
 
 ## Security and Git Safety
-Baseline team policy:
+Baseline team practice:
 
 1. Never commit secrets or local runtime files.
-2. Use PR-based changes into `main` (avoid direct pushes to `main`).
+2. Prefer branch and PR-based changes into `main`.
 3. Run the safety script before push:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\scripts\verify-git-safety.ps1
 ```
 
-## Access Roles (UID Based)
-Role mapping is currently maintained in code via Firebase Auth UID allowlists in `config/accessControl.shared.js`.
+## Access Roles
+Access control is maintained in `config/accessControl.shared.js` using Firebase Auth UID allowlists.
 
-- `full`: admin access to all app areas.
-- `quote-only`: default signed-in access to quote flow only.
-- `sketch-only`: dashboard + `Rita Uteservering` only.
+- `full`: admin-level access, including inventory management and inventory logs.
+- `quote-only`: quote flow plus quote history.
+- `sketch-only`: dashboard plus the sketch tool only.
+- `guest`: not signed in / no UID.
 
 Role precedence:
 
@@ -110,46 +140,61 @@ Role precedence:
 4. Otherwise -> `quote-only`
 
 Notes:
-- `sketch-only` users cannot export sketch data into quote flow (`Exportera till Offert` is disabled).
-- Keep UID lists minimal and review them regularly.
+- `sketch-only` users cannot enter the quote flow.
+- `quote-only` users can access `Mina Offerter`.
+- Keep UID allowlists minimal and review them when access changes.
 
 ## Firestore Rules and Deploy Notes
-This repository includes `firestore.rules` with the intended baseline:
+The checked-in `firestore.rules` file currently allows:
 
-- Users can only access their own quotes: `/users/{uid}/quotes/*`
-- Users can only access their own quote revisions: `/users/{uid}/quotes/*/revisions/*`
-- Inventory and inventory logs are admin-only: `/stock/*`, `/inventory_logs/*`
-- All other document paths are denied
+- `/users/{uid}/quotes/{quoteId}` for the signed-in owner
+- `/users/{uid}/quotes/{quoteId}/revisions/{revisionId}` for the signed-in owner
+- `/users/{uid}/templates/{templateId}` for the signed-in owner
+- `/stock/{docId}` for admins
+- `/inventory_logs/{logId}` for admins
+- admin read access to `templates` through collection-group queries
+- all other document paths denied
 
 Before deploy:
 
-1. Replace `UID_ADMIN_1..3` values in `firestore.rules` with real Firebase Auth UIDs.
-2. Deploy rules via Firebase Console or Firebase CLI.
+1. If admin UIDs change, keep `firestore.rules` and `config/accessControl.shared.js` synchronized.
+2. Deploy rules through Firebase Console or Firebase CLI.
 
-Quote lifecycle notes:
-- Lifecycle is enabled by default.
-- You can disable locally with `window.FEATURE_QUOTE_LIFECYCLE = false` (set before app scripts run).
+## Quote Lifecycle and Backfill
+Quote lifecycle is enabled by default.
+
+- You can disable it locally with `window.FEATURE_QUOTE_LIFECYCLE = false` before app scripts run.
 - Optional metadata backfill script:
 
 ```powershell
 node .\scripts\backfill-quote-metadata.mjs
 ```
 
-Requires Firebase Admin credentials (`GOOGLE_APPLICATION_CREDENTIALS` or `FIREBASE_SERVICE_ACCOUNT_JSON`).
+The backfill script requires Firebase Admin credentials via `GOOGLE_APPLICATION_CREDENTIALS` or `FIREBASE_SERVICE_ACCOUNT_JSON`.
 
-Scrive integration notes:
-- Scrive UI/actions are currently disabled.
+## Scrive Notes
+Scrive support is currently reference-only:
+
+- Scrive UI/actions are disabled.
 - Existing Scrive metadata fields are retained for backward compatibility.
-- `integrations/scrive-proxy/` remains as reference scaffold.
+- `integrations/scrive-proxy/` remains a reference scaffold rather than an active runtime dependency.
 
-## Legacy/Reference Notes (Non-default)
-These are kept for reference, fallback, or historical context. They are not the default development workflow.
+## Legacy and Reference Notes
+Actual legacy/reference assets:
 
-- `server.py` and `start_server.bat`: legacy local server tooling.
-- `index_legacy.html`: legacy UI entrypoint retained for rollback/reference.
-- Some legacy modules under root `features/`/`services/` still exist alongside modern `src/` implementation.
+- `index_legacy.html`
+- older root shell files such as `app.js` and `data.js`
+- `server.py`
+- `start_server.bat`
+- `start_tunnel.py`
 
-Use React + Vite (`npm run dev`) unless you are explicitly debugging legacy behavior.
+Still-active shared code:
+
+- `features/`
+- `services/`
+- `config/`
+
+Use `npm run dev` for normal development unless you are intentionally debugging the older shell.
 
 ## Branch and Contribution Flow
 Typical workflow:
@@ -157,13 +202,13 @@ Typical workflow:
 ```powershell
 git checkout main
 git pull
-git checkout -b fix/<short-name>
+git checkout -b docs/readme-sync
 # make changes
 npm run test:run
 npm run build
 git add .
-git commit -m "Describe change"
-git push -u origin fix/<short-name>
+git commit -m "Sync QuoteGenerator README with current repo"
+git push -u origin docs/readme-sync
 ```
 
-Then open a PR to `main` in GitHub.
+Then open a PR to `main`.

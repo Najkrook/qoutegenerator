@@ -13,7 +13,7 @@ import {
     writeBatch,
     runTransaction
 } from './services/firebase.js';
-import { currentUser, onAuthChange, logout, requireFullAccess, hasFullAccess } from './services/authService.js';
+import { currentUser, onAuthChange, logout, requireQuoteHistoryAccess, hasQuoteHistoryAccess } from './services/authService.js';
 import { createQuoteRepository, normalizeQuoteStatus } from './services/quoteRepository.js';
 import { escapeHtml } from './features/utils.js';
 import { initNotifications, notifyError, notifyInfo, notifySuccess, confirmAction } from './services/notificationService.js';
@@ -411,7 +411,7 @@ onAuthChange((user) => {
         return;
     }
 
-    if (!hasFullAccess(user)) {
+    if (!hasQuoteHistoryAccess(user)) {
         window.location.href = 'index.html';
         return;
     }
@@ -421,9 +421,9 @@ onAuthChange((user) => {
 
 document.addEventListener('DOMContentLoaded', async () => {
     try {
-        await requireFullAccess({ redirectTo: 'index.html' });
+        await requireQuoteHistoryAccess({ redirectTo: 'index.html' });
     } catch (err) {
-        console.error('Full-access check failed:', err);
+        console.error('Quote-history access check failed:', err);
         window.location.href = 'login.html';
         return;
     }

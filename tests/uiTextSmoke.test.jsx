@@ -7,6 +7,7 @@ const authState = vi.hoisted(() => ({
         canViewEverything: false,
         canStartQuote: false,
         canAccessSketch: false,
+        canAccessQuoteHistory: false,
         canExportSketchToQuote: false
     }
 }));
@@ -30,6 +31,7 @@ const quoteState = vi.hoisted(() => ({
                 date: '',
                 validity: '30 dagar'
             },
+            step: 0,
             inventoryData: { bahama: [], clickitup: {} },
             cloudInventoryData: { bahama: [], clickitup: {} },
             sketchDraft: null,
@@ -78,6 +80,7 @@ vi.mock('react-hot-toast', () => ({
 }));
 
 import { Dashboard } from '../src/views/Dashboard.jsx';
+import { Header } from '../src/components/layout/Header.jsx';
 import { SketchBom } from '../src/components/features/SketchBom.jsx';
 import { SketchTool } from '../src/views/SketchTool.jsx';
 
@@ -87,6 +90,7 @@ describe('UI text smoke', () => {
             canViewEverything: false,
             canStartQuote: false,
             canAccessSketch: false,
+            canAccessQuoteHistory: false,
             canExportSketchToQuote: false
         };
         quoteState.value = {
@@ -107,6 +111,7 @@ describe('UI text smoke', () => {
                     date: '',
                     validity: '30 dagar'
                 },
+                step: 0,
                 inventoryData: { bahama: [], clickitup: {} },
                 cloudInventoryData: { bahama: [], clickitup: {} },
                 sketchDraft: null,
@@ -121,6 +126,7 @@ describe('UI text smoke', () => {
             canViewEverything: false,
             canStartQuote: true,
             canAccessSketch: false,
+            canAccessQuoteHistory: true,
             canExportSketchToQuote: false
         };
 
@@ -137,6 +143,7 @@ describe('UI text smoke', () => {
             canViewEverything: false,
             canStartQuote: false,
             canAccessSketch: true,
+            canAccessQuoteHistory: false,
             canExportSketchToQuote: false
         };
 
@@ -153,6 +160,7 @@ describe('UI text smoke', () => {
             canViewEverything: true,
             canStartQuote: true,
             canAccessSketch: true,
+            canAccessQuoteHistory: true,
             canExportSketchToQuote: true
         };
 
@@ -190,11 +198,35 @@ describe('UI text smoke', () => {
         expect(html).toContain('Export till Offert ej tillgänglig');
     });
 
+    it('renders Mina Offerter for quote-only users without Lagerloggar', () => {
+        authState.value = {
+            canViewEverything: false,
+            canStartQuote: true,
+            canAccessSketch: false,
+            canAccessQuoteHistory: true,
+            canExportSketchToQuote: false,
+            user: { email: 'sales@example.com' }
+        };
+        quoteState.value = {
+            state: {
+                ...quoteState.value.state,
+                step: 1
+            },
+            dispatch: vi.fn()
+        };
+
+        const html = renderToStaticMarkup(<Header />);
+
+        expect(html).toContain('Mina Offerter');
+        expect(html).not.toContain('Lagerloggar');
+    });
+
     it('renders SketchTool header copy correctly', () => {
         authState.value = {
             canViewEverything: true,
             canStartQuote: true,
             canAccessSketch: true,
+            canAccessQuoteHistory: true,
             canExportSketchToQuote: true
         };
 
