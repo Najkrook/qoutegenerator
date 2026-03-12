@@ -8,12 +8,15 @@ import { SummaryExport } from './views/SummaryExport';
 import { InventoryManager } from './views/InventoryManager';
 import { SketchTool } from './views/SketchTool';
 import { Planner } from './views/Planner';
+import { History } from './views/History';
+import { InventoryLogs } from './views/InventoryLogs';
+import { Login } from './views/Login';
 import { useQuote } from './store/QuoteContext';
 import { useAuth } from './store/AuthContext';
 
 function App() {
     const { state, dispatch } = useQuote();
-    const { user, loading, canViewEverything, canStartQuote, canAccessSketch } = useAuth();
+    const { user, loading, canViewEverything, canStartQuote, canAccessSketch, canAccessQuoteHistory } = useAuth();
     const { step } = state;
     const [sketchBackStep, setSketchBackStep] = useState(0);
 
@@ -22,9 +25,7 @@ function App() {
     };
 
     useEffect(() => {
-        if (!loading && !user) {
-            window.location.replace('login.html');
-        }
+        // Auth state changes are handled reactively by rendering <Login /> when !user
     }, [loading, user]);
 
     useEffect(() => {
@@ -43,8 +44,19 @@ function App() {
 
         if (isQuoteFlowStep && !canStartQuote) {
             dispatch({ type: 'SET_STEP', payload: 0 });
+            return;
         }
-    }, [loading, user, canViewEverything, canStartQuote, canAccessSketch, step, dispatch]);
+
+        if (step === 'history' && !canAccessQuoteHistory) {
+            dispatch({ type: 'SET_STEP', payload: 0 });
+            return;
+        }
+
+        if (step === 'inventory-logs' && !canViewEverything) {
+            dispatch({ type: 'SET_STEP', payload: 0 });
+            return;
+        }
+    }, [loading, user, canViewEverything, canStartQuote, canAccessSketch, canAccessQuoteHistory, step, dispatch]);
 
     if (loading) {
         return (
@@ -55,11 +67,7 @@ function App() {
     }
 
     if (!user) {
-        return (
-            <div className="min-h-screen bg-bg text-text-primary flex items-center justify-center">
-                <p className="text-text-secondary text-sm">Omdirigerar till inloggning...</p>
-            </div>
-        );
+        return <Login />;
     }
 
     return (
@@ -139,6 +147,15 @@ function App() {
                     {canViewEverything && step === 'inventory' && <InventoryManager onBack={() => setStep(0)} />}
                     {canAccessSketch && step === 'sketch' && <SketchTool onBack={() => setStep(sketchBackStep)} />}
                     {canViewEverything && step === 'planner' && <Planner onBack={() => setStep(0)} />}
+                    {canAccessQuoteHistory && step === 'history' && (
+                        <History 
+                            onBack={() => setStep(0)} 
+                            onOpenQuote={(payload) => {
+                                dispatch({ type: 'HYDRATE_STATE', payload: { ...payload, step: 1 } });
+                            }} 
+                        />
+                    )}
+                    {canViewEverything && step === 'inventory-logs' && <InventoryLogs onBack={() => setStep(0)} />}
                 </main>
             </div>
         </div>

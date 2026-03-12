@@ -21,7 +21,7 @@ export function Header() {
 
     const handleLogout = async () => {
         await logout();
-        window.location.href = 'login.html';
+        dispatch({ type: 'SET_STEP', payload: 0 });
     };
 
     return (
@@ -58,15 +58,23 @@ export function Header() {
 
                 <div className="flex items-center gap-3">
                     {canAccessQuoteHistory && (
-                        <a href="history.html" className="text-text-primary no-underline font-medium text-sm bg-panel-bg px-3 py-1.5 rounded-md border border-panel-border transition-colors hover:bg-panel-border">
+                        <button 
+                            type="button" 
+                            onClick={() => dispatch({ type: 'SET_STEP', payload: 'history' })} 
+                            className={`text-text-primary no-underline font-medium text-sm px-3 py-1.5 rounded-md border transition-colors cursor-pointer ${step === 'history' ? 'bg-panel-border border-panel-border' : 'bg-panel-bg border-panel-border hover:bg-panel-border'}`}
+                        >
                             Mina Offerter
-                        </a>
+                        </button>
                     )}
 
                     {canViewEverything && (
-                        <a href="inventory-logs.html" className="text-text-primary no-underline font-medium text-sm bg-panel-bg px-3 py-1.5 rounded-md border border-panel-border transition-colors hover:bg-panel-border">
+                        <button 
+                            type="button" 
+                            onClick={() => dispatch({ type: 'SET_STEP', payload: 'inventory-logs' })} 
+                            className={`text-text-primary no-underline font-medium text-sm px-3 py-1.5 rounded-md border transition-colors cursor-pointer ${step === 'inventory-logs' ? 'bg-panel-border border-panel-border' : 'bg-panel-bg border-panel-border hover:bg-panel-border'}`}
+                        >
                             Lagerloggar
-                        </a>
+                        </button>
                     )}
 
                     <div className="flex items-center gap-2 bg-panel-bg px-3 py-1.5 rounded-md border border-panel-border text-sm">

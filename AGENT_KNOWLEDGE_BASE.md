@@ -4,16 +4,16 @@ This file exists to help future agents understand the actual `QuoteGenerator` pr
 
 Last verified: `2026-03-10`
 
-`QuoteGenerator` is a hybrid repo. Some active runtime logic lives under `src/`, but active shared logic also still lives under root `features/`, `services/`, and `config/`. Several HTML entrypoints remain active. `README.md` is useful for human onboarding; this file is the deeper agent map.
+`QuoteGenerator` is a React SPA repository. All active runtime logic lives under `src/`. `README.md` is useful for human onboarding; this file is the deeper agent map.
 
 ## Executive Snapshot
 - Internal quote, inventory, sketch, and planner portal for BRIXX.
 - Main frontend stack is React 19 + Vite 5 + Tailwind 4 + Firebase Auth/Firestore.
-- Runtime architecture is hybrid: one React app plus several separate HTML pages and root-level JS modules.
+- Runtime architecture is a unified React Single Page Application (SPA).
 - In-progress quote state is persisted in localStorage under `offertverktyg_state`.
 - Persistent backend data lives in Firestore for quotes, revisions, templates, inventory, and inventory logs.
-- Access control is UID-based and resolved in `config/accessControl.shared.js`.
-- Quote persistence and revisioning are centralized in root `services/quoteRepository.js`, not in `src/` alone.
+- Access control is UID-based and resolved in `src/config/accessControl.shared.js`.
+- Quote persistence and revisioning are centralized in `src/services/quoteRepository.js`.
 - The repo is not fully healthy: `npm run test:run` currently fails in `tests/exportDataBuilders.test.js`.
 - CI exists in `.github/workflows/ci.yml` and runs the same failing test command.
 - The new Planner UI writes to `users/{uid}/planner_projects`, but current `firestore.rules` do not allow that collection.
@@ -32,25 +32,7 @@ Primary active React runtime.
 - `src/utils/` contains sketch geometry and client helpers.
 - `src/data/` contains catalog data.
 
-### `features/`
-Active shared code, not just history.
 
-- Export logic and older interoperability live here.
-- Modern React views still import from this directory.
-- Example: `src/views/SummaryExport.jsx` imports `../../features/pdfExport` and `../../features/excelExport`.
-
-### `services/`
-Active shared code plus root-page support.
-
-- This directory contains the authoritative quote repository and shared domain logic.
-- Root HTML pages import from here directly.
-- Modern React code also still reaches into it for calculations and repository behavior.
-
-### `config/`
-Active shared configuration.
-
-- Access control lives in `config/accessControl.shared.js`.
-- Built-in legal templates live in `config/legalTemplates.shared.js`.
 
 ### `tests/`
 Vitest coverage.
@@ -74,34 +56,22 @@ Reference or scaffold code.
 ### `styles/`
 Support for root HTML pages and older DOM-driven surfaces.
 
-- Still relevant for `history.html`, `inventory-logs.html`, and older surfaces.
+- `styles/` has been removed as it was only relevant to legacy HTML entry points.
 
 ### Root HTML files
-These are operationally important.
-
-- `index.html` is the main React app shell.
-- `login.html`, `history.html`, and `inventory-logs.html` are active separate pages.
-- `index_legacy.html` is still built and should be treated as reference or rollback territory.
+- `index.html` is the only active entry point, serving the React Single Page Application.
+- Older legacy entry points (`index_legacy.html`, `login.html`, `history.html`, `inventory-logs.html`) have been removed.
 
 ## Active Entry Points and Build Inputs
-`vite.config.js` defines a multi-page build. This repo is not an SPA-only build.
-
-| Entrypoint | Purpose | Runtime style | Access expectations | Key script/module |
-| --- | --- | --- | --- | --- |
-| `index.html` | Main app shell for dashboard, quote flow, inventory, sketch, planner | React-driven | Redirects unauthenticated users to `login.html` via `src/App.jsx` | `src/main.jsx` |
-| `login.html` | Email/password login page | DOM-driven page with inline module script | Public entrypoint; redirects signed-in users to `index.html` | Inline module in `login.html`, importing `services/authService.js` |
-| `history.html` | Quote history and revision browsing | DOM-driven page | Intended for quote-history-capable users, but currently contains a stale full-access precheck as well | `history.js` plus inline auth script |
-| `inventory-logs.html` | Inventory audit log browsing | DOM-driven page | Full-access only | `inventoryLogs.js` |
-| `index_legacy.html` | Older app shell / rollback reference | Legacy DOM-driven page | Treat as reference unless explicitly debugging legacy behavior | Legacy root scripts |
+`vite.config.js` defines a single robust build around `index.html`.
 
 Operational notes:
 
-- `vite.config.js` builds all five pages.
-- `index.html` also loads CDN dependencies for legacy export paths such as jsPDF, `xlsx`, and `html2canvas`.
-- `history.html` still includes `data.js` in addition to `history.js`.
+- `vite.config.js` builds exclusively `index.html`.
+- `index.html` also loads CDN dependencies for export paths such as jsPDF, `xlsx`, and `html2canvas`.
 
 ## Runtime Architecture
-The codebase is a mixed modern-plus-shared system, not a cleanly separated migration.
+The codebase completes the migration to a modern, separated React architecture.
 
 ### React shell
 - `src/main.jsx` wraps the app with `AuthProvider` and `QuoteProvider`.
@@ -109,34 +79,17 @@ The codebase is a mixed modern-plus-shared system, not a cleanly separated migra
 - Numeric steps `1` through `4` represent the quote flow.
 - String steps such as `inventory`, `sketch`, and `planner` represent side branches.
 
-### Shared root modules still in use
-- Modern React views still import from root `features/` and `services/`.
-- `src/views/SummaryExport.jsx` imports:
-  - `../../services/calculationEngine`
-  - `../../features/pdfExport`
-  - `../../features/excelExport`
-- `src/services/quoteRepositoryClient.js` imports `../../services/quoteRepository`.
-- `src/components/features/FinalSummaryTable.jsx` and `src/components/features/PricingTable.jsx` also use root calculation logic.
+### Shared internal modules
+- All internal module dependencies are contained within `src/` (e.g., `src/features/` and `src/services/`).
 
-### Duplicate service layers
-There are two parallel service stacks:
-
-- `src/services/*` for the React app
-- root `services/*` for legacy pages and shared repository/helpers
-
-Important examples:
-
-- `src/services/firebase.js` uses the installed Firebase package.
-- `services/firebase.js` uses Firebase CDN modules.
-- `src/services/authService.js` is the React auth wrapper.
-- `services/authService.js` is used by root pages like `login.html`, `history.js`, and `inventoryLogs.js`.
-
-This means edits to auth or Firebase behavior may need to be made twice, or at least checked in both layers.
+### Service layers
+- The application relies on `src/services/firebase.js` using the installed Firebase package.
+- `src/services/authService.js` is the React auth wrapper and acts as the sole authentication mechanism for the dashboard and quote routes.
 
 ### Direct answers for future agents
-- If you change quote calculations, start in `services/calculationEngine.js`.
-- If you change save or revision behavior, start in `services/quoteRepository.js`, then check `src/services/quoteSaveService.js` and `src/services/quoteRepositoryClient.js`.
-- This project is not routed in the React-router sense. `src/App.jsx` switches views by state, and separate HTML pages handle login/history/logs.
+- If you change quote calculations, start in `src/services/calculationEngine.js`.
+- If you change save or revision behavior, start in `src/services/quoteRepository.js`, then check `src/services/quoteSaveService.js` and `src/services/quoteRepositoryClient.js`.
+- This project uses a state-driven view-switching architecture inside the single React SPA. `src/App.jsx` dynamically renders `Login`, `Quote History`, and `Inventory Logs` alongside other dashboard/quote flows.
 
 ## Main User Flows
 

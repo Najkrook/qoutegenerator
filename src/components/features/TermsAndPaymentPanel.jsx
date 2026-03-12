@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useMemo, useState, useCallback } from 'react';
+import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import { useQuote } from '../../store/QuoteContext';
 import { useAuth } from '../../store/AuthContext';
 import {
@@ -12,7 +12,7 @@ import {
     fetchAllTemplates,
     saveTemplate,
     deleteTemplate
-} from '../services/templateService.js';
+} from '../../services/templateService.js';
 import toast from 'react-hot-toast';
 
 function normalizePositiveInt(value, fallback) {

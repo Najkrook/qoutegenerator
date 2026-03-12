@@ -18,11 +18,7 @@ export default defineConfig({
         sourcemap: true,
         rollupOptions: {
             input: {
-                main: resolve(__dirname, 'index.html'),
-                login: resolve(__dirname, 'login.html'),
-                history: resolve(__dirname, 'history.html'),
-                inventoryLogs: resolve(__dirname, 'inventory-logs.html'),
-                indexLegacy: resolve(__dirname, 'index_legacy.html')
+                main: resolve(__dirname, 'index.html')
             }
         }
     }

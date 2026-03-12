@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { onAuthChange, login as firebaseLogin, logout as firebaseLogout } from './services/authService';
+import { onAuthChange, login as firebaseLogin, logout as firebaseLogout } from '../services/authService';
 import { canAccessQuoteHistoryLevel, resolveAccessLevelFromUser } from '../config/accessControl.shared.js';
 
 const AuthContext = createContext();

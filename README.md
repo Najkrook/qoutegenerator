@@ -3,14 +3,13 @@
 ## What This Repo Is
 QuoteGenerator is an internal quote, sketch, and inventory application for BRIXX.
 
-The primary UI is a React + Vite app under `src/`, but the current runtime is still hybrid:
+The primary UI is a React + Vite Single Page Application (SPA) under `src/`.
 
-- `src/` contains the main SPA entrypoint, views, context providers, and client-facing services.
-- Shared root-level modules under `features/`, `services/`, and `config/` are still part of the active app.
-- `login.html`, `history.html`, and `inventory-logs.html` remain active entrypoints.
-- `index_legacy.html` and the older root app shell are the true legacy/reference layer.
+- `src/` contains the main entrypoint, views, context providers, client-facing services, configuration, and data models.
+- The application uses context-based routing to handle navigation to features like Login, Quote History, and Inventory Logs.
+- Legacy vanilla JS files and multi-page HTML entrypoints have been removed to consolidate the architecture.
 
-This repository should not be treated as a fully isolated `src/`-only app yet.
+This repository is a fully isolated `src/`-only React SPA environment.
 
 ## Quick Start
 ### Prerequisites
@@ -77,15 +76,12 @@ powershell -ExecutionPolicy Bypass -File .\scripts\verify-git-safety.ps1
 ## Project Structure
 Current active directories:
 
-- `src/`: React app entrypoint, views, contexts, client-side services, utilities, and catalog data.
-- `features/`: Shared export and legacy-interoperability modules still used by the React app.
-- `services/`: Shared domain and data modules used by current app code and tests.
-- `config/`: Shared access-control and template configuration.
+- `src/`: React app entrypoint, views, contexts, client-side services, utilities, and catalog data. Contains migrated `features/`, `services/`, and `config/` directories.
 - `tests/`: Vitest coverage for calculations, repositories, exports, and UI text.
 - `scripts/`: Maintenance and safety scripts.
 - `integrations/scrive-proxy/`: Disabled/reference Scrive integration scaffold.
 
-The active application still pulls code from both `src/` and selected root-level modules.
+The active application is fully encapsulated within the `src/` directory.
 
 ## Core Workflow
 The quote flow uses state-driven navigation rather than URL routing:

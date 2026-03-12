@@ -1,9 +1,11 @@
-﻿import React, { createContext, useContext, useReducer, useEffect } from 'react';
-import { DEFAULT_TEMPLATE_ID, isBuiltinTemplateId, getTemplateById } from '../config/legalTemplates.shared.js';
+import React, { createContext, useContext, useReducer, useEffect } from 'react';
+import {
+    QUOTE_STATE_STORAGE_KEY,
+    createInitialQuoteState,
+    hydrateQuoteState
+} from './quoteStateSchema.js';
 
 const QuoteContext = createContext();
-
-const STORAGE_KEY = 'offertverktyg_state';
 
 function normalizePositiveInt(value, fallback) {
     const parsed = Number.parseInt(value, 10);
@@ -21,88 +23,16 @@ function formatValidityLabel(days) {
     return `${days} dagar`;
 }
 
-function normalizePdfOptions(state) {
-    // Accept any template ID (built-in or custom Firestore ID) — fallback to default if empty
-    const safeTemplateId = state.termsTemplateId || DEFAULT_TEMPLATE_ID;
-    const template = isBuiltinTemplateId(safeTemplateId) ? getTemplateById(safeTemplateId) : null;
+const initialState = createInitialQuoteState();
 
-    const customerInfoSource = state.customerInfo || {};
-    const validityFromCustomer = parseValidityDays(customerInfoSource.validity);
-    const normalizedValidityDays = normalizePositiveInt(
-        state.quoteValidityDays,
-        validityFromCustomer || 30
-    );
-
-    return {
-        ...state,
-        customerInfo: {
-            ...customerInfoSource,
-            validity: formatValidityLabel(normalizedValidityDays)
-        },
-        includeTerms: state.includeTerms !== false,
-        termsTemplateId: safeTemplateId,
-        termsText: typeof state.termsText === 'string' && state.termsText.trim().length > 0
-            ? state.termsText
-            : (template?.body || ''),
-        termsCustomized: typeof state.termsCustomized === 'boolean' ? state.termsCustomized : false,
-        includeSignatureBlock: state.includeSignatureBlock === true,
-        includePaymentBox: state.includePaymentBox === true,
-        paymentTermsDays: normalizePositiveInt(state.paymentTermsDays, 30),
-        quoteValidityDays: normalizedValidityDays
-    };
-}
-
-const initialState = normalizePdfOptions({
-    step: 0,
-    selectedLines: [],
-    builderItems: [],
-    gridSelections: {},
-    customCosts: [],
-    includesVat: false,
-    globalDiscountPct: 0,
-    prevGlobalDiscountPct: 0,
-    exchangeRate: 12.2,
-    customerInfo: {
-        name: '',
-        company: '',
-        email: '',
-        reference: '',
-        date: '',
-        validity: '30 dagar'
-    },
-    inventoryData: { bahama: [], clickitup: {} },
-    cloudInventoryData: { bahama: [], clickitup: {} },
-    sketchDraft: null,
-    sketchMeta: { addedBahamaLine: false },
-    inventoryBasket: [],
-    activeQuoteId: null,
-    activeQuoteVersion: 0,
-    quoteStatus: 'draft',
-    includeTerms: true,
-    termsText: '',
-    termsTemplateId: DEFAULT_TEMPLATE_ID,
-    termsCustomized: false,
-    includeSignatureBlock: false,
-    includePaymentBox: false,
-    paymentTermsDays: 30,
-    quoteValidityDays: 30,
-    scriveEnabled: false,
-    scriveStatus: 'not_sent',
-    scriveDocumentId: null,
-    scriveSignerName: '',
-    scriveSignerEmail: '',
-    scriveLastError: null,
-    scriveSentAtMs: null,
-    scriveLastEventAtMs: null,
-    scriveCompletedAtMs: null
-});
-
-function quoteReducer(state, action) {
+export function quoteReducer(state, action) {
     switch (action.type) {
         case 'SET_STEP':
             return { ...state, step: action.payload };
+        case 'HYDRATE_STATE':
+            return hydrateQuoteState(action.payload);
         case 'UPDATE_STATE':
-            return normalizePdfOptions({ ...state, ...action.payload });
+            return hydrateQuoteState({ ...state, ...action.payload });
         case 'SET_CUSTOMER_INFO':
         case 'UPDATE_CUSTOMER_INFO': {
             const incoming = action.payload || {};
@@ -114,11 +44,11 @@ function quoteReducer(state, action) {
             }
 
             const validityDays = parseValidityDays(mergedCustomer.validity) || state.quoteValidityDays || 30;
-            return {
+            return hydrateQuoteState({
                 ...state,
                 customerInfo: { ...mergedCustomer, validity: formatValidityLabel(validityDays) },
                 quoteValidityDays: validityDays
-            };
+            });
         }
         case 'SET_INCLUDES_VAT':
             return { ...state, includesVat: Boolean(action.payload) };
@@ -145,10 +75,7 @@ function quoteReducer(state, action) {
         case 'SET_TERMS_TEXT':
             return { ...state, termsText: String(action.payload ?? '') };
         case 'SET_TERMS_TEMPLATE_ID':
-            return {
-                ...state,
-                termsTemplateId: action.payload || DEFAULT_TEMPLATE_ID
-            };
+            return { ...state, termsTemplateId: action.payload || state.termsTemplateId };
         case 'SET_TERMS_CUSTOMIZED':
             return { ...state, termsCustomized: Boolean(action.payload) };
         case 'SET_INCLUDE_PAYMENT_BOX':
@@ -156,20 +83,14 @@ function quoteReducer(state, action) {
         case 'SET_INCLUDE_SIGNATURE_BLOCK':
             return { ...state, includeSignatureBlock: Boolean(action.payload) };
         case 'SET_PAYMENT_TERMS_DAYS':
-            return { ...state, paymentTermsDays: normalizePositiveInt(action.payload, 30) };
-        case 'SET_QUOTE_VALIDITY_DAYS': {
-            const validityDays = normalizePositiveInt(action.payload, 30);
-            return {
+            return hydrateQuoteState({ ...state, paymentTermsDays: normalizePositiveInt(action.payload, 30) });
+        case 'SET_QUOTE_VALIDITY_DAYS':
+            return hydrateQuoteState({
                 ...state,
-                quoteValidityDays: validityDays,
-                customerInfo: {
-                    ...state.customerInfo,
-                    validity: formatValidityLabel(validityDays)
-                }
-            };
-        }
+                quoteValidityDays: normalizePositiveInt(action.payload, 30)
+            });
         case 'RESET_STATE':
-            return JSON.parse(JSON.stringify(initialState));
+            return createInitialQuoteState();
         default:
             return state;
     }
@@ -178,9 +99,9 @@ function quoteReducer(state, action) {
 export function QuoteProvider({ children }) {
     const [state, dispatch] = useReducer(quoteReducer, initialState, (initial) => {
         try {
-            const saved = localStorage.getItem(STORAGE_KEY);
+            const saved = localStorage.getItem(QUOTE_STATE_STORAGE_KEY);
             if (saved) {
-                return normalizePdfOptions({ ...initial, ...JSON.parse(saved) });
+                return hydrateQuoteState(JSON.parse(saved));
             }
         } catch (e) {
             console.error('Failed to load state from localStorage', e);
@@ -190,7 +111,7 @@ export function QuoteProvider({ children }) {
 
     useEffect(() => {
         try {
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+            localStorage.setItem(QUOTE_STATE_STORAGE_KEY, JSON.stringify(state));
         } catch (e) {
             console.error('Failed to save state to localStorage', e);
         }
