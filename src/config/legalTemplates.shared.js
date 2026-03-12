@@ -1,66 +1,46 @@
+const STANDARD_TERMS_BODY = `OFFERT OCH PRISER
+- Samtliga priser i offerten anges i SEK exklusive moms om inget annat uttryckligen anges.
+- Offerten gäller under den giltighetstid som anges i offerten. Därefter förbehåller sig BRIXX rätten att justera pris och leveransvillkor.
+
+BETALNINGSVILLKOR
+- Betalning sker mot faktura med 30 dagars netto om inget annat anges i offerten.
+- Vid försenad betalning debiteras dröjsmålsränta och eventuella lagstadgade påminnelseavgifter.
+
+LEVERANS
+- Standard produktionstid 4-6 veckorgäller om inget annat anges i offerten.
+- Nettofrakt tillkommer om inget annat anges.
+
+MONTERING OCH FÖRUTSÄTTNINGAR
+- Montage eller installation ingår ej i offertens omfattning om inget annat anges i offerten.
+- Kunden ansvarar för att tillträde, arbetsyta, el, underlag och övriga praktiska förutsättningar finns tillgängliga enligt överenskommelse.
+- Ändrings- och tilläggsarbeten som inte omfattas av offerten beställs separat och debiteras utöver offertbeloppet.
+
+SPECIALBESTÄLLNINGAR
+- Kundunika eller specialbeställda produkter tas hem eller produceras särskilt för kunden och kan därför inte avbeställas eller returneras utan att faktisk uppkommen kostnad debiteras.
+
+REKLAMATION
+- Eventuella reklamationer ska göras skriftligen inom skälig tid efter att felet upptäckts eller borde ha upptäckts.
+- BRIXX ansvarar inte för fel eller skador som orsakas av bristande underhåll, felaktig användning eller omständigheter utanför BRIXX kontroll.
+
+ÖVRIGT
+- BRIXX förbehåller sig rätten att korrigera skrivfel, räknefel och uppenbara felaktigheter i offerten.
+- BRIXX ansvarar inte för förseningar eller utebliven leverans som beror på force majeure eller annan omständighet utanför BRIXX rimliga kontroll.`;
+
 export const LEGAL_TEMPLATES = [
     {
         id: 'standard',
         label: 'Standardvillkor',
-        body: `BETALNINGSVILLKOR
-- Betalning sker mot faktura med 30 dagars netto.
-- Vid försenad betalning debiteras dröjsmålsränta enligt räntelagen.
-
-LEVERANS
-- Leveranstid cirka 4-6 veckor efter orderbekräftelse.
-- Fraktkostnad tillkommer enligt offert.
-- Leverans sker fritt vårt lager om ej annat anges.
-
-GARANTI & REKLAMATION
-- Garanti enligt gällande konsumentköplag.
-- Reklamation ska ske skriftligt senast 14 dagar efter leverans.
-
-MONTERING
-- Montering ingår ej om ej annat avtalats.
-- Vid montering av BRIXX ansvarar kunden för att underlaget är plant och stabilt.
-
-ÖVRIGT
-- Alla priser är exklusive moms om ej annat anges.
-- Offerten är giltig enligt angiven giltighetstid.
-- BRIXX Europe AB förbehåller sig rätten till prisändringar och tryckfel.`
+        body: STANDARD_TERMS_BODY
     },
     {
         id: 'service_work',
-        label: 'Service & installation',
-        body: `SERVICEARBETE
-- Arbetet utförs enligt överenskommen omfattning och tidplan.
-- Eventuella tilläggsarbeten beställs skriftligt och debiteras separat.
-
-BETALNING
-- 40% faktureras vid beställning, resterande 60% efter färdigställande.
-- Betalningsvillkor 15 dagar netto om inget annat avtalats.
-
-TILLTRÄDE OCH ANSVAR
-- Kunden ansvarar för fri tillgång till arbetsplatsen under avtalad tid.
-- Förseningar orsakade av bristande tillträde kan medföra omplaneringskostnad.
-
-GARANTI
-- Garantitid för utfört arbete är 12 månader från godkänd leverans.
-- Garantin omfattar inte normalt slitage eller skador från yttre påverkan.`
+        label: 'Standardvillkor (tidigare service)',
+        body: STANDARD_TERMS_BODY
     },
     {
         id: 'project_delivery',
-        label: 'Projektleverans',
-        body: `PROJEKTLEVERANS
-- Leveransplan och etapper fastställs vid orderbekräftelse.
-- Del- och slutfakturering sker enligt betalningsplan i offerten.
-
-BETALNINGSPLAN
-- 30% vid order, 50% vid leverans, 20% efter godkänd slutkontroll.
-- Betalningsvillkor 30 dagar netto om inget annat avtalats.
-
-LEVERANS OCH RISK
-- Riskövergång sker när varan avlämnats till avtalad leveransadress.
-- Kunden ansvarar för mottagningskontroll och eventuell avvikelseanmälan inom 5 arbetsdagar.
-
-ÄNDRINGAR OCH AVBESTÄLLNING
-- Ändringar efter godkänd beställning kan påverka pris och leveranstid.
-- Avbeställning av specialbeställda produkter debiteras enligt faktisk kostnad.`
+        label: 'Standardvillkor (tidigare projekt)',
+        body: STANDARD_TERMS_BODY
     }
 ];
 
@@ -81,4 +61,3 @@ export function getTemplateById(id, customTemplates = []) {
     if (match) return match;
     return LEGAL_TEMPLATES.find((t) => t.id === DEFAULT_TEMPLATE_ID) || LEGAL_TEMPLATES[0];
 }
-
