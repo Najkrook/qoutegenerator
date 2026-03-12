@@ -12,6 +12,7 @@ import {
 import {
     DEFAULT_PARASOL_PRESET_ID,
     getParasolPresetById,
+    isParasolRotatable,
     getAreaPolygon,
     pointInPolygon,
     snapToStep100,
@@ -82,6 +83,15 @@ function normalizeDoorSize(rawValue) {
     return nearestFromList(base, DOOR_SIZES);
 }
 
+function normalizeParasol(parasol) {
+    if (!parasol) return parasol;
+
+    return {
+        ...parasol,
+        rotationDeg: parasol.rotationDeg === 90 ? 90 : 0
+    };
+}
+
 function sanitizeConfig(config) {
     const next = { ...config };
     next.width = normalizeDimension(next.width, 8000);
@@ -134,7 +144,9 @@ function sanitizeConfig(config) {
 
     next.manualSectionsByEdge = config.manualSectionsByEdge || {};
     next.activeMode = config.activeMode || 'clickitup';
-    next.parasols = config.parasols || [];
+    next.parasols = Array.isArray(config.parasols)
+        ? config.parasols.map(normalizeParasol).filter(Boolean)
+        : [];
     next.selectedParasolId = config.selectedParasolId || null;
     next.selectedParasolPresetId = getParasolPresetById(config.selectedParasolPresetId)
         ? config.selectedParasolPresetId
@@ -422,6 +434,7 @@ export function SketchTool({ onBack }) {
             label: preset.label,
             widthMm: preset.widthMm,
             depthMm: preset.depthMm,
+            rotationDeg: 0,
             xMm: snappedX,
             yMm: snappedY,
             exportLine: preset.exportLine,
@@ -453,6 +466,19 @@ export function SketchTool({ onBack }) {
             )
         });
     }, [config.parasols, parasolAreaPolygon, updateConfig]);
+
+    const handleRotateParasol = useCallback((id, rotationDeg) => {
+        updateConfig({
+            parasols: (config.parasols || []).map((parasol) => {
+                if (parasol.id !== id) return parasol;
+                if (!isParasolRotatable(parasol)) return parasol;
+                return {
+                    ...parasol,
+                    rotationDeg: rotationDeg === 90 ? 90 : 0
+                };
+            })
+        });
+    }, [config.parasols, updateConfig]);
 
     const handleDeleteParasol = useCallback((id) => {
         updateConfig({
@@ -813,6 +839,7 @@ export function SketchTool({ onBack }) {
                         onClearManualPins={clearManualPins}
                         edgeSummaries={layout.edgeSummaries}
                         onDeleteParasol={handleDeleteParasol}
+                        onRotateParasol={handleRotateParasol}
                     />
 
                     <div className="bg-panel-bg border border-panel-border rounded-xl p-5">

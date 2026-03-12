@@ -3,7 +3,9 @@ import { DOOR_SIZES, MIN_DIMENSION_MM, SECTION_SIZES, STEP_MM } from '../../util
 import {
     DEFAULT_PARASOL_PRESET_ID,
     PARASOL_PRESETS,
-    groupParasolPresetsByCategory
+    getParasolRotationDeg,
+    groupParasolPresetsByCategory,
+    isParasolRotatable
 } from '../../utils/parasolGeometry';
 
 const PRIO_DESCRIPTIONS = {
@@ -110,7 +112,8 @@ export function SketchConfig({
     onSetManualPin,
     onClearManualPins,
     edgeSummaries,
-    onDeleteParasol
+    onDeleteParasol,
+    onRotateParasol
 }) {
     const {
         activeMode = 'clickitup',
@@ -202,6 +205,8 @@ export function SketchConfig({
     const selectedParasol = selectedParasolId
         ? parasols.find((parasol) => parasol.id === selectedParasolId) || null
         : null;
+    const canRotateSelectedParasol = isParasolRotatable(selectedParasol);
+    const selectedParasolRotation = getParasolRotationDeg(selectedParasol);
 
     const groupedParasolPresets = groupParasolPresetsByCategory(PARASOL_PRESETS);
 
@@ -238,6 +243,33 @@ export function SketchConfig({
                         <p className="text-xs text-text-secondary m-0">
                             Storlek: <b className="text-text-primary">{selectedParasol?.label || 'Okänd'}</b>
                         </p>
+                        {canRotateSelectedParasol && (
+                            <div className="space-y-2">
+                                <span className="block text-xs font-semibold text-text-secondary uppercase">Riktning</span>
+                                <div className="grid grid-cols-2 gap-2">
+                                    {[
+                                        { label: 'Standard', rotationDeg: 0 },
+                                        { label: 'Roterad 90°', rotationDeg: 90 }
+                                    ].map((option) => {
+                                        const isActive = selectedParasolRotation === option.rotationDeg;
+                                        return (
+                                            <button
+                                                key={option.label}
+                                                type="button"
+                                                aria-pressed={isActive}
+                                                onClick={() => onRotateParasol?.(selectedParasolId, option.rotationDeg)}
+                                                className={`px-3 py-2 rounded-md text-xs border transition-colors ${isActive
+                                                    ? 'border-amber-300/70 bg-amber-400/20 text-amber-100'
+                                                    : 'border-panel-border bg-input-bg text-text-secondary hover:text-text-primary hover:bg-white/5'
+                                                    }`}
+                                            >
+                                                {option.label}
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+                        )}
                         <button
                             onClick={() => onDeleteParasol?.(selectedParasolId)}
                             className="w-full px-3 py-1.5 rounded-md text-xs border border-red-500/40 bg-red-500/10 text-red-400 hover:bg-red-500/20 transition-colors"

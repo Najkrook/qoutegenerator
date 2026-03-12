@@ -73,6 +73,32 @@ export function pointInPolygon(x, y, polygon) {
     return inside;
 }
 
+export function getParasolRotationDeg(parasol) {
+    return parasol?.rotationDeg === 90 ? 90 : 0;
+}
+
+export function isParasolRotatable(parasol) {
+    if (!parasol) return false;
+    return Number(parasol.widthMm) > 0
+        && Number(parasol.depthMm) > 0
+        && Number(parasol.widthMm) !== Number(parasol.depthMm);
+}
+
+export function getEffectiveParasolDimensions(parasol) {
+    const widthMm = Number(parasol?.widthMm) || 0;
+    const depthMm = Number(parasol?.depthMm) || 0;
+    const rotationDeg = getParasolRotationDeg(parasol);
+
+    if (rotationDeg === 90) {
+        return {
+            widthMm: depthMm,
+            depthMm: widthMm
+        };
+    }
+
+    return { widthMm, depthMm };
+}
+
 /**
  * Warns if parasols AABB overlap.
  * @param {Array<Object>} parasols Array of placed parasol objects
@@ -83,16 +109,18 @@ export function computeParasolOverlapWarnings(parasols) {
         for (let j = i + 1; j < parasols.length; j++) {
             const p1 = parasols[i];
             const p2 = parasols[j];
+            const p1Dims = getEffectiveParasolDimensions(p1);
+            const p2Dims = getEffectiveParasolDimensions(p2);
 
-            const p1Left = p1.xMm - p1.widthMm / 2;
-            const p1Right = p1.xMm + p1.widthMm / 2;
-            const p1Top = p1.yMm + p1.depthMm / 2;
-            const p1Bottom = p1.yMm - p1.depthMm / 2;
+            const p1Left = p1.xMm - p1Dims.widthMm / 2;
+            const p1Right = p1.xMm + p1Dims.widthMm / 2;
+            const p1Top = p1.yMm + p1Dims.depthMm / 2;
+            const p1Bottom = p1.yMm - p1Dims.depthMm / 2;
 
-            const p2Left = p2.xMm - p2.widthMm / 2;
-            const p2Right = p2.xMm + p2.widthMm / 2;
-            const p2Top = p2.yMm + p2.depthMm / 2;
-            const p2Bottom = p2.yMm - p2.depthMm / 2;
+            const p2Left = p2.xMm - p2Dims.widthMm / 2;
+            const p2Right = p2.xMm + p2Dims.widthMm / 2;
+            const p2Top = p2.yMm + p2Dims.depthMm / 2;
+            const p2Bottom = p2.yMm - p2Dims.depthMm / 2;
 
             // Check AABB overlap
             if (p1Left < p2Right && p1Right > p2Left &&

@@ -4,8 +4,11 @@ import {
     DEFAULT_PARASOL_PRESET_ID,
     PARASOL_PRESETS,
     buildJumbrellaParasolPresets,
+    computeParasolOverlapWarnings,
+    getEffectiveParasolDimensions,
     getParasolPresetById,
     groupParasolPresetsByCategory,
+    isParasolRotatable,
     parseJumbrellaSize
 } from '../src/utils/parasolGeometry.js';
 
@@ -75,5 +78,28 @@ describe('parasolGeometry', () => {
         expect(groups.map((group) => group.category)).toEqual(['Kvadrat', 'Rektangel']);
         expect(groups[0].presets[0].label).toBe('3x3 Kvadrat');
         expect(groups[1].presets[0].label).toBe('3x1,5 Rektangel');
+    });
+
+    it('treats only non-square rectangular parasols as rotatable and swaps effective dimensions at 90 degrees', () => {
+        expect(isParasolRotatable({ widthMm: 5000, depthMm: 2500 })).toBe(true);
+        expect(isParasolRotatable({ widthMm: 3000, depthMm: 3000 })).toBe(false);
+
+        expect(getEffectiveParasolDimensions({ widthMm: 5000, depthMm: 2500, rotationDeg: 0 })).toEqual({
+            widthMm: 5000,
+            depthMm: 2500
+        });
+        expect(getEffectiveParasolDimensions({ widthMm: 5000, depthMm: 2500, rotationDeg: 90 })).toEqual({
+            widthMm: 2500,
+            depthMm: 5000
+        });
+    });
+
+    it('uses rotated effective dimensions for overlap warnings', () => {
+        const warnings = computeParasolOverlapWarnings([
+            { id: 'a', xMm: 2000, yMm: 2000, widthMm: 5000, depthMm: 2500, rotationDeg: 90 },
+            { id: 'b', xMm: 2000, yMm: 5600, widthMm: 2500, depthMm: 2500, rotationDeg: 0 }
+        ]);
+
+        expect(warnings).toEqual([{ id: 'parasol-overlap', text: 'Flera parasoller overlappar varandra.' }]);
     });
 });

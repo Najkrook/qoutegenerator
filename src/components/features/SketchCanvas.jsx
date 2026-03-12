@@ -1,5 +1,10 @@
 import React, { useMemo, useRef, useState, useEffect, useCallback } from 'react';
 import { DOOR_LABEL, MIN_DIMENSION_MM, STEP_MM } from '../../utils/sectionCalculator';
+import {
+    getEffectiveParasolDimensions,
+    getParasolRotationDeg,
+    isParasolRotatable
+} from '../../utils/parasolGeometry';
 
 const DEFAULT_CAMERA = { zoom: 1, panX: 0, panY: 0 };
 
@@ -840,19 +845,15 @@ export function SketchCanvas({
     const renderParasols = () => {
         return parasols.map((p) => {
             const isSelected = p.id === selectedParasolId;
-            const px = p.xMm - p.widthMm / 2;
-            const py = p.yMm - p.depthMm / 2;
+            const dims = getEffectiveParasolDimensions(p);
+            const px = p.xMm - dims.widthMm / 2;
+            const py = p.yMm - dims.depthMm / 2;
+            const isRotatable = isParasolRotatable(p);
+            const isRotated = getParasolRotationDeg(p) === 90;
 
             return (
-                <rect
+                <g
                     key={p.id}
-                    x={px}
-                    y={py}
-                    width={p.widthMm}
-                    height={p.depthMm}
-                    fill={isSelected ? 'rgba(59,130,246,0.3)' : 'rgba(241,245,249,0.1)'}
-                    stroke={isSelected ? '#3b82f6' : 'rgba(203,213,225,0.4)'}
-                    strokeWidth={isSelected ? 30 : 20}
                     onClick={(e) => {
                         e.stopPropagation();
                         if (activeMode === 'parasol' && onSelectParasol) {
@@ -868,7 +869,29 @@ export function SketchCanvas({
                         beginParasolDrag(p.id, e);
                     }}
                     style={{ cursor: activeMode === 'parasol' ? 'move' : 'default', pointerEvents: activeMode === 'parasol' ? 'all' : 'none' }}
-                />
+                >
+                    <rect
+                        x={px}
+                        y={py}
+                        width={dims.widthMm}
+                        height={dims.depthMm}
+                        fill={isSelected ? 'rgba(59,130,246,0.3)' : 'rgba(241,245,249,0.1)'}
+                        stroke={isSelected ? '#3b82f6' : 'rgba(203,213,225,0.4)'}
+                        strokeWidth={isSelected ? 30 : 20}
+                    />
+                    {isSelected && isRotatable && (
+                        <line
+                            x1={isRotated ? p.xMm : px}
+                            y1={isRotated ? py : p.yMm}
+                            x2={isRotated ? p.xMm : px + dims.widthMm}
+                            y2={isRotated ? py + dims.depthMm : p.yMm}
+                            stroke="rgba(191,219,254,0.95)"
+                            strokeWidth="24"
+                            strokeLinecap="round"
+                            pointerEvents="none"
+                        />
+                    )}
+                </g>
             );
         });
     };
