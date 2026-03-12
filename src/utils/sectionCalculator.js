@@ -189,23 +189,96 @@ function normalizeDoorSize(rawDoorSize) {
     return nearestFromList(value, DOOR_SIZES);
 }
 
-function doorCandidatesFromRequested(requestedDoorSize) {
-    return DOOR_SIZES.filter((size) => size <= requestedDoorSize);
+function normalizeSectionSize(rawSectionSize) {
+    const value = normalizeNumber(rawSectionSize, { fallback: 1600, min: MIN_SECTION_SIZE, max: 2000 });
+    return nearestFromList(value, SECTION_SIZES);
 }
 
-function solveEdgeWithFixedDoor(totalLength, doorSize, mode, targetLength) {
-    const normalizedTotal = Math.max(0, roundToStep(totalLength, STEP_MM));
-    if (normalizedTotal < doorSize) return null;
-    const remaining = normalizedTotal - doorSize;
-    const sectionSolution = solveExactFill(remaining, mode, targetLength);
-    if (!sectionSolution) return null;
-    return [`${DOOR_LABEL} ${doorSize}`, ...sectionSolution];
+function normalizeDoorSegment(rawSegment, fallbackIndex = 0) {
+    if (!rawSegment || typeof rawSegment !== 'object') return null;
+
+    const parsedIndex = Number.parseInt(rawSegment.index, 10);
+    return {
+        index: Number.isFinite(parsedIndex) && parsedIndex >= 0 ? parsedIndex : fallbackIndex,
+        size: normalizeDoorSize(rawSegment.size ?? rawSegment.doorSize ?? 1000)
+    };
 }
 
-function solveEdge(totalLength, needsDoor, options = {}) {
+function normalizeDoorSegments(rawSegments = []) {
+    const deduped = new Map();
+
+    (Array.isArray(rawSegments) ? rawSegments : []).forEach((segment, fallbackIndex) => {
+        const normalized = normalizeDoorSegment(segment, fallbackIndex);
+        if (!normalized) return;
+        deduped.set(normalized.index, normalized);
+    });
+
+    return [...deduped.values()].sort((a, b) => a.index - b.index);
+}
+
+function normalizeManualPins(rawPins = [], doorSegments = []) {
+    const occupiedDoorIndexes = new Set(doorSegments.map((segment) => segment.index));
+    const deduped = new Map();
+
+    (Array.isArray(rawPins) ? rawPins : []).forEach((pin, fallbackIndex) => {
+        if (!pin || typeof pin !== 'object') return;
+        const parsedIndex = Number.parseInt(pin.index, 10);
+        const index = Number.isFinite(parsedIndex) && parsedIndex >= 0 ? parsedIndex : fallbackIndex;
+        if (occupiedDoorIndexes.has(index)) return;
+        deduped.set(index, {
+            index,
+            size: normalizeSectionSize(pin.size)
+        });
+    });
+
+    return [...deduped.values()].sort((a, b) => a.index - b.index);
+}
+
+function buildOccupiedEntries(doorSegments, sectionPins) {
+    return [
+        ...doorSegments.map((segment) => ({
+            index: segment.index,
+            kind: 'door',
+            value: `${DOOR_LABEL} ${segment.size}`,
+            size: segment.size
+        })),
+        ...sectionPins.map((pin) => ({
+            index: pin.index,
+            kind: 'section',
+            value: pin.size,
+            size: pin.size
+        }))
+    ].sort((a, b) => {
+        if (a.index !== b.index) return a.index - b.index;
+        if (a.kind === b.kind) return 0;
+        return a.kind === 'door' ? -1 : 1;
+    });
+}
+
+function rebuildSequenceWithOccupiedEntries(freeSections, occupiedEntries) {
+    const result = [];
+    let freeIndex = 0;
+
+    occupiedEntries.forEach((entry) => {
+        while (result.length < entry.index && freeIndex < freeSections.length) {
+            result.push(freeSections[freeIndex++]);
+        }
+        result.push(entry.value);
+    });
+
+    while (freeIndex < freeSections.length) {
+        result.push(freeSections[freeIndex++]);
+    }
+
+    return result;
+}
+
+function solveEdge(totalLength, options = {}) {
     const mode = normalizeMode(options.prioMode);
     const targetLength = normalizeNumber(options.targetLength, { fallback: 1500, min: 700, max: 2000 });
     const normalizedTotal = Math.max(0, roundToStep(totalLength, STEP_MM));
+    const doorSegments = normalizeDoorSegments(options.doorSegments);
+    const sectionPins = normalizeManualPins(options.sectionPins, doorSegments);
 
     if (normalizedTotal === 0) {
         return {
@@ -218,53 +291,40 @@ function solveEdge(totalLength, needsDoor, options = {}) {
         };
     }
 
-    if (!needsDoor) {
-        const sectionSolution = solveExactFill(normalizedTotal, mode, targetLength);
-        if (!sectionSolution) {
-            return {
-                sections: [],
-                valid: false,
-                requestedDoorSize: null,
-                resolvedDoorSize: null,
-                autoAdjusted: false,
-                errorCode: 'NO_SECTION_SOLUTION'
-            };
-        }
+    const occupiedEntries = buildOccupiedEntries(doorSegments, sectionPins);
+    const reservedLength = occupiedEntries.reduce((sum, entry) => sum + entry.size, 0);
+    const remaining = normalizedTotal - reservedLength;
 
+    if (remaining < 0) {
         return {
-            sections: sectionSolution,
-            valid: true,
+            sections: [],
+            valid: false,
             requestedDoorSize: null,
             resolvedDoorSize: null,
             autoAdjusted: false,
-            errorCode: null
+            errorCode: doorSegments.length > 0 ? 'NO_DOOR_COMBINATION' : 'NO_SECTION_SOLUTION'
         };
     }
 
-    const requestedDoorSize = normalizeDoorSize(options.doorSize);
-    const candidates = doorCandidatesFromRequested(requestedDoorSize);
-
-    for (const doorSize of candidates) {
-        const sectionSolution = solveEdgeWithFixedDoor(normalizedTotal, doorSize, mode, targetLength);
-        if (!sectionSolution) continue;
-
+    const freeSections = solveExactFill(remaining, mode, targetLength);
+    if (!freeSections && remaining !== 0) {
         return {
-            sections: sectionSolution,
-            valid: true,
-            requestedDoorSize,
-            resolvedDoorSize: doorSize,
-            autoAdjusted: doorSize !== requestedDoorSize,
-            errorCode: null
+            sections: [],
+            valid: false,
+            requestedDoorSize: null,
+            resolvedDoorSize: null,
+            autoAdjusted: false,
+            errorCode: doorSegments.length > 0 ? 'NO_DOOR_COMBINATION' : 'NO_SECTION_SOLUTION'
         };
     }
 
     return {
-        sections: [],
-        valid: false,
-        requestedDoorSize,
+        sections: rebuildSequenceWithOccupiedEntries(freeSections || [], occupiedEntries),
+        valid: true,
+        requestedDoorSize: null,
         resolvedDoorSize: null,
         autoAdjusted: false,
-        errorCode: 'NO_DOOR_COMBINATION'
+        errorCode: null
     };
 }
 
@@ -273,7 +333,15 @@ function solveEdge(totalLength, needsDoor, options = {}) {
  * Preserved for compatibility: returns only section output.
  */
 export function calculateSectionsForEdge(totalLength, needsDoor = false, options = {}) {
-    return solveEdge(totalLength, needsDoor, options).sections;
+    if (needsDoor) {
+        const doorSize = normalizeDoorSize(options.doorSize);
+        return solveEdge(totalLength, {
+            ...options,
+            doorSegments: [{ index: 0, size: doorSize }]
+        }).sections;
+    }
+
+    return solveEdge(totalLength, options).sections;
 }
 
 /**
@@ -285,88 +353,10 @@ export function calculateSectionsForEdge(totalLength, needsDoor = false, options
  * cannot be solved.
  */
 export function resolveEdgeWithPins(totalLength, existingSections, pins, options = {}) {
-    if (!pins || pins.length === 0) {
-        // No overrides — just re-solve normally
-        return solveEdge(totalLength, false, options).sections;
-    }
-
-    const mode = normalizeMode(options.prioMode);
-    const targetLength = normalizeNumber(options.targetLength, { fallback: 1500, min: 700, max: 2000 });
-    const normalizedTotal = Math.max(0, roundToStep(totalLength, STEP_MM));
-
-    // Build the pinned size map
-    const pinnedMap = new Map();
-    pins.forEach(({ index, size }) => pinnedMap.set(index, size));
-
-    // The total number of sections we expect (keep same count as before)
-    const existingCount = existingSections.filter((s) => !String(s).includes(DOOR_LABEL)).length;
-    const totalPinnedSize = [...pinnedMap.values()].reduce((sum, s) => sum + s, 0);
-    const remainingBudget = normalizedTotal - totalPinnedSize;
-
-    // Number of free slots we originally had
-    const freeSlotsCount = existingCount - pinnedMap.size;
-
-    if (remainingBudget < 0) return null;
-
-    // If all slots are pinned, just splice them together
-    if (freeSlotsCount === 0) {
-        if (remainingBudget !== 0) return null;
-        const result = [];
-        for (let i = 0; i < existingCount; i++) {
-            result.push(pinnedMap.get(i) ?? 0);
-        }
-        return result;
-    }
-
-    // Solve the remaining budget for the free slots without forcing count
-    const solvedFree = solveExactFill(remainingBudget, mode, targetLength);
-    if (!solvedFree) return null;
-
-    // Splice pinned and free sections back together. 
-    // We place pins at their exact index if possible. Extra free slots are 
-    // distributed where free slots used to be.
-    const result = [];
-    let freeIdx = 0;
-
-    // Create an array mapping each original index to a type: 'pin' or 'free'
-    for (let i = 0; i < existingCount; i++) {
-        if (pinnedMap.has(i)) {
-            // Before placing the pin, if we are short on remaining original free slots
-            // to place all solvedFree, we might need to dump some solvedFree now.
-            result.push(pinnedMap.get(i));
-        } else {
-            if (freeIdx < solvedFree.length) {
-                result.push(solvedFree[freeIdx++]);
-            }
-        }
-    }
-
-    // If there are leftover free sections because the new solution has more sections
-    // than the original count, append them at the end.
-    while (freeIdx < solvedFree.length) {
-        result.push(solvedFree[freeIdx++]);
-    }
-
-    return result;
-}
-
-function normalizeDoorEdges(rawDoorEdges, includeBack) {
-    const edges = rawDoorEdges instanceof Set ? new Set(rawDoorEdges) : new Set(rawDoorEdges || []);
-    if (!includeBack) edges.delete('back');
-    return edges;
-}
-
-function normalizeDoorSizeByEdge(rawDoorSizeByEdge, doorEdges, fallbackDoorSize) {
-    const source = rawDoorSizeByEdge || {};
-    const normalized = {};
-
-    EDGE_KEYS.forEach((edge) => {
-        if (!doorEdges.has(edge)) return;
-        const requested = source[edge] ?? fallbackDoorSize;
-        normalized[edge] = normalizeDoorSize(requested);
-    });
-
-    return normalized;
+    return solveEdge(totalLength, {
+        ...options,
+        sectionPins: pins
+    }).sections;
 }
 
 function parseSection(section) {
@@ -386,14 +376,53 @@ function parseSection(section) {
     };
 }
 
+function normalizeDoorSegmentsByEdge(rawDoorSegmentsByEdge, legacyDoorEdges, legacyDoorSizeByEdge, includeBack, enabledEdges) {
+    const normalized = {};
+    const hasNewModel = rawDoorSegmentsByEdge && typeof rawDoorSegmentsByEdge === 'object';
+
+    EDGE_KEYS.forEach((edge) => {
+        if (!enabledEdges[edge]) return;
+
+        if (hasNewModel) {
+            const segments = normalizeDoorSegments(rawDoorSegmentsByEdge[edge]);
+            if (segments.length > 0) {
+                normalized[edge] = segments;
+            }
+            return;
+        }
+
+        const legacyEdges = legacyDoorEdges instanceof Set ? legacyDoorEdges : new Set(legacyDoorEdges || []);
+        if (edge === 'back' && !includeBack) legacyEdges.delete('back');
+        if (!legacyEdges.has(edge)) return;
+        normalized[edge] = [{
+            index: 0,
+            size: normalizeDoorSize(legacyDoorSizeByEdge?.[edge] ?? 1000)
+        }];
+    });
+
+    return normalized;
+}
+
+function normalizeManualSectionsByEdge(rawManualSectionsByEdge, doorSegmentsByEdge) {
+    const normalized = {};
+
+    EDGE_KEYS.forEach((edge) => {
+        const pins = normalizeManualPins(rawManualSectionsByEdge?.[edge], doorSegmentsByEdge[edge] || []);
+        if (pins.length > 0) {
+            normalized[edge] = pins;
+        }
+    });
+
+    return normalized;
+}
+
 function determineWarningLevel(diagnostics) {
     if (!diagnostics.valid) return 'critical';
     if (diagnostics.autoAdjusted) return 'warning';
     return 'none';
 }
 
-function buildNearestLengthSuggestion(requestedLength, needsDoor, diagnostics, mode, targetLength, edgeKey) {
-    const requestedDoorSize = diagnostics.requestedDoorSize;
+function buildNearestLengthSuggestion(requestedLength, doorSegments, sectionPins, mode, targetLength, edgeKey) {
     const maxDelta = 5000;
     const minRequestedLength = getEdgeRequestedMin(edgeKey);
 
@@ -405,11 +434,14 @@ function buildNearestLengthSuggestion(requestedLength, needsDoor, diagnostics, m
             const candidateEffective = computeEdgeEffectiveLength(edgeKey, candidateRequested);
             const candidateSolver = computeEdgeSolverLength(edgeKey, candidateEffective);
 
-            const solved = needsDoor
-                ? (requestedDoorSize ? solveEdgeWithFixedDoor(candidateSolver, requestedDoorSize, mode, targetLength) : null)
-                : solveExactFill(candidateSolver, mode, targetLength);
+            const solved = solveEdge(candidateSolver, {
+                prioMode: mode,
+                targetLength,
+                doorSegments,
+                sectionPins
+            });
 
-            if (solved) {
+            if (solved.valid) {
                 return candidateRequested;
             }
         }
@@ -418,16 +450,45 @@ function buildNearestLengthSuggestion(requestedLength, needsDoor, diagnostics, m
     return null;
 }
 
-function buildEdgeWarningsAndSuggestions(edgeKey, lengths, needsDoor, diagnostics, mode, targetLength) {
+function findDoorAdjustmentSuggestion(edgeKey, lengths, doorSegments, sectionPins, mode, targetLength) {
+    for (const segment of doorSegments) {
+        for (const candidateSize of DOOR_SIZES.filter((size) => size < segment.size)) {
+            const updatedSegments = doorSegments.map((entry) =>
+                entry.index === segment.index ? { ...entry, size: candidateSize } : entry
+            );
+            const solved = solveEdge(lengths.solver, {
+                prioMode: mode,
+                targetLength,
+                doorSegments: updatedSegments,
+                sectionPins
+            });
+            if (solved.valid) {
+                return {
+                    id: `suggestion-${edgeKey}-set-door-${segment.index}-${candidateSize}`,
+                    type: 'setDoorSegmentSize',
+                    edge: edgeKey,
+                    index: segment.index,
+                    value: candidateSize,
+                    priority: 'high',
+                    text: `Byt dörr på ${EDGE_LENGTH_LABEL[edgeKey]} till ${candidateSize} mm.`
+                };
+            }
+        }
+    }
+
+    return null;
+}
+
+function buildEdgeWarningsAndSuggestions(edgeKey, lengths, doorSegments, sectionPins, diagnostics, mode, targetLength) {
     const edgeRequestedLength = lengths.requested;
-    const edgeSolverLength = lengths.solver;
 
     const warnings = [];
     const suggestions = [];
     const warningLevel = determineWarningLevel(diagnostics);
+    const hasDoors = doorSegments.length > 0;
 
     if (!diagnostics.valid) {
-        const errorText = diagnostics.errorCode === 'NO_DOOR_COMBINATION'
+        const errorText = hasDoors && diagnostics.errorCode === 'NO_DOOR_COMBINATION'
             ? `Ingen giltig kombination hittades för ${EDGE_LENGTH_LABEL[edgeKey]} med vald dörrstorlek.`
             : `Ingen giltig sektionskombination hittades för ${EDGE_LENGTH_LABEL[edgeKey]}.`;
 
@@ -439,7 +500,7 @@ function buildEdgeWarningsAndSuggestions(edgeKey, lengths, needsDoor, diagnostic
             text: errorText
         });
 
-        const nearestLength = buildNearestLengthSuggestion(edgeRequestedLength, needsDoor, diagnostics, mode, targetLength, edgeKey);
+        const nearestLength = buildNearestLengthSuggestion(edgeRequestedLength, doorSegments, sectionPins, mode, targetLength, edgeKey);
         const dimensionKey = EDGE_TO_DIMENSION[edgeKey];
         if (Number.isFinite(nearestLength) && nearestLength !== edgeRequestedLength) {
             suggestions.push({
@@ -453,28 +514,17 @@ function buildEdgeWarningsAndSuggestions(edgeKey, lengths, needsDoor, diagnostic
             });
         }
 
-        if (needsDoor) {
-            const requestedDoorSize = diagnostics.requestedDoorSize || normalizeDoorSize(1000);
-            const viableDoorSize = DOOR_SIZES
-                .filter((size) => size < requestedDoorSize)
-                .find((size) => !!solveEdgeWithFixedDoor(edgeSolverLength, size, mode, targetLength));
-
-            if (Number.isFinite(viableDoorSize)) {
-                suggestions.push({
-                    id: `suggestion-${edgeKey}-set-door-${viableDoorSize}`,
-                    type: 'setDoorSize',
-                    edge: edgeKey,
-                    value: viableDoorSize,
-                    priority: 'high',
-                    text: `Byt dörr på ${EDGE_LENGTH_LABEL[edgeKey]} till ${viableDoorSize} mm.`
-                });
+        if (hasDoors) {
+            const sizeSuggestion = findDoorAdjustmentSuggestion(edgeKey, lengths, doorSegments, sectionPins, mode, targetLength);
+            if (sizeSuggestion) {
+                suggestions.push(sizeSuggestion);
             }
 
             suggestions.push({
-                id: `suggestion-${edgeKey}-remove-door`,
-                type: 'toggleDoor',
+                id: `suggestion-${edgeKey}-remove-door-${doorSegments[0].index}`,
+                type: 'removeDoorSegment',
                 edge: edgeKey,
-                value: false,
+                index: doorSegments[0].index,
                 priority: 'medium',
                 text: `Ta bort dörr på ${EDGE_LENGTH_LABEL[edgeKey]}.`
             });
@@ -489,9 +539,10 @@ function buildEdgeWarningsAndSuggestions(edgeKey, lengths, needsDoor, diagnostic
         });
 
         suggestions.push({
-            id: `suggestion-${edgeKey}-confirm-door-${diagnostics.resolvedDoorSize}`,
-            type: 'setDoorSize',
+            id: `suggestion-${edgeKey}-confirm-door-${doorSegments[0]?.index ?? 0}-${diagnostics.resolvedDoorSize}`,
+            type: 'setDoorSegmentSize',
             edge: edgeKey,
+            index: doorSegments[0]?.index ?? 0,
             value: diagnostics.resolvedDoorSize,
             priority: 'low',
             text: `Bekräfta ${diagnostics.resolvedDoorSize} mm som standarddörr för ${EDGE_LENGTH_LABEL[edgeKey]}.`
@@ -543,10 +594,6 @@ export function computeLayout(config = {}) {
     const includeBack = !!config.includeBack;
     const prioMode = normalizeMode(config.prioMode);
     const targetLength = normalizeNumber(config.targetLength, { fallback: 1500, min: 700, max: 2000 });
-    const doorEdges = normalizeDoorEdges(config.doorEdges, includeBack);
-    const fallbackDoorSize = normalizeDoorSize(config.doorSize ?? 1000);
-    const doorSizeByEdge = normalizeDoorSizeByEdge(config.doorSizeByEdge, doorEdges, fallbackDoorSize);
-    const manualSectionsByEdge = config.manualSectionsByEdge || {};
 
     const requestedDimensions = {
         width: computeEdgeRequestedLength('front', config),
@@ -559,8 +606,6 @@ export function computeLayout(config = {}) {
     const depthLeft = requestedDimensions.depthLeft;
     const depthRight = config.equalDepth ? requestedDimensions.depthLeft : requestedDimensions.depthRight;
     const sideEdgesPresent = Math.max(depthLeft, depthRight) > 0;
-
-    const solveOptions = { prioMode, targetLength };
 
     function solveNamedEdge(edgeKey, lengths, enabled) {
         if (!enabled) {
@@ -576,20 +621,14 @@ export function computeLayout(config = {}) {
             };
         }
 
-        const needsDoor = doorEdges.has(edgeKey);
-        const edgeResult = solveEdge(lengths.solver, needsDoor, {
+        const doorSegments = doorSegmentsByEdge[edgeKey] || [];
+        const sectionPins = manualSectionsByEdge[edgeKey] || [];
+        const edgeResult = solveEdge(lengths.solver, {
             prioMode,
             targetLength,
-            doorSize: doorSizeByEdge[edgeKey] ?? fallbackDoorSize
+            doorSegments,
+            sectionPins
         });
-
-        // Apply manual section pins if any exist for this edge
-        const pins = manualSectionsByEdge[edgeKey];
-        let finalSections = edgeResult.sections;
-        if (pins && pins.length > 0 && edgeResult.valid && !needsDoor) {
-            const overridden = resolveEdgeWithPins(lengths.solver, edgeResult.sections, pins, solveOptions);
-            if (overridden) finalSections = overridden;
-        }
 
         const diagnostics = {
             valid: edgeResult.valid,
@@ -602,14 +641,15 @@ export function computeLayout(config = {}) {
         const { warningLevel, warnings, suggestions } = buildEdgeWarningsAndSuggestions(
             edgeKey,
             lengths,
-            needsDoor,
+            doorSegments,
+            sectionPins,
             diagnostics,
             prioMode,
             targetLength
         );
 
         return {
-            sections: finalSections,
+            sections: edgeResult.sections,
             diagnostics,
             warningLevel,
             warnings,
@@ -641,6 +681,20 @@ export function computeLayout(config = {}) {
         };
     });
 
+    const enabledEdges = EDGE_KEYS.reduce((acc, edgeKey) => {
+        acc[edgeKey] = edges[edgeKey].enabled;
+        return acc;
+    }, {});
+
+    const doorSegmentsByEdge = normalizeDoorSegmentsByEdge(
+        config.doorSegmentsByEdge,
+        config.doorEdges,
+        config.doorSizeByEdge,
+        includeBack,
+        enabledEdges
+    );
+    const manualSectionsByEdge = normalizeManualSectionsByEdge(config.manualSectionsByEdge, doorSegmentsByEdge);
+
     const left = solveNamedEdge('left', { requested: edges.left.requestedLength, effective: edges.left.effectiveLength, solver: edges.left.solverLength }, edges.left.enabled);
     const right = solveNamedEdge('right', { requested: edges.right.requestedLength, effective: edges.right.effectiveLength, solver: edges.right.solverLength }, edges.right.enabled);
     const front = solveNamedEdge('front', { requested: edges.front.requestedLength, effective: edges.front.effectiveLength, solver: edges.front.solverLength }, edges.front.enabled);
@@ -670,18 +724,17 @@ export function computeLayout(config = {}) {
     const suggestions = [];
     EDGE_KEYS.forEach((edgeKey) => {
         if (!edges[edgeKey].enabled) return;
-        const needsDoor = doorEdges.has(edgeKey);
         const lengths = {
             requested: edges[edgeKey].requestedLength,
             effective: edges[edgeKey].effectiveLength,
             solver: edges[edgeKey].solverLength
         };
 
-        // build warnings using the solver dimension logic wrapper inside to properly reflect actual solution boundaries
         const info = buildEdgeWarningsAndSuggestions(
             edgeKey,
             lengths,
-            needsDoor,
+            doorSegmentsByEdge[edgeKey] || [],
+            manualSectionsByEdge[edgeKey] || [],
             edgeDiagnostics[edgeKey],
             prioMode,
             targetLength
@@ -729,7 +782,8 @@ export function computeLayout(config = {}) {
         depthLeft,
         depthRight,
         targetLength,
-        doorSizeByEdge,
+        doorSegmentsByEdge,
+        manualSectionsByEdge,
         leftEdge,
         rightEdge,
         frontEdge,

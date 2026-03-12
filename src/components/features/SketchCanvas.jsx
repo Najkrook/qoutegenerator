@@ -593,9 +593,7 @@ export function SketchCanvas({
                 onClick={(e) => {
                     e.stopPropagation();
                     onSelectEdge?.(edgeKey);
-                    if (!segment.isDoor) {
-                        onSelectSection?.(edgeKey, segment.index);
-                    }
+                    onSelectSection?.(edgeKey, segment.index);
                 }}
             >
                 <rect

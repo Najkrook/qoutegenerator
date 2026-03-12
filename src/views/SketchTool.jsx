@@ -83,6 +83,95 @@ function normalizeDoorSize(rawValue) {
     return nearestFromList(base, DOOR_SIZES);
 }
 
+function normalizeDoorSegment(rawSegment, fallbackIndex = 0) {
+    const parsedIndex = Number(rawSegment?.index);
+    const normalizedIndex = Number.isInteger(parsedIndex) && parsedIndex >= 0 ? parsedIndex : fallbackIndex;
+    return {
+        index: normalizedIndex,
+        size: normalizeDoorSize(rawSegment?.size)
+    };
+}
+
+function normalizeDoorSegments(rawSegments = []) {
+    if (!Array.isArray(rawSegments)) return [];
+
+    const byIndex = new Map();
+    rawSegments.forEach((segment, position) => {
+        const normalized = normalizeDoorSegment(segment, position);
+        byIndex.set(normalized.index, normalized);
+    });
+
+    return Array.from(byIndex.values()).sort((a, b) => a.index - b.index);
+}
+
+function normalizeDoorSegmentsByEdge(config, includeBack, hasLeftDepth, hasRightDepth) {
+    const rawDoorSegmentsByEdge = config.doorSegmentsByEdge;
+    const hasNewModel = rawDoorSegmentsByEdge && typeof rawDoorSegmentsByEdge === 'object' && !Array.isArray(rawDoorSegmentsByEdge);
+    const normalized = {};
+
+    if (hasNewModel) {
+        EDGE_KEYS.forEach((edge) => {
+            if (edge === 'back' && !includeBack) return;
+            if (edge === 'left' && !hasLeftDepth) return;
+            if (edge === 'right' && !hasRightDepth) return;
+            const segments = normalizeDoorSegments(rawDoorSegmentsByEdge[edge]);
+            if (segments.length > 0) {
+                normalized[edge] = segments;
+            }
+        });
+        return normalized;
+    }
+
+    const rawDoorEdges = config.doorEdges;
+    const normalizedDoorEdges = rawDoorEdges instanceof Set
+        ? [...rawDoorEdges]
+        : Array.isArray(rawDoorEdges)
+            ? rawDoorEdges
+            : [];
+    const doors = new Set(normalizedDoorEdges);
+    if (!includeBack) doors.delete('back');
+    if (!hasLeftDepth) doors.delete('left');
+    if (!hasRightDepth) doors.delete('right');
+
+    const sourceDoorSizes = config.doorSizeByEdge || {};
+    doors.forEach((edge) => {
+        normalized[edge] = [{
+            index: 0,
+            size: normalizeDoorSize(sourceDoorSizes[edge] ?? 1000)
+        }];
+    });
+
+    return normalized;
+}
+
+function normalizeManualSectionsByEdge(rawManualSectionsByEdge, doorSegmentsByEdge) {
+    const normalized = {};
+
+    EDGE_KEYS.forEach((edge) => {
+        const rawPins = Array.isArray(rawManualSectionsByEdge?.[edge]) ? rawManualSectionsByEdge[edge] : [];
+        const blockedIndexes = new Set((doorSegmentsByEdge[edge] || []).map((segment) => segment.index));
+        const byIndex = new Map();
+
+        rawPins.forEach((pin) => {
+            const parsedIndex = Number(pin?.index);
+            if (!Number.isInteger(parsedIndex) || parsedIndex < 0 || blockedIndexes.has(parsedIndex)) {
+                return;
+            }
+            byIndex.set(parsedIndex, {
+                index: parsedIndex,
+                size: nearestFromList(clamp(Number(pin?.size) || 1600, 700, 2000), SECTION_SIZES)
+            });
+        });
+
+        const pins = Array.from(byIndex.values()).sort((a, b) => a.index - b.index);
+        if (pins.length > 0) {
+            normalized[edge] = pins;
+        }
+    });
+
+    return normalized;
+}
+
 function normalizeParasol(parasol) {
     if (!parasol) return parasol;
 
@@ -122,27 +211,10 @@ function sanitizeConfig(config) {
     }
     next.prioMode = ['symmetrical', 'convenient', 'target'].includes(next.prioMode) ? next.prioMode : 'symmetrical';
 
-    const rawDoorEdges = next.doorEdges;
-    const normalizedDoorEdges = rawDoorEdges instanceof Set
-        ? [...rawDoorEdges]
-        : Array.isArray(rawDoorEdges)
-            ? rawDoorEdges
-            : [];
-    const doors = new Set(normalizedDoorEdges);
-    if (!next.includeBack) doors.delete('back');
-    if (!hasLeftDepth) doors.delete('left');
-    if (!hasRightDepth) doors.delete('right');
-    next.doorEdges = doors;
-
-    const sourceDoorSizes = next.doorSizeByEdge || {};
-    const normalizedDoorSizes = {};
-    EDGE_KEYS.forEach((edge) => {
-        if (!doors.has(edge)) return;
-        normalizedDoorSizes[edge] = normalizeDoorSize(sourceDoorSizes[edge] ?? 1000);
-    });
-    next.doorSizeByEdge = normalizedDoorSizes;
-
-    next.manualSectionsByEdge = config.manualSectionsByEdge || {};
+    next.doorSegmentsByEdge = normalizeDoorSegmentsByEdge(next, next.includeBack, hasLeftDepth, hasRightDepth);
+    next.manualSectionsByEdge = normalizeManualSectionsByEdge(config.manualSectionsByEdge, next.doorSegmentsByEdge);
+    delete next.doorEdges;
+    delete next.doorSizeByEdge;
     next.activeMode = config.activeMode || 'clickitup';
     next.parasols = Array.isArray(config.parasols)
         ? config.parasols.map(normalizeParasol).filter(Boolean)
@@ -170,9 +242,9 @@ function getInitialDensity() {
 }
 
 function serializeSketchConfig(config) {
+    const { doorEdges, doorSizeByEdge, ...rest } = config || {};
     return {
-        ...config,
-        doorEdges: Array.from(config?.doorEdges || [])
+        ...rest
     };
 }
 
@@ -190,8 +262,7 @@ export function SketchTool({ onBack }) {
             includeBack: false,
             prioMode: 'symmetrical',
             targetLength: 1500,
-            doorEdges: new Set(),
-            doorSizeByEdge: {},
+            doorSegmentsByEdge: {},
             manualSectionsByEdge: {},
             activeMode: 'clickitup',
             parasols: [],
@@ -221,29 +292,43 @@ export function SketchTool({ onBack }) {
             const merged = {
                 ...prev,
                 ...partial,
-                doorSizeByEdge: {
-                    ...(prev.doorSizeByEdge || {}),
-                    ...(partial.doorSizeByEdge || {})
-                },
-                manualSectionsByEdge: {
-                    ...(prev.manualSectionsByEdge || {}),
-                    ...(partial.manualSectionsByEdge || {})
-                }
+                doorSegmentsByEdge: Object.prototype.hasOwnProperty.call(partial, 'doorSegmentsByEdge')
+                    ? partial.doorSegmentsByEdge
+                    : prev.doorSegmentsByEdge,
+                manualSectionsByEdge: Object.prototype.hasOwnProperty.call(partial, 'manualSectionsByEdge')
+                    ? partial.manualSectionsByEdge
+                    : prev.manualSectionsByEdge
             };
             return sanitizeConfig(merged);
         });
     }, []);
 
     const setManualPin = useCallback((edgeKey, segmentIndex, size) => {
+        const nextPins = { ...(config.manualSectionsByEdge || {}) };
+        const currentPins = (nextPins[edgeKey] || []).filter((pin) => pin.index !== segmentIndex);
+        if (size !== null) {
+            currentPins.push({ index: segmentIndex, size });
+            currentPins.sort((a, b) => a.index - b.index);
+        }
+        if (currentPins.length > 0) {
+            nextPins[edgeKey] = currentPins;
+        } else {
+            delete nextPins[edgeKey];
+        }
+
+        const nextDoors = { ...(config.doorSegmentsByEdge || {}) };
+        const filteredDoors = (nextDoors[edgeKey] || []).filter((segment) => segment.index !== segmentIndex);
+        if (filteredDoors.length > 0) {
+            nextDoors[edgeKey] = filteredDoors;
+        } else {
+            delete nextDoors[edgeKey];
+        }
+
         updateConfig({
-            manualSectionsByEdge: {
-                ...(config.manualSectionsByEdge || {}),
-                [edgeKey]: size !== null
-                    ? [...((config.manualSectionsByEdge || {})[edgeKey] || []).filter(p => p.index !== segmentIndex), { index: segmentIndex, size }]
-                    : ((config.manualSectionsByEdge || {})[edgeKey] || []).filter(p => p.index !== segmentIndex)
-            }
+            manualSectionsByEdge: nextPins,
+            doorSegmentsByEdge: nextDoors
         });
-    }, [config.manualSectionsByEdge, updateConfig]);
+    }, [config.doorSegmentsByEdge, config.manualSectionsByEdge, updateConfig]);
 
     const clearManualPins = useCallback((edgeKey) => {
         const next = { ...(config.manualSectionsByEdge || {}) };
@@ -251,13 +336,45 @@ export function SketchTool({ onBack }) {
         updateConfig({ manualSectionsByEdge: next });
     }, [config.manualSectionsByEdge, updateConfig]);
 
+    const setDoorSegmentSize = useCallback((edgeKey, segmentIndex, size) => {
+        const nextDoors = { ...(config.doorSegmentsByEdge || {}) };
+        const current = (nextDoors[edgeKey] || []).filter((segment) => segment.index !== segmentIndex);
+        current.push({ index: segmentIndex, size: normalizeDoorSize(size) });
+        current.sort((a, b) => a.index - b.index);
+        nextDoors[edgeKey] = current;
+
+        const nextPins = { ...(config.manualSectionsByEdge || {}) };
+        const filteredPins = (nextPins[edgeKey] || []).filter((pin) => pin.index !== segmentIndex);
+        if (filteredPins.length > 0) {
+            nextPins[edgeKey] = filteredPins;
+        } else {
+            delete nextPins[edgeKey];
+        }
+
+        updateConfig({
+            doorSegmentsByEdge: nextDoors,
+            manualSectionsByEdge: nextPins
+        });
+    }, [config.doorSegmentsByEdge, config.manualSectionsByEdge, updateConfig]);
+
+    const resetDoorSegment = useCallback((edgeKey, segmentIndex) => {
+        const nextDoors = { ...(config.doorSegmentsByEdge || {}) };
+        const filteredDoors = (nextDoors[edgeKey] || []).filter((segment) => segment.index !== segmentIndex);
+        if (filteredDoors.length > 0) {
+            nextDoors[edgeKey] = filteredDoors;
+        } else {
+            delete nextDoors[edgeKey];
+        }
+        updateConfig({ doorSegmentsByEdge: nextDoors });
+    }, [config.doorSegmentsByEdge, updateConfig]);
+
     const layout = useMemo(() => computeLayout(config), [config]);
     const previewConfig = useMemo(() => {
         if (!dragPreview) return config;
         return sanitizeConfig({
             ...config,
             ...dragPreview,
-            doorSizeByEdge: config.doorSizeByEdge,
+            doorSegmentsByEdge: config.doorSegmentsByEdge,
             manualSectionsByEdge: config.manualSectionsByEdge
         });
     }, [config, dragPreview]);
@@ -351,28 +468,10 @@ export function SketchTool({ onBack }) {
             const suggestion = (layout.suggestions || []).find((entry) => entry.id === suggestionId);
             if (!suggestion) return;
 
-            if (suggestion.type === 'setDoorSize') {
-                const nextDoors = new Set(config.doorEdges);
-                nextDoors.add(suggestion.edge);
-                updateConfig({
-                    doorEdges: nextDoors,
-                    doorSizeByEdge: {
-                        ...config.doorSizeByEdge,
-                        [suggestion.edge]: suggestion.value
-                    }
-                });
-            } else if (suggestion.type === 'toggleDoor') {
-                const nextDoors = new Set(config.doorEdges);
-                if (suggestion.value) {
-                    nextDoors.add(suggestion.edge);
-                } else {
-                    nextDoors.delete(suggestion.edge);
-                }
-                const nextDoorSizeByEdge = { ...config.doorSizeByEdge };
-                if (!suggestion.value) {
-                    delete nextDoorSizeByEdge[suggestion.edge];
-                }
-                updateConfig({ doorEdges: nextDoors, doorSizeByEdge: nextDoorSizeByEdge });
+            if (suggestion.type === 'setDoorSegmentSize') {
+                setDoorSegmentSize(suggestion.edge, suggestion.index ?? 0, suggestion.value);
+            } else if (suggestion.type === 'removeDoorSegment') {
+                resetDoorSegment(suggestion.edge, suggestion.index ?? 0);
             } else if (suggestion.type === 'setDimension') {
                 let nextDimensionUpdate = { [suggestion.dimension]: suggestion.value };
                 if (suggestion.dimension === 'depth') {
@@ -394,7 +493,7 @@ export function SketchTool({ onBack }) {
 
             toast.success('Förslag applicerat.');
         },
-        [config.doorEdges, config.doorSizeByEdge, layout.suggestions, updateConfig]
+        [config.equalDepth, layout.suggestions, resetDoorSegment, setDoorSegmentSize, updateConfig]
     );
 
     const parasolWarnings = useMemo(
@@ -837,6 +936,9 @@ export function SketchTool({ onBack }) {
                         onSelectEdge={handleSelectEdge}
                         onSetManualPin={setManualPin}
                         onClearManualPins={clearManualPins}
+                        onConvertSegmentToDoor={setDoorSegmentSize}
+                        onSetDoorSegmentSize={setDoorSegmentSize}
+                        onResetDoorSegment={resetDoorSegment}
                         edgeSummaries={layout.edgeSummaries}
                         onDeleteParasol={handleDeleteParasol}
                         onRotateParasol={handleRotateParasol}

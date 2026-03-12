@@ -10,8 +10,7 @@ function baseConfig(overrides = {}) {
         includeBack: false,
         prioMode: 'symmetrical',
         targetLength: 1500,
-        doorEdges: new Set(),
-        doorSizeByEdge: {},
+        doorSegmentsByEdge: {},
         ...overrides
     };
 }
@@ -39,8 +38,10 @@ describe('computeLayout split depth handling', () => {
             baseConfig({
                 depthLeft: 1300,
                 depthRight: 1300,
-                doorEdges: new Set(['left', 'right']),
-                doorSizeByEdge: { left: 1100, right: 1100 }
+                doorSegmentsByEdge: {
+                    left: [{ index: 0, size: 1100 }],
+                    right: [{ index: 0, size: 1100 }]
+                }
             })
         );
 
@@ -108,8 +109,10 @@ describe('computeLayout split depth handling', () => {
                 depthLeft: 0,
                 depthRight: 0,
                 includeBack: false,
-                doorEdges: new Set(['left', 'right']),
-                doorSizeByEdge: { left: 1100, right: 1100 }
+                doorSegmentsByEdge: {
+                    left: [{ index: 0, size: 1100 }],
+                    right: [{ index: 0, size: 1100 }]
+                }
             })
         );
 
@@ -134,5 +137,27 @@ describe('computeLayout split depth handling', () => {
         expect(layout.backEdge).toEqual([]);
         expect(layout.edgeSummaries.back.enabled).toBe(false);
         expect(hasCriticalWarningForEdge(layout, 'back')).toBe(false);
+    });
+
+    it('supports multiple doors on the same edge', () => {
+        const layout = computeLayout(
+            baseConfig({
+                width: 8000,
+                depth: 4000,
+                depthLeft: 4000,
+                depthRight: 4000,
+                doorSegmentsByEdge: {
+                    front: [
+                        { index: 1, size: 700 },
+                        { index: 3, size: 1100 }
+                    ]
+                }
+            })
+        );
+
+        expect(layout.edgeSummaries.front.doorCount).toBe(2);
+        expect(layout.frontEdge.filter((segment) => String(segment).includes('Dörr')).length).toBe(2);
+        expect(layout.frontEdge[1]).toBe('Dörr 700');
+        expect(layout.frontEdge[3]).toBe('Dörr 1100');
     });
 });
