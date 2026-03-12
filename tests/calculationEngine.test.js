@@ -3,6 +3,16 @@ import { computeQuoteTotals } from '../services/calculationEngine.js';
 import { createCatalogFixture, createStateFixture } from './fixtures/calculationFixtures.js';
 
 describe('computeQuoteTotals', () => {
+    function addClickitUpAutoScaleAddons(catalogData) {
+        catalogData.ClickitUP.addonCategories.push({
+            items: [
+                { id: 'svartanodiserade', name: 'Svartanodiserade profiler', price: 340, autoScale: true },
+                { id: 'stoppknapp', name: 'Stoppknapp 140 cm', price: 564, autoScale: true }
+            ]
+        });
+        return catalogData;
+    }
+
     it('computes mixed quote totals deterministically', () => {
         const summary = computeQuoteTotals({
             state: createStateFixture(),
@@ -241,5 +251,232 @@ describe('computeQuoteTotals', () => {
         });
 
         expect(summary.totals.filter((row) => !row.isAddon && !row.isCustom).map((row) => row.qty)).toEqual([1, 2]);
+    });
+
+    it('auto-syncs ClickitUp auto-scale add-ons to section subtotal when entries are missing', () => {
+        const state = createStateFixture({
+            builderItems: [],
+            customCosts: [],
+            exchangeRate: 1,
+            gridSelections: {
+                ClickitUP: {
+                    items: {
+                        'ClickitUP Section|1000': { qty: 4, discountPct: 0 },
+                        'ClickitUP Section|1200': { qty: 3, discountPct: 0 }
+                    },
+                    addons: {}
+                }
+            }
+        });
+        const catalogData = addClickitUpAutoScaleAddons(createCatalogFixture());
+
+        const summary = computeQuoteTotals({ state, catalogData });
+        const autoRows = summary.totals.filter((row) => row.source.type === 'grid-addon' && ['svartanodiserade', 'stoppknapp'].includes(row.source.addonId));
+
+        expect(autoRows.map((row) => `${row.source.addonId}:${row.qty}`)).toEqual([
+            'svartanodiserade:7',
+            'stoppknapp:7'
+        ]);
+    });
+
+    it('preserves a manual auto-scale addon while other missing auto-scale rows still sync', () => {
+        const state = createStateFixture({
+            builderItems: [],
+            customCosts: [],
+            exchangeRate: 1,
+            gridSelections: {
+                ClickitUP: {
+                    items: {
+                        'ClickitUP Section|1000': { qty: 4, discountPct: 0 },
+                        'ClickitUP Section|1200': { qty: 3, discountPct: 0 }
+                    },
+                    addons: {
+                        svartanodiserade: { qty: 3, discountPct: 0, syncMode: 'manual' }
+                    }
+                }
+            }
+        });
+        const catalogData = addClickitUpAutoScaleAddons(createCatalogFixture());
+
+        const summary = computeQuoteTotals({ state, catalogData });
+        const svartanodiserade = summary.totals.find((row) => row.source.addonId === 'svartanodiserade');
+        const stoppknapp = summary.totals.find((row) => row.source.addonId === 'stoppknapp');
+
+        expect(svartanodiserade.qty).toBe(3);
+        expect(stoppknapp.qty).toBe(7);
+    });
+
+    it('ignores stored qty when an auto-scale addon is explicitly set to auto', () => {
+        const state = createStateFixture({
+            builderItems: [],
+            customCosts: [],
+            exchangeRate: 1,
+            gridSelections: {
+                ClickitUP: {
+                    items: {
+                        'ClickitUP Section|1000': { qty: 4, discountPct: 0 },
+                        'ClickitUP Section|1200': { qty: 3, discountPct: 0 }
+                    },
+                    addons: {
+                        stoppknapp: { qty: 2, discountPct: 0, syncMode: 'auto' }
+                    }
+                }
+            }
+        });
+        const catalogData = addClickitUpAutoScaleAddons(createCatalogFixture());
+
+        const summary = computeQuoteTotals({ state, catalogData });
+        const stoppknapp = summary.totals.find((row) => row.source.addonId === 'stoppknapp');
+
+        expect(stoppknapp.qty).toBe(7);
+    });
+
+    it('treats legacy persisted auto-scale addon values without sync mode as manual', () => {
+        const state = createStateFixture({
+            builderItems: [],
+            customCosts: [],
+            exchangeRate: 1,
+            gridSelections: {
+                ClickitUP: {
+                    items: {
+                        'ClickitUP Section|1000': { qty: 4, discountPct: 0 },
+                        'ClickitUP Section|1200': { qty: 3, discountPct: 0 }
+                    },
+                    addons: {
+                        svartanodiserade: { qty: 4, discountPct: 0 }
+                    }
+                }
+            }
+        });
+        const catalogData = addClickitUpAutoScaleAddons(createCatalogFixture());
+
+        const summary = computeQuoteTotals({ state, catalogData });
+        const svartanodiserade = summary.totals.find((row) => row.source.addonId === 'svartanodiserade');
+
+        expect(svartanodiserade.qty).toBe(4);
+    });
+
+    it('omits auto-scale addon rows when section subtotal is zero', () => {
+        const state = createStateFixture({
+            builderItems: [],
+            customCosts: [],
+            exchangeRate: 1,
+            gridSelections: {
+                ClickitUP: {
+                    items: {},
+                    addons: {}
+                }
+            }
+        });
+        const catalogData = addClickitUpAutoScaleAddons(createCatalogFixture());
+
+        const summary = computeQuoteTotals({ state, catalogData });
+
+        expect(summary.totals.some((row) => ['svartanodiserade', 'stoppknapp'].includes(row.source?.addonId))).toBe(false);
+    });
+
+    it('uses the global discount by default for missing auto-scale add-on rows', () => {
+        const state = createStateFixture({
+            builderItems: [],
+            customCosts: [],
+            exchangeRate: 1,
+            globalDiscountPct: 5,
+            gridSelections: {
+                ClickitUP: {
+                    items: {
+                        'ClickitUP Section|1000': { qty: 4, discountPct: 0 },
+                        'ClickitUP Section|1200': { qty: 3, discountPct: 0 }
+                    },
+                    addons: {}
+                }
+            }
+        });
+        const catalogData = addClickitUpAutoScaleAddons(createCatalogFixture());
+
+        const summary = computeQuoteTotals({ state, catalogData });
+        const autoRows = summary.totals.filter((row) => row.source.type === 'grid-addon' && ['svartanodiserade', 'stoppknapp'].includes(row.source.addonId));
+
+        expect(autoRows.map((row) => `${row.source.addonId}:${row.discountPct}`)).toEqual([
+            'svartanodiserade:5',
+            'stoppknapp:5'
+        ]);
+    });
+
+    it('keeps legacy persisted auto-scale discounts manual when discount sync mode is missing', () => {
+        const state = createStateFixture({
+            builderItems: [],
+            customCosts: [],
+            exchangeRate: 1,
+            globalDiscountPct: 5,
+            gridSelections: {
+                ClickitUP: {
+                    items: {
+                        'ClickitUP Section|1000': { qty: 4, discountPct: 0 },
+                        'ClickitUP Section|1200': { qty: 3, discountPct: 0 }
+                    },
+                    addons: {
+                        svartanodiserade: { qty: 7, discountPct: 0 }
+                    }
+                }
+            }
+        });
+        const catalogData = addClickitUpAutoScaleAddons(createCatalogFixture());
+
+        const summary = computeQuoteTotals({ state, catalogData });
+        const svartanodiserade = summary.totals.find((row) => row.source.addonId === 'svartanodiserade');
+
+        expect(svartanodiserade.discountPct).toBe(0);
+    });
+
+    it('uses global discount when an auto-scale row is explicitly marked as global', () => {
+        const state = createStateFixture({
+            builderItems: [],
+            customCosts: [],
+            exchangeRate: 1,
+            globalDiscountPct: 5,
+            gridSelections: {
+                ClickitUP: {
+                    items: {
+                        'ClickitUP Section|1000': { qty: 4, discountPct: 0 },
+                        'ClickitUP Section|1200': { qty: 3, discountPct: 0 }
+                    },
+                    addons: {
+                        stoppknapp: { qty: 7, discountPct: 0, discountSyncMode: 'global' }
+                    }
+                }
+            }
+        });
+        const catalogData = addClickitUpAutoScaleAddons(createCatalogFixture());
+
+        const summary = computeQuoteTotals({ state, catalogData });
+        const stoppknapp = summary.totals.find((row) => row.source.addonId === 'stoppknapp');
+
+        expect(stoppknapp.discountPct).toBe(5);
+    });
+
+    it('preserves manual discount overrides for auto-scale add-ons', () => {
+        const state = createStateFixture({
+            builderItems: [],
+            customCosts: [],
+            exchangeRate: 1,
+            globalDiscountPct: 5,
+            gridSelections: {
+                ClickitUP: {
+                    items: {
+                        'ClickitUP Section|1000': { qty: 4, discountPct: 0 },
+                        'ClickitUP Section|1200': { qty: 3, discountPct: 0 }
+                    },
+                    addons: {
+                        svartanodiserade: { qty: 7, discountPct: 2, discountSyncMode: 'manual' }
+                    }
+                }
+            }
+        });
+        const catalogData = addClickitUpAutoScaleAddons(createCatalogFixture());
+
+        const summary = computeQuoteTotals({ state, catalogData });
+        const svartanodiserade = summary.totals.find((row) => row.source.addonId === 'svartanodiserade');
+
+        expect(svartanodiserade.discountPct).toBe(2);
     });
 });

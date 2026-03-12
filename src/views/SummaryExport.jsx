@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import toast from 'react-hot-toast';
 import { useQuote } from '../store/QuoteContext';
 import { useAuth } from '../store/AuthContext';
@@ -32,7 +32,7 @@ function buildPdfFileName(customerInfo = {}) {
     return `${safeBase || 'Offert'}-${date}.pdf`;
 }
 
-export function SummaryExport() {
+export function SummaryExport({ onPrev, onBackToSketch }) {
     const { state, dispatch } = useQuote();
     const { user } = useAuth();
     const summaryData = useMemo(() => computeQuoteTotals({ state, catalogData }), [state]);
@@ -74,7 +74,11 @@ export function SummaryExport() {
     }, []);
 
     const handleBack = () => {
-        dispatch({ type: 'SET_STEP', payload: 3 });
+        if (onPrev) {
+            onPrev();
+        } else {
+            dispatch({ type: 'SET_STEP', payload: 3 });
+        }
     };
 
     const handleExportPDF = async () => {
@@ -153,7 +157,15 @@ export function SummaryExport() {
                             <h2 className="text-3xl font-black text-white tracking-tight uppercase">Offertsammanställning</h2>
                             <p className="text-text-secondary mt-1">Granska kunduppgifter och slutgiltiga belopp före export.</p>
                         </div>
-                        <div className="flex gap-3">
+                        <div className="flex items-center gap-3">
+                            {onBackToSketch && (
+                                <button
+                                    onClick={onBackToSketch}
+                                    className="px-6 py-2.5 bg-panel-bg border border-panel-border text-text-secondary rounded-lg font-medium hover:bg-panel-border hover:text-white transition-all text-sm tracking-wide"
+                                >
+                                    Tillbaka till ritning
+                                </button>
+                            )}
                             <button
                                 onClick={handleSaveQuote}
                                 disabled={isSavingQuote}

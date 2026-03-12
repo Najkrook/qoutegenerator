@@ -1,8 +1,10 @@
 import React from 'react';
 import { useQuote } from '../store/QuoteContext';
 import { useAuth } from '../store/AuthContext';
+import { catalogData } from '../data/catalog';
 import { PricingTable } from '../components/features/PricingTable';
 import { CustomCosts } from '../components/features/CustomCosts';
+import { applyGlobalDiscountToLineSelection } from '../utils/gridAutoScale.js';
 
 function parseDiscount(value) {
     const num = parseFloat(value);
@@ -50,6 +52,7 @@ export function Pricing({ onNext, onPrev }) {
         });
 
         const updatedGridSelections = Object.entries(state.gridSelections || {}).reduce((acc, [lineId, lineSelection]) => {
+            const lineData = catalogData[lineId];
             const nextItems = Object.entries(lineSelection.items || {}).reduce((itemsAcc, [key, item]) => {
                 const currentDiscount = Number.isFinite(item.discountPct) ? item.discountPct : 0;
                 itemsAcc[key] = shouldFollowGlobal(currentDiscount)
@@ -59,6 +62,13 @@ export function Pricing({ onNext, onPrev }) {
             }, {});
 
             const nextAddons = Object.entries(lineSelection.addons || {}).reduce((addonsAcc, [addonId, addon]) => {
+                const addonDef = (lineData?.addonCategories || [])
+                    .flatMap((category) => category.items || [])
+                    .find((item) => item.id === addonId);
+                if (addonDef?.autoScale) {
+                    addonsAcc[addonId] = addon;
+                    return addonsAcc;
+                }
                 const currentDiscount = Number.isFinite(addon.discountPct) ? addon.discountPct : 0;
                 addonsAcc[addonId] = shouldFollowGlobal(currentDiscount)
                     ? { ...addon, discountPct: nextGlobalDiscount }
@@ -66,11 +76,11 @@ export function Pricing({ onNext, onPrev }) {
                 return addonsAcc;
             }, {});
 
-            acc[lineId] = {
+            acc[lineId] = applyGlobalDiscountToLineSelection(lineData, {
                 ...lineSelection,
                 items: nextItems,
                 addons: nextAddons
-            };
+            }, nextGlobalDiscount);
             return acc;
         }, {});
 

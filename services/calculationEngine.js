@@ -1,3 +1,5 @@
+import { buildEffectiveGridSelections } from '../src/utils/gridAutoScale.js';
+
 function toFloat(value) {
     if (typeof value === 'number') return Number.isFinite(value) ? value : 0;
     if (value === null || value === undefined) return 0;
@@ -242,6 +244,9 @@ export function computeQuoteTotals({ state, catalogData }) {
     for (const line of Object.keys(gridSelections)) {
         const lineData = safeCatalog?.[line];
         const gridState = gridSelections[line] || {};
+        const effectiveGridSelections = buildEffectiveGridSelections(lineData, gridState, {
+            globalDiscountPct: safeState.globalDiscountPct
+        });
 
         for (const key of Object.keys(gridState.items || {})) {
             const [model, size] = key.split('|');
@@ -279,12 +284,13 @@ export function computeQuoteTotals({ state, catalogData }) {
             });
         }
 
-        for (const addonId of Object.keys(gridState.addons || {})) {
-            const addonState = gridState.addons[addonId] || {};
+        for (const addonId of Object.keys(effectiveGridSelections.addons || {})) {
+            const addonState = effectiveGridSelections.addons[addonId] || {};
             const addonDef = findGridAddon(lineData, addonId);
             const basePrice = toFloat(addonDef?.price || 0);
             const unitPrice = getUnitSekPrice(basePrice, line, safeCatalog, exchangeRate);
-            const qty = toInt(addonState.qty, 1);
+            const qty = toInt(addonState.qty, 0);
+            if (qty <= 0) continue;
             const gross = unitPrice * qty;
             const discountPct = toFloat(addonState.discountPct || 0);
             const discountSek = gross * (discountPct / 100);

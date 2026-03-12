@@ -2,6 +2,7 @@ import React from 'react';
 import { useQuote } from '../../store/QuoteContext';
 import { catalogData } from '../../data/catalog';
 import { computeQuoteTotals } from '../../../services/calculationEngine';
+import { buildEffectiveGridSelections } from '../../utils/gridAutoScale.js';
 
 export function PricingTable() {
     const { state, dispatch } = useQuote();
@@ -40,14 +41,25 @@ export function PricingTable() {
             };
             dispatch({ type: 'SET_GRID_SELECTIONS', payload: newSelections });
         } else if (source.type === 'grid-addon') {
-            const lineSelections = state.gridSelections[source.lineId];
+            const lineSelections = state.gridSelections[source.lineId] || { items: {}, addons: {} };
+            const effectiveSelections = buildEffectiveGridSelections(catalogData[source.lineId], lineSelections, {
+                globalDiscountPct: state.globalDiscountPct
+            });
+            const existingAddon = lineSelections.addons?.[source.addonId];
+            const effectiveAddon = effectiveSelections.addons?.[source.addonId] || {};
             const newSelections = {
                 ...state.gridSelections,
                 [source.lineId]: {
                     ...lineSelections,
                     addons: {
                         ...lineSelections.addons,
-                        [source.addonId]: { ...lineSelections.addons[source.addonId], discountPct }
+                        [source.addonId]: {
+                            ...(existingAddon || {}),
+                            qty: existingAddon?.qty ?? effectiveAddon.qty ?? 0,
+                            syncMode: existingAddon?.syncMode ?? effectiveAddon.syncMode ?? 'manual',
+                            discountPct,
+                            discountSyncMode: 'manual'
+                        }
                     }
                 }
             };

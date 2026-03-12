@@ -123,7 +123,19 @@ function App() {
                         />
                     )}
                     {canStartQuote && step === 3 && <Pricing onNext={() => setStep(4)} onPrev={() => setStep(2)} />}
-                    {canStartQuote && step === 4 && <SummaryExport onPrev={() => setStep(3)} />}
+                    {canStartQuote && step === 4 && (
+                        <SummaryExport 
+                            onPrev={() => setStep(3)}
+                            onBackToSketch={
+                                canAccessSketch
+                                    ? () => {
+                                        setSketchBackStep(4);
+                                        setStep('sketch');
+                                    }
+                                    : undefined
+                            }
+                        />
+                    )}
                     {canViewEverything && step === 'inventory' && <InventoryManager onBack={() => setStep(0)} />}
                     {canAccessSketch && step === 'sketch' && <SketchTool onBack={() => setStep(sketchBackStep)} />}
                     {canViewEverything && step === 'planner' && <Planner onBack={() => setStep(0)} />}

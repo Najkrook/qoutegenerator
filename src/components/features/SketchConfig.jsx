@@ -355,7 +355,7 @@ export function SketchConfig({
             </label>
 
             {!hasAnySideDepth && (
-                <p className="text-xs text-text-secondary m-0">Rak layout (0 mm djup) kan inte ha bakvÃ¤gg.</p>
+                <p className="text-xs text-text-secondary m-0">Rak layout (0 mm djup) kan inte ha bakvagg.</p>
             )}
 
             <div className="flex flex-col gap-1.5">

@@ -1,6 +1,7 @@
 import React from 'react';
 import { useQuote } from '../../store/QuoteContext';
 import { catalogData } from '../../data/catalog';
+import { buildEffectiveGridSelections } from '../../utils/gridAutoScale.js';
 
 export function GridConfig({ lineId }) {
     const { state, dispatch } = useQuote();
@@ -8,6 +9,9 @@ export function GridConfig({ lineId }) {
 
     const lineData = catalogData[lineId];
     const selections = gridSelections[lineId] || { items: {}, addons: {} };
+    const effectiveSelections = buildEffectiveGridSelections(lineData, selections, {
+        globalDiscountPct
+    });
 
     const updateGrid = (updates) => {
         const newSelections = { ...gridSelections, [lineId]: { ...selections, ...updates } };
@@ -28,16 +32,41 @@ export function GridConfig({ lineId }) {
         updateGrid({ items: newItems });
     };
 
-    const setAddonQty = (addonId, qty) => {
+    const setAddonQtyManual = (addonId, qty, addon) => {
         const newAddons = { ...selections.addons };
-        if (qty > 0) {
+        const normalizedQty = Math.max(0, qty);
+        if (normalizedQty > 0 || addon?.autoScale) {
             const existing = newAddons[addonId];
             newAddons[addonId] = existing
-                ? { ...existing, qty }
-                : { qty, discountPct: globalDiscountPct };
+                ? {
+                    ...existing,
+                    qty: normalizedQty,
+                    syncMode: 'manual',
+                    discountSyncMode: existing.discountSyncMode || 'manual'
+                }
+                : {
+                    qty: normalizedQty,
+                    discountPct: globalDiscountPct,
+                    syncMode: 'manual',
+                    discountSyncMode: 'global'
+                };
         } else {
             delete newAddons[addonId];
         }
+        updateGrid({ addons: newAddons });
+    };
+
+    const setAddonSyncMode = (addonId, syncMode) => {
+        const newAddons = { ...selections.addons };
+        const existing = newAddons[addonId];
+        const effectiveQty = effectiveSelections.addons[addonId]?.qty || 0;
+        newAddons[addonId] = {
+            ...(existing || {}),
+            qty: existing?.qty ?? effectiveQty,
+            discountPct: existing?.discountPct ?? globalDiscountPct,
+            syncMode,
+            discountSyncMode: existing?.discountSyncMode ?? (existing ? 'manual' : 'global')
+        };
         updateGrid({ addons: newAddons });
     };
 
@@ -49,7 +78,7 @@ export function GridConfig({ lineId }) {
             const price = group?.sizes.find(s => s.size === size)?.price || 0;
             total += price * val.qty;
         });
-        Object.entries(selections.addons).forEach(([id, val]) => {
+        Object.entries(effectiveSelections.addons).forEach(([id, val]) => {
             let price = 0;
             lineData.addonCategories.forEach(cat => {
                 const found = cat.items.find(a => a.id === id);
@@ -71,12 +100,8 @@ export function GridConfig({ lineId }) {
         return total;
     };
 
-    const getItemsQtyTotal = () => {
-        return Object.values(selections.items).reduce((sum, entry) => sum + (Number(entry?.qty) || 0), 0);
-    };
-
     const itemsSubtotal = getItemsSubtotal();
-    const itemsQtyTotal = getItemsQtyTotal();
+    const itemsQtyTotal = effectiveSelections.itemsQtyTotal;
 
     return (
         <div className="bg-panel-bg border border-panel-border rounded-lg p-6 mb-8 bg-black/5 animate-fade-in">
@@ -166,7 +191,9 @@ export function GridConfig({ lineId }) {
                                     </td>
                                 </tr>
                                 {cat.items.map(addon => {
-                                    const qty = selections.addons[addon.id]?.qty || 0;
+                                    const effectiveAddon = effectiveSelections.addons[addon.id] || {};
+                                    const qty = effectiveAddon.qty || 0;
+                                    const syncMode = effectiveAddon.syncMode || 'manual';
                                     const total = addon.price * qty;
                                     return (
                                         <tr key={addon.id} className="hover:bg-white/5 transition-colors">
@@ -174,27 +201,40 @@ export function GridConfig({ lineId }) {
                                             <td className="p-3 text-sm text-right">{addon.price.toLocaleString('sv-SE')} SEK</td>
                                             <td className="p-3">
                                                 <div className="flex items-center justify-center gap-2">
+                                                    {addon.autoScale && (
+                                                        <button
+                                                            type="button"
+                                                            aria-pressed={syncMode === 'auto'}
+                                                            onClick={() => setAddonSyncMode(addon.id, 'auto')}
+                                                            className={`px-2 py-1 rounded-full text-[10px] font-semibold border transition-colors ${syncMode === 'auto'
+                                                                ? 'bg-primary/20 text-primary border-primary/60'
+                                                                : 'bg-panel-bg border-panel-border text-text-secondary hover:text-text-primary'
+                                                                }`}
+                                                        >
+                                                            Auto
+                                                        </button>
+                                                    )}
                                                     <button
-                                                        onClick={() => setAddonQty(addon.id, qty - 6)}
+                                                        onClick={() => setAddonQtyManual(addon.id, qty - 6, addon)}
                                                         className="bg-panel-bg border border-panel-border text-text-primary px-1.5 py-1 rounded text-[10px] hover:bg-panel-border cursor-pointer"
                                                     >-6</button>
                                                     <button
-                                                        onClick={() => setAddonQty(addon.id, qty - 1)}
+                                                        onClick={() => setAddonQtyManual(addon.id, qty - 1, addon)}
                                                         className="bg-panel-bg border border-panel-border text-text-primary px-2 py-1 rounded text-xs hover:bg-panel-border cursor-pointer"
                                                     >-</button>
                                                     <input
                                                         type="number"
                                                         min="0"
                                                         value={qty}
-                                                        onChange={(e) => setAddonQty(addon.id, parseInt(e.target.value) || 0)}
+                                                        onChange={(e) => setAddonQtyManual(addon.id, parseInt(e.target.value, 10) || 0, addon)}
                                                         className={`w-12 text-center font-bold bg-black/20 border border-panel-border rounded p-1 text-sm outline-none focus:border-primary ${qty > 0 ? 'text-primary' : ''}`}
                                                     />
                                                     <button
-                                                        onClick={() => setAddonQty(addon.id, qty + 1)}
+                                                        onClick={() => setAddonQtyManual(addon.id, qty + 1, addon)}
                                                         className="bg-panel-bg border border-panel-border text-text-primary px-2 py-1 rounded text-xs hover:bg-panel-border cursor-pointer"
                                                     >+</button>
                                                     <button
-                                                        onClick={() => setAddonQty(addon.id, qty + 6)}
+                                                        onClick={() => setAddonQtyManual(addon.id, qty + 6, addon)}
                                                         className="bg-panel-bg border border-panel-border text-text-primary px-1.5 py-1 rounded text-[10px] hover:bg-panel-border cursor-pointer"
                                                     >+6</button>
                                                 </div>

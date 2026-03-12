@@ -33,7 +33,7 @@ describe('export data builders', () => {
             state,
             catalogData: createCatalogFixture()
         });
-        const rows = buildPdfTableData(state, summary, formatSek);
+        const rows = buildPdfTableData(summary.totals, formatSek);
 
         expect(rows).toHaveLength(summary.totals.length);
         expect(rows[0][0]).toContain('BaHaMa');
@@ -71,9 +71,10 @@ describe('export data builders', () => {
         };
 
         const wsData = buildExcelSheetData(state, summary);
-        const pdfRows = buildPdfTableData(state, summary, formatSek);
+        const pdfRows = buildPdfTableData(summary.totals, formatSek);
 
         expect(wsData.some((row) => String(row[0]).includes('Overgripande Rabatt'))).toBe(true);
-        expect(pdfRows.some((row) => String(row[0]).includes('Overgripande Rabatt'))).toBe(true);
+        expect(pdfRows.some((row) => String(row[0]).includes('Overgripande Rabatt'))).toBe(false);
+        expect(pdfRows).toHaveLength(summary.totals.length);
     });
 });
