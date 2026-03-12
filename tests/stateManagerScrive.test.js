@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { state } from '../services/stateManager.js';
+import { state } from '../src/services/stateManager.js';
 
 describe('stateManager Scrive defaults', () => {
     it('starts with Scrive disabled by default', () => {

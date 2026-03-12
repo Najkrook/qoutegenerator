@@ -4,7 +4,7 @@ import {
     DEFAULT_TEMPLATE_ID,
     getTemplateById,
     isLegalTemplateId
-} from '../features/legalTemplates.js';
+} from '../src/features/legalTemplates.js';
 
 describe('legalTemplates', () => {
     it('contains three selectable templates', () => {

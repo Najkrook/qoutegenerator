@@ -13,7 +13,7 @@ import {
     writeBatch,
     runTransaction
 } from './firebase';
-import { createQuoteRepository } from '../../services/quoteRepository';
+import { createQuoteRepository } from '../services/quoteRepository';
 
 export const quoteRepository = createQuoteRepository({
     db,

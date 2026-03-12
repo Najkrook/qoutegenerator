@@ -1,5 +1,5 @@
 ﻿import React, { createContext, useContext, useReducer, useEffect } from 'react';
-import { DEFAULT_TEMPLATE_ID, isBuiltinTemplateId, getTemplateById } from '../../config/legalTemplates.shared.js';
+import { DEFAULT_TEMPLATE_ID, isBuiltinTemplateId, getTemplateById } from '../config/legalTemplates.shared.js';
 
 const QuoteContext = createContext();
 

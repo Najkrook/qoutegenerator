@@ -1,7 +1,7 @@
 import React from 'react';
 import { useQuote } from '../../store/QuoteContext';
 import { catalogData } from '../../data/catalog';
-import { computeQuoteTotals } from '../../../services/calculationEngine';
+import { computeQuoteTotals } from '../../services/calculationEngine';
 import { buildEffectiveGridSelections } from '../../utils/gridAutoScale.js';
 
 export function PricingTable() {

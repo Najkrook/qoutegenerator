@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { computeQuoteTotals } from '../services/calculationEngine.js';
+import { computeQuoteTotals } from '../src/services/calculationEngine.js';
 import {
     buildExcelSheetData,
     buildExportSummary,
     buildPdfTableData
-} from '../services/exportDataBuilders.js';
+} from '../src/services/exportDataBuilders.js';
 import { createCatalogFixture, createStateFixture } from './fixtures/calculationFixtures.js';
 
 function formatSek(value) {

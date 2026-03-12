@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { computeValidUntilDateString } from '../features/pdfExport.js';
+import { computeValidUntilDateString } from '../src/features/pdfExport.js';
 
 describe('pdfExport helpers', () => {
     it('computes valid-until date from quote date and validity days', () => {

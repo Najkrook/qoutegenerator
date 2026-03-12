@@ -6,13 +6,13 @@ import {
     DEFAULT_TEMPLATE_ID,
     getTemplateById,
     isBuiltinTemplateId
-} from '../../../config/legalTemplates.shared.js';
+} from '../../config/legalTemplates.shared.js';
 import {
     fetchUserTemplates,
     fetchAllTemplates,
     saveTemplate,
     deleteTemplate
-} from '../../services/templateService.js';
+} from '../services/templateService.js';
 import toast from 'react-hot-toast';
 
 function normalizePositiveInt(value, fallback) {
