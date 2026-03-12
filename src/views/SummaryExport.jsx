@@ -12,6 +12,7 @@ import { generateExcel } from '../features/excelExport';
 import { downloadBlob, saveBlobWithPicker } from '../utils/fileUtils';
 import { quoteRepository } from '../services/quoteRepositoryClient';
 import { saveQuoteToRepository } from '../services/quoteSaveService';
+import { safeLogActivity } from '../services/activityLogService';
 
 function sanitizeFileNamePart(value) {
     return String(value || '')
@@ -91,6 +92,21 @@ export function SummaryExport({ onPrev, onBackToSketch }) {
 
         const pickerResult = await saveBlobWithPicker(pdfBlob, fileName);
         if (pickerResult === 'saved') {
+            void safeLogActivity({
+                user,
+                eventType: 'quote_export_pdf',
+                system: 'quote',
+                targetType: 'quote',
+                targetId: state.activeQuoteId || 'unsaved_quote',
+                details: `PDF exporterad: ${fileName}`,
+                metadata: {
+                    format: 'pdf',
+                    fileName,
+                    version: state.activeQuoteVersion || null,
+                    customerName: state.customerInfo?.name || '',
+                    reference: state.customerInfo?.reference || ''
+                }
+            });
             toast.success(`PDF sparad: ${fileName}`);
             return;
         }
@@ -106,6 +122,21 @@ export function SummaryExport({ onPrev, onBackToSketch }) {
 
         if (pickerResult === 'failed' || pickerResult === 'unavailable') {
             downloadBlob(pdfBlob, fileName);
+            void safeLogActivity({
+                user,
+                eventType: 'quote_export_pdf',
+                system: 'quote',
+                targetType: 'quote',
+                targetId: state.activeQuoteId || 'unsaved_quote',
+                details: `PDF exporterad: ${fileName}`,
+                metadata: {
+                    format: 'pdf',
+                    fileName,
+                    version: state.activeQuoteVersion || null,
+                    customerName: state.customerInfo?.name || '',
+                    reference: state.customerInfo?.reference || ''
+                }
+            });
             toast.success(`PDF nedladdad: ${fileName}`);
         }
     };
@@ -116,6 +147,21 @@ export function SummaryExport({ onPrev, onBackToSketch }) {
             return;
         }
         generateExcel(state, summaryData);
+        void safeLogActivity({
+            user,
+            eventType: 'quote_export_excel',
+            system: 'quote',
+            targetType: 'quote',
+            targetId: state.activeQuoteId || 'unsaved_quote',
+            details: 'Excel exporterad: Offert.xlsx',
+            metadata: {
+                format: 'excel',
+                fileName: 'Offert.xlsx',
+                version: state.activeQuoteVersion || null,
+                customerName: state.customerInfo?.name || '',
+                reference: state.customerInfo?.reference || ''
+            }
+        });
     };
 
     const handleSaveQuote = async () => {
@@ -123,7 +169,7 @@ export function SummaryExport({ onPrev, onBackToSketch }) {
 
         setIsSavingQuote(true);
         try {
-            const { isNewQuote, statePatch } = await saveQuoteToRepository({
+            const { saved, isNewQuote, statePatch } = await saveQuoteToRepository({
                 quoteRepository,
                 user,
                 state,
@@ -133,6 +179,23 @@ export function SummaryExport({ onPrev, onBackToSketch }) {
             dispatch({
                 type: 'UPDATE_STATE',
                 payload: statePatch
+            });
+
+            void safeLogActivity({
+                user,
+                eventType: isNewQuote ? 'quote_created' : 'quote_revision_saved',
+                system: 'quote',
+                targetType: isNewQuote ? 'quote' : 'revision',
+                targetId: statePatch.activeQuoteId || saved?.quoteId || 'unknown_quote',
+                details: isNewQuote
+                    ? 'Offert skapad och sparad i Mina Offerter.'
+                    : `Offerten sparades som version ${statePatch.activeQuoteVersion}.`,
+                metadata: {
+                    version: statePatch.activeQuoteVersion || null,
+                    customerName: state.customerInfo?.name || '',
+                    reference: state.customerInfo?.reference || '',
+                    totalSek: summaryData.finalTotalSek || 0
+                }
             });
 
             if (isNewQuote) {

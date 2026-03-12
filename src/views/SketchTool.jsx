@@ -23,6 +23,7 @@ import { SketchConfig } from '../components/features/SketchConfig';
 import { SketchBom } from '../components/features/SketchBom';
 import { StockComparisonModal } from '../components/features/StockComparisonModal';
 import toast from 'react-hot-toast';
+import { safeLogActivity } from '../services/activityLogService';
 
 const EDGE_LABELS = {
     front: 'Fram',
@@ -165,7 +166,7 @@ function serializeSketchConfig(config) {
 
 export function SketchTool({ onBack }) {
     const { state, dispatch } = useQuote();
-    const { canExportSketchToQuote } = useAuth();
+    const { user, canExportSketchToQuote } = useAuth();
 
     const [config, setConfig] = useState(() => {
         const defaultConfig = {
@@ -599,6 +600,24 @@ export function SketchTool({ onBack }) {
 
         dispatch({ type: 'SET_STEP', payload: 2 });
 
+        void safeLogActivity({
+            user,
+            eventType: 'sketch_export_to_quote',
+            system: 'sketch',
+            targetType: state.activeQuoteId ? 'quote' : 'draft_quote',
+            targetId: state.activeQuoteId || 'draft_quote',
+            details: hasParasols
+                ? `Ritning exporterad till offert med ${config.parasols.length} parasoller.`
+                : 'Ritning exporterad till offert.',
+            metadata: {
+                width: config.width,
+                depthLeft: config.depthLeft,
+                depthRight: config.depthRight,
+                sectionCount: layout.allSections.length,
+                parasolCount: (config.parasols || []).length
+            }
+        });
+
         if (autoAdjustedEdges.length > 0) {
             const adjusted = autoAdjustedEdges
                 .map(
@@ -651,6 +670,23 @@ export function SketchTool({ onBack }) {
                 const pickerResult = await saveBlobWithPicker(blob, fileName);
 
                 if (pickerResult === 'saved') {
+                    void safeLogActivity({
+                        user,
+                        eventType: 'sketch_export_image',
+                        system: 'sketch',
+                        targetType: 'sketch',
+                        targetId: 'sketch_canvas',
+                        details: `Ritningsbild sparad: ${fileName}`,
+                        metadata: {
+                            format: 'png',
+                            fileName,
+                            width: config.width,
+                            depthLeft: config.depthLeft,
+                            depthRight: config.depthRight,
+                            sectionCount: layout.allSections.length,
+                            parasolCount: (config.parasols || []).length
+                        }
+                    });
                     toast.success(`Skiss sparad: ${fileName}`, { id: toastId });
                 } else if (pickerResult === 'canceled') {
                     toast.dismiss(toastId);
@@ -660,6 +696,23 @@ export function SketchTool({ onBack }) {
                         toast('Kunde inte öppna spara-dialog. Använder nedladdning istället.', { icon: '!' });
                     }
                     downloadBlob(blob, fileName);
+                    void safeLogActivity({
+                        user,
+                        eventType: 'sketch_export_image',
+                        system: 'sketch',
+                        targetType: 'sketch',
+                        targetId: 'sketch_canvas',
+                        details: `Ritningsbild nedladdad: ${fileName}`,
+                        metadata: {
+                            format: 'png',
+                            fileName,
+                            width: config.width,
+                            depthLeft: config.depthLeft,
+                            depthRight: config.depthRight,
+                            sectionCount: layout.allSections.length,
+                            parasolCount: (config.parasols || []).length
+                        }
+                    });
                     toast.success(`Skiss nedladdad: ${fileName}`, { id: toastId });
                 }
             }, 'image/png');

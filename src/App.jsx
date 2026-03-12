@@ -10,6 +10,7 @@ import { SketchTool } from './views/SketchTool';
 import { Planner } from './views/Planner';
 import { History } from './views/History';
 import { InventoryLogs } from './views/InventoryLogs';
+import { ActivityLogs } from './views/ActivityLogs';
 import { Login } from './views/Login';
 import { useQuote } from './store/QuoteContext';
 import { useAuth } from './store/AuthContext';
@@ -56,6 +57,11 @@ function App() {
             dispatch({ type: 'SET_STEP', payload: 0 });
             return;
         }
+
+        if (step === 'activity-logs' && !canViewEverything) {
+            dispatch({ type: 'SET_STEP', payload: 0 });
+            return;
+        }
     }, [loading, user, canViewEverything, canStartQuote, canAccessSketch, canAccessQuoteHistory, step, dispatch]);
 
     if (loading) {
@@ -89,6 +95,7 @@ function App() {
                                     : undefined
                             }
                             onOpenPlanner={canViewEverything ? () => setStep('planner') : undefined}
+                            onOpenActivity={canViewEverything ? () => setStep('activity-logs') : undefined}
                         />
                     )}
                     {canStartQuote && step === 1 && <ProductLineSelection onNext={() => setStep(2)} />}
@@ -155,6 +162,7 @@ function App() {
                             }} 
                         />
                     )}
+                    {canViewEverything && step === 'activity-logs' && <ActivityLogs onBack={() => setStep(0)} />}
                     {canViewEverything && step === 'inventory-logs' && <InventoryLogs onBack={() => setStep(0)} />}
                 </main>
             </div>

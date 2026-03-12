@@ -1,21 +1,13 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../store/AuthContext';
 import { db, collection, query, orderBy, limit, getDocs } from '../services/firebase';
+import {
+    formatActivityMetadata,
+    getActivityLogVisual,
+    normalizeActivityLog
+} from '../services/activityLogService';
 
-function getLogVisual(entry) {
-    if (entry.action === 'Lades Till' || (entry.action === 'Justering' && Number(entry.delta) > 0)) {
-        return { icon: '+', color: 'var(--color-success)' };
-    }
-    if (entry.action === 'Togs Bort' || (entry.action === 'Justering' && Number(entry.delta) < 0)) {
-        return { icon: '-', color: 'var(--color-danger)' };
-    }
-    if (entry.action === 'Massuppdatering') {
-        return { icon: '*', color: 'var(--color-primary)' };
-    }
-    return { icon: 'i', color: 'var(--color-primary)' };
-}
-
-export function Dashboard({ onStartQuote, onOpenInventory, onOpenSketch, onOpenPlanner }) {
+export function Dashboard({ onStartQuote, onOpenInventory, onOpenSketch, onOpenPlanner, onOpenActivity }) {
     const { canViewEverything, canStartQuote, canAccessSketch } = useAuth();
     const [logs, setLogs] = useState([]);
     const [logsLoading, setLogsLoading] = useState(false);
@@ -29,19 +21,10 @@ export function Dashboard({ onStartQuote, onOpenInventory, onOpenSketch, onOpenP
 
         setLogsLoading(true);
         try {
-            const logsRef = collection(db, 'inventory_logs');
-            let snap;
-            try {
-                snap = await getDocs(query(logsRef, orderBy('timestamp', 'desc'), limit(20)));
-            } catch {
-                snap = await getDocs(query(logsRef, orderBy('createdAt', 'desc'), limit(20)));
-            }
-            const data = snap.docs.map((d) => d.data());
-            data.sort((a, b) => {
-                const tA = typeof a.createdAt === 'number' ? a.createdAt : Date.parse(a.timestamp || '') || 0;
-                const tB = typeof b.createdAt === 'number' ? b.createdAt : Date.parse(b.timestamp || '') || 0;
-                return tB - tA;
-            });
+            const logsRef = collection(db, 'activity_logs');
+            const snap = await getDocs(query(logsRef, orderBy('createdAt', 'desc'), limit(20)));
+            const data = snap.docs.map((docSnap) => normalizeActivityLog(docSnap));
+            data.sort((a, b) => b.resolvedMs - a.resolvedMs);
             setLogs(data);
         } catch (err) {
             console.error('Failed to fetch logs:', err);
@@ -101,6 +84,19 @@ export function Dashboard({ onStartQuote, onOpenInventory, onOpenSketch, onOpenP
                     </button>
                 )}
 
+                {canViewEverything && onOpenActivity && (
+                    <button
+                        onClick={onOpenActivity}
+                        className="flex-1 min-w-[250px] max-w-[350px] bg-panel-bg border border-panel-border rounded-xl p-12 cursor-pointer text-center transition-all hover:-translate-y-1 hover:shadow-lg hover:border-primary group"
+                    >
+                        <div className="text-5xl mb-4 group-hover:scale-110 transition-transform">🕘</div>
+                        <h3 className="text-2xl font-semibold text-text-primary mb-2">Aktivitetslog</h3>
+                        <p className="text-text-secondary leading-relaxed m-0">
+                            Se vem som skapade offerter, exporterade filer och använde ritverktyget.
+                        </p>
+                    </button>
+                )}
+
                 {canViewEverything && onOpenPlanner && (
                     <button
                         onClick={onOpenPlanner}
@@ -135,9 +131,10 @@ export function Dashboard({ onStartQuote, onOpenInventory, onOpenSketch, onOpenP
                             <p className="text-text-secondary text-center italic">Inga loggade händelser ännu.</p>
                         ) : (
                             logs.slice(0, 10).map((entry, idx) => {
-                                const time = typeof entry.createdAt === 'number' ? entry.createdAt : Date.parse(entry.timestamp || '') || Date.now();
-                                const date = new Date(time);
-                                const { icon, color } = getLogVisual(entry);
+                                const date = new Date(entry.resolvedMs || Date.now());
+                                const { icon, color, label } = getActivityLogVisual(entry);
+                                const metadataSummary = formatActivityMetadata(entry.metadata);
+                                const targetLabel = entry.targetId && entry.targetId !== '-' ? entry.targetId : entry.targetType;
                                 return (
                                     <div
                                         key={idx}
@@ -148,15 +145,19 @@ export function Dashboard({ onStartQuote, onOpenInventory, onOpenSketch, onOpenP
                                         <div className="flex-1 min-w-0">
                                             <div className="flex justify-between mb-1">
                                                 <span className="font-semibold text-text-primary text-sm">
-                                                    {entry.system}: {entry.action}
+                                                    {label}
                                                 </span>
                                                 <span className="text-xs text-text-secondary whitespace-nowrap">
                                                     {date.toLocaleDateString('sv-SE', { month: 'short', day: 'numeric' })}{' '}
                                                     {date.toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit' })}
                                                 </span>
                                             </div>
-                                            <div className="text-sm text-text-primary">{entry.targetId || entry.element || '-'}</div>
-                                            <div className="text-xs text-text-secondary">{entry.details || '-'}</div>
+                                            <div className="text-sm text-text-primary">
+                                                {entry.user || '-'}{targetLabel ? ` · ${targetLabel}` : ''}
+                                            </div>
+                                            <div className="text-xs text-text-secondary">
+                                                {entry.details || '-'}{metadataSummary ? ` · ${metadataSummary}` : ''}
+                                            </div>
                                         </div>
                                     </div>
                                 );

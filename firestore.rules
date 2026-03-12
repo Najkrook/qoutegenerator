@@ -13,6 +13,20 @@ service cloud.firestore {
       ];
     }
 
+    function isOwnActivityLogCreate() {
+      return isSignedIn()
+        && request.resource.data.userUid == request.auth.uid
+        && request.resource.data.user == (request.auth.token.email != null ? request.auth.token.email : "")
+        && request.resource.data.createdAt is int
+        && request.resource.data.timestamp is string
+        && request.resource.data.eventType is string
+        && request.resource.data.system is string
+        && request.resource.data.targetType is string
+        && request.resource.data.targetId is string
+        && request.resource.data.details is string
+        && request.resource.data.metadata is map;
+    }
+
     match /users/{userId}/quotes/{quoteId} {
       allow read, create, update, delete: if isSignedIn() && request.auth.uid == userId;
     }
@@ -27,6 +41,11 @@ service cloud.firestore {
 
     match /inventory_logs/{logId} {
       allow read, write: if isAdmin();
+    }
+
+    match /activity_logs/{logId} {
+      allow read: if isAdmin();
+      allow create: if isOwnActivityLogCreate();
     }
 
     match /users/{userId}/templates/{templateId} {

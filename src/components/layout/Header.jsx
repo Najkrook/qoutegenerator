@@ -70,6 +70,16 @@ export function Header() {
                     {canViewEverything && (
                         <button 
                             type="button" 
+                            onClick={() => dispatch({ type: 'SET_STEP', payload: 'activity-logs' })} 
+                            className={`text-text-primary no-underline font-medium text-sm px-3 py-1.5 rounded-md border transition-colors cursor-pointer ${step === 'activity-logs' ? 'bg-panel-border border-panel-border' : 'bg-panel-bg border-panel-border hover:bg-panel-border'}`}
+                        >
+                            Aktivitetslog
+                        </button>
+                    )}
+
+                    {canViewEverything && (
+                        <button 
+                            type="button" 
                             onClick={() => dispatch({ type: 'SET_STEP', payload: 'inventory-logs' })} 
                             className={`text-text-primary no-underline font-medium text-sm px-3 py-1.5 rounded-md border transition-colors cursor-pointer ${step === 'inventory-logs' ? 'bg-panel-border border-panel-border' : 'bg-panel-bg border-panel-border hover:bg-panel-border'}`}
                         >
