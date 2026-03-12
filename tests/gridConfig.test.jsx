@@ -1,44 +1,57 @@
 import React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
-
-const quoteState = vi.hoisted(() => ({
-    value: {
-        state: {
-            gridSelections: {},
-            globalDiscountPct: 0
-        },
-        dispatch: vi.fn()
-    }
-}));
-
-vi.mock('../src/store/QuoteContext.jsx', () => ({
-    useQuote: () => quoteState.value
-}));
-
+import { QuoteProvider } from '../src/store/QuoteContext.jsx';
+import { QUOTE_STATE_STORAGE_KEY } from '../src/store/quoteStateSchema.js';
 import { GridConfig } from '../src/components/features/GridConfig.jsx';
+
+function stubLocalStorage(serializedState) {
+    const storage = new Map();
+    if (serializedState !== undefined) {
+        storage.set(QUOTE_STATE_STORAGE_KEY, serializedState);
+    }
+
+    const localStorageMock = {
+        getItem: vi.fn((key) => (storage.has(key) ? storage.get(key) : null)),
+        setItem: vi.fn((key, value) => storage.set(key, value)),
+        removeItem: vi.fn((key) => storage.delete(key)),
+        clear: vi.fn(() => storage.clear())
+    };
+
+    Object.defineProperty(globalThis, 'localStorage', {
+        value: localStorageMock,
+        configurable: true,
+        writable: true
+    });
+}
+
+function renderGridConfig(state) {
+    stubLocalStorage(JSON.stringify(state));
+    return renderToStaticMarkup(
+        <QuoteProvider>
+            <GridConfig lineId="ClickitUP" />
+        </QuoteProvider>
+    );
+}
 
 describe('GridConfig auto-scale add-ons', () => {
     beforeEach(() => {
-        quoteState.value = {
-            state: {
-                globalDiscountPct: 0,
-                gridSelections: {
-                    ClickitUP: {
-                        items: {
-                            'ClickitUP Section|1500': { qty: 4, discountPct: 0 },
-                            'ClickitUP Section|1600': { qty: 3, discountPct: 0 }
-                        },
-                        addons: {}
-                    }
-                }
-            },
-            dispatch: vi.fn()
-        };
+        stubLocalStorage();
     });
 
     it('renders auto-sync controls for ClickitUp recommended add-ons by default', () => {
-        const html = renderToStaticMarkup(<GridConfig lineId="ClickitUP" />);
+        const html = renderGridConfig({
+            globalDiscountPct: 0,
+            gridSelections: {
+                ClickitUP: {
+                    items: {
+                        'ClickitUP Section|1500': { qty: 4, discountPct: 0 },
+                        'ClickitUP Section|1600': { qty: 3, discountPct: 0 }
+                    },
+                    addons: {}
+                }
+            }
+        });
 
         expect(html).toContain('Svartanodiserade profiler');
         expect(html).toContain('Stoppknapp 140 cm');
@@ -47,25 +60,20 @@ describe('GridConfig auto-scale add-ons', () => {
     });
 
     it('renders a manual auto-scale row as inactive while leaving missing rows auto', () => {
-        quoteState.value = {
-            state: {
-                globalDiscountPct: 0,
-                gridSelections: {
-                    ClickitUP: {
-                        items: {
-                            'ClickitUP Section|1500': { qty: 4, discountPct: 0 },
-                            'ClickitUP Section|1600': { qty: 3, discountPct: 0 }
-                        },
-                        addons: {
-                            svartanodiserade: { qty: 4, discountPct: 0, syncMode: 'manual' }
-                        }
+        const html = renderGridConfig({
+            globalDiscountPct: 0,
+            gridSelections: {
+                ClickitUP: {
+                    items: {
+                        'ClickitUP Section|1500': { qty: 4, discountPct: 0 },
+                        'ClickitUP Section|1600': { qty: 3, discountPct: 0 }
+                    },
+                    addons: {
+                        svartanodiserade: { qty: 4, discountPct: 0, syncMode: 'manual' }
                     }
                 }
-            },
-            dispatch: vi.fn()
-        };
-
-        const html = renderToStaticMarkup(<GridConfig lineId="ClickitUP" />);
+            }
+        });
 
         expect(html).toContain('Svartanodiserade profiler');
         expect(html).toContain('Stoppknapp 140 cm');

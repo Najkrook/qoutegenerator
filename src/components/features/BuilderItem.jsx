@@ -139,6 +139,9 @@ export function BuilderItem({ item, index, onRemove }) {
 
     const itemGrandTotal = itemBaseTotal + addonsTotal;
     const selectedAddonCount = item.addons.length;
+    const selectedAddonBadgeText = selectedAddonCount === 1 ? '1 tillägg' : `${selectedAddonCount} tillägg`;
+    const getSelectedCategoryCount = (category) => category.items.filter((addon) => item.addons.some((selected) => selected.id === addon.id)).length;
+    const getSelectedCategoryLabel = (count) => (count === 1 ? '1 vald' : `${count} valda`);
 
     return (
         <div className="bg-panel-bg border border-panel-border rounded-lg p-6 mb-6 relative animate-slide-in">
@@ -146,6 +149,11 @@ export function BuilderItem({ item, index, onRemove }) {
                 <h3 className="text-lg font-semibold m-0 flex items-center gap-2">
                     <span className="text-text-secondary cursor-grab">=</span>
                     Produkt {index + 1} ({item.line})
+                    {selectedAddonCount > 0 && (
+                        <span className="inline-flex items-center rounded-full bg-primary/20 px-2.5 py-1 text-xs font-semibold text-primary">
+                            {selectedAddonBadgeText}
+                        </span>
+                    )}
                 </h3>
                 <button
                     onClick={() => onRemove(item.id)}
@@ -225,11 +233,21 @@ export function BuilderItem({ item, index, onRemove }) {
                     </summary>
 
                     <div className="mt-4 space-y-4">
-                        {modelData.addonCategories?.map((cat) => (
+                        {modelData.addonCategories?.map((cat) => {
+                            const selectedCategoryCount = getSelectedCategoryCount(cat);
+
+                            return (
                             <details key={cat.name} className="bg-black/10 border border-panel-border rounded-md overflow-hidden group">
                                 <summary className="p-3 text-sm font-semibold text-primary uppercase cursor-pointer list-none flex justify-between items-center group-open:border-b group-open:border-panel-border">
-                                    {cat.name}
-                                    <span className="text-xs transition-transform group-open:rotate-180">▼</span>
+                                    <span>{cat.name}</span>
+                                    <span className="flex items-center gap-3">
+                                        {selectedCategoryCount > 0 && (
+                                            <span className="inline-flex items-center rounded-full bg-primary/20 px-2.5 py-1 text-[11px] font-semibold normal-case tracking-normal text-primary">
+                                                {getSelectedCategoryLabel(selectedCategoryCount)}
+                                            </span>
+                                        )}
+                                        <span className="text-xs transition-transform group-open:rotate-180">▼</span>
+                                    </span>
                                 </summary>
                                 <div className="p-4 space-y-3">
                                     {cat.items.map((addon) => {
@@ -264,7 +282,8 @@ export function BuilderItem({ item, index, onRemove }) {
                                     })}
                                 </div>
                             </details>
-                        ))}
+                            );
+                        })}
 
                         {modelData.addons?.length > 0 && (
                             <div className="bg-black/10 border border-panel-border rounded-md p-4 space-y-3">
