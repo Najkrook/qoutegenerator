@@ -163,10 +163,10 @@ export function generatePDF(state, summaryData, returnBlob = false) {
             return acc;
         }, {});
 
-        // Sort groups (optional, but nice to have order: ClickitUP, BaHaMa, others)
+        // Sort groups (optional, but nice to have order: ClickitUp, BaHaMa, others)
         const groupKeys = Object.keys(groupedTotals).sort((a, b) => {
-            if (a === 'ClickitUP') return -1;
-            if (b === 'ClickitUP') return 1;
+            if (a === 'ClickitUp') return -1;
+            if (b === 'ClickitUp') return 1;
             if (a === 'BaHaMa') return -1;
             if (b === 'BaHaMa') return 1;
             if (a === 'Övrigt') return 1;
@@ -185,19 +185,19 @@ export function generatePDF(state, summaryData, returnBlob = false) {
                 doc.addPage();
                 drawHeader();
                 currentY = 35;
-                
+
                 doc.setFont("helvetica", "bold");
                 doc.setFontSize(14);
                 doc.setTextColor(...darkText);
                 doc.text(`Produkter - ${lineKey}`, PAGE_MARGIN_X, currentY);
                 currentY += 8;
             } else if (groupKeys.length > 1 && lineKey !== 'Övrigt') {
-                 // Even on page 1, if there are multiple lines, a subtitle helps
-                 doc.setFont("helvetica", "bold");
-                 doc.setFontSize(12);
-                 doc.setTextColor(...darkText);
-                 doc.text(`Produkter - ${lineKey}`, PAGE_MARGIN_X, currentY);
-                 currentY += 6;
+                // Even on page 1, if there are multiple lines, a subtitle helps
+                doc.setFont("helvetica", "bold");
+                doc.setFontSize(12);
+                doc.setTextColor(...darkText);
+                doc.text(`Produkter - ${lineKey}`, PAGE_MARGIN_X, currentY);
+                currentY += 6;
             }
 
             const tableData = buildPdfTableData(lineItems, formatSEK);
@@ -580,7 +580,7 @@ export function generatePDF(state, summaryData, returnBlob = false) {
             doc.setFont("helvetica", "bold");
             doc.setFontSize(7.5);
             doc.setTextColor(255, 255, 255);
-            doc.text("+46 (0) 705-250 000   |   info@brixx.se   |   WWW.BRIXX.SE   |   EST'D 1992", pageWidth / 2, footerY, { align: "center" });
+            doc.text("+46 (0) 708-500 000   |   team@brixx.se   |   WWW.BRIXX.SE   |   EST'D 1992", pageWidth / 2, footerY, { align: "center" });
 
             // Page number (bottom right, orange)
             doc.setTextColor(...brandOrange);
