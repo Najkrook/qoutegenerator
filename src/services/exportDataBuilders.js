@@ -6,6 +6,10 @@ function safeCustomerInfo(state) {
     return state?.customerInfo || {};
 }
 
+function isZeroNumber(value) {
+    return Number(value) === 0;
+}
+
 export function buildExportSummary(state = {}, summaryData = {}) {
     const finalTotalSek = Number(summaryData.finalTotalSek) || 0;
     const grossTotalSek = Number(summaryData.grossTotalSek) || 0;
@@ -20,6 +24,17 @@ export function buildExportSummary(state = {}, summaryData = {}) {
         vatAmount,
         totalWithVat
     };
+}
+
+export function hasZeroDiscountSummary(summaryData = {}) {
+    const totals = Array.isArray(summaryData?.totals) ? summaryData.totals : [];
+    return isZeroNumber(summaryData?.totalDiscountSek) && totals.every((row) => (
+        isZeroNumber(row?.discountPct) && isZeroNumber(row?.discountSek)
+    ));
+}
+
+export function shouldHideDiscountReferencesInPdf(state = {}, summaryData = {}) {
+    return state?.hideZeroDiscountReferencesInPdf === true && hasZeroDiscountSummary(summaryData);
 }
 
 export function buildExcelSheetData(state = {}, summaryData = {}) {
@@ -100,20 +115,32 @@ export function buildExcelSheetData(state = {}, summaryData = {}) {
     return wsData;
 }
 
-export function buildPdfTableData(totalsArray = [], formatSEK = (v) => String(v)) {
+export function buildPdfTableData(totalsArray = [], formatSEK = (v) => String(v), options = {}) {
+    const hideDiscountColumns = options.hideDiscountColumns === true;
+    const hideRecommendedPriceColumn = options.hideRecommendedPriceColumn === true;
     const tableData = [];
 
     totalsArray.forEach((row) => {
-        tableData.push([
+        const cells = [
             row.model,
             row.size || '-',
             `${formatSEK(row.unitPrice)} SEK`,
             `${row.qty}`,
-            `${formatSEK(row.net)} SEK`,
-            `${formatSEK(row.gross)} SEK`,
-            `${formatSEK(row.discountSek)} SEK`,
-            `${row.discountPct}%`
-        ]);
+            `${formatSEK(row.net)} SEK`
+        ];
+
+        if (!hideRecommendedPriceColumn) {
+            cells.push(`${formatSEK(row.gross)} SEK`);
+        }
+
+        if (!hideDiscountColumns) {
+            cells.push(
+                `${formatSEK(row.discountSek)} SEK`,
+                `${row.discountPct}%`
+            );
+        }
+
+        tableData.push(cells);
     });
 
     return tableData;

@@ -13,6 +13,7 @@ import {
     saveTemplate,
     deleteTemplate
 } from '../../services/templateService.js';
+import { hasZeroDiscountSummary } from '../../services/exportDataBuilders.js';
 import toast from 'react-hot-toast';
 
 function normalizePositiveInt(value, fallback) {
@@ -20,7 +21,7 @@ function normalizePositiveInt(value, fallback) {
     return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
 }
 
-export function TermsAndPaymentPanel() {
+export function TermsAndPaymentPanel({ summaryData }) {
     const { state, dispatch } = useQuote();
     const { user, canViewEverything } = useAuth();
     const [paymentDaysInput, setPaymentDaysInput] = useState(String(state.paymentTermsDays));
@@ -60,6 +61,7 @@ export function TermsAndPaymentPanel() {
     );
 
     const selectedTemplateId = state.termsTemplateId || DEFAULT_TEMPLATE_ID;
+    const canHideDiscountReferences = hasZeroDiscountSummary(summaryData);
 
     useEffect(() => {
         setPaymentDaysInput(String(state.paymentTermsDays));
@@ -295,6 +297,20 @@ export function TermsAndPaymentPanel() {
                             />
                             Visa signeringsruta i PDF
                         </label>
+                        {canHideDiscountReferences && (
+                            <label className="flex items-center gap-2 text-sm text-text-primary cursor-pointer">
+                                <input
+                                    type="checkbox"
+                                    checked={state.hideZeroDiscountReferencesInPdf === true}
+                                    onChange={(e) => dispatch({
+                                        type: 'SET_HIDE_ZERO_DISCOUNT_REFERENCES_IN_PDF',
+                                        payload: e.target.checked
+                                    })}
+                                    className="w-4 h-4 accent-primary"
+                                />
+                                Dölj rabattreferenser i PDF när rabatten är 0%
+                            </label>
+                        )}
                     </div>
                 </>
             )}

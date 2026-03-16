@@ -11,6 +11,7 @@ import { downloadBlob, saveBlobWithPicker } from '../utils/fileUtils';
 import { quoteRepository } from '../services/quoteRepositoryClient';
 import { saveQuoteToRepository } from '../services/quoteSaveService';
 import { safeLogActivity } from '../services/activityLogService';
+import { hasZeroDiscountSummary } from '../services/exportDataBuilders.js';
 
 function sanitizeFileNamePart(value) {
     return String(value || '')
@@ -54,6 +55,17 @@ export function SummaryExport({ onPrev, onBackToSketch }) {
     const [previewError, setPreviewError] = useState('');
     const [isSavingQuote, setIsSavingQuote] = useState(false);
     const previewUrlRef = useRef('');
+
+    useEffect(() => {
+        if (hasZeroDiscountSummary(summaryData) || state.hideZeroDiscountReferencesInPdf !== true) {
+            return;
+        }
+
+        dispatch({
+            type: 'SET_HIDE_ZERO_DISCOUNT_REFERENCES_IN_PDF',
+            payload: false
+        });
+    }, [dispatch, state.hideZeroDiscountReferencesInPdf, summaryData]);
 
     useEffect(() => {
         let cancelled = false;
@@ -268,7 +280,7 @@ export function SummaryExport({ onPrev, onBackToSketch }) {
                         </section>
 
                         <section>
-                            <TermsAndPaymentPanel />
+                            <TermsAndPaymentPanel summaryData={summaryData} />
                         </section>
 
                         <section className="bg-panel-bg border border-panel-border rounded-lg p-6 shadow-sm">

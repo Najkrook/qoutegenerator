@@ -2,7 +2,11 @@ import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { BRIXX_LOGO_BASE64 } from '../../assets/logoData.js';
 import { notifyWarn, notifyError } from '../services/notificationService.js';
-import { buildPdfTableData, buildExportSummary } from '../services/exportDataBuilders.js';
+import {
+    buildPdfTableData,
+    buildExportSummary,
+    shouldHideDiscountReferencesInPdf
+} from '../services/exportDataBuilders.js';
 
 function normalizePositiveInt(value, fallback) {
     const parsed = Number.parseInt(value, 10);
@@ -41,6 +45,30 @@ export function generatePDF(state, summaryData, returnBlob = false) {
             : window.FEATURE_PDF_LEGAL_TEMPLATES !== false;
         const shouldRenderPaymentBox = pdfLegalTemplatesEnabled && state.includePaymentBox !== false;
         const shouldRenderSignatureBlock = pdfLegalTemplatesEnabled && state.includeSignatureBlock !== false;
+        const hideDiscountReferences = shouldHideDiscountReferencesInPdf(state, summaryData);
+        const hideRecommendedPriceColumn = hideDiscountReferences;
+        const tableHead = hideDiscountReferences
+            ? [['Modell', 'Storlek', 'Pris/enhet\nExkl. moms', 'Antal', 'Ert Pris\nExkl. moms']]
+            : [['Modell', 'Storlek', 'Pris/enhet\nExkl. moms', 'Antal', 'Ert Pris\nExkl. moms', 'Rek Utpris\nExkl. moms', 'Rabatt\ni SEK', 'Rabatt\ni %']];
+        const tableColumnStyles = hideDiscountReferences
+            ? {
+                0: { halign: 'left', fontStyle: 'bold', cellWidth: 54 },
+                1: { halign: 'center', cellWidth: 20 },
+                2: { halign: 'right', cellWidth: 33 },
+                3: { halign: 'center', fontStyle: 'bold', cellWidth: 18 },
+                4: { halign: 'right', fontStyle: 'bold', cellWidth: 33 }
+            }
+            : {
+                0: { halign: 'left', fontStyle: 'bold', cellWidth: 44 },
+                1: { halign: 'center', cellWidth: 16 },
+                2: { halign: 'right', cellWidth: 27 },
+                3: { halign: 'center', fontStyle: 'bold', cellWidth: 14 },
+                4: { halign: 'right', fontStyle: 'bold', cellWidth: 27 },
+                5: { halign: 'right', cellWidth: 27 },
+                6: { halign: 'right', cellWidth: 23 },
+                7: { halign: 'center', cellWidth: 14 }
+            };
+        const reducedTableWidth = Object.values(tableColumnStyles).reduce((sum, style) => sum + (style.cellWidth || 0), 0);
 
         const pageWidth = doc.internal.pageSize.width;
         const pageHeight = doc.internal.pageSize.height;
@@ -189,11 +217,20 @@ export function generatePDF(state, summaryData, returnBlob = false) {
                 currentY += 6;
             }
 
-            const tableData = buildPdfTableData(lineItems, formatSEK);
+            const tableData = buildPdfTableData(lineItems, formatSEK, {
+                hideDiscountColumns: hideDiscountReferences,
+                hideRecommendedPriceColumn
+            });
+            const tableLeftMargin = hideDiscountReferences
+                ? Math.max(PAGE_MARGIN_X, (pageWidth - reducedTableWidth) / 2)
+                : PAGE_MARGIN_X;
+            const tableRightMargin = hideDiscountReferences
+                ? Math.max(PAGE_MARGIN_X, pageWidth - tableLeftMargin - reducedTableWidth)
+                : PAGE_MARGIN_X;
 
             autoTable(doc, {
                 startY: currentY,
-                head: [['Modell', 'Storlek', 'Pris/enhet\nExkl. moms', 'Antal', 'Ert Pris\nExkl. moms', 'Rek Utpris\nExkl. moms', 'Rabatt\ni SEK', 'Rabatt\ni %']],
+                head: tableHead,
                 body: tableData,
                 theme: 'striped',
                 styles: {
@@ -214,16 +251,7 @@ export function generatePDF(state, summaryData, returnBlob = false) {
                 alternateRowStyles: {
                     fillColor: [248, 249, 250]
                 },
-                columnStyles: {
-                    0: { halign: 'left', fontStyle: 'bold', cellWidth: 44 },
-                    1: { halign: 'center', cellWidth: 16 },
-                    2: { halign: 'right', cellWidth: 27 },
-                    3: { halign: 'center', fontStyle: 'bold', cellWidth: 14 },
-                    4: { halign: 'right', fontStyle: 'bold', cellWidth: 27 },
-                    5: { halign: 'right', cellWidth: 27 },
-                    6: { halign: 'right', cellWidth: 23 },
-                    7: { halign: 'center', cellWidth: 14 }
-                },
+                columnStyles: tableColumnStyles,
                 didParseCell: function (data) {
                     if (data.section === 'head' && data.column.index === 4) {
                         data.cell.styles.fillColor = accentGreen;
@@ -233,7 +261,8 @@ export function generatePDF(state, summaryData, returnBlob = false) {
                         data.cell.styles.fillColor = [235, 250, 240];
                     }
                 },
-                margin: { left: PAGE_MARGIN_X, right: PAGE_MARGIN_X, top: 14, bottom: CONTENT_BOTTOM_SAFE },
+                margin: { left: tableLeftMargin, right: tableRightMargin, top: 14, bottom: CONTENT_BOTTOM_SAFE },
+                tableWidth: hideDiscountReferences ? reducedTableWidth : 'auto',
                 pageBreak: 'auto',
                 rowPageBreak: 'avoid'
             });
@@ -420,9 +449,13 @@ export function generatePDF(state, summaryData, returnBlob = false) {
         drawTotalLine("Totalt Rek Utpris:", `${formatSEK(exportSummary.grossTotalSek)} SEK`, finalY);
         finalY += 6;
 
-        doc.setTextColor(...grayText);
-        drawTotalLine("Total Rabatt:", `-${formatSEK(exportSummary.totalDiscountSek)} SEK`, finalY);
-        finalY += 10;
+        if (!hideDiscountReferences) {
+            doc.setTextColor(...grayText);
+            drawTotalLine("Total Rabatt:", `-${formatSEK(exportSummary.totalDiscountSek)} SEK`, finalY);
+            finalY += 10;
+        } else {
+            finalY += 4;
+        }
 
         // Green bar for final total
         drawTotalLine("Totalt Exkl. moms:", `${formatSEK(exportSummary.finalTotalSek)} SEK`, finalY, true, accentGreen);

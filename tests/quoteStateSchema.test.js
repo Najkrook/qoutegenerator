@@ -12,6 +12,7 @@ describe('quoteStateSchema', () => {
 
         expect(hydrated).toEqual(createInitialQuoteState());
         expect(hydrated.stateVersion).toBe(CURRENT_STATE_VERSION);
+        expect(hydrated.hideZeroDiscountReferencesInPdf).toBe(false);
     });
 
     it('migrates an unversioned legacy blob to the current shape', () => {
@@ -45,6 +46,7 @@ describe('quoteStateSchema', () => {
         expect(hydrated.customerInfo.validity).toBe('14 dagar');
         expect(hydrated.inventoryData).toEqual({ bahama: [], clickitup: {} });
         expect(hydrated.scriveStatus).toBe('not_sent');
+        expect(hydrated.hideZeroDiscountReferencesInPdf).toBe(false);
     });
 
     it('normalizes legacy validity and terms defaults safely', () => {
@@ -141,6 +143,17 @@ describe('quoteStateSchema', () => {
         expect(nextState.selectedLines).toEqual(['ClickitUP']);
         expect(nextState.quoteValidityDays).toBe(60);
         expect(nextState.customerInfo.validity).toBe('60 dagar');
+    });
+
+    it('supports toggling the PDF zero-discount discount-reference flag through the reducer', () => {
+        const initial = createInitialQuoteState();
+
+        const nextState = quoteReducer(initial, {
+            type: 'SET_HIDE_ZERO_DISCOUNT_REFERENCES_IN_PDF',
+            payload: true
+        });
+
+        expect(nextState.hideZeroDiscountReferencesInPdf).toBe(true);
     });
 
     it('preserves sketch metadata for both parasol and fiesta exports', () => {
