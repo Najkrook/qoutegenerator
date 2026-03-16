@@ -5,7 +5,7 @@ import {
 } from './quoteStateSchema.js';
 import { loadPersistedQuoteState, persistQuoteState } from './quoteStatePersistence.js';
 
-const QuoteContext = createContext();
+export const QuoteContext = createContext();
 
 function normalizePositiveInt(value, fallback) {
     const parsed = Number.parseInt(value, 10);

@@ -3,8 +3,31 @@ import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 const ROOT_DIR = path.resolve(process.cwd());
-const SRC_DIR = path.join(ROOT_DIR, 'src');
-const README_PATH = path.join(ROOT_DIR, 'README.md');
+const USER_VISIBLE_DIRECTORIES = [
+    {
+        dirPath: path.join(ROOT_DIR, 'src'),
+        filePattern: /\.(js|jsx|json)$/
+    },
+    {
+        dirPath: path.join(ROOT_DIR, 'public'),
+        filePattern: /\.(html|json|txt|md)$/
+    }
+];
+const ROOT_FILES = [
+    'README.md',
+    'AGENT_KNOWLEDGE_BASE.md',
+    'index.html'
+];
+const HIGH_RISK_FILE_PATHS = [
+    'src/features/legalTemplates.js',
+    'src/views/Dashboard.jsx',
+    'src/views/Planner.jsx',
+    'src/views/InventoryManager.jsx',
+    'src/views/SketchTool.jsx',
+    'src/views/SummaryExport.jsx',
+    'src/components/layout/Header.jsx',
+    'src/services/quoteSaveService.js'
+];
 
 const SUSPICIOUS_TOKENS = [
     'Ã¤',
@@ -21,18 +44,22 @@ const SUSPICIOUS_TOKENS = [
     '�'
 ];
 
-function collectFiles(dirPath) {
+function collectFiles(dirPath, filePattern) {
+    if (!fs.existsSync(dirPath)) {
+        return [];
+    }
+
     const entries = fs.readdirSync(dirPath, { withFileTypes: true });
     const files = [];
 
     entries.forEach((entry) => {
         const fullPath = path.join(dirPath, entry.name);
         if (entry.isDirectory()) {
-            files.push(...collectFiles(fullPath));
+            files.push(...collectFiles(fullPath, filePattern));
             return;
         }
 
-        if (!/\.(js|jsx)$/.test(entry.name)) {
+        if (!filePattern.test(entry.name)) {
             return;
         }
 
@@ -65,8 +92,14 @@ function findSuspiciousMatches(filePath) {
 }
 
 describe('text encoding guard', () => {
-    it('does not contain known mojibake patterns in app-owned source files', () => {
-        const filesToCheck = [...collectFiles(SRC_DIR), README_PATH];
+    it('does not contain known mojibake patterns in user-facing source files and docs', () => {
+        const discoveredFiles = USER_VISIBLE_DIRECTORIES.flatMap(({ dirPath, filePattern }) => (
+            collectFiles(dirPath, filePattern)
+        ));
+        const explicitFiles = [...ROOT_FILES, ...HIGH_RISK_FILE_PATHS]
+            .map((relativePath) => path.join(ROOT_DIR, relativePath))
+            .filter((filePath) => fs.existsSync(filePath));
+        const filesToCheck = [...new Set([...discoveredFiles, ...explicitFiles])];
         const failures = [];
 
         filesToCheck.forEach((filePath) => {

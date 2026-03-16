@@ -222,28 +222,17 @@ Permission booleans exposed by `useAuth()`:
 - `canExportSketchToQuote`
 
 ### App-level enforcement
-- `src/App.jsx` redirects unauthenticated users to `login.html`.
-- `src/App.jsx` also blocks unauthorized step transitions:
-  - `inventory` requires `canViewEverything`
-  - quote-flow numeric steps require `canStartQuote`
-  - `sketch` requires `canAccessSketch`
-  - `planner` is only rendered for `canViewEverything`
-
-### Root-page enforcement
-- `login.html`, `history.js`, and `inventoryLogs.js` use root `services/authService.js`.
-- `inventoryLogs.js` requires full access.
-- `history.js` uses quote-history access logic.
-
-### Important mismatch
-- `history.html` still contains an inline `requireFullAccess({ redirectTo: 'index.html' })` check.
-- `history.js` itself expects quote-history access, which should allow `full` and `quote-only`.
-- Future agents should treat quote-history access as inconsistent until this mismatch is resolved.
+- `src/App.jsx` sanitizes step transitions through `getAuthorizedStepForAccess()` in `src/config/accessControl.shared.js`.
+- Full-access-only views are `inventory`, `inventory-logs`, `activity-logs`, and `planner`.
+- Quote-flow numeric steps require `canStartQuote`.
+- `sketch` requires `canAccessSketch`.
+- `history` is allowed for `full` and `quote-only`.
 
 ### Operational implication
 If you change roles or access expectations:
 - update `config/accessControl.shared.js`
 - review `src/store/AuthContext.jsx`
-- review root auth consumers in `services/authService.js`, `history.html`, `history.js`, and `inventoryLogs.js`
+- review `src/App.jsx`, `src/components/layout/Header.jsx`, and `src/views/History.jsx`
 
 ## State Model and Persistence
 `src/store/QuoteContext.jsx` is the main state container for the React app.
@@ -272,9 +261,9 @@ If you change roles or access expectations:
 - PDF-related defaults are normalized through helper functions in the same file.
 
 ### History-page rehydration flow
-- `history.js` loads a quote revision from Firestore.
-- It writes the revision state back into `offertverktyg_state`.
-- It then redirects the browser to `index.html`.
+- `src/views/History.jsx` loads quote revisions from Firestore through `quoteRepository`.
+- Opening a saved quote dispatches `HYDRATE_STATE` in the SPA and returns the user to quote step `1`.
+- Quote-history hydration therefore shares the same schema and reducer path as normal in-app state restores.
 
 ### Operational implication
 The React app, history page, and some older flows depend on the same serialized state shape. Schema changes to quote state should be treated as cross-cutting and backward-compatibility-sensitive.
@@ -308,7 +297,7 @@ The authoritative quote repository is root `services/quoteRepository.js`.
 ### Revision behavior
 - Each revision stores a full state snapshot plus summary data.
 - If transactions are unavailable, the repository falls back to a non-transactional save path.
-- `history.js` can open the latest revision or fetch older revisions.
+- `src/views/History.jsx` can open the latest revision or fetch older revisions.
 
 ### Lifecycle status values
 Quote statuses in `services/quoteRepository.js`:
@@ -366,8 +355,7 @@ Behavior notes:
 - The dashboard also reads recent `inventory_logs` for admins.
 
 ### Inventory Logs Page
-- Entrypoint: `inventory-logs.html`
-- Main script: `inventoryLogs.js`
+- Main React UI: `src/views/InventoryLogs.jsx`
 - Access: full-access only
 - Behavior: client-side filtering and paging over Firestore batches
 
@@ -442,7 +430,6 @@ CI is explicit and matches the recommended local confidence workflow.
 
 ## Known Issues and Repo Traps
 - Hybrid architecture trap: modern React code still depends on root `features/` and `services/`.
-- Quote-history access mismatch: `AuthContext` and `history.js` imply `quote-only` users should have history access, but `history.html` still has an inline full-access precheck.
 - Full-suite status is not re-verified in this pass: focused sketch/export tests and `vite build` passed, but a normal `vitest run` hit sandbox `spawn EPERM`.
 - Previous `exportDataBuilders.test.js` drift notes require fresh confirmation before action; do not assume that exact test failure is still current without rerunning the full suite outside this sandbox.
 - CI implication: use `.github/workflows/ci.yml` and the local `test:confidence` + `build` pair as the default verification baseline.
@@ -471,7 +458,7 @@ Start with:
 - `services/quoteRepository.js`
 - `src/services/quoteSaveService.js`
 - `src/services/quoteRepositoryClient.js`
-- `history.js`
+- `src/views/History.jsx`
 
 ### Change PDF or Excel export output
 Start with:
@@ -484,12 +471,10 @@ Start with:
 ### Change access roles or permissions
 Start with:
 - `config/accessControl.shared.js`
-- `src/store/AuthContext.jsx`
-- `services/authService.js`
 - `src/App.jsx`
-- `history.html`
-- `history.js`
-- `inventoryLogs.js`
+- `src/store/AuthContext.jsx`
+- `src/components/layout/Header.jsx`
+- `src/views/History.jsx`
 
 ### Change legal templates or terms behavior
 Start with:
@@ -510,23 +495,22 @@ Start with:
 Start with:
 - `src/views/InventoryManager.jsx`
 - `src/views/Dashboard.jsx`
-- `inventoryLogs.js`
+- `src/views/InventoryLogs.jsx`
 - `firestore.rules`
 
 ### Change quote history page behavior
 Start with:
-- `history.html`
-- `history.js`
+- `src/views/History.jsx`
+- `src/App.jsx`
+- `src/components/layout/Header.jsx`
 - `services/quoteRepository.js`
-- `services/authService.js`
 
 ### Change login or auth redirect behavior
 Start with:
-- `login.html`
+- `src/views/Login.jsx`
 - `src/App.jsx`
 - `src/store/AuthContext.jsx`
 - `src/services/authService.js`
-- `services/authService.js`
 
 ### Change Firestore permissions
 Start with:

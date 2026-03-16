@@ -9,6 +9,7 @@ import { ActivityLogs } from './views/ActivityLogs';
 import { Login } from './views/Login';
 import { useQuote } from './store/QuoteContext';
 import { useAuth } from './store/AuthContext';
+import { getAuthorizedStepForAccess } from './config/accessControl.shared.js';
 
 const SummaryExport = lazy(() => import('./views/SummaryExport').then((module) => ({ default: module.SummaryExport })));
 const InventoryManager = lazy(() => import('./views/InventoryManager').then((module) => ({ default: module.InventoryManager })));
@@ -26,7 +27,7 @@ function ViewLoader() {
 
 function App() {
     const { state, dispatch } = useQuote();
-    const { user, loading, canViewEverything, canStartQuote, canAccessSketch, canAccessQuoteHistory } = useAuth();
+    const { user, loading, accessLevel, canViewEverything, canStartQuote, canAccessSketch, canAccessQuoteHistory } = useAuth();
     const { step } = state;
     const [sketchBackStep, setSketchBackStep] = useState(0);
 
@@ -40,38 +41,11 @@ function App() {
 
     useEffect(() => {
         if (loading || !user) return;
-        const isQuoteFlowStep = typeof step === 'number' && step >= 1 && step <= 4;
-
-        if (step === 'inventory' && !canViewEverything) {
-            dispatch({ type: 'SET_STEP', payload: 0 });
-            return;
+        const authorizedStep = getAuthorizedStepForAccess(step, accessLevel);
+        if (authorizedStep !== step) {
+            dispatch({ type: 'SET_STEP', payload: authorizedStep });
         }
-
-        if (step === 'sketch' && !canAccessSketch) {
-            dispatch({ type: 'SET_STEP', payload: 0 });
-            return;
-        }
-
-        if (isQuoteFlowStep && !canStartQuote) {
-            dispatch({ type: 'SET_STEP', payload: 0 });
-            return;
-        }
-
-        if (step === 'history' && !canAccessQuoteHistory) {
-            dispatch({ type: 'SET_STEP', payload: 0 });
-            return;
-        }
-
-        if (step === 'inventory-logs' && !canViewEverything) {
-            dispatch({ type: 'SET_STEP', payload: 0 });
-            return;
-        }
-
-        if (step === 'activity-logs' && !canViewEverything) {
-            dispatch({ type: 'SET_STEP', payload: 0 });
-            return;
-        }
-    }, [loading, user, canViewEverything, canStartQuote, canAccessSketch, canAccessQuoteHistory, step, dispatch]);
+    }, [loading, user, accessLevel, step, dispatch]);
 
     if (loading) {
         return (

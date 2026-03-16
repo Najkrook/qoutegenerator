@@ -51,6 +51,7 @@ From `QuoteGenerator/`:
 - `npm run preview`: Preview the production build locally.
 - `npm run test`: Run Vitest in interactive mode.
 - `npm run test:watch`: Run Vitest in watch mode.
+- `npm run test:confidence`: Run the fast regression suite for access control, state, sketch export, PDF/export, and text integrity.
 - `npm run test:run`: Run Vitest once with the basic reporter.
 
 ## Environment & Secrets
@@ -96,7 +97,7 @@ Other active paths:
 
 - Inventory management is an admin-only branch from the dashboard.
 - Sketch mode is a separate branch from the dashboard.
-- Quote history and inventory logs are accessed through dedicated HTML pages and header links, not the main stepper.
+- Quote history, inventory logs, and activity logs are state-driven SPA views launched from the header or dashboard rather than legacy standalone pages.
 
 ## Useful Local Checks
 Useful local validation commands:
@@ -138,6 +139,7 @@ Role precedence:
 Notes:
 - `sketch-only` users cannot enter the quote flow.
 - `quote-only` users can access `Mina Offerter`.
+- Quote-history permissions should remain aligned with the shared access-control helpers used by both auth state and step gating.
 - Keep UID allowlists minimal and review them when access changes.
 
 ## Firestore Rules and Deploy Notes

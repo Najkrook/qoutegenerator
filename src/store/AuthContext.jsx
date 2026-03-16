@@ -1,12 +1,12 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { onAuthChange, login as firebaseLogin, logout as firebaseLogout } from '../services/authService';
-import { canAccessQuoteHistoryLevel, resolveAccessLevelFromUser } from '../config/accessControl.shared.js';
+import { ACCESS_LEVELS, getAccessCapabilities, resolveAccessLevelFromUser } from '../config/accessControl.shared.js';
 
-const AuthContext = createContext();
+export const AuthContext = createContext();
 
 export function AuthProvider({ children }) {
     const [user, setUser] = useState(null);
-    const [accessLevel, setAccessLevel] = useState('guest');
+    const [accessLevel, setAccessLevel] = useState(ACCESS_LEVELS.GUEST);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
@@ -28,11 +28,13 @@ export function AuthProvider({ children }) {
         return firebaseLogout();
     };
 
-    const canViewEverything = accessLevel === 'full';
-    const canStartQuote = accessLevel === 'full' || accessLevel === 'quote-only';
-    const canAccessSketch = accessLevel === 'full' || accessLevel === 'sketch-only';
-    const canAccessQuoteHistory = canAccessQuoteHistoryLevel(accessLevel);
-    const canExportSketchToQuote = accessLevel === 'full';
+    const {
+        canViewEverything,
+        canStartQuote,
+        canAccessSketch,
+        canAccessQuoteHistory,
+        canExportSketchToQuote
+    } = getAccessCapabilities(accessLevel);
 
     return (
         <AuthContext.Provider value={{

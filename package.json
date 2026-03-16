@@ -9,7 +9,7 @@
     "preview": "vite preview",
     "test": "vitest",
     "test:watch": "vitest --watch",
-    "test:confidence": "vitest run --reporter=basic tests/quoteStateSchema.test.js tests/quoteStatePersistence.test.js tests/sketchExportState.test.js tests/parasolGeometry.test.js tests/sketchConfig.test.jsx tests/exportDataBuilders.test.js tests/pdfExport.test.js",
+    "test:confidence": "vitest run --reporter=basic tests/accessControl.shared.test.js tests/quoteStateSchema.test.js tests/quoteStatePersistence.test.js tests/sketchExportState.test.js tests/parasolGeometry.test.js tests/sketchConfig.test.jsx tests/exportDataBuilders.test.js tests/pdfExport.test.js tests/textEncodingGuard.test.js tests/uiTextSmoke.test.jsx",
     "test:run": "vitest run --reporter=basic"
   },
   "devDependencies": {

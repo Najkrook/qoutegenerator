@@ -41,14 +41,6 @@ const quoteState = vi.hoisted(() => ({
     }
 }));
 
-vi.mock('../src/store/AuthContext.jsx', () => ({
-    useAuth: () => authState.value
-}));
-
-vi.mock('../src/store/QuoteContext.jsx', () => ({
-    useQuote: () => quoteState.value
-}));
-
 vi.mock('../src/services/firebase', () => ({
     db: {},
     collection: vi.fn(() => ({})),
@@ -58,16 +50,54 @@ vi.mock('../src/services/firebase', () => ({
     getDocs: vi.fn(async () => ({ docs: [] }))
 }));
 
-vi.mock('../src/components/features/SketchCanvas.jsx', () => ({
+vi.mock('../src/components/features/SketchCanvas', () => ({
     SketchCanvas: () => React.createElement('div', null, 'SketchCanvasMock')
 }));
 
-vi.mock('../src/components/features/SketchConfig.jsx', () => ({
+vi.mock('../src/components/features/SketchConfig', () => ({
     SketchConfig: () => React.createElement('div', null, 'SketchConfigMock')
 }));
 
-vi.mock('../src/components/features/StockComparisonModal.jsx', () => ({
+vi.mock('../src/components/features/StockComparisonModal', () => ({
     StockComparisonModal: () => null
+}));
+
+vi.mock('../src/components/features/CustomerInfoForm', () => ({
+    CustomerInfoForm: () => React.createElement('div', null, 'CustomerInfoFormMock')
+}));
+
+vi.mock('../src/components/features/FinalSummaryTable', () => ({
+    FinalSummaryTable: () => React.createElement('div', null, 'FinalSummaryTableMock')
+}));
+
+vi.mock('../src/components/features/TermsAndPaymentPanel', () => ({
+    TermsAndPaymentPanel: () => React.createElement('div', null, 'TermsAndPaymentPanelMock')
+}));
+
+vi.mock('../src/services/calculationEngine', () => ({
+    computeQuoteTotals: () => ({
+        totals: [],
+        finalTotalSek: 0,
+        grossTotalSek: 0,
+        totalDiscountSek: 0
+    })
+}));
+
+vi.mock('../src/utils/fileUtils', () => ({
+    downloadBlob: vi.fn(),
+    saveBlobWithPicker: vi.fn(async () => 'unavailable')
+}));
+
+vi.mock('../src/services/quoteRepositoryClient', () => ({
+    quoteRepository: {}
+}));
+
+vi.mock('../src/services/quoteSaveService', () => ({
+    saveQuoteToRepository: vi.fn()
+}));
+
+vi.mock('../src/services/activityLogService', () => ({
+    safeLogActivity: vi.fn()
 }));
 
 vi.mock('react-hot-toast', () => ({
@@ -83,6 +113,38 @@ import { Dashboard } from '../src/views/Dashboard.jsx';
 import { Header } from '../src/components/layout/Header.jsx';
 import { SketchBom } from '../src/components/features/SketchBom.jsx';
 import { SketchTool } from '../src/views/SketchTool.jsx';
+import { SummaryExport } from '../src/views/SummaryExport.jsx';
+import { AuthContext } from '../src/store/AuthContext.jsx';
+import { QuoteContext } from '../src/store/QuoteContext.jsx';
+
+function renderWithProviders(node, overrides = {}) {
+    const authValue = {
+        user: null,
+        loading: false,
+        accessLevel: 'guest',
+        canViewEverything: false,
+        canStartQuote: false,
+        canAccessSketch: false,
+        canAccessQuoteHistory: false,
+        canExportSketchToQuote: false,
+        login: vi.fn(),
+        logout: vi.fn(),
+        ...authState.value,
+        ...(overrides.auth || {})
+    };
+    const quoteValue = {
+        ...quoteState.value,
+        ...(overrides.quote || {})
+    };
+
+    return renderToStaticMarkup(
+        <AuthContext.Provider value={authValue}>
+            <QuoteContext.Provider value={quoteValue}>
+                {node}
+            </QuoteContext.Provider>
+        </AuthContext.Provider>
+    );
+}
 
 describe('UI text smoke', () => {
     beforeEach(() => {
@@ -130,7 +192,7 @@ describe('UI text smoke', () => {
             canExportSketchToQuote: false
         };
 
-        const html = renderToStaticMarkup(
+        const html = renderWithProviders(
             <Dashboard onStartQuote={() => {}} onOpenInventory={() => {}} onOpenSketch={() => {}} />
         );
 
@@ -147,7 +209,7 @@ describe('UI text smoke', () => {
             canExportSketchToQuote: false
         };
 
-        const html = renderToStaticMarkup(
+        const html = renderWithProviders(
             <Dashboard onStartQuote={() => {}} onOpenInventory={() => {}} onOpenSketch={() => {}} />
         );
 
@@ -164,7 +226,7 @@ describe('UI text smoke', () => {
             canExportSketchToQuote: true
         };
 
-        const html = renderToStaticMarkup(
+        const html = renderWithProviders(
             <Dashboard onStartQuote={() => {}} onOpenInventory={() => {}} onOpenSketch={() => {}} />
         );
 
@@ -215,7 +277,7 @@ describe('UI text smoke', () => {
             dispatch: vi.fn()
         };
 
-        const html = renderToStaticMarkup(<Header />);
+        const html = renderWithProviders(<Header />);
 
         expect(html).toContain('Mina Offerter');
         expect(html).not.toContain('Lagerloggar');
@@ -230,11 +292,44 @@ describe('UI text smoke', () => {
             canExportSketchToQuote: true
         };
 
-        const html = renderToStaticMarkup(<SketchTool onBack={() => {}} />);
+        const html = renderWithProviders(<SketchTool onBack={() => {}} />);
 
         expect(html).toContain('Rita Uteservering');
         expect(html).toContain('Återställ vy');
         expect(html).toContain('Tillbaka');
         expect(html).toContain('Förslag');
+    });
+
+    it('renders SummaryExport labels for save, preview, and export actions', () => {
+        authState.value = {
+            canViewEverything: false,
+            canStartQuote: true,
+            canAccessSketch: false,
+            canAccessQuoteHistory: true,
+            canExportSketchToQuote: false,
+            user: { email: 'sales@example.com' }
+        };
+        quoteState.value = {
+            state: {
+                ...quoteState.value.state,
+                step: 4,
+                customerInfo: {
+                    ...quoteState.value.state.customerInfo,
+                    name: 'Ada'
+                },
+                includeTerms: false,
+                includePaymentBox: false,
+                includeSignatureBlock: false
+            },
+            dispatch: vi.fn()
+        };
+
+        const html = renderWithProviders(<SummaryExport onPrev={() => {}} />);
+
+        expect(html).toContain('Offertsammanställning');
+        expect(html).toContain('Spara offert');
+        expect(html).toContain('PDF förhandsvisning');
+        expect(html).toContain('Exportera som PDF');
+        expect(html).toContain('Exportera som Excel');
     });
 });
