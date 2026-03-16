@@ -88,7 +88,7 @@ function createBaseInitialState() {
         inventoryData: { bahama: [], clickitup: {} },
         cloudInventoryData: { bahama: [], clickitup: {} },
         sketchDraft: null,
-        sketchMeta: { addedBahamaLine: false },
+        sketchMeta: { addedBahamaLine: false, addedFiestaLine: false },
         inventoryBasket: [],
         activeQuoteId: null,
         activeQuoteVersion: 0,
@@ -150,7 +150,7 @@ function migrateV0ToV1(rawState = {}) {
         inventoryData,
         cloudInventoryData,
         sketchDraft: Object.prototype.hasOwnProperty.call(next, 'sketchDraft') ? clone(next.sketchDraft) : null,
-        sketchMeta: isObject(next.sketchMeta) ? clone(next.sketchMeta) : { addedBahamaLine: false },
+        sketchMeta: isObject(next.sketchMeta) ? clone(next.sketchMeta) : { addedBahamaLine: false, addedFiestaLine: false },
         inventoryBasket: Array.isArray(next.inventoryBasket) ? clone(next.inventoryBasket) : [],
         activeQuoteId: next.activeQuoteId ? String(next.activeQuoteId) : null,
         activeQuoteVersion: toNumber(next.activeQuoteVersion, 0),
@@ -261,7 +261,8 @@ export function hydrateQuoteState(input) {
         sketchMeta: {
             ...initialState.sketchMeta,
             ...(isObject(mergedState.sketchMeta) ? clone(mergedState.sketchMeta) : {}),
-            addedBahamaLine: Boolean(mergedState?.sketchMeta?.addedBahamaLine)
+            addedBahamaLine: Boolean(mergedState?.sketchMeta?.addedBahamaLine),
+            addedFiestaLine: Boolean(mergedState?.sketchMeta?.addedFiestaLine)
         },
         inventoryBasket: Array.isArray(mergedState.inventoryBasket) ? clone(mergedState.inventoryBasket) : [],
         activeQuoteId: mergedState.activeQuoteId ? String(mergedState.activeQuoteId) : null,

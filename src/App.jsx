@@ -1,19 +1,28 @@
-import React, { useEffect, useState } from 'react';
+import React, { Suspense, lazy, useEffect, useState } from 'react';
 import { Header } from './components/layout/Header';
 import { Dashboard } from './views/Dashboard';
 import { ProductLineSelection } from './views/ProductLineSelection';
 import { Configuration } from './views/Configuration';
 import { Pricing } from './views/Pricing';
-import { SummaryExport } from './views/SummaryExport';
-import { InventoryManager } from './views/InventoryManager';
-import { SketchTool } from './views/SketchTool';
-import { Planner } from './views/Planner';
-import { History } from './views/History';
 import { InventoryLogs } from './views/InventoryLogs';
 import { ActivityLogs } from './views/ActivityLogs';
 import { Login } from './views/Login';
 import { useQuote } from './store/QuoteContext';
 import { useAuth } from './store/AuthContext';
+
+const SummaryExport = lazy(() => import('./views/SummaryExport').then((module) => ({ default: module.SummaryExport })));
+const InventoryManager = lazy(() => import('./views/InventoryManager').then((module) => ({ default: module.InventoryManager })));
+const SketchTool = lazy(() => import('./views/SketchTool').then((module) => ({ default: module.SketchTool })));
+const Planner = lazy(() => import('./views/Planner').then((module) => ({ default: module.Planner })));
+const History = lazy(() => import('./views/History').then((module) => ({ default: module.History })));
+
+function ViewLoader() {
+    return (
+        <div className="min-h-[320px] flex items-center justify-center">
+            <p className="text-text-secondary text-sm">Laddar vy...</p>
+        </div>
+    );
+}
 
 function App() {
     const { state, dispatch } = useQuote();
@@ -82,6 +91,7 @@ function App() {
                 <Header currentStep={step} />
 
                 <main>
+                    <Suspense fallback={<ViewLoader />}>
                     {step === 0 && (
                         <Dashboard
                             onStartQuote={canStartQuote ? () => setStep(1) : undefined}
@@ -107,18 +117,24 @@ function App() {
                                 canAccessSketch
                                     ? () => {
                                         const cleanedBuilderItems = (state.builderItems || []).filter(
-                                            (item) => !(item.source === 'sketch' && item.sourceType === 'parasol')
+                                            (item) => !(item.source === 'sketch' && (item.sourceType === 'parasol' || item.sourceType === 'fiesta'))
                                         );
                                         const hasNonSketchBahamaBuilder = cleanedBuilderItems.some(
                                             (item) => item.line === 'BaHaMa'
                                         );
+                                        const hasNonSketchFiestaBuilder = cleanedBuilderItems.some(
+                                            (item) => item.line === 'Fiesta'
+                                        );
                                         const shouldRemoveBahamaLine = Boolean(state.sketchMeta?.addedBahamaLine) && !hasNonSketchBahamaBuilder;
-                                        const cleanedSelectedLines = shouldRemoveBahamaLine
-                                            ? (state.selectedLines || []).filter((line) => line !== 'BaHaMa')
-                                            : state.selectedLines;
+                                        const shouldRemoveFiestaLine = Boolean(state.sketchMeta?.addedFiestaLine) && !hasNonSketchFiestaBuilder;
+                                        const cleanedSelectedLines = (state.selectedLines || []).filter((line) => {
+                                            if (shouldRemoveBahamaLine && line === 'BaHaMa') return false;
+                                            if (shouldRemoveFiestaLine && line === 'Fiesta') return false;
+                                            return true;
+                                        });
 
                                         dispatch({ type: 'SET_BUILDER_ITEMS', payload: cleanedBuilderItems });
-                                        if (shouldRemoveBahamaLine) {
+                                        if (shouldRemoveBahamaLine || shouldRemoveFiestaLine) {
                                             dispatch({ type: 'SET_SELECTED_LINES', payload: cleanedSelectedLines });
                                         }
                                         dispatch({
@@ -126,7 +142,8 @@ function App() {
                                             payload: {
                                                 sketchMeta: {
                                                     ...(state.sketchMeta || {}),
-                                                    addedBahamaLine: false
+                                                    addedBahamaLine: false,
+                                                    addedFiestaLine: false
                                                 }
                                             }
                                         });
@@ -164,6 +181,7 @@ function App() {
                     )}
                     {canViewEverything && step === 'activity-logs' && <ActivityLogs onBack={() => setStep(0)} />}
                     {canViewEverything && step === 'inventory-logs' && <InventoryLogs onBack={() => setStep(0)} />}
+                    </Suspense>
                 </main>
             </div>
         </div>

@@ -2,7 +2,7 @@
 
 This file exists to help future agents understand the actual `QuoteGenerator` project shape before editing anything substantial.
 
-Last verified: `2026-03-10`
+Last verified: `2026-03-16`
 
 `QuoteGenerator` is a React SPA repository. All active runtime logic lives under `src/`. `README.md` is useful for human onboarding; this file is the deeper agent map.
 
@@ -10,13 +10,14 @@ Last verified: `2026-03-10`
 - Internal quote, inventory, sketch, and planner portal for BRIXX.
 - Main frontend stack is React 19 + Vite 5 + Tailwind 4 + Firebase Auth/Firestore.
 - Runtime architecture is a unified React Single Page Application (SPA).
-- In-progress quote state is persisted in localStorage under `offertverktyg_state`.
+- In-progress quote state is persisted in localStorage under `offertverktyg_state` through `src/store/QuoteContext.jsx` and `src/store/quoteStatePersistence.js`.
 - Persistent backend data lives in Firestore for quotes, revisions, templates, inventory, and inventory logs.
 - Access control is UID-based and resolved in `src/config/accessControl.shared.js`.
 - Quote persistence and revisioning are centralized in `src/services/quoteRepository.js`.
-- The repo is not fully healthy: `npm run test:run` currently fails in `tests/exportDataBuilders.test.js`.
-- CI exists in `.github/workflows/ci.yml` and runs the same failing test command.
-- The new Planner UI writes to `users/{uid}/planner_projects`, but current `firestore.rules` do not allow that collection.
+- Current fast-confidence workflow centers on `npm run test:confidence` plus `npm run build`.
+- A normal full-suite `npm run test:run` was not re-verified in this sandbox because plain `vitest run` still hit a local `spawn EPERM`.
+- CI exists in `.github/workflows/ci.yml` and now runs explicit install, fast-confidence tests, and build steps.
+- Planner uses the root `planner_projects` collection, and `firestore.rules` currently allow admin read/write access to it.
 
 ## Repo Topology
 
@@ -68,7 +69,7 @@ Support for root HTML pages and older DOM-driven surfaces.
 Operational notes:
 
 - `vite.config.js` builds exclusively `index.html`.
-- `index.html` also loads CDN dependencies for export paths such as jsPDF, `xlsx`, and `html2canvas`.
+- Export-related dependencies are loaded through npm/Vite modules rather than CDN script tags.
 
 ## Runtime Architecture
 The codebase completes the migration to a modern, separated React architecture.
@@ -146,9 +147,9 @@ The codebase completes the migration to a modern, separated React architecture.
   - `src/views/SummaryExport.jsx`
   - `src/services/quoteSaveService.js`
   - `src/services/quoteRepositoryClient.js`
-  - root `services/quoteRepository.js`
-  - root `features/pdfExport.js`
-  - root `features/excelExport.js`
+  - `src/services/quoteRepository.js`
+  - `src/features/pdfExport.js`
+  - `src/features/excelExport.js`
 - Persistence:
   - localStorage for in-progress state.
   - Firestore for saved quotes and revisions.
@@ -379,9 +380,9 @@ Behavior notes:
 
 ### Planner
 - Main React UI: `src/views/Planner.jsx`
-- Collection path: `users/{uid}/planner_projects`
+- Collection path: `planner_projects`
 - UI access gate: admin-only branch from the dashboard
-- Status: live in the UI, but backend rules do not currently authorize the collection
+- Status: live in the UI with matching admin-only Firestore rules
 
 ## Firestore Rules and Security Reality
 `firestore.rules` currently allow:
@@ -395,23 +396,24 @@ Behavior notes:
 - deny-all fallback for everything else
 
 ### Current mismatches / caution
-- `planner_projects` is not allowed by current `firestore.rules`, even though `src/views/Planner.jsx` writes there.
 - Any new feature that writes to a new collection must be reflected in Firestore rules.
 - Admin UIDs are hardcoded in both `firestore.rules` and `config/accessControl.shared.js` and must stay synchronized.
 
 ## Tooling, Scripts, and CI
 
 ### Local commands
-- `npm install`
+- `npm ci`
 - `npm run dev`
 - `npm run build`
+- `npm run test:confidence`
 - `npm run test:run`
 
 ### PowerShell caveat
 If `npm.ps1` is blocked by execution policy, use:
 
-- `cmd /c npm install`
+- `cmd /c npm ci`
 - `cmd /c npm run dev`
+- `cmd /c npm run test:confidence`
 - `cmd /c npm run test:run`
 
 ### Scripts
@@ -428,10 +430,11 @@ If `npm.ps1` is blocked by execution policy, use:
 - Runs:
   - tracked-file safety check
   - clean-repo sanity check
-  - `npm install --no-package-lock`
-  - `npm run test:run`
+  - `npm ci`
+  - `npm run test:confidence`
+  - `npm run build`
 
-CI is real and currently depends on a test command that is not fully passing.
+CI is explicit and matches the recommended local confidence workflow.
 
 ### Build output
 - `dist/` exists in the repo right now.
@@ -439,13 +442,10 @@ CI is real and currently depends on a test command that is not fully passing.
 
 ## Known Issues and Repo Traps
 - Hybrid architecture trap: modern React code still depends on root `features/` and `services/`.
-- Planner/rules mismatch: `src/views/Planner.jsx` writes to `users/{uid}/planner_projects`, but `firestore.rules` deny that path.
 - Quote-history access mismatch: `AuthContext` and `history.js` imply `quote-only` users should have history access, but `history.html` still has an inline full-access precheck.
-- Test suite not fully green: `npm run test:run` currently fails in `tests/exportDataBuilders.test.js`.
-- Export builder contract drift: `buildPdfTableData(...)` in `services/exportDataBuilders.js` currently expects an array, while `tests/exportDataBuilders.test.js` calls it with `(state, summary, formatSek)`.
-- CI implication: `.github/workflows/ci.yml` runs the same failing `npm run test:run` command.
-- Duplicate service layers: both `src/services/firebase.js` and root `services/firebase.js` exist, and both `src/services/authService.js` and root `services/authService.js` exist.
-- Firebase version skew risk: the React layer uses the installed Firebase package, while root pages use CDN Firebase modules from `10.9.0`.
+- Full-suite status is not re-verified in this pass: focused sketch/export tests and `vite build` passed, but a normal `vitest run` hit sandbox `spawn EPERM`.
+- Previous `exportDataBuilders.test.js` drift notes require fresh confirmation before action; do not assume that exact test failure is still current without rerunning the full suite outside this sandbox.
+- CI implication: use `.github/workflows/ci.yml` and the local `test:confidence` + `build` pair as the default verification baseline.
 - Encoding or mojibake risk: some files visibly contain corrupted Swedish text or symbols.
 - Known mojibake examples include:
   - `config/legalTemplates.shared.js`
@@ -455,7 +455,7 @@ CI is real and currently depends on a test command that is not fully passing.
   - `src/views/SketchTool.jsx`
   - `src/services/quoteSaveService.js`
 - `tests/textEncodingGuard.test.js` exists, but it does not catch every visibly broken encoding pattern in the repo.
-- Multi-page build trap: changes can affect separate pages such as `login.html`, `history.html`, `inventory-logs.html`, and `index_legacy.html`, not just `index.html`.
+- Lazy-load trap: large view imports and export modules affect the code-splitting strategy, not just local component behavior.
 
 ## Where To Edit
 
@@ -559,5 +559,5 @@ If you are new to the repo, read these files in order:
 - If you touch quote persistence, inspect both React and root-page consumers.
 - If you touch Firestore collections, update rules and access expectations together.
 - If you touch strings or Swedish copy, manually watch for encoding corruption.
-- If you touch entrypoints or build behavior, check `vite.config.js` multi-page inputs.
+- If you touch entrypoints or build behavior, check `vite.config.js` chunking and lazy-loaded view boundaries.
 - Before push, run `scripts/verify-git-safety.ps1`.

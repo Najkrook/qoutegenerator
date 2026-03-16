@@ -1,6 +1,7 @@
 import React, { useMemo, useRef, useState, useEffect, useCallback } from 'react';
 import { DOOR_LABEL, MIN_DIMENSION_MM, STEP_MM } from '../../utils/sectionCalculator';
 import {
+    getFiestaRadiusMm,
     getEffectiveParasolDimensions,
     getParasolRotationDeg,
     isParasolRotatable
@@ -82,6 +83,8 @@ export function SketchCanvas({
     activeMode = 'clickitup',
     parasols = [],
     selectedParasolId = null,
+    fiestaItems = [],
+    selectedFiestaId = null,
     onResize,
     onResizePreview,
     onResizeCommit,
@@ -92,7 +95,10 @@ export function SketchCanvas({
     onChangeMode,
     onPlaceParasol,
     onSelectParasol,
-    onMoveParasol
+    onMoveParasol,
+    onPlaceFiesta,
+    onSelectFiesta,
+    onMoveFiesta
 }) {
     const svgRef = useRef(null);
     const [activeDrag, setActiveDrag] = useState(null);
@@ -310,7 +316,7 @@ export function SketchCanvas({
     const parasolDragRef = useRef(null);
 
     const handlePolygonClick = useCallback((event) => {
-        if (activeMode !== 'parasol' || !onPlaceParasol) return;
+        if (activeMode !== 'parasol' && activeMode !== 'fiesta') return;
 
         if (panRef.current) {
             const dx = Math.abs(event.clientX - panRef.current.startX);
@@ -328,8 +334,12 @@ export function SketchCanvas({
         const worldX = activeCamera.panX + pointerX * viewWidth;
         const worldY = activeCamera.panY + pointerY * viewHeight;
 
-        onPlaceParasol(worldX, Math.max(0, worldY));
-    }, [activeMode, onPlaceParasol, activeCamera, viewWidth, viewHeight]);
+        if (activeMode === 'parasol') {
+            onPlaceParasol?.(worldX, Math.max(0, worldY));
+        } else if (activeMode === 'fiesta') {
+            onPlaceFiesta?.(worldX, Math.max(0, worldY));
+        }
+    }, [activeMode, onPlaceFiesta, onPlaceParasol, activeCamera, viewWidth, viewHeight]);
 
     const beginParasolDrag = useCallback((id, event) => {
         if (activeMode !== 'parasol') return;
@@ -382,6 +392,61 @@ export function SketchCanvas({
             window.removeEventListener('mouseup', handleUp);
         };
     }, [activeParasolDrag, viewWidth, viewHeight, onMoveParasol]);
+
+    const [activeFiestaDrag, setActiveFiestaDrag] = useState(null);
+    const fiestaDragRef = useRef(null);
+
+    const beginFiestaDrag = useCallback((id, event) => {
+        if (activeMode !== 'fiesta') return;
+        event.preventDefault();
+        event.stopPropagation();
+
+        const fiesta = fiestaItems.find((item) => item.id === id);
+        if (!fiesta) return;
+
+        fiestaDragRef.current = {
+            id,
+            startX: event.clientX,
+            startY: event.clientY,
+            initialX: fiesta.xMm,
+            initialY: fiesta.yMm
+        };
+        setActiveFiestaDrag(id);
+    }, [activeMode, fiestaItems]);
+
+    useEffect(() => {
+        if (!activeFiestaDrag) return undefined;
+
+        const handleMove = (event) => {
+            const svg = svgRef.current;
+            if (!svg || !fiestaDragRef.current || !onMoveFiesta) return;
+            const rect = svg.getBoundingClientRect();
+            if (!rect.width || !rect.height) return;
+
+            const worldPerPixelX = viewWidth / rect.width;
+            const worldPerPixelY = viewHeight / rect.height;
+            const deltaX = (event.clientX - fiestaDragRef.current.startX) * worldPerPixelX;
+            const deltaY = (event.clientY - fiestaDragRef.current.startY) * worldPerPixelY;
+
+            const nextX = fiestaDragRef.current.initialX + deltaX;
+            const nextY = fiestaDragRef.current.initialY + deltaY;
+
+            onMoveFiesta(activeFiestaDrag, nextX, nextY);
+        };
+
+        const handleUp = () => {
+            setActiveFiestaDrag(null);
+            fiestaDragRef.current = null;
+        };
+
+        window.addEventListener('mousemove', handleMove);
+        window.addEventListener('mouseup', handleUp);
+
+        return () => {
+            window.removeEventListener('mousemove', handleMove);
+            window.removeEventListener('mouseup', handleUp);
+        };
+    }, [activeFiestaDrag, viewWidth, viewHeight, onMoveFiesta]);
 
     const startPan = useCallback(
         (event) => {
@@ -894,6 +959,47 @@ export function SketchCanvas({
         });
     };
 
+    const renderFiestaItems = (zLayer) => {
+        return fiestaItems
+            .filter((fiesta) => (fiesta.zLayer || 'below') === zLayer)
+            .map((fiesta) => {
+                const isSelected = fiesta.id === selectedFiestaId;
+                const radiusMm = getFiestaRadiusMm(fiesta);
+
+                return (
+                    <g
+                        key={fiesta.id}
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            if (activeMode === 'fiesta' && onSelectFiesta) {
+                                onSelectFiesta(fiesta.id);
+                            }
+                        }}
+                        onMouseDown={(e) => {
+                            if (activeMode !== 'fiesta') return;
+                            e.stopPropagation();
+                            if (onSelectFiesta && fiesta.id !== selectedFiestaId) {
+                                onSelectFiesta(fiesta.id);
+                            }
+                            beginFiestaDrag(fiesta.id, e);
+                        }}
+                        style={{ cursor: activeMode === 'fiesta' ? 'move' : 'default', pointerEvents: activeMode === 'fiesta' ? 'all' : 'none' }}
+                    >
+                        <circle
+                            cx={fiesta.xMm}
+                            cy={fiesta.yMm}
+                            r={radiusMm}
+                            fill={zLayer === 'above'
+                                ? (isSelected ? 'rgba(251,191,36,0.30)' : 'rgba(250,204,21,0.18)')
+                                : (isSelected ? 'rgba(148,163,184,0.26)' : 'rgba(226,232,240,0.14)')}
+                            stroke={isSelected ? '#f59e0b' : 'rgba(226,232,240,0.55)'}
+                            strokeWidth={isSelected ? 30 : 20}
+                        />
+                    </g>
+                );
+            });
+    };
+
     return (
         <div id="sketchCanvasContainer" className="bg-panel-bg border border-panel-border rounded-xl p-4 space-y-3 text-text-primary">
             <div className="flex flex-wrap items-center justify-between gap-3 text-sm" data-html2canvas-ignore="true">
@@ -923,6 +1029,17 @@ export function SketchCanvas({
                                 }`}
                         >
                             Parasoll
+                        </button>
+                        <button
+                            type="button"
+                            aria-pressed={activeMode === 'fiesta'}
+                            onClick={() => onChangeMode && onChangeMode('fiesta')}
+                            className={`h-8 px-3.5 rounded-md border text-xs font-semibold tracking-wide transition-all ${activeMode === 'fiesta'
+                                ? 'bg-primary/95 text-white border-blue-200/60 shadow-[0_0_0_1px_rgba(191,219,254,0.55),0_8px_18px_rgba(37,99,235,0.35)]'
+                                : 'bg-input-bg text-slate-300 border-panel-border hover:text-white hover:border-slate-400/60 hover:bg-slate-800/60'
+                                }`}
+                        >
+                            Fiesta
                         </button>
                     </div>
                 </div>
@@ -960,7 +1077,7 @@ export function SketchCanvas({
                     strokeWidth="26"
                     strokeDasharray="100 70"
                     onMouseUp={handlePolygonClick}
-                    style={{ pointerEvents: activeMode === 'parasol' ? 'all' : 'none' }}
+                    style={{ pointerEvents: activeMode === 'parasol' || activeMode === 'fiesta' ? 'all' : 'none' }}
                 />
 
                 {renderEdge('front', 0, currentMaxDepth, 'E')}
@@ -994,7 +1111,9 @@ export function SketchCanvas({
                     </g>
                 )}
 
+                {renderFiestaItems('below')}
                 {renderParasols()}
+                {renderFiestaItems('above')}
                 {renderDimensions()}
 
                 {activeMode === 'clickitup' && (

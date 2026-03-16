@@ -1,9 +1,9 @@
 import React, { createContext, useContext, useReducer, useEffect } from 'react';
 import {
-    QUOTE_STATE_STORAGE_KEY,
     createInitialQuoteState,
     hydrateQuoteState
 } from './quoteStateSchema.js';
+import { loadPersistedQuoteState, persistQuoteState } from './quoteStatePersistence.js';
 
 const QuoteContext = createContext();
 
@@ -97,24 +97,10 @@ export function quoteReducer(state, action) {
 }
 
 export function QuoteProvider({ children }) {
-    const [state, dispatch] = useReducer(quoteReducer, initialState, (initial) => {
-        try {
-            const saved = localStorage.getItem(QUOTE_STATE_STORAGE_KEY);
-            if (saved) {
-                return hydrateQuoteState(JSON.parse(saved));
-            }
-        } catch (e) {
-            console.error('Failed to load state from localStorage', e);
-        }
-        return initial;
-    });
+    const [state, dispatch] = useReducer(quoteReducer, initialState, () => loadPersistedQuoteState());
 
     useEffect(() => {
-        try {
-            localStorage.setItem(QUOTE_STATE_STORAGE_KEY, JSON.stringify(state));
-        } catch (e) {
-            console.error('Failed to save state to localStorage', e);
-        }
+        persistQuoteState(state);
     }, [state]);
 
     return (

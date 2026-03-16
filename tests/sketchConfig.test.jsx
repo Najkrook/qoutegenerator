@@ -175,4 +175,52 @@ describe('SketchConfig zero-depth controls', () => {
         expect(html).toContain('Återställ till sektion');
         expect(html).not.toContain('Dörrplacering');
     });
+
+    it('shows Fiesta controls and selected Fiesta layer actions in fiesta mode', () => {
+        const html = renderToStaticMarkup(
+            <SketchConfig
+                config={{
+                    activeMode: 'fiesta',
+                    parasols: [],
+                    fiestaItems: [{
+                        id: 'fiesta-1',
+                        diameterMm: 700,
+                        xMm: 1200,
+                        yMm: 1400,
+                        zLayer: 'above'
+                    }],
+                    selectedFiestaId: 'fiesta-1',
+                    selectedParasolId: null,
+                    width: 8000,
+                    depth: 4000,
+                    depthLeft: 4000,
+                    depthRight: 4000,
+                    equalDepth: true,
+                    includeBack: false,
+                    prioMode: 'symmetrical',
+                    targetLength: 1500,
+                    doorSegmentsByEdge: {},
+                    manualSectionsByEdge: {}
+                }}
+                onChange={vi.fn()}
+                selectedEdge={null}
+                selectedSegmentIndex={null}
+                onSelectEdge={vi.fn()}
+                onSetManualPin={vi.fn()}
+                onClearManualPins={vi.fn()}
+                onConvertSegmentToDoor={vi.fn()}
+                onSetDoorSegmentSize={vi.fn()}
+                onResetDoorSegment={vi.fn()}
+                edgeSummaries={{}}
+                onDeleteParasol={vi.fn()}
+                onRotateParasol={vi.fn()}
+                onDeleteFiesta={vi.fn()}
+            />
+        );
+
+        expect(html).toContain('Fiesta 70 cm');
+        expect(html).toContain('Vald Fiesta');
+        expect(html).toContain('Ta bort markerad Fiesta');
+        expect(html).not.toContain('Under parasoll');
+    });
 });

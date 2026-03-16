@@ -142,4 +142,18 @@ describe('quoteStateSchema', () => {
         expect(nextState.quoteValidityDays).toBe(60);
         expect(nextState.customerInfo.validity).toBe('60 dagar');
     });
+
+    it('preserves sketch metadata for both parasol and fiesta exports', () => {
+        const hydrated = hydrateQuoteState({
+            sketchMeta: {
+                addedBahamaLine: true,
+                addedFiestaLine: true
+            }
+        });
+
+        expect(hydrated.sketchMeta).toEqual({
+            addedBahamaLine: true,
+            addedFiestaLine: true
+        });
+    });
 });

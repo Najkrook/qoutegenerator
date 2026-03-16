@@ -19,6 +19,34 @@ export default defineConfig({
         rollupOptions: {
             input: {
                 main: resolve(__dirname, 'index.html')
+            },
+            output: {
+                manualChunks(id) {
+                    if (!id.includes('node_modules')) return undefined;
+
+                    if (
+                        id.includes('jspdf')
+                        || id.includes('jspdf-autotable')
+                        || id.includes('xlsx')
+                        || id.includes('html2canvas')
+                    ) {
+                        return 'export-tools';
+                    }
+
+                    if (id.includes('firebase')) {
+                        return 'firebase';
+                    }
+
+                    if (
+                        id.includes('react')
+                        || id.includes('scheduler')
+                        || id.includes('react-hot-toast')
+                    ) {
+                        return 'react-vendor';
+                    }
+
+                    return undefined;
+                }
             }
         }
     }

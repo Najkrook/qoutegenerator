@@ -2,13 +2,19 @@ import { describe, expect, it } from 'vitest';
 import { catalogData } from '../src/data/catalog.js';
 import {
     DEFAULT_PARASOL_PRESET_ID,
+    FIESTA_DIAMETER_MM,
+    FIESTA_EXPORT_LINE,
+    FIESTA_EXPORT_MODEL,
+    FIESTA_EXPORT_SIZE,
     PARASOL_PRESETS,
     buildJumbrellaParasolPresets,
     computeParasolOverlapWarnings,
+    getFiestaRadiusMm,
     getEffectiveParasolDimensions,
     getParasolPresetById,
     groupParasolPresetsByCategory,
     isParasolRotatable,
+    normalizeFiestaItem,
     parseJumbrellaSize
 } from '../src/utils/parasolGeometry.js';
 
@@ -101,5 +107,25 @@ describe('parasolGeometry', () => {
         ]);
 
         expect(warnings).toEqual([{ id: 'parasol-overlap', text: 'Flera parasoller overlappar varandra.' }]);
+    });
+
+    it('normalizes Fiesta sketch items with fixed diameter and export metadata', () => {
+        expect(normalizeFiestaItem({
+            id: 'fiesta-1',
+            xMm: 1200,
+            yMm: 1400,
+            zLayer: 'above'
+        })).toEqual({
+            id: 'fiesta-1',
+            xMm: 1200,
+            yMm: 1400,
+            diameterMm: FIESTA_DIAMETER_MM,
+            zLayer: 'above',
+            exportLine: FIESTA_EXPORT_LINE,
+            exportModel: FIESTA_EXPORT_MODEL,
+            exportSize: FIESTA_EXPORT_SIZE
+        });
+
+        expect(getFiestaRadiusMm({ diameterMm: FIESTA_DIAMETER_MM })).toBe(350);
     });
 });

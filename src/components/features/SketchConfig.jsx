@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { DOOR_SIZES, MIN_DIMENSION_MM, SECTION_SIZES, STEP_MM } from '../../utils/sectionCalculator';
 import {
     DEFAULT_PARASOL_PRESET_ID,
+    FIESTA_DIAMETER_MM,
     PARASOL_PRESETS,
     getParasolRotationDeg,
     groupParasolPresetsByCategory,
@@ -116,13 +117,16 @@ export function SketchConfig({
     onResetDoorSegment,
     edgeSummaries,
     onDeleteParasol,
-    onRotateParasol
+    onRotateParasol,
+    onDeleteFiesta
 }) {
     const {
         activeMode = 'clickitup',
         parasols = [],
         selectedParasolId = null,
         selectedParasolPresetId = DEFAULT_PARASOL_PRESET_ID,
+        fiestaItems = [],
+        selectedFiestaId = null,
         width,
         depth,
         depthLeft,
@@ -184,6 +188,9 @@ export function SketchConfig({
     const selectedDoorSize = existingDoorSegment?.size ?? normalizeDoorSize(selectedSegment?.length ?? 1000);
     const selectedParasol = selectedParasolId
         ? parasols.find((parasol) => parasol.id === selectedParasolId) || null
+        : null;
+    const selectedFiesta = selectedFiestaId
+        ? fiestaItems.find((fiesta) => fiesta.id === selectedFiestaId) || null
         : null;
     const canRotateSelectedParasol = isParasolRotatable(selectedParasol);
     const selectedParasolRotation = getParasolRotationDeg(selectedParasol);
@@ -255,6 +262,39 @@ export function SketchConfig({
                             className="w-full px-3 py-1.5 rounded-md text-xs border border-red-500/40 bg-red-500/10 text-red-400 hover:bg-red-500/20 transition-colors"
                         >
                             Ta bort markerat parasoll
+                        </button>
+                    </div>
+                )}
+            </div>
+        );
+    }
+
+    if (activeMode === 'fiesta') {
+        return (
+            <div className="bg-panel-bg border border-panel-border rounded-xl p-5 space-y-5">
+                <h3 className="text-lg font-semibold text-text-primary m-0">● Fiesta</h3>
+
+                <div className="flex flex-col gap-1.5">
+                    <label className="text-xs font-semibold text-text-secondary uppercase">Lägg till Fiesta</label>
+                    <div className="bg-input-bg border border-panel-border text-text-primary p-3 rounded-lg text-sm">
+                        Fiesta 70 cm
+                    </div>
+                    <p className="text-xs text-text-secondary mt-1">Klicka i den ritade ytan för att placera en Fiesta med 700 mm diameter.</p>
+                </div>
+
+                {selectedFiestaId && (
+                    <div className="border border-amber-500/40 bg-amber-500/10 rounded-xl p-4 space-y-3">
+                        <div className="flex justify-between items-center">
+                            <span className="text-xs font-semibold text-amber-400 uppercase">Vald Fiesta</span>
+                        </div>
+                        <p className="text-xs text-text-secondary m-0">
+                            Storlek: <b className="text-text-primary">{FIESTA_DIAMETER_MM} mm</b>
+                        </p>
+                        <button
+                            onClick={() => onDeleteFiesta?.(selectedFiestaId)}
+                            className="w-full px-3 py-1.5 rounded-md text-xs border border-red-500/40 bg-red-500/10 text-red-400 hover:bg-red-500/20 transition-colors"
+                        >
+                            Ta bort markerad Fiesta
                         </button>
                     </div>
                 )}

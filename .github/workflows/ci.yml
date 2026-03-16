@@ -31,11 +31,16 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '20'
+          cache: 'npm'
 
-      - name: Install test dependencies
+      - name: Install dependencies
         shell: bash
-        run: npm install --no-package-lock
+        run: npm ci
 
-      - name: Run calculation regression tests
+      - name: Run fast confidence tests
         shell: bash
-        run: npm run test:run
+        run: npm run test:confidence
+
+      - name: Build production bundle
+        shell: bash
+        run: npm run build

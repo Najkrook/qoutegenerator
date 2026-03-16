@@ -16,6 +16,7 @@ export function SketchBom({
     invalidEdges,
     autoAdjustedEdges,
     parasols = [],
+    fiestaItems = [],
     parasolWarnings = [],
     canExportToQuote = true,
     onExport,
@@ -34,8 +35,9 @@ export function SketchBom({
         return acc;
     }, {});
     const parasolKeys = Object.keys(parasolCounts).sort();
+    const fiestaCount = fiestaItems.length;
 
-    const hasExportableLayout = sortedKeys.length > 0 || parasols.length > 0;
+    const hasExportableLayout = sortedKeys.length > 0 || parasols.length > 0 || fiestaCount > 0;
     const exportDisabled = !hasExportableLayout || !canExportToQuote;
     const exportButtonTitle = !canExportToQuote
         ? 'Du har inte behörighet att exportera till offert.'
@@ -111,9 +113,18 @@ export function SketchBom({
                         <span className="font-bold text-text-primary">{parasolCounts[label]} st</span>
                     </li>
                 ))}
+
+                {fiestaCount > 0 && (
+                    <li className="py-2.5 border-b border-panel-border flex justify-between items-center text-sm">
+                        <span className="text-text-primary">
+                            Fiesta <b>70 cm</b>
+                        </span>
+                        <span className="font-bold text-text-primary">{fiestaCount} st</span>
+                    </li>
+                )}
             </ul>
 
-            {sortedKeys.length === 0 && parasols.length === 0 && (
+            {sortedKeys.length === 0 && parasols.length === 0 && fiestaCount === 0 && (
                 <p className="text-text-secondary text-center text-sm py-4 m-0 italic">Inga sektioner beräknade.</p>
             )}
 
@@ -134,7 +145,7 @@ export function SketchBom({
                 </button>
                 <button
                     onClick={onExportImage}
-                    disabled={sortedKeys.length === 0}
+                    disabled={sortedKeys.length === 0 && parasols.length === 0 && fiestaCount === 0}
                     className="w-full py-2.5 border border-panel-border bg-panel-bg text-text-primary rounded-lg cursor-pointer text-sm hover:bg-white/5 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
                 >
                     🖼️ Ladda ner Bild

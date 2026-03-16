@@ -1,3 +1,5 @@
+import { jsPDF } from 'jspdf';
+import autoTable from 'jspdf-autotable';
 import { BRIXX_LOGO_BASE64 } from '../../assets/logoData.js';
 import { notifyWarn, notifyError } from '../services/notificationService.js';
 import { buildPdfTableData, buildExportSummary } from '../services/exportDataBuilders.js';
@@ -31,20 +33,7 @@ export function computeValidUntilDateString(quoteDateValue, quoteValidityDays, n
 }
 
 export function generatePDF(state, summaryData, returnBlob = false) {
-    if (!window.jspdf || !window.jspdf.jsPDF) {
-        if (!returnBlob) notifyWarn("PDF-motorn laddar fortfarande, försök igen om några sekunder.");
-        return null;
-    }
-    const { jsPDF } = window.jspdf;
     const doc = new jsPDF();
-
-    // Support multiple jspdf-autotable attachment styles.
-    const runAutoTable = (options) => {
-        if (typeof doc.autoTable === 'function') return doc.autoTable(options);
-        if (typeof window.autoTable === 'function') return window.autoTable(doc, options);
-        if (typeof window.jspdf?.autoTable === 'function') return window.jspdf.autoTable(doc, options);
-        return null;
-    };
     try {
         const formatSEK = (val) => new Intl.NumberFormat('sv-SE', { minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(val);
         const pdfLegalTemplatesEnabled = typeof window === 'undefined'
@@ -202,7 +191,7 @@ export function generatePDF(state, summaryData, returnBlob = false) {
 
             const tableData = buildPdfTableData(lineItems, formatSEK);
 
-            const autoTableResult = runAutoTable({
+            autoTable(doc, {
                 startY: currentY,
                 head: [['Modell', 'Storlek', 'Pris/enhet\nExkl. moms', 'Antal', 'Ert Pris\nExkl. moms', 'Rek Utpris\nExkl. moms', 'Rabatt\ni SEK', 'Rabatt\ni %']],
                 body: tableData,
@@ -249,7 +238,7 @@ export function generatePDF(state, summaryData, returnBlob = false) {
                 rowPageBreak: 'avoid'
             });
 
-            currentY = doc.lastAutoTable?.finalY || autoTableResult?.finalY || (currentY + 20);
+            currentY = doc.lastAutoTable?.finalY || (currentY + 20);
             // --- Per-group subtotal (only when multiple product lines) ---
             if (groupKeys.length > 1) {
                 const baseItems = lineItems.filter(r => !r.isAddon);
@@ -596,7 +585,7 @@ export function generatePDF(state, summaryData, returnBlob = false) {
     } catch (err) {
         console.error("PDF export failed:", err);
         if (!returnBlob) {
-            notifyError("Kunde inte skapa PDF. Kontrollera att PDF-biblioteken är laddade och försök igen.");
+            notifyError("Kunde inte skapa PDF. Kontrollera innehållet och försök igen.");
         }
         return null;
     }

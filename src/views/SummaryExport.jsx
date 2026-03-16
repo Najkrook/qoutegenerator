@@ -7,8 +7,6 @@ import { computeQuoteTotals } from '../services/calculationEngine';
 import { CustomerInfoForm } from '../components/features/CustomerInfoForm';
 import { FinalSummaryTable } from '../components/features/FinalSummaryTable';
 import { TermsAndPaymentPanel } from '../components/features/TermsAndPaymentPanel';
-import { generatePDF } from '../features/pdfExport';
-import { generateExcel } from '../features/excelExport';
 import { downloadBlob, saveBlobWithPicker } from '../utils/fileUtils';
 import { quoteRepository } from '../services/quoteRepositoryClient';
 import { saveQuoteToRepository } from '../services/quoteSaveService';
@@ -33,6 +31,21 @@ function buildPdfFileName(customerInfo = {}) {
     return `${safeBase || 'Offert'}-${date}.pdf`;
 }
 
+async function createPdfBlob(state, summaryData) {
+    try {
+        const { generatePDF } = await import('../features/pdfExport');
+        return generatePDF(state, summaryData, true);
+    } catch (error) {
+        console.error('Failed to load PDF export module:', error);
+        return null;
+    }
+}
+
+async function exportExcelWorkbook(state, summaryData) {
+    const { generateExcel } = await import('../features/excelExport');
+    return generateExcel(state, summaryData);
+}
+
 export function SummaryExport({ onPrev, onBackToSketch }) {
     const { state, dispatch } = useQuote();
     const { user } = useAuth();
@@ -43,26 +56,35 @@ export function SummaryExport({ onPrev, onBackToSketch }) {
     const previewUrlRef = useRef('');
 
     useEffect(() => {
-        const pdfBlob = generatePDF(state, summaryData, true);
+        let cancelled = false;
 
-        if (!pdfBlob) {
+        void (async () => {
+            const pdfBlob = await createPdfBlob(state, summaryData);
+            if (cancelled) return;
+
+            if (!pdfBlob) {
+                if (previewUrlRef.current) {
+                    URL.revokeObjectURL(previewUrlRef.current);
+                    previewUrlRef.current = '';
+                }
+                setPreviewUrl('');
+                setPreviewError('Kunde inte skapa PDF-förhandsvisning. Kontrollera offertinnehållet och försök igen.');
+                return;
+            }
+
+            const nextUrl = URL.createObjectURL(pdfBlob);
             if (previewUrlRef.current) {
                 URL.revokeObjectURL(previewUrlRef.current);
-                previewUrlRef.current = '';
             }
-            setPreviewUrl('');
-            setPreviewError('Kunde inte skapa PDF-förhandsvisning. Kontrollera att PDF-motorn är laddad.');
-            return;
-        }
 
-        const nextUrl = URL.createObjectURL(pdfBlob);
-        if (previewUrlRef.current) {
-            URL.revokeObjectURL(previewUrlRef.current);
-        }
+            previewUrlRef.current = nextUrl;
+            setPreviewUrl(nextUrl);
+            setPreviewError('');
+        })();
 
-        previewUrlRef.current = nextUrl;
-        setPreviewUrl(nextUrl);
-        setPreviewError('');
+        return () => {
+            cancelled = true;
+        };
     }, [state, summaryData]);
 
     useEffect(() => {
@@ -84,7 +106,7 @@ export function SummaryExport({ onPrev, onBackToSketch }) {
 
     const handleExportPDF = async () => {
         const fileName = buildPdfFileName(state.customerInfo);
-        const pdfBlob = generatePDF(state, summaryData, true);
+        const pdfBlob = await createPdfBlob(state, summaryData);
         if (!pdfBlob) {
             toast.error('Kunde inte skapa PDF.');
             return;
@@ -141,27 +163,28 @@ export function SummaryExport({ onPrev, onBackToSketch }) {
         }
     };
 
-    const handleExportExcel = () => {
-        if (!window.XLSX) {
-            toast.error('Excel-motorn laddar fortfarande. Försök igen om några sekunder.');
-            return;
+    const handleExportExcel = async () => {
+        try {
+            await exportExcelWorkbook(state, summaryData);
+            void safeLogActivity({
+                user,
+                eventType: 'quote_export_excel',
+                system: 'quote',
+                targetType: 'quote',
+                targetId: state.activeQuoteId || 'unsaved_quote',
+                details: 'Excel exporterad: Offert.xlsx',
+                metadata: {
+                    format: 'excel',
+                    fileName: 'Offert.xlsx',
+                    version: state.activeQuoteVersion || null,
+                    customerName: state.customerInfo?.name || '',
+                    reference: state.customerInfo?.reference || ''
+                }
+            });
+        } catch (error) {
+            console.error('Failed to export Excel:', error);
+            toast.error('Kunde inte skapa Excel.');
         }
-        generateExcel(state, summaryData);
-        void safeLogActivity({
-            user,
-            eventType: 'quote_export_excel',
-            system: 'quote',
-            targetType: 'quote',
-            targetId: state.activeQuoteId || 'unsaved_quote',
-            details: 'Excel exporterad: Offert.xlsx',
-            metadata: {
-                format: 'excel',
-                fileName: 'Offert.xlsx',
-                version: state.activeQuoteVersion || null,
-                customerName: state.customerInfo?.name || '',
-                reference: state.customerInfo?.reference || ''
-            }
-        });
     };
 
     const handleSaveQuote = async () => {

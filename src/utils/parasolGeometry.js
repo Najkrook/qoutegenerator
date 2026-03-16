@@ -77,6 +77,43 @@ export function getParasolRotationDeg(parasol) {
     return parasol?.rotationDeg === 90 ? 90 : 0;
 }
 
+export const FIESTA_DIAMETER_MM = 700;
+export const FIESTA_EXPORT_LINE = 'Fiesta';
+export const FIESTA_EXPORT_MODEL = 'FIESTA Biogasstolpe 12 kW';
+export const FIESTA_EXPORT_SIZE = 'Standard';
+export const FIESTA_DEFAULT_LAYER = 'below';
+
+export function normalizeFiestaLayer(layer) {
+    if (layer === 'above' || layer === 'below') return layer;
+    return FIESTA_DEFAULT_LAYER;
+}
+
+export function getFiestaRadiusMm(fiesta) {
+    const diameterMm = Number(fiesta?.diameterMm) || FIESTA_DIAMETER_MM;
+    return diameterMm / 2;
+}
+
+export function normalizeFiestaItem(fiesta) {
+    if (!fiesta) return null;
+
+    const xMm = Number(fiesta.xMm);
+    const yMm = Number(fiesta.yMm);
+    if (!Number.isFinite(xMm) || !Number.isFinite(yMm)) {
+        return null;
+    }
+
+    return {
+        ...fiesta,
+        diameterMm: FIESTA_DIAMETER_MM,
+        xMm,
+        yMm,
+        zLayer: normalizeFiestaLayer(fiesta.zLayer),
+        exportLine: fiesta.exportLine || FIESTA_EXPORT_LINE,
+        exportModel: fiesta.exportModel || FIESTA_EXPORT_MODEL,
+        exportSize: fiesta.exportSize || FIESTA_EXPORT_SIZE
+    };
+}
+
 export function isParasolRotatable(parasol) {
     if (!parasol) return false;
     return Number(parasol.widthMm) > 0

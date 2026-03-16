@@ -9,6 +9,7 @@
     "preview": "vite preview",
     "test": "vitest",
     "test:watch": "vitest --watch",
+    "test:confidence": "vitest run --reporter=basic tests/quoteStateSchema.test.js tests/quoteStatePersistence.test.js tests/sketchExportState.test.js tests/parasolGeometry.test.js tests/sketchConfig.test.jsx tests/exportDataBuilders.test.js tests/pdfExport.test.js",
     "test:run": "vitest run --reporter=basic"
   },
   "devDependencies": {
@@ -22,6 +23,9 @@
   },
   "dependencies": {
     "firebase": "^12.10.0",
+    "html2canvas": "^1.4.1",
+    "jspdf": "^4.2.0",
+    "jspdf-autotable": "^5.0.7",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
     "react-hot-toast": "^2.6.0",

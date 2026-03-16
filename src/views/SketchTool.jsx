@@ -11,7 +11,13 @@ import {
 } from '../utils/sectionCalculator';
 import {
     DEFAULT_PARASOL_PRESET_ID,
+    FIESTA_DIAMETER_MM,
+    FIESTA_DEFAULT_LAYER,
+    FIESTA_EXPORT_LINE,
+    FIESTA_EXPORT_MODEL,
+    FIESTA_EXPORT_SIZE,
     getParasolPresetById,
+    normalizeFiestaItem,
     isParasolRotatable,
     getAreaPolygon,
     pointInPolygon,
@@ -19,6 +25,7 @@ import {
     computeParasolOverlapWarnings
 } from '../utils/parasolGeometry';
 import { downloadBlob, saveBlobWithPicker } from '../utils/fileUtils';
+import { buildSketchExportState } from '../features/sketchExportState.js';
 import { SketchCanvas } from '../components/features/SketchCanvas';
 import { SketchConfig } from '../components/features/SketchConfig';
 import { SketchBom } from '../components/features/SketchBom';
@@ -181,6 +188,10 @@ function normalizeParasol(parasol) {
     };
 }
 
+function normalizeFiesta(fiesta) {
+    return normalizeFiestaItem(fiesta);
+}
+
 function sanitizeConfig(config) {
     const next = { ...config };
     next.width = normalizeDimension(next.width, 8000);
@@ -223,6 +234,12 @@ function sanitizeConfig(config) {
     next.selectedParasolPresetId = getParasolPresetById(config.selectedParasolPresetId)
         ? config.selectedParasolPresetId
         : DEFAULT_PARASOL_PRESET_ID;
+    next.fiestaItems = Array.isArray(config.fiestaItems)
+        ? config.fiestaItems.map(normalizeFiesta).filter(Boolean)
+        : [];
+    next.selectedFiestaId = (config.selectedFiestaId && next.fiestaItems.some((fiesta) => fiesta.id === config.selectedFiestaId))
+        ? config.selectedFiestaId
+        : null;
     return next;
 }
 
@@ -267,7 +284,9 @@ export function SketchTool({ onBack }) {
             activeMode: 'clickitup',
             parasols: [],
             selectedParasolId: null,
-            selectedParasolPresetId: DEFAULT_PARASOL_PRESET_ID
+            selectedParasolPresetId: DEFAULT_PARASOL_PRESET_ID,
+            fiestaItems: [],
+            selectedFiestaId: null
         };
         return sanitizeConfig(state.sketchDraft?.config || defaultConfig);
     });
@@ -403,7 +422,7 @@ export function SketchTool({ onBack }) {
         [layout.layoutWarnings]
     );
 
-    const canExport = layout.allSections.length > 0 || (config.parasols || []).length > 0;
+    const canExport = layout.allSections.length > 0 || (config.parasols || []).length > 0 || (config.fiestaItems || []).length > 0;
 
     const handleResizePreview = useCallback((dims) => {
         if (!dims || Object.keys(dims).length === 0) {
@@ -442,16 +461,6 @@ export function SketchTool({ onBack }) {
             camera
         }));
     }, []);
-
-
-
-    const setUiDensity = useCallback((uiDensity) => {
-        setWorkspace((prev) => ({
-            ...prev,
-            uiDensity
-        }));
-    }, []);
-
     const resetCamera = useCallback(() => {
         setWorkspace((prev) => ({
             ...prev,
@@ -459,7 +468,9 @@ export function SketchTool({ onBack }) {
         }));
         updateConfig({
             parasols: [],
-            selectedParasolId: null
+            selectedParasolId: null,
+            fiestaItems: [],
+            selectedFiestaId: null
         });
     }, [updateConfig]);
 
@@ -509,9 +520,10 @@ export function SketchTool({ onBack }) {
     const handleChangeMode = useCallback((mode) => {
         updateConfig({
             activeMode: mode,
-            selectedParasolId: mode === 'parasol' ? config.selectedParasolId : null
+            selectedParasolId: mode === 'parasol' ? config.selectedParasolId : null,
+            selectedFiestaId: mode === 'fiesta' ? config.selectedFiestaId : null
         });
-    }, [config.selectedParasolId, updateConfig]);
+    }, [config.selectedFiestaId, config.selectedParasolId, updateConfig]);
 
     const handlePlaceParasol = useCallback((xMm, yMm) => {
         if (config.activeMode !== 'parasol') return;
@@ -586,6 +598,61 @@ export function SketchTool({ onBack }) {
         });
     }, [config.parasols, config.selectedParasolId, updateConfig]);
 
+    const handlePlaceFiesta = useCallback((xMm, yMm) => {
+        if (config.activeMode !== 'fiesta') return;
+
+        const snappedX = snapToStep100(xMm);
+        const snappedY = snapToStep100(yMm);
+
+        if (!pointInPolygon(snappedX, snappedY, parasolAreaPolygon)) {
+            toast.error('Fiestas centrum måste vara inom ytan.');
+            return;
+        }
+
+        const newId = `fiesta-${Date.now()}`;
+        const newFiesta = {
+            id: newId,
+            diameterMm: FIESTA_DIAMETER_MM,
+            xMm: snappedX,
+            yMm: snappedY,
+            zLayer: FIESTA_DEFAULT_LAYER,
+            exportLine: FIESTA_EXPORT_LINE,
+            exportModel: FIESTA_EXPORT_MODEL,
+            exportSize: FIESTA_EXPORT_SIZE
+        };
+
+        updateConfig({
+            fiestaItems: [...(config.fiestaItems || []), newFiesta],
+            selectedFiestaId: newId
+        });
+    }, [config.activeMode, config.fiestaItems, parasolAreaPolygon, updateConfig]);
+
+    const handleSelectFiesta = useCallback((id) => {
+        updateConfig({ selectedFiestaId: id });
+    }, [updateConfig]);
+
+    const handleMoveFiesta = useCallback((id, xMm, yMm) => {
+        const snappedX = snapToStep100(xMm);
+        const snappedY = Math.max(0, snapToStep100(yMm));
+
+        if (!pointInPolygon(snappedX, snappedY, parasolAreaPolygon)) {
+            return;
+        }
+
+        updateConfig({
+            fiestaItems: (config.fiestaItems || []).map((fiesta) =>
+                fiesta.id === id ? { ...fiesta, xMm: snappedX, yMm: snappedY } : fiesta
+            )
+        });
+    }, [config.fiestaItems, parasolAreaPolygon, updateConfig]);
+
+    const handleDeleteFiesta = useCallback((id) => {
+        updateConfig({
+            fiestaItems: (config.fiestaItems || []).filter((fiesta) => fiesta.id !== id),
+            selectedFiestaId: config.selectedFiestaId === id ? null : config.selectedFiestaId
+        });
+    }, [config.fiestaItems, config.selectedFiestaId, updateConfig]);
+
     const handleExportClick = () => {
         if (!canExportSketchToQuote) {
             toast.error('Du har inte behorighet att exportera till offert.');
@@ -617,28 +684,15 @@ export function SketchTool({ onBack }) {
         setShowStockModal(false);
 
         const hasParasols = config.parasols && config.parasols.length > 0;
-        const hadSketchBahamaLine = Boolean(state.sketchMeta?.addedBahamaLine);
-
-        let newSelectedLines = state.selectedLines.includes('ClickitUP')
-            ? [...state.selectedLines]
-            : [...state.selectedLines, 'ClickitUP'];
-
-        let nextSketchAddedBahamaLine = hadSketchBahamaLine;
-
-        if (hasParasols) {
-            if (!newSelectedLines.includes('BaHaMa')) {
-                newSelectedLines.push('BaHaMa');
-            }
-            nextSketchAddedBahamaLine = true;
-        } else if (hadSketchBahamaLine) {
-            const hasNonSketchBahamaBuilder = (state.builderItems || []).some(
-                (item) => item.line === 'BaHaMa' && !(item.source === 'sketch' && item.sourceType === 'parasol')
-            );
-            if (!hasNonSketchBahamaBuilder) {
-                newSelectedLines = newSelectedLines.filter((line) => line !== 'BaHaMa');
-            }
-            nextSketchAddedBahamaLine = false;
-        }
+        const hasFiestaItems = config.fiestaItems && config.fiestaItems.length > 0;
+        const nextSketchExportState = buildSketchExportState({
+            selectedLines: state.selectedLines,
+            builderItems: state.builderItems || [],
+            globalDiscountPct: state.globalDiscountPct || 0,
+            sketchMeta: state.sketchMeta || {},
+            parasols: config.parasols || [],
+            fiestaItems: config.fiestaItems || []
+        });
 
         const gridSelections = { ...state.gridSelections };
         // Build from scratch so each export reflects only the current sketch.
@@ -669,46 +723,9 @@ export function SketchTool({ onBack }) {
 
         gridSelections.ClickitUP = cuGrid;
 
-        dispatch({ type: 'SET_SELECTED_LINES', payload: newSelectedLines });
+        dispatch({ type: 'SET_SELECTED_LINES', payload: nextSketchExportState.selectedLines });
         dispatch({ type: 'SET_GRID_SELECTIONS', payload: gridSelections });
-
-        // Legacy untagged parasol rows are intentionally left untouched.
-        const baseBuilderItems = (state.builderItems || []).filter(
-            (item) => !(item.source === 'sketch' && item.sourceType === 'parasol')
-        );
-        const newBuilderItems = [...baseBuilderItems];
-
-        if (hasParasols) {
-            const groupedParasols = (config.parasols || []).reduce((acc, p) => {
-                const key = `${p.exportLine}|${p.exportModel}|${p.exportSize}`;
-                if (!acc[key]) {
-                    acc[key] = {
-                        line: p.exportLine,
-                        model: p.exportModel,
-                        size: p.exportSize,
-                        qty: 0
-                    };
-                }
-                acc[key].qty += 1;
-                return acc;
-            }, {});
-
-            Object.values(groupedParasols).forEach((grouped) => {
-                newBuilderItems.push({
-                    id: Math.random().toString(36).substr(2, 9),
-                    line: grouped.line,
-                    model: grouped.model,
-                    size: grouped.size,
-                    qty: grouped.qty,
-                    addons: [],
-                    discountPct: state.globalDiscountPct || 0,
-                    source: 'sketch',
-                    sourceType: 'parasol'
-                });
-            });
-        }
-
-        dispatch({ type: 'SET_BUILDER_ITEMS', payload: newBuilderItems });
+        dispatch({ type: 'SET_BUILDER_ITEMS', payload: nextSketchExportState.builderItems });
         dispatch({
             type: 'UPDATE_STATE',
             payload: {
@@ -716,15 +733,10 @@ export function SketchTool({ onBack }) {
                     config: serializeSketchConfig(config),
                     workspace
                 },
-                sketchMeta: {
-                    ...(state.sketchMeta || {}),
-                    addedBahamaLine: nextSketchAddedBahamaLine
-                }
+                sketchMeta: nextSketchExportState.sketchMeta
             }
         });
-
         dispatch({ type: 'SET_STEP', payload: 2 });
-
         void safeLogActivity({
             user,
             eventType: 'sketch_export_to_quote',
@@ -732,14 +744,17 @@ export function SketchTool({ onBack }) {
             targetType: state.activeQuoteId ? 'quote' : 'draft_quote',
             targetId: state.activeQuoteId || 'draft_quote',
             details: hasParasols
-                ? `Ritning exporterad till offert med ${config.parasols.length} parasoller.`
-                : 'Ritning exporterad till offert.',
+                ? `Ritning exporterad till offert med ${config.parasols.length} parasoller${hasFiestaItems ? ` och ${config.fiestaItems.length} Fiesta` : ''}.`
+                : hasFiestaItems
+                    ? `Ritning exporterad till offert med ${config.fiestaItems.length} Fiesta.`
+                    : 'Ritning exporterad till offert.',
             metadata: {
                 width: config.width,
                 depthLeft: config.depthLeft,
                 depthRight: config.depthRight,
                 sectionCount: layout.allSections.length,
-                parasolCount: (config.parasols || []).length
+                parasolCount: (config.parasols || []).length,
+                fiestaCount: (config.fiestaItems || []).length
             }
         });
 
@@ -754,17 +769,15 @@ export function SketchTool({ onBack }) {
         }
 
         const successMsg = hasParasols
-            ? `Exporterade skissen och ${config.parasols.length} st parasoller till offerten.`
-            : 'ClickitUP-sektioner exporterade till offerten.';
+            ? `Exporterade skissen och ${config.parasols.length} st parasoller${hasFiestaItems ? ` samt ${config.fiestaItems.length} st Fiesta` : ''} till offerten.`
+            : hasFiestaItems
+                ? `Exporterade skissen och ${config.fiestaItems.length} st Fiesta till offerten.`
+                : 'Exporterade skissen till offerten.';
+
         toast.success(successMsg);
     };
 
     const handleExportImage = async () => {
-        if (typeof window.html2canvas !== 'function') {
-            toast.error('Bildexport är inte tillgänglig just nu. Ladda om sidan och försök igen.');
-            return;
-        }
-
         const element = document.getElementById('sketchCanvasContainer');
         if (!element) {
             toast.error('Kan inte hitta skissen att exportera.');
@@ -782,7 +795,8 @@ export function SketchTool({ onBack }) {
         const fileName = `Uteservering_Skiss_${config.width}x${config.depthLeft}.png`;
 
         try {
-            const canvas = await window.html2canvas(element, {
+            const { default: html2canvas } = await import('html2canvas');
+            const canvas = await html2canvas(element, {
                 scale: 2,
                 useCORS: true,
                 backgroundColor: '#0b1220'
@@ -809,7 +823,8 @@ export function SketchTool({ onBack }) {
                             depthLeft: config.depthLeft,
                             depthRight: config.depthRight,
                             sectionCount: layout.allSections.length,
-                            parasolCount: (config.parasols || []).length
+                            parasolCount: (config.parasols || []).length,
+                            fiestaCount: (config.fiestaItems || []).length
                         }
                     });
                     toast.success(`Skiss sparad: ${fileName}`, { id: toastId });
@@ -835,7 +850,8 @@ export function SketchTool({ onBack }) {
                             depthLeft: config.depthLeft,
                             depthRight: config.depthRight,
                             sectionCount: layout.allSections.length,
-                            parasolCount: (config.parasols || []).length
+                            parasolCount: (config.parasols || []).length,
+                            fiestaCount: (config.fiestaItems || []).length
                         }
                     });
                     toast.success(`Skiss nedladdad: ${fileName}`, { id: toastId });
@@ -878,14 +894,13 @@ export function SketchTool({ onBack }) {
                         >
                             Återställ vy
                         </button>
-
                         <div className="flex rounded-lg border border-panel-border overflow-hidden bg-input-bg">
                             {['desktop', 'touch'].map((density) => (
                                 <button
                                     key={density}
-                                    onClick={() => setUiDensity(density)}
-                                    className={`px-4 py-2 text-sm transition-colors ${workspace.uiDensity === density
-                                        ? 'bg-primary text-white font-medium'
+                                    onClick={() => setWorkspace((prev) => ({ ...prev, uiDensity: density }))}
+                                    className={`px-3 py-2 text-sm transition-colors ${workspace.uiDensity === density
+                                        ? 'bg-white/10 text-text-primary'
                                         : 'text-text-secondary hover:text-text-primary hover:bg-white/5'
                                         }`}
                                 >
@@ -942,6 +957,7 @@ export function SketchTool({ onBack }) {
                         edgeSummaries={layout.edgeSummaries}
                         onDeleteParasol={handleDeleteParasol}
                         onRotateParasol={handleRotateParasol}
+                        onDeleteFiesta={handleDeleteFiesta}
                     />
 
                     <div className="bg-panel-bg border border-panel-border rounded-xl p-5">
@@ -975,6 +991,7 @@ export function SketchTool({ onBack }) {
                         invalidEdges={invalidEdges}
                         autoAdjustedEdges={autoAdjustedEdges}
                         parasols={config.parasols}
+                        fiestaItems={config.fiestaItems}
                         parasolWarnings={parasolWarnings}
                         canExportToQuote={canExportSketchToQuote}
                         onExport={handleExportClick}
@@ -987,9 +1004,14 @@ export function SketchTool({ onBack }) {
                         activeMode={config.activeMode}
                         parasols={config.parasols}
                         selectedParasolId={config.selectedParasolId}
+                        fiestaItems={config.fiestaItems}
+                        selectedFiestaId={config.selectedFiestaId}
                         onPlaceParasol={handlePlaceParasol}
                         onSelectParasol={handleSelectParasol}
                         onMoveParasol={handleMoveParasol}
+                        onPlaceFiesta={handlePlaceFiesta}
+                        onSelectFiesta={handleSelectFiesta}
+                        onMoveFiesta={handleMoveFiesta}
                         onChangeMode={handleChangeMode}
                         width={previewConfig.width}
                         depth={previewConfig.depth}
