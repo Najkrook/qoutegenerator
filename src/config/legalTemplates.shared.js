@@ -7,7 +7,7 @@ BETALNINGSVILLKOR
 - Vid försenad betalning debiteras dröjsmålsränta och eventuella lagstadgade påminnelseavgifter.
 
 LEVERANS
-- Standard produktionstid 4-6 veckorgäller om inget annat anges i offerten.
+- Bedömd standard produktionstid 4-6 veckor gäller om inget annat anges i offerten.
 - Nettofrakt tillkommer om inget annat anges.
 
 MONTERING OCH FÖRUTSÄTTNINGAR

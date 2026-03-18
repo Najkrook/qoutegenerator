@@ -193,7 +193,7 @@ export function InventoryTable({ items, searchTerm, onAddToBasket, onEdit, onDel
     };
 
     return (
-        <div className="overflow-x-auto border border-panel-border rounded-lg">
+        <div className={`overflow-x-auto border border-panel-border rounded-lg transition-all ${isSizeFilterOpen ? 'min-h-[350px]' : ''}`}>
             <table className="w-full border-collapse min-w-[800px]">
                 <thead>
                     <tr className="bg-white/[0.02]">

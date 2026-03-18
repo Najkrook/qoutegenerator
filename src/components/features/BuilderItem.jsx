@@ -35,13 +35,23 @@ export function BuilderItem({ item, index, onRemove }) {
     };
 
     const handleQtyChange = (e) => {
-        updateItem({ qty: parseInt(e.target.value, 10) || 1 });
+        const newQty = parseInt(e.target.value, 10) || 1;
+        const oldQty = item.qty;
+        
+        const newAddons = item.addons.map((a) => {
+            if (a.qty === oldQty) {
+                return { ...a, qty: newQty };
+            }
+            return a;
+        });
+
+        updateItem({ qty: newQty, addons: newAddons });
     };
 
     const toggleAddon = (addonId, isChecked) => {
         let newAddons = [...item.addons];
         if (isChecked) {
-            newAddons.push({ id: addonId, qty: 1, discountPct: globalDiscountPct });
+            newAddons.push({ id: addonId, qty: item.qty, discountPct: globalDiscountPct });
         } else {
             newAddons = newAddons.filter((a) => a.id !== addonId);
         }
@@ -269,7 +279,7 @@ export function BuilderItem({ item, index, onRemove }) {
                                                 <input
                                                     type="number"
                                                     min="1"
-                                                    value={isChecked ? existing.qty : 1}
+                                                    value={isChecked ? existing.qty : item.qty}
                                                     disabled={!isChecked}
                                                     onChange={(e) => updateAddonQty(addon.id, e.target.value)}
                                                     className="bg-input-bg border border-panel-border text-text-primary p-1.5 rounded-md outline-none focus:border-primary w-16 text-sm disabled:opacity-50"
@@ -306,7 +316,7 @@ export function BuilderItem({ item, index, onRemove }) {
                                             <input
                                                 type="number"
                                                 min="1"
-                                                value={isChecked ? existing.qty : 1}
+                                                value={isChecked ? existing.qty : item.qty}
                                                 disabled={!isChecked}
                                                 onChange={(e) => updateAddonQty(addon.id, e.target.value)}
                                                 className="bg-input-bg border border-panel-border text-text-primary p-1.5 rounded-md outline-none focus:border-primary w-16 text-sm disabled:opacity-50"
