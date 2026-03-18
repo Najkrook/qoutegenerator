@@ -106,12 +106,14 @@ export function Header() {
                         const stepNumber = index + 1;
                         const isActive = step === stepNumber;
                         return (
-                            <div
+                            <button
                                 key={label}
-                                className={`flex-1 text-center py-2 px-4 rounded-md text-sm font-medium whitespace-nowrap transition-colors ${isActive ? 'bg-primary text-white' : 'text-text-secondary'}`}
+                                type="button"
+                                onClick={() => dispatch({ type: 'SET_STEP', payload: stepNumber })}
+                                className={`flex-1 text-center py-2 px-4 rounded-md text-sm font-medium whitespace-nowrap transition-colors cursor-pointer border-none outline-none ${isActive ? 'bg-primary text-white' : 'bg-transparent text-text-secondary hover:bg-panel-border hover:text-text-primary'}`}
                             >
                                 {label}
-                            </div>
+                            </button>
                         );
                     })}
                 </div>
