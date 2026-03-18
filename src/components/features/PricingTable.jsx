@@ -64,6 +64,10 @@ export function PricingTable() {
                 }
             };
             dispatch({ type: 'SET_GRID_SELECTIONS', payload: newSelections });
+        } else if (source.type === 'custom') {
+            const newCosts = [...state.customCosts];
+            newCosts[source.index] = { ...newCosts[source.index], discountPct };
+            dispatch({ type: 'SET_CUSTOM_COSTS', payload: newCosts });
         }
     };
 
@@ -97,15 +101,13 @@ export function PricingTable() {
                             <td className="p-4 text-sm text-center font-medium">{row.qty}</td>
                             <td className="p-4 text-sm text-right text-text-secondary">{fmt(row.gross)}</td>
                             <td className="p-4 text-center">
-                                {!row.isCustom && (
-                                    <input
-                                        type="number"
-                                        step="1"
-                                        value={row.discountPct}
-                                        onChange={(e) => handleDiscountChange(row.source, e.target.value)}
-                                        className={`w-16 text-center bg-black/20 border border-panel-border rounded p-1 text-sm outline-none focus:border-primary ${row.discountPct > 0 ? 'text-primary' : ''}`}
-                                    />
-                                )}
+                                <input
+                                    type="number"
+                                    step="1"
+                                    value={row.discountPct}
+                                    onChange={(e) => handleDiscountChange(row.source, e.target.value)}
+                                    className={`w-16 text-center bg-black/20 border border-panel-border rounded p-1 text-sm outline-none focus:border-primary ${row.discountPct > 0 ? 'text-primary' : ''}`}
+                                />
                             </td>
                             <td className="p-4 text-sm text-right font-bold text-primary">
                                 {fmt(row.net)}

@@ -320,12 +320,18 @@ export function computeQuoteTotals({ state, catalogData }) {
         }
     }
 
-    for (const cost of safeState.customCosts || []) {
+    const customCosts = safeState.customCosts || [];
+    for (let i = 0; i < customCosts.length; i++) {
+        const cost = customCosts[i];
         const unitPrice = toFloat(cost?.price || 0);
         const qty = toInt(cost?.qty, 1);
         const gross = unitPrice * qty;
+        const discountPct = toFloat(cost?.discountPct || 0);
+        const discountSek = gross * (discountPct / 100);
+        const net = gross - discountSek;
 
         grossTotalSek += gross;
+        totalDiscountSek += discountSek;
 
         totals.push({
             model: `Ovrigt: ${cost?.description || 'Kostnad'}`,
@@ -333,12 +339,12 @@ export function computeQuoteTotals({ state, catalogData }) {
             unitPrice,
             qty,
             gross,
-            discountPct: 0,
-            discountSek: 0,
-            net: gross,
+            discountPct,
+            discountSek,
+            net,
             isAddon: false,
             isCustom: true,
-            source: { type: 'custom' },
+            source: { type: 'custom', index: i },
             line: 'Övrigt',
             sortModel: `Ovrigt: ${cost?.description || 'Kostnad'}`,
             sortSizeRaw: '-',
