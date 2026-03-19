@@ -265,6 +265,12 @@ function serializeSketchConfig(config) {
     };
 }
 
+function warnIfActivityLogFailed(result, message) {
+    if (result?.ok === false) {
+        toast(message, { icon: '!' });
+    }
+}
+
 export function SketchTool({ onBack }) {
     const { state, dispatch } = useQuote();
     const { user, canExportSketchToQuote } = useAuth();
@@ -756,7 +762,7 @@ export function SketchTool({ onBack }) {
                 parasolCount: (config.parasols || []).length,
                 fiestaCount: (config.fiestaItems || []).length
             }
-        });
+        }).then((result) => warnIfActivityLogFailed(result, 'Exporten lyckades, men aktivitetsloggen kunde inte uppdateras.'));
 
         if (autoAdjustedEdges.length > 0) {
             const adjusted = autoAdjustedEdges
@@ -826,7 +832,7 @@ export function SketchTool({ onBack }) {
                             parasolCount: (config.parasols || []).length,
                             fiestaCount: (config.fiestaItems || []).length
                         }
-                    });
+                    }).then((result) => warnIfActivityLogFailed(result, 'Bildexporten lyckades, men aktivitetsloggen kunde inte uppdateras.'));
                     toast.success(`Skiss sparad: ${fileName}`, { id: toastId });
                 } else if (pickerResult === 'canceled') {
                     toast.dismiss(toastId);
@@ -853,7 +859,7 @@ export function SketchTool({ onBack }) {
                             parasolCount: (config.parasols || []).length,
                             fiestaCount: (config.fiestaItems || []).length
                         }
-                    });
+                    }).then((result) => warnIfActivityLogFailed(result, 'Bildexporten lyckades, men aktivitetsloggen kunde inte uppdateras.'));
                     toast.success(`Skiss nedladdad: ${fileName}`, { id: toastId });
                 }
             }, 'image/png');

@@ -11,15 +11,18 @@ export function Dashboard({ onStartQuote, onOpenInventory, onOpenSketch, onOpenP
     const { canViewEverything, canStartQuote, canAccessSketch } = useAuth();
     const [logs, setLogs] = useState([]);
     const [logsLoading, setLogsLoading] = useState(false);
+    const [logsError, setLogsError] = useState(false);
 
     const fetchLogs = useCallback(async () => {
         if (!canViewEverything) {
             setLogs([]);
             setLogsLoading(false);
+            setLogsError(false);
             return;
         }
 
         setLogsLoading(true);
+        setLogsError(false);
         try {
             const logsRef = collection(db, 'activity_logs');
             const snap = await getDocs(query(logsRef, orderBy('createdAt', 'desc'), limit(20)));
@@ -29,6 +32,7 @@ export function Dashboard({ onStartQuote, onOpenInventory, onOpenSketch, onOpenP
         } catch (err) {
             console.error('Failed to fetch logs:', err);
             setLogs([]);
+            setLogsError(true);
         } finally {
             setLogsLoading(false);
         }
@@ -127,8 +131,10 @@ export function Dashboard({ onStartQuote, onOpenInventory, onOpenSketch, onOpenP
                     <div className="flex flex-col gap-3">
                         {logsLoading ? (
                             <p className="text-text-secondary text-center italic">Laddar loggar...</p>
+                        ) : logsError ? (
+                            <p className="text-text-secondary text-center italic">Kunde inte ladda senaste händelser just nu.</p>
                         ) : logs.length === 0 ? (
-                            <p className="text-text-secondary text-center italic">Inga loggade händelser ännu.</p>
+                            <p className="text-text-secondary text-center italic">Inga loggade händelser ännu. Nya sparade offerter och exporter visas här.</p>
                         ) : (
                             logs.slice(0, 10).map((entry, idx) => {
                                 const date = new Date(entry.resolvedMs || Date.now());

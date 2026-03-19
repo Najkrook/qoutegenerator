@@ -1,10 +1,14 @@
 import { describe, expect, it } from 'vitest';
+
 import {
     buildActivityLogEntry,
+    buildActivityLogFailureResult,
+    buildActivityLogSuccessResult,
     formatActivityMetadata,
     getActivityEventDefinition,
     getActivityLogVisual,
     getActivitySystemLabel,
+    isActivityLogFailure,
     normalizeActivityLog
 } from '../src/services/activityLogService.js';
 
@@ -61,5 +65,47 @@ describe('activityLogService', () => {
         expect(getActivityEventDefinition(row.eventType).label).toBe('Ritningsbild nedladdad');
         expect(getActivityLogVisual(row).icon).toBe('🖼️');
         expect(formatActivityMetadata(row.metadata)).toBe('PNG · 5 sektioner');
+    });
+
+    it('builds a structured success result when activity logging succeeds', () => {
+        const result = buildActivityLogSuccessResult(
+            { id: 'log-123' },
+            {
+            eventType: 'quote_created',
+                system: 'quote'
+            }
+        );
+
+        expect(result).toMatchObject({
+            ok: true,
+            id: 'log-123',
+            eventType: 'quote_created',
+            system: 'quote'
+        });
+        expect(isActivityLogFailure(result)).toBe(false);
+    });
+
+    it('builds a structured failure result when activity logging fails', () => {
+        const result = buildActivityLogFailureResult(
+            Object.assign(new Error('Missing or insufficient permissions.'), {
+                code: 'permission-denied'
+            }),
+            {
+                eventType: 'quote_created',
+                system: 'quote'
+            }
+        );
+
+        expect(result).toMatchObject({
+            ok: false,
+            id: null,
+            eventType: 'quote_created',
+            system: 'quote',
+            error: {
+                code: 'permission-denied',
+                message: expect.stringContaining('Missing or insufficient permissions.')
+            }
+        });
+        expect(isActivityLogFailure(result)).toBe(true);
     });
 });

@@ -26,6 +26,17 @@ function getDateEndMs(dateValue) {
     return Number.isFinite(ms) ? ms : null;
 }
 
+export function hasActiveActivityFilters(filters = {}) {
+    return Object.values(filters).some((value) => String(value || '').trim() !== '');
+}
+
+export function getActivityLogsEmptyStateMessage({ loading = false, hasError = false, hasActiveFilters = false } = {}) {
+    if (loading) return 'Laddar...';
+    if (hasError) return 'Kunde inte ladda aktivitetsloggen.';
+    if (hasActiveFilters) return 'Inga loggar matchar de aktiva filtren.';
+    return 'Inga loggade händelser ännu.';
+}
+
 export function ActivityLogs({ onBack }) {
     const { user, canViewEverything } = useAuth();
 
@@ -34,7 +45,8 @@ export function ActivityLogs({ onBack }) {
         pageIndex: 0,
         pageStarts: [null],
         hasNext: false,
-        rows: []
+        rows: [],
+        error: false
     });
 
     const [filters, setFilters] = useState({
@@ -73,6 +85,7 @@ export function ActivityLogs({ onBack }) {
 
         return true;
     };
+    const hasActiveFilters = hasActiveActivityFilters(filters);
 
     const fetchLogsBatch = async (startCursor) => {
         const logsRef = collection(db, 'activity_logs');
@@ -82,7 +95,7 @@ export function ActivityLogs({ onBack }) {
     };
 
     const loadPage = useCallback(async (targetPageIndex, currentStarts) => {
-        setPageState((prev) => ({ ...prev, loading: true, rows: [] }));
+        setPageState((prev) => ({ ...prev, loading: true, rows: [], error: false }));
 
         const activeFilters = getActiveFilters();
         const startCursor = currentStarts[targetPageIndex] || null;
@@ -90,6 +103,7 @@ export function ActivityLogs({ onBack }) {
         let lastIncludedCursor = startCursor;
         let foundExtra = false;
         let exhausted = false;
+        let hadError = false;
         const rows = [];
 
         try {
@@ -125,6 +139,7 @@ export function ActivityLogs({ onBack }) {
             console.error('Failed to load activity logs:', err);
             notifyError('Kunde inte ladda aktivitetslogg.');
             exhausted = true;
+            hadError = true;
         }
 
         setPageState((prev) => {
@@ -143,7 +158,8 @@ export function ActivityLogs({ onBack }) {
                 pageIndex: finalIndex,
                 rows,
                 hasNext: finalHasNext,
-                pageStarts: newStarts
+                pageStarts: newStarts,
+                error: hadError
             };
         });
     }, [getActiveFilters]);
@@ -154,7 +170,8 @@ export function ActivityLogs({ onBack }) {
             pageIndex: 0,
             pageStarts: [null],
             hasNext: false,
-            loading: true
+            loading: true,
+            error: false
         }));
         loadPage(0, [null]);
     }, [loadPage]);
@@ -274,7 +291,7 @@ export function ActivityLogs({ onBack }) {
                         Användare
                         <input
                             type="text"
-                            placeholder="E-post eller UID"
+                            placeholder="E-post"
                             className="px-3 py-2 rounded-md border border-panel-border bg-black/20 text-text-primary"
                             value={filters.actor}
                             onChange={(e) => handleFilterChange('actor', e.target.value)}
@@ -331,7 +348,7 @@ export function ActivityLogs({ onBack }) {
                 </div>
 
                 <div className="overflow-x-auto border border-panel-border rounded-lg">
-                    <table className="w-full text-left border-collapse min-w-[1040px]">
+                    <table className="w-full text-left border-collapse min-w-[920px]">
                         <thead>
                             <tr className="bg-black/20 border-b border-panel-border text-xs uppercase tracking-wider text-text-secondary">
                                 <th className="px-4 py-3 font-medium">Tid</th>
@@ -339,15 +356,29 @@ export function ActivityLogs({ onBack }) {
                                 <th className="px-4 py-3 font-medium">Händelse</th>
                                 <th className="px-4 py-3 font-medium">Target</th>
                                 <th className="px-4 py-3 font-medium">Användare</th>
-                                <th className="px-4 py-3 font-medium">UID</th>
                                 <th className="px-4 py-3 font-medium">Detaljer</th>
                             </tr>
                         </thead>
                         <tbody className="text-sm divide-y divide-panel-border">
                             {pageState.rows.length === 0 ? (
                                 <tr>
-                                    <td colSpan="7" className="px-4 py-8 text-center text-text-secondary">
-                                        {pageState.loading ? 'Laddar...' : 'Inga loggar matchar filtret.'}
+                                    <td colSpan="6" className="px-4 py-8 text-center text-text-secondary">
+                                        <div className="space-y-3">
+                                            <div>{getActivityLogsEmptyStateMessage({
+                                                loading: pageState.loading,
+                                                hasError: pageState.error,
+                                                hasActiveFilters
+                                            })}</div>
+                                            {hasActiveFilters && !pageState.loading && !pageState.error && (
+                                                <button
+                                                    type="button"
+                                                    onClick={resetFilters}
+                                                    className="px-4 py-2 text-sm border border-panel-border rounded bg-transparent text-text-primary hover:bg-white/5 transition-colors"
+                                                >
+                                                    Rensa filter
+                                                </button>
+                                            )}
+                                        </div>
                                     </td>
                                 </tr>
                             ) : (
@@ -373,7 +404,6 @@ export function ActivityLogs({ onBack }) {
                                             <td className="px-4 py-3 whitespace-nowrap">{eventLabel}</td>
                                             <td className="px-4 py-3 whitespace-nowrap">{targetValue}</td>
                                             <td className="px-4 py-3 whitespace-nowrap">{row.user}</td>
-                                            <td className="px-4 py-3 whitespace-nowrap text-text-secondary text-xs font-mono">{row.userUid}</td>
                                             <td className="px-4 py-3 min-w-[320px] break-words text-text-secondary">
                                                 <div>{row.details}</div>
                                                 {metadataSummary && (

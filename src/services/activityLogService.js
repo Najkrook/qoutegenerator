@@ -17,6 +17,34 @@ export const ACTIVITY_EVENT_DEFINITIONS = {
     sketch_export_image: { label: 'Ritningsbild nedladdad', icon: '🖼️', color: 'var(--color-success)' }
 };
 
+function buildActivityLogError(error) {
+    return {
+        name: String(error?.name || 'Error'),
+        code: String(error?.code || 'unknown'),
+        message: String(error?.message || 'Unknown activity log failure.')
+    };
+}
+
+export function buildActivityLogSuccessResult(ref, params = {}) {
+    return {
+        ok: true,
+        id: ref?.id || null,
+        ref: ref || null,
+        eventType: String(params?.eventType || ''),
+        system: String(params?.system || '')
+    };
+}
+
+export function buildActivityLogFailureResult(error, params = {}) {
+    return {
+        ok: false,
+        id: null,
+        eventType: String(params?.eventType || ''),
+        system: String(params?.system || ''),
+        error: buildActivityLogError(error)
+    };
+}
+
 function sanitizeMetadata(metadata) {
     try {
         const cloned = JSON.parse(JSON.stringify(metadata || {}));
@@ -131,6 +159,10 @@ export function getActivityLogVisual(entry) {
     };
 }
 
+export function isActivityLogFailure(result) {
+    return Boolean(result) && result.ok === false;
+}
+
 export async function logActivity(params) {
     const entry = buildActivityLogEntry(params);
     return addDoc(collection(db, 'activity_logs'), entry);
@@ -138,9 +170,11 @@ export async function logActivity(params) {
 
 export async function safeLogActivity(params) {
     try {
-        return await logActivity(params);
+        const ref = await logActivity(params);
+        return buildActivityLogSuccessResult(ref, params);
     } catch (err) {
-        console.error('Failed to log activity:', err);
-        return null;
+        const failure = buildActivityLogFailureResult(err, params);
+        console.error('Failed to log activity:', failure, err);
+        return failure;
     }
 }

@@ -47,6 +47,12 @@ async function exportExcelWorkbook(state, summaryData) {
     return generateExcel(state, summaryData);
 }
 
+function warnIfActivityLogFailed(result, message) {
+    if (result?.ok === false) {
+        toast(message, { icon: '!' });
+    }
+}
+
 export function SummaryExport({ onPrev, onBackToSketch }) {
     const { state, dispatch } = useQuote();
     const { user } = useAuth();
@@ -140,7 +146,7 @@ export function SummaryExport({ onPrev, onBackToSketch }) {
                     customerName: state.customerInfo?.name || '',
                     reference: state.customerInfo?.reference || ''
                 }
-            });
+            }).then((result) => warnIfActivityLogFailed(result, 'PDF-exporten lyckades, men aktivitetsloggen kunde inte uppdateras.'));
             toast.success(`PDF sparad: ${fileName}`);
             return;
         }
@@ -170,7 +176,7 @@ export function SummaryExport({ onPrev, onBackToSketch }) {
                     customerName: state.customerInfo?.name || '',
                     reference: state.customerInfo?.reference || ''
                 }
-            });
+            }).then((result) => warnIfActivityLogFailed(result, 'PDF-exporten lyckades, men aktivitetsloggen kunde inte uppdateras.'));
             toast.success(`PDF nedladdad: ${fileName}`);
         }
     };
@@ -192,7 +198,7 @@ export function SummaryExport({ onPrev, onBackToSketch }) {
                     customerName: state.customerInfo?.name || '',
                     reference: state.customerInfo?.reference || ''
                 }
-            });
+            }).then((result) => warnIfActivityLogFailed(result, 'Excel-exporten lyckades, men aktivitetsloggen kunde inte uppdateras.'));
         } catch (error) {
             console.error('Failed to export Excel:', error);
             toast.error('Kunde inte skapa Excel.');
@@ -231,7 +237,7 @@ export function SummaryExport({ onPrev, onBackToSketch }) {
                     reference: state.customerInfo?.reference || '',
                     totalSek: summaryData.finalTotalSek || 0
                 }
-            });
+            }).then((result) => warnIfActivityLogFailed(result, 'Offerten sparades, men aktivitetsloggen kunde inte uppdateras.'));
 
             if (isNewQuote) {
                 toast.success('Offerten sparades i Mina Offerter.');

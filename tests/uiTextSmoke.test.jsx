@@ -47,6 +47,7 @@ vi.mock('../src/services/firebase', () => ({
     query: vi.fn(() => ({})),
     orderBy: vi.fn(() => ({})),
     limit: vi.fn(() => ({})),
+    startAfter: vi.fn(() => ({})),
     getDocs: vi.fn(async () => ({ docs: [] }))
 }));
 
@@ -97,6 +98,14 @@ vi.mock('../src/services/quoteSaveService', () => ({
 }));
 
 vi.mock('../src/services/activityLogService', () => ({
+    ACTIVITY_EVENT_DEFINITIONS: {
+        quote_created: { label: 'Offert skapad' }
+    },
+    formatActivityMetadata: vi.fn(() => ''),
+    getActivityEventDefinition: vi.fn(() => ({ label: 'Offert skapad' })),
+    getActivityLogVisual: vi.fn(() => ({ icon: '📄', color: 'var(--color-primary)', label: 'Offert skapad' })),
+    getActivitySystemLabel: vi.fn(() => 'Offert'),
+    normalizeActivityLog: vi.fn((value) => value),
     safeLogActivity: vi.fn()
 }));
 
@@ -110,6 +119,7 @@ vi.mock('react-hot-toast', () => ({
 }));
 
 import { Dashboard } from '../src/views/Dashboard.jsx';
+import { ActivityLogs, getActivityLogsEmptyStateMessage } from '../src/views/ActivityLogs.jsx';
 import { Header } from '../src/components/layout/Header.jsx';
 import { SketchBom } from '../src/components/features/SketchBom.jsx';
 import { SketchTool } from '../src/views/SketchTool.jsx';
@@ -233,6 +243,31 @@ describe('UI text smoke', () => {
         expect(html).toContain('Välkommen till Brixx portal');
         expect(html).toContain('Skapa Ny Offert');
         expect(html).toContain('Rita Uteservering');
+        expect(html).toContain('Inga loggade händelser ännu. Nya sparade offerter och exporter visas här.');
+    });
+
+    it('renders activity log empty state for an untouched log list', () => {
+        authState.value = {
+            canViewEverything: true,
+            canStartQuote: true,
+            canAccessSketch: true,
+            canAccessQuoteHistory: true,
+            canExportSketchToQuote: true,
+            user: { uid: 'admin-1', email: 'admin@example.com' }
+        };
+
+        const html = renderWithProviders(<ActivityLogs onBack={() => {}} />);
+
+        expect(html).toContain('Aktivitetslogg');
+        expect(html).toContain('Inga loggade händelser ännu.');
+    });
+
+    it('returns a filter-specific empty state message for filtered activity views', () => {
+        expect(getActivityLogsEmptyStateMessage({
+            loading: false,
+            hasError: false,
+            hasActiveFilters: true
+        })).toBe('Inga loggar matchar de aktiva filtren.');
     });
 
     it('renders SketchBom labels and restricted export copy correctly', () => {
