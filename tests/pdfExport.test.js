@@ -190,6 +190,30 @@ describe('pdfExport helpers', () => {
         expect(pdfMockState.textCalls.map((call) => call.value)).not.toContain('Total Rabatt:');
     });
 
+    it('writes project reference and customer reference on separate rows in the PDF header', () => {
+        const state = createZeroDiscountState({
+            customerInfo: {
+                name: '',
+                company: 'Two Forks',
+                reference: 'PROJ-1',
+                customerReference: 'ER-900',
+                date: '2026-03-19',
+                validity: '30 dagar'
+            }
+        });
+        const summary = computeQuoteTotals({
+            state,
+            catalogData: createCatalogFixture()
+        });
+
+        const pdfBlob = generatePDF(state, summary, true);
+        const textValues = pdfMockState.textCalls.map((call) => call.value);
+
+        expect(pdfBlob).toBeInstanceOf(Blob);
+        expect(textValues).toContain('Projektreferens: PROJ-1');
+        expect(textValues).toContain('Er referens: ER-900');
+    });
+
     it('ignores the hide flag when discounts are present in the quote', () => {
         const state = createStateFixture({
             includeTerms: false,
@@ -242,6 +266,7 @@ describe('pdfExport helpers', () => {
                 name: 'Ada',
                 company: 'Brixx',
                 reference: 'REF-7',
+                customerReference: 'ER-7',
                 date: '2026-03-01',
                 validity: '14 dagar'
             }
@@ -260,6 +285,9 @@ describe('pdfExport helpers', () => {
         expect(pdfMockState.addPageCalls.length).toBeGreaterThanOrEqual(1);
         expect(textValues).toContain('BETALNING & GILTIGHET');
         expect(textValues).toContain('Godkännande');
+        expect(textValues).toContain('Projektreferens: REF-7');
+        expect(textValues).toContain('Er referens: ER-7');
+        expect(textValues).toContain('Projektreferens: REF-7');
         expect(paymentBoxRect).toBeTruthy();
         expect(signatureRect).toBeTruthy();
 

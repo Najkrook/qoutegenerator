@@ -41,9 +41,9 @@ export function buildExcelSheetData(state = {}, summaryData = {}) {
     const customerInfo = safeCustomerInfo(state);
     const wsData = [
         ['Offert'],
-        ['Kund', customerInfo.name || ''],
-        ['Foretag', customerInfo.company || ''],
-        ['Referens', customerInfo.reference || ''],
+        ['Foretag', customerInfo.company || customerInfo.name || ''],
+        ['Projektreferens', customerInfo.reference || ''],
+        ['Er referens', customerInfo.customerReference || ''],
         ['Datum', customerInfo.date || new Date().toLocaleDateString()],
         ['Giltighetstid', customerInfo.validity || ''],
         [],

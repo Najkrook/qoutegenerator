@@ -207,7 +207,7 @@ export function History({ onBack, onOpenQuote }) {
                         type="text" 
                         value={searchFilter} 
                         onChange={e => setSearchFilter(e.target.value)}
-                        placeholder="Sök kund, företag eller referens"
+                        placeholder="Sök företag eller referens"
                         className="px-3 py-2 rounded-md border border-panel-border bg-panel-bg text-text-primary min-w-[180px]"
                     />
                 </div>
@@ -239,13 +239,13 @@ export function History({ onBack, onOpenQuote }) {
                             <article key={quote.quoteId} className="bg-panel-bg border border-panel-border rounded-lg p-6 mb-4 flex flex-col md:flex-row justify-between items-start md:items-center transition-all hover:bg-gray-800 hover:border-white/30 gap-4">
                                 <div>
                                     <div className="flex items-center gap-3 mb-1">
-                                        <h3 className="m-0 text-xl font-semibold">{quote.customerName || 'Okänd kund'}</h3>
+                                        <h3 className="m-0 text-xl font-semibold">{quote.company || quote.customerName || 'Okänd kund'}</h3>
                                         <span className={`inline-flex items-center rounded-full text-[11px] tracking-wider uppercase font-bold px-2 py-0.5 status-${status}`}>
                                             {STATUS_LABELS[status]}
                                         </span>
                                     </div>
                                     <p className="m-0 text-text-secondary text-sm leading-relaxed">
-                                        <strong>Företag:</strong> {quote.company || '-'} &nbsp;|&nbsp; <strong>Referens:</strong> {quote.reference || '-'}
+                                        <strong>Företag:</strong> {quote.company || quote.customerName || '-'} &nbsp;|&nbsp; <strong>Projektreferens:</strong> {quote.reference || '-'} &nbsp;|&nbsp; <strong>Er referens:</strong> {quote.customerReference || '-'}
                                     </p>
                                     <p className="m-0 text-text-secondary text-sm leading-relaxed">
                                         <strong>Uppdaterad:</strong> {formatDateTime(quote.updatedAtMs)} &nbsp;|&nbsp; <strong>Version:</strong> v{quote.latestVersion}

@@ -19,16 +19,6 @@ export function CustomerInfoForm() {
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <div className="flex flex-col gap-1.5">
-                    <label className="text-xs font-semibold uppercase text-text-secondary tracking-wider">Kundnamn</label>
-                    <input
-                        type="text"
-                        value={customerInfo.name || ''}
-                        onChange={(e) => handleChange('name', e.target.value)}
-                        placeholder="Namn på kunden"
-                        className="bg-black/20 border border-panel-border rounded-md px-3 py-2 text-sm focus:border-primary outline-none transition-colors"
-                    />
-                </div>
-                <div className="flex flex-col gap-1.5">
                     <label className="text-xs font-semibold uppercase text-text-secondary tracking-wider">Företag / Organisation</label>
                     <input
                         type="text"
@@ -55,6 +45,16 @@ export function CustomerInfoForm() {
                         value={customerInfo.reference || ''}
                         onChange={(e) => handleChange('reference', e.target.value)}
                         placeholder="Referens eller projektnamn"
+                        className="bg-black/20 border border-panel-border rounded-md px-3 py-2 text-sm focus:border-primary outline-none transition-colors"
+                    />
+                </div>
+                <div className="flex flex-col gap-1.5">
+                    <label className="text-xs font-semibold uppercase text-text-secondary tracking-wider">Er referens</label>
+                    <input
+                        type="text"
+                        value={customerInfo.customerReference || ''}
+                        onChange={(e) => handleChange('customerReference', e.target.value)}
+                        placeholder="Kundens referens"
                         className="bg-black/20 border border-panel-border rounded-md px-3 py-2 text-sm focus:border-primary outline-none transition-colors"
                     />
                 </div>

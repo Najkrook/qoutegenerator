@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback, useRef } from 'react';
 import { useQuote } from '../store/QuoteContext';
 import { useAuth } from '../store/AuthContext';
 import {
@@ -265,6 +265,42 @@ function serializeSketchConfig(config) {
     };
 }
 
+function createDefaultSketchConfig() {
+    return {
+        width: 8000,
+        depth: 4000,
+        depthLeft: 4000,
+        depthRight: 4000,
+        equalDepth: true,
+        includeBack: false,
+        prioMode: 'symmetrical',
+        targetLength: 1500,
+        doorSegmentsByEdge: {},
+        manualSectionsByEdge: {},
+        activeMode: 'clickitup',
+        parasols: [],
+        selectedParasolId: null,
+        selectedParasolPresetId: DEFAULT_PARASOL_PRESET_ID,
+        fiestaItems: [],
+        selectedFiestaId: null
+    };
+}
+
+function cloneSketchConfig(config) {
+    return sanitizeConfig(JSON.parse(JSON.stringify(config || createDefaultSketchConfig())));
+}
+
+function cloneWorkspace(saved = {}) {
+    return {
+        camera: { ...DEFAULT_CAMERA, ...(saved.camera || {}) },
+        selection: {
+            edgeKey: saved.selection?.edgeKey || 'front',
+            segmentIndex: saved.selection?.segmentIndex ?? null
+        },
+        uiDensity: saved.uiDensity || getInitialDensity()
+    };
+}
+
 function warnIfActivityLogFailed(result, message) {
     if (result?.ok === false) {
         toast(message, { icon: '!' });
@@ -275,39 +311,11 @@ export function SketchTool({ onBack }) {
     const { state, dispatch } = useQuote();
     const { user, canExportSketchToQuote } = useAuth();
 
-    const [config, setConfig] = useState(() => {
-        const defaultConfig = {
-            width: 8000,
-            depth: 4000,
-            depthLeft: 4000,
-            depthRight: 4000,
-            equalDepth: true,
-            includeBack: false,
-            prioMode: 'symmetrical',
-            targetLength: 1500,
-            doorSegmentsByEdge: {},
-            manualSectionsByEdge: {},
-            activeMode: 'clickitup',
-            parasols: [],
-            selectedParasolId: null,
-            selectedParasolPresetId: DEFAULT_PARASOL_PRESET_ID,
-            fiestaItems: [],
-            selectedFiestaId: null
-        };
-        return sanitizeConfig(state.sketchDraft?.config || defaultConfig);
-    });
+    const initialConfigRef = useRef(cloneSketchConfig(state.sketchDraft?.config || createDefaultSketchConfig()));
+    const initialWorkspaceRef = useRef(cloneWorkspace(state.sketchDraft?.workspace || {}));
 
-    const [workspace, setWorkspace] = useState(() => {
-        const saved = state.sketchDraft?.workspace || {};
-        return {
-            camera: { ...DEFAULT_CAMERA, ...(saved.camera || {}) },
-            selection: {
-                edgeKey: saved.selection?.edgeKey || 'front',
-                segmentIndex: saved.selection?.segmentIndex ?? null
-            },
-            uiDensity: saved.uiDensity || getInitialDensity()
-        };
-    });
+    const [config, setConfig] = useState(() => cloneSketchConfig(initialConfigRef.current));
+    const [workspace, setWorkspace] = useState(() => cloneWorkspace(initialWorkspaceRef.current));
 
     const [showStockModal, setShowStockModal] = useState(false);
     const [dragPreview, setDragPreview] = useState(null);
@@ -467,18 +475,12 @@ export function SketchTool({ onBack }) {
             camera
         }));
     }, []);
-    const resetCamera = useCallback(() => {
-        setWorkspace((prev) => ({
-            ...prev,
-            camera: DEFAULT_CAMERA
-        }));
-        updateConfig({
-            parasols: [],
-            selectedParasolId: null,
-            fiestaItems: [],
-            selectedFiestaId: null
-        });
-    }, [updateConfig]);
+    const resetSketch = useCallback(() => {
+        setDragPreview(null);
+        setShowStockModal(false);
+        setConfig(cloneSketchConfig(initialConfigRef.current));
+        setWorkspace(cloneWorkspace(initialWorkspaceRef.current));
+    }, []);
 
     const applySuggestion = useCallback(
         (suggestionId) => {
@@ -895,10 +897,10 @@ export function SketchTool({ onBack }) {
                 <div className="flex items-center gap-3">
                     <div className="flex gap-2">
                         <button
-                            onClick={resetCamera}
+                            onClick={resetSketch}
                             className="px-3 py-2 rounded-lg text-sm border border-panel-border bg-input-bg text-text-secondary hover:text-text-primary transition-colors"
                         >
-                            Återställ vy
+                            Återställ ritning
                         </button>
                         <div className="flex rounded-lg border border-panel-border overflow-hidden bg-input-bg">
                             {['desktop', 'touch'].map((density) => (

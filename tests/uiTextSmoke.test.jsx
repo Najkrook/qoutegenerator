@@ -330,7 +330,7 @@ describe('UI text smoke', () => {
         const html = renderWithProviders(<SketchTool onBack={() => {}} />);
 
         expect(html).toContain('Rita Uteservering');
-        expect(html).toContain('Återställ vy');
+        expect(html).toContain('Återställ ritning');
         expect(html).toContain('Tillbaka');
         expect(html).toContain('Förslag');
     });

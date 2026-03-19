@@ -34,9 +34,10 @@ export function buildQuoteSearchText({
     customerName = '',
     company = '',
     reference = '',
+    customerReference = '',
     status = 'draft'
 } = {}) {
-    return [customerName, company, reference, normalizeQuoteStatus(status)]
+    return [customerName, company, reference, customerReference, normalizeQuoteStatus(status)]
         .map((value) => String(value || '').trim().toLowerCase())
         .filter(Boolean)
         .join(' ');
@@ -44,9 +45,10 @@ export function buildQuoteSearchText({
 
 export function normalizeQuoteMetadata(quoteId, raw = {}) {
     const fallbackCustomer = raw?.state?.customerInfo || {};
-    const customerName = String(raw.customerName || fallbackCustomer.name || 'Okand kund');
+    const customerName = String(raw.customerName || fallbackCustomer.company || fallbackCustomer.name || 'Okand kund');
     const company = String(raw.company || fallbackCustomer.company || '');
     const reference = String(raw.reference || fallbackCustomer.reference || '-');
+    const customerReference = String(raw.customerReference || fallbackCustomer.customerReference || '');
     const totalSek = toNumber(raw.totalSek, toNumber(raw?.summary?.finalTotalSek, 0));
     const timestampMs = toNumber(Date.parse(raw.timestamp || ''), 0);
     const createdAtMs = toNumber(raw.createdAtMs, timestampMs || Date.now());
@@ -61,6 +63,7 @@ export function normalizeQuoteMetadata(quoteId, raw = {}) {
         customerName,
         company,
         reference,
+        customerReference,
         status,
         createdAtMs,
         updatedAtMs,
@@ -72,7 +75,7 @@ export function normalizeQuoteMetadata(quoteId, raw = {}) {
         ...scrive,
         searchText: String(
             raw.searchText ||
-            buildQuoteSearchText({ customerName, company, reference, status })
+            buildQuoteSearchText({ customerName, company, reference, customerReference, status })
         ),
         // Keep legacy fields available for fallback reads.
         state: raw.state || null,
@@ -118,9 +121,10 @@ export function buildQuoteMetadata({
     existing = {}
 }) {
     const normalizedStatus = normalizeQuoteStatus(status || existing.status);
-    const customerName = String(customerInfo.name || existing.customerName || 'Okand kund');
     const company = String(customerInfo.company || existing.company || '');
+    const customerName = String(company || customerInfo.name || existing.customerName || existing.company || 'Okand kund');
     const reference = String(customerInfo.reference || existing.reference || '-');
+    const customerReference = String(customerInfo.customerReference || existing.customerReference || '');
     const existingScrive = normalizeScriveMetadata(existing, customerInfo);
     const normalizedScriveStatus = normalizeScriveStatus(scrive.status || existingScrive.scriveStatus || 'not_sent');
     const scriveDocumentId = scrive.documentId || existingScrive.scriveDocumentId || null;
@@ -157,6 +161,7 @@ export function buildQuoteMetadata({
         customerName,
         company,
         reference,
+        customerReference,
         status: normalizedStatus,
         createdAtMs: toNumber(existing.createdAtMs, nowMs),
         updatedAtMs: nowMs,
@@ -178,6 +183,7 @@ export function buildQuoteMetadata({
             customerName,
             company,
             reference,
+            customerReference,
             status: normalizedStatus
         })
     };
@@ -190,7 +196,7 @@ export function applyQuoteFilters(quotes = [], { status = '', search = '' } = {}
     return quotes.filter((quote) => {
         if (normalizedStatus && quote.status !== normalizedStatus) return false;
         if (!normalizedSearch) return true;
-        const haystack = `${quote.searchText || ''} ${quote.customerName || ''} ${quote.reference || ''}`.toLowerCase();
+        const haystack = `${quote.searchText || ''} ${quote.customerName || ''} ${quote.reference || ''} ${quote.customerReference || ''}`.toLowerCase();
         return haystack.includes(normalizedSearch);
     });
 }
@@ -496,6 +502,7 @@ export function createQuoteRepository(deps) {
             customerName: existing.customerName,
             company: existing.company,
             reference: existing.reference,
+            customerReference: existing.customerReference,
             status: normalizedStatus
         });
 

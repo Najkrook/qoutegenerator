@@ -25,11 +25,15 @@ function sanitizeFileNamePart(value) {
 
 function buildPdfFileName(customerInfo = {}) {
     const rawRef = customerInfo.reference?.trim();
-    const rawName = customerInfo.name?.trim();
+    const rawName = customerInfo.company?.trim() || customerInfo.name?.trim();
     const date = customerInfo.date || new Date().toISOString().slice(0, 10);
     const base = rawRef || rawName || 'Offert';
     const safeBase = sanitizeFileNamePart(base);
     return `${safeBase || 'Offert'}-${date}.pdf`;
+}
+
+function getActivityCustomerLabel(customerInfo = {}) {
+    return customerInfo.company || customerInfo.name || '';
 }
 
 async function createPdfBlob(state, summaryData) {
@@ -143,7 +147,7 @@ export function SummaryExport({ onPrev, onBackToSketch }) {
                     format: 'pdf',
                     fileName,
                     version: state.activeQuoteVersion || null,
-                    customerName: state.customerInfo?.name || '',
+                    customerName: getActivityCustomerLabel(state.customerInfo),
                     reference: state.customerInfo?.reference || ''
                 }
             }).then((result) => warnIfActivityLogFailed(result, 'PDF-exporten lyckades, men aktivitetsloggen kunde inte uppdateras.'));
@@ -173,7 +177,7 @@ export function SummaryExport({ onPrev, onBackToSketch }) {
                     format: 'pdf',
                     fileName,
                     version: state.activeQuoteVersion || null,
-                    customerName: state.customerInfo?.name || '',
+                    customerName: getActivityCustomerLabel(state.customerInfo),
                     reference: state.customerInfo?.reference || ''
                 }
             }).then((result) => warnIfActivityLogFailed(result, 'PDF-exporten lyckades, men aktivitetsloggen kunde inte uppdateras.'));
@@ -195,7 +199,7 @@ export function SummaryExport({ onPrev, onBackToSketch }) {
                     format: 'excel',
                     fileName: 'Offert.xlsx',
                     version: state.activeQuoteVersion || null,
-                    customerName: state.customerInfo?.name || '',
+                    customerName: getActivityCustomerLabel(state.customerInfo),
                     reference: state.customerInfo?.reference || ''
                 }
             }).then((result) => warnIfActivityLogFailed(result, 'Excel-exporten lyckades, men aktivitetsloggen kunde inte uppdateras.'));
@@ -233,7 +237,7 @@ export function SummaryExport({ onPrev, onBackToSketch }) {
                     : `Offerten sparades som version ${statePatch.activeQuoteVersion}.`,
                 metadata: {
                     version: statePatch.activeQuoteVersion || null,
-                    customerName: state.customerInfo?.name || '',
+                    customerName: getActivityCustomerLabel(state.customerInfo),
                     reference: state.customerInfo?.reference || '',
                     totalSek: summaryData.finalTotalSek || 0
                 }

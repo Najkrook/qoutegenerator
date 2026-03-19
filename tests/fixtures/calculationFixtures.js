@@ -76,6 +76,7 @@ export function createStateFixture(overrides = {}) {
             name: 'Testkund',
             company: 'Testbolag AB',
             reference: 'REF-123',
+            customerReference: 'CUST-456',
             date: '2026-03-02',
             validity: '30 dagar'
         },

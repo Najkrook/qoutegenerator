@@ -82,6 +82,7 @@ function createBaseInitialState() {
             company: '',
             email: '',
             reference: '',
+            customerReference: '',
             date: '',
             validity: '30 dagar'
         },
@@ -145,6 +146,7 @@ function migrateV0ToV1(rawState = {}) {
             company: String(customerInfo.company || ''),
             email: String(customerInfo.email || ''),
             reference: String(customerInfo.reference || ''),
+            customerReference: String(customerInfo.customerReference || ''),
             date: String(customerInfo.date || ''),
             validity: String(customerInfo.validity || formatValidityLabel(normalizePositiveInt(next.quoteValidityDays, validityFromCustomer || 30)))
         },
@@ -252,6 +254,7 @@ export function hydrateQuoteState(input) {
             company: String(customerInfoSource.company || ''),
             email: String(customerInfoSource.email || ''),
             reference: String(customerInfoSource.reference || ''),
+            customerReference: String(customerInfoSource.customerReference || ''),
             date: String(customerInfoSource.date || ''),
             validity: formatValidityLabel(normalizedValidityDays)
         },

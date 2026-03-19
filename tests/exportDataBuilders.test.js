@@ -92,8 +92,13 @@ describe('export data builders', () => {
 
         const wsData = buildExcelSheetData(state, summary);
         const totalsRow = wsData.find((row) => row[0] === 'Totalt Exkl. Moms');
+        const customerLabels = wsData.slice(0, 6).map((row) => row[0]);
 
         expect(totalsRow).toBeTruthy();
+        expect(customerLabels).toContain('Foretag');
+        expect(customerLabels).toContain('Projektreferens');
+        expect(customerLabels).toContain('Er referens');
+        expect(customerLabels).not.toContain('Kund');
         expect(totalsRow[4]).toBe(Math.round(summary.finalTotalSek));
         expect(totalsRow[5]).toBe(Math.round(summary.grossTotalSek));
         expect(totalsRow[6]).toBe(Math.round(-summary.totalDiscountSek));

@@ -20,9 +20,10 @@ const user = {
 
 const baseState = {
     customerInfo: {
-        name: 'Testkund',
+        name: '',
         company: 'Brixx AB',
-        reference: 'REF-01'
+        reference: 'REF-01',
+        customerReference: 'ER-01'
     }
 };
 
@@ -46,8 +47,10 @@ describe('quoteRepository', () => {
         expect(saved.quoteId).toContain('quote_');
         expect(saved.metadata.latestVersion).toBe(1);
         expect(saved.metadata.status).toBe('draft');
+        expect(saved.metadata.customerName).toBe('Brixx AB');
+        expect(saved.metadata.customerReference).toBe('ER-01');
         expect(saved.revision.version).toBe(1);
-        expect(saved.revision.state.customerInfo.name).toBe('Testkund');
+        expect(saved.revision.state.customerInfo.company).toBe('Brixx AB');
     });
 
     it('saveQuoteRevision increments version and updates latest metadata pointer', async () => {
@@ -67,13 +70,15 @@ describe('quoteRepository', () => {
                 ...baseState,
                 customerInfo: {
                     ...baseState.customerInfo,
-                    reference: 'REF-02'
+                    reference: 'REF-02',
+                    customerReference: 'ER-02'
                 }
             },
             summary: { ...baseSummary, finalTotalSek: 15000 },
             customerInfo: {
                 ...baseState.customerInfo,
-                reference: 'REF-02'
+                reference: 'REF-02',
+                customerReference: 'ER-02'
             },
             status: 'sent',
             changeNote: 'Updated reference'
@@ -82,6 +87,7 @@ describe('quoteRepository', () => {
         expect(updated.metadata.latestVersion).toBe(2);
         expect(updated.metadata.latestRevisionId).toBe(updated.revision.revisionId);
         expect(updated.metadata.status).toBe('sent');
+        expect(updated.metadata.customerReference).toBe('ER-02');
         expect(updated.revision.version).toBe(2);
     });
 
@@ -105,16 +111,18 @@ describe('quoteRepository', () => {
             user,
             state: {
                 customerInfo: {
-                    name: 'Andra kund',
+                    name: '',
                     company: 'Nordic Partner',
-                    reference: 'ABC'
+                    reference: 'ABC',
+                    customerReference: 'CUST-ABC'
                 }
             },
             summary: { ...baseSummary, finalTotalSek: 5000 },
             customerInfo: {
-                name: 'Andra kund',
+                name: '',
                 company: 'Nordic Partner',
-                reference: 'ABC'
+                reference: 'ABC',
+                customerReference: 'CUST-ABC'
             },
             status: 'draft'
         });
@@ -129,11 +137,18 @@ describe('quoteRepository', () => {
             status: '',
             search: 'nordic'
         });
+        const customerRefSearch = await repo.getUserQuotes({
+            userId: user.uid,
+            status: '',
+            search: 'cust-abc'
+        });
 
         expect(won).toHaveLength(1);
         expect(won[0].status).toBe('won');
         expect(search).toHaveLength(1);
         expect(search[0].company).toBe('Nordic Partner');
+        expect(customerRefSearch).toHaveLength(1);
+        expect(customerRefSearch[0].customerReference).toBe('CUST-ABC');
     });
 
     it('supports legacy quote docs without lifecycle metadata', async () => {
@@ -178,13 +193,15 @@ describe('quoteRepository', () => {
                 ...baseState,
                 customerInfo: {
                     ...baseState.customerInfo,
-                    reference: 'REV-2'
+                    reference: 'REV-2',
+                    customerReference: 'ER-REV-2'
                 }
             },
             summary: { ...baseSummary, finalTotalSek: 22222 },
             customerInfo: {
                 ...baseState.customerInfo,
-                reference: 'REV-2'
+                reference: 'REV-2',
+                customerReference: 'ER-REV-2'
             },
             status: 'sent'
         });
@@ -196,6 +213,7 @@ describe('quoteRepository', () => {
 
         expect(latest?.revision?.version).toBe(2);
         expect(latest?.revision?.state?.customerInfo?.reference).toBe('REV-2');
+        expect(latest?.revision?.state?.customerInfo?.customerReference).toBe('ER-REV-2');
         expect(latest?.metadata?.status).toBe('sent');
     });
 
@@ -232,6 +250,7 @@ describe('quoteRepository pure helpers', () => {
     it('normalizeQuoteMetadata defaults status/version for legacy payload', () => {
         const normalized = normalizeQuoteMetadata('q1', {
             customerName: 'A',
+            customerReference: 'ER-7',
             reference: 'X',
             timestamp: '2026-01-01T00:00:00.000Z'
         });
@@ -240,17 +259,19 @@ describe('quoteRepository pure helpers', () => {
         expect(normalized.latestVersion).toBe(1);
         expect(normalized.scriveEnabled).toBe(false);
         expect(normalized.scriveStatus).toBe('not_sent');
+        expect(normalized.customerReference).toBe('ER-7');
         expect(normalized.searchText).toContain('draft');
     });
 
     it('applyQuoteFilters filters by status and search text', () => {
         const rows = [
-            { status: 'draft', searchText: 'acme draft', customerName: 'Acme', reference: 'A1' },
-            { status: 'won', searchText: 'beta won', customerName: 'Beta', reference: 'B1' }
+            { status: 'draft', searchText: 'acme draft er-1', customerName: 'Acme', reference: 'A1', customerReference: 'ER-1' },
+            { status: 'won', searchText: 'beta won er-2', customerName: 'Beta', reference: 'B1', customerReference: 'ER-2' }
         ];
 
         expect(applyQuoteFilters(rows, { status: 'won', search: '' })).toHaveLength(1);
         expect(applyQuoteFilters(rows, { status: '', search: 'acme' })).toHaveLength(1);
+        expect(applyQuoteFilters(rows, { status: '', search: 'er-2' })).toHaveLength(1);
         expect(applyQuoteFilters(rows, { status: 'lost', search: '' })).toHaveLength(0);
     });
 

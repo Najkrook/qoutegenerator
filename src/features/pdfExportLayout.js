@@ -5,9 +5,9 @@ import { buildPdfTableData } from '../services/exportDataBuilders.js';
 export const PDF_LAYOUT = Object.freeze({
     pageMarginX: 10,
     headerTopY: 16,
-    headerLineY: 28,
-    customerBoxY: 31,
-    contentStartY: 35,
+    headerLineY: 34,
+    customerBoxY: 37,
+    contentStartY: 41,
     contentBottomSafe: 36,
     termsStartY: 31,
     termsFooterZone: 35,
@@ -148,7 +148,10 @@ export function drawHeader(doc, { pageWidth, quoteDate, customerInfo = {}, layou
     doc.setTextColor(...layout.colors.grayText);
     doc.text(`Datum: ${quoteDate}`, pageWidth - pageMarginX, 22, { align: 'right' });
     if (customerInfo.reference) {
-        doc.text(`Ref: ${customerInfo.reference}`, pageWidth - pageMarginX, 26, { align: 'right' });
+        doc.text(`Projektreferens: ${customerInfo.reference}`, pageWidth - pageMarginX, 26, { align: 'right' });
+    }
+    if (customerInfo.customerReference) {
+        doc.text(`Er referens: ${customerInfo.customerReference}`, pageWidth - pageMarginX, 30, { align: 'right' });
     }
 
     doc.setDrawColor(...layout.colors.brandOrange);
@@ -158,7 +161,7 @@ export function drawHeader(doc, { pageWidth, quoteDate, customerInfo = {}, layou
 
 export function renderCustomerInfoBlock(doc, { customerInfo = {}, pageWidth, layout = PDF_LAYOUT }) {
     const customerLines = [];
-    const recipient = [customerInfo.company, customerInfo.name].filter(Boolean).join(' / ');
+    const recipient = customerInfo.company || customerInfo.name || '';
     if (recipient) {
         customerLines.push({ type: 'recipient', value: recipient });
     }
@@ -387,7 +390,7 @@ export function renderTotalsSection(doc, {
             `Giltig till: ${state.validUntilDate}`
         ];
         if (state.customerInfo?.reference) {
-            lines.push(`Referens: ${state.customerInfo.reference}`);
+            lines.push(`Projektreferens: ${state.customerInfo.reference}`);
         }
 
         const boxHeight = 14 + (lines.length * 5);

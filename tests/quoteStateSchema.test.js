@@ -13,6 +13,7 @@ describe('quoteStateSchema', () => {
         expect(hydrated).toEqual(createInitialQuoteState());
         expect(hydrated.stateVersion).toBe(CURRENT_STATE_VERSION);
         expect(hydrated.hideZeroDiscountReferencesInPdf).toBe(false);
+        expect(hydrated.customerInfo.customerReference).toBe('');
     });
 
     it('migrates an unversioned legacy blob to the current shape', () => {
@@ -31,6 +32,7 @@ describe('quoteStateSchema', () => {
             customCosts: [{ description: 'Frakt', price: 1000, qty: 1 }],
             customerInfo: {
                 name: 'Ada',
+                customerReference: 'ER-14',
                 validity: '14 dagar'
             }
         });
@@ -42,6 +44,7 @@ describe('quoteStateSchema', () => {
         expect(hydrated.gridSelections.ClickitUP.items['ClickitUP Section|1500'].qty).toBe(3);
         expect(hydrated.customCosts).toHaveLength(1);
         expect(hydrated.customerInfo.name).toBe('Ada');
+        expect(hydrated.customerInfo.customerReference).toBe('ER-14');
         expect(hydrated.quoteValidityDays).toBe(14);
         expect(hydrated.customerInfo.validity).toBe('14 dagar');
         expect(hydrated.inventoryData).toEqual({ bahama: [], clickitup: {} });
@@ -81,6 +84,7 @@ describe('quoteStateSchema', () => {
         expect(hydrated.activeQuoteVersion).toBe(4);
         expect(hydrated.quoteStatus).toBe('sent');
         expect(hydrated.customerInfo.name).toBe('Revision Kund');
+        expect(hydrated.customerInfo.customerReference).toBe('');
     });
 
     it('survives malformed nested objects without crashing', () => {
@@ -110,6 +114,7 @@ describe('quoteStateSchema', () => {
         expect(hydrated.stateVersion).toBe(CURRENT_STATE_VERSION);
         expect(hydrated.selectedLines).toEqual(['ClickitUP']);
         expect(hydrated.customerInfo.name).toBe('Future');
+        expect(hydrated.customerInfo.customerReference).toBe('');
 
         warnSpy.mockRestore();
     });
@@ -143,6 +148,7 @@ describe('quoteStateSchema', () => {
         expect(nextState.selectedLines).toEqual(['ClickitUP']);
         expect(nextState.quoteValidityDays).toBe(60);
         expect(nextState.customerInfo.validity).toBe('60 dagar');
+        expect(nextState.customerInfo.customerReference).toBe('');
     });
 
     it('supports toggling the PDF zero-discount discount-reference flag through the reducer', () => {
