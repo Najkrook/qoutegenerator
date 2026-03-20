@@ -9,6 +9,10 @@ function normalizeDiscountPct(value) {
     return Math.max(0, Math.min(100, parsed));
 }
 
+function nearlyEqual(a, b) {
+    return Math.abs(a - b) < 0.0001;
+}
+
 function getCatalogAddonMap(lineData = {}) {
     const addonMap = {};
     (lineData.addonCategories || []).forEach((category) => {
@@ -140,5 +144,28 @@ export function applyGlobalDiscountToLineSelection(lineData = {}, lineSelection 
     return {
         ...lineSelection,
         addons: nextAddons
+    };
+}
+
+export function applyGlobalDiscountToGridCustomAddons(lineSelection = {}, previousGlobalDiscount = 0, nextGlobalDiscount = 0) {
+    const previousDiscount = normalizeDiscountPct(previousGlobalDiscount);
+    const nextDiscount = normalizeDiscountPct(nextGlobalDiscount);
+    const customAddonsByCategory = lineSelection.customAddonsByCategory || {};
+
+    const nextCustomAddonsByCategory = Object.entries(customAddonsByCategory).reduce((acc, [categoryId, rows]) => {
+        acc[categoryId] = Array.isArray(rows)
+            ? rows.map((row) => {
+                const currentDiscount = normalizeDiscountPct(row?.discountPct);
+                return nearlyEqual(currentDiscount, previousDiscount)
+                    ? { ...row, discountPct: nextDiscount }
+                    : row;
+            })
+            : [];
+        return acc;
+    }, {});
+
+    return {
+        ...lineSelection,
+        customAddonsByCategory: nextCustomAddonsByCategory
     };
 }

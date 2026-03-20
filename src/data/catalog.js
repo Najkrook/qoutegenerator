@@ -430,6 +430,7 @@ export const catalogData = {
             { model: "Curved Rundat Hörn", sizes: [{ size: "500x500", price: 21200 }] },
             {
                 model: "ClickitUp Hane", sizes: [
+                    { size: "700", price: 11869 },
                     { size: "1000", price: 11869 },
                     { size: "1100", price: 12114 }
                 ]
@@ -444,12 +445,14 @@ export const catalogData = {
         ],
         addonCategories: [
             {
+                id: "freight",
                 name: "Fraktkostnad",
                 items: [
                     { id: "frakt_glas", name: "Glasfrakt Specialpall", price: 2120 }
                 ]
             },
             {
+                id: "required",
                 name: "Nödvändiga Tillval",
                 items: [
                     { id: "stodben_stort", name: "Stödben stort (45°)", price: 1074 },
@@ -458,6 +461,7 @@ export const catalogData = {
                 ]
             },
             {
+                id: "recommended",
                 name: "Rekommenderade tillval",
                 items: [
                     { id: "svartanodiserade", name: "Svartanodiserade profiler", price: 340, autoScale: true },
@@ -465,11 +469,14 @@ export const catalogData = {
                 ]
             },
             {
+                id: "additional",
                 name: "Andra Tillval / Tillkommande",
                 items: [
                     { id: "montering_gangjarn", name: "Montering Gångjärn Rostfritt", price: 1140 },
                     { id: "rostfritt_vinkel", name: "Rostfritt vinkelbeslag", price: 124 },
                     { id: "galvad_stall", name: "Galvad Ställfot (ovan mark inst)", price: 967 },
+                    { id: "vitlackerade_profiler", name: "Vitlackerade profiler", price: 680 },
+                    { id: "stallavgift_lackering", name: "Ställavgift lackering", price: 4900 },
                     { id: "panikregel", name: "Panikregel", price: 5000 },
                     { id: "projektering", name: "Projektering. (Fast timpris)", price: 720 }
                 ]

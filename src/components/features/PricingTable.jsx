@@ -41,7 +41,7 @@ export function PricingTable() {
             };
             dispatch({ type: 'SET_GRID_SELECTIONS', payload: newSelections });
         } else if (source.type === 'grid-addon') {
-            const lineSelections = state.gridSelections[source.lineId] || { items: {}, addons: {} };
+            const lineSelections = state.gridSelections[source.lineId] || { items: {}, addons: {}, customAddonsByCategory: {} };
             const effectiveSelections = buildEffectiveGridSelections(catalogData[source.lineId], lineSelections, {
                 globalDiscountPct: state.globalDiscountPct
             });
@@ -61,6 +61,22 @@ export function PricingTable() {
                             discountSyncMode: 'manual'
                         }
                     }
+                }
+            };
+            dispatch({ type: 'SET_GRID_SELECTIONS', payload: newSelections });
+        } else if (source.type === 'grid-custom-addon') {
+            const lineSelections = state.gridSelections[source.lineId] || { items: {}, addons: {}, customAddonsByCategory: {} };
+            const nextCustomAddonsByCategory = {
+                ...(lineSelections.customAddonsByCategory || {}),
+                [source.categoryId]: (lineSelections.customAddonsByCategory?.[source.categoryId] || []).map((row) => (
+                    row.id === source.rowId ? { ...row, discountPct } : row
+                ))
+            };
+            const newSelections = {
+                ...state.gridSelections,
+                [source.lineId]: {
+                    ...lineSelections,
+                    customAddonsByCategory: nextCustomAddonsByCategory
                 }
             };
             dispatch({ type: 'SET_GRID_SELECTIONS', payload: newSelections });

@@ -62,6 +62,10 @@ function findGridAddon(lineData, addonId) {
     return null;
 }
 
+function getGridAddonCategoryId(category, index) {
+    return String(category?.id || category?.categoryId || `category_${index}`);
+}
+
 function parseSortableMetric(part) {
     const cleaned = String(part || '').trim().replace(',', '.');
     const parsed = Number.parseFloat(cleaned);
@@ -318,6 +322,93 @@ export function computeQuoteTotals({ state, catalogData }) {
                 originalIndex: originalIndex++
             });
         }
+
+        const customAddonsByCategory = gridState.customAddonsByCategory || {};
+        const seenCategoryIds = new Set();
+
+        (lineData?.addonCategories || []).forEach((category, categoryIndex) => {
+            const categoryId = getGridAddonCategoryId(category, categoryIndex);
+            seenCategoryIds.add(categoryId);
+            const rows = Array.isArray(customAddonsByCategory[categoryId]) ? customAddonsByCategory[categoryId] : [];
+
+            rows.forEach((row, rowIndex) => {
+                const unitPrice = getUnitSekPrice(toFloat(row?.price || 0), line, safeCatalog, exchangeRate);
+                const qty = toInt(row?.qty, 0);
+                const gross = unitPrice * qty;
+                const discountPct = toFloat(row?.discountPct || 0);
+                const discountSek = gross * (discountPct / 100);
+                const net = gross - discountSek;
+
+                grossTotalSek += gross;
+                totalDiscountSek += discountSek;
+
+                totals.push({
+                    model: `  + Tillval: ${String(row?.name || '').trim() || 'Egen rad'}`,
+                    size: '-',
+                    unitPrice,
+                    qty,
+                    gross,
+                    discountPct,
+                    discountSek,
+                    net,
+                    isAddon: true,
+                    source: {
+                        type: 'grid-custom-addon',
+                        lineId: line,
+                        categoryId,
+                        rowId: String(row?.id || `custom_${rowIndex}`)
+                    },
+                    line: line || 'Ã–vrigt',
+                    sortModel: line,
+                    sortSizeRaw: '-',
+                    sortKind: 'empty',
+                    sortDimensions: [],
+                    originalIndex: originalIndex++
+                });
+            });
+        });
+
+        Object.entries(customAddonsByCategory).forEach(([categoryId, rows]) => {
+            if (seenCategoryIds.has(categoryId) || !Array.isArray(rows)) {
+                return;
+            }
+
+            rows.forEach((row, rowIndex) => {
+                const unitPrice = getUnitSekPrice(toFloat(row?.price || 0), line, safeCatalog, exchangeRate);
+                const qty = toInt(row?.qty, 0);
+                const gross = unitPrice * qty;
+                const discountPct = toFloat(row?.discountPct || 0);
+                const discountSek = gross * (discountPct / 100);
+                const net = gross - discountSek;
+
+                grossTotalSek += gross;
+                totalDiscountSek += discountSek;
+
+                totals.push({
+                    model: `  + Tillval: ${String(row?.name || '').trim() || 'Egen rad'}`,
+                    size: '-',
+                    unitPrice,
+                    qty,
+                    gross,
+                    discountPct,
+                    discountSek,
+                    net,
+                    isAddon: true,
+                    source: {
+                        type: 'grid-custom-addon',
+                        lineId: line,
+                        categoryId,
+                        rowId: String(row?.id || `custom_${rowIndex}`)
+                    },
+                    line: line || 'Ã–vrigt',
+                    sortModel: line,
+                    sortSizeRaw: '-',
+                    sortKind: 'empty',
+                    sortDimensions: [],
+                    originalIndex: originalIndex++
+                });
+            });
+        });
     }
 
     const customCosts = safeState.customCosts || [];
@@ -334,7 +425,7 @@ export function computeQuoteTotals({ state, catalogData }) {
         totalDiscountSek += discountSek;
 
         totals.push({
-            model: `Ovrigt: ${cost?.description || 'Kostnad'}`,
+            model: `Övrigt: ${cost?.description || 'Kostnad'}`,
             size: '-',
             unitPrice,
             qty,
@@ -346,7 +437,7 @@ export function computeQuoteTotals({ state, catalogData }) {
             isCustom: true,
             source: { type: 'custom', index: i },
             line: 'Övrigt',
-            sortModel: `Ovrigt: ${cost?.description || 'Kostnad'}`,
+            sortModel: `Övrigt: ${cost?.description || 'Kostnad'}`,
             sortSizeRaw: '-',
             sortKind: 'empty',
             sortDimensions: [],

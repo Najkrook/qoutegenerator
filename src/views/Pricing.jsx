@@ -4,7 +4,7 @@ import { useAuth } from '../store/AuthContext';
 import { catalogData } from '../data/catalog';
 import { PricingTable } from '../components/features/PricingTable';
 import { CustomCosts } from '../components/features/CustomCosts';
-import { applyGlobalDiscountToLineSelection } from '../utils/gridAutoScale.js';
+import { applyGlobalDiscountToGridCustomAddons, applyGlobalDiscountToLineSelection } from '../utils/gridAutoScale.js';
 
 function parseDiscount(value) {
     const num = parseFloat(value);
@@ -76,8 +76,14 @@ export function Pricing({ onNext, onPrev }) {
                 return addonsAcc;
             }, {});
 
-            acc[lineId] = applyGlobalDiscountToLineSelection(lineData, {
+            const nextLineSelection = applyGlobalDiscountToGridCustomAddons({
                 ...lineSelection,
+                items: nextItems,
+                addons: nextAddons
+            }, previousGlobalDiscount, nextGlobalDiscount);
+
+            acc[lineId] = applyGlobalDiscountToLineSelection(lineData, {
+                ...nextLineSelection,
                 items: nextItems,
                 addons: nextAddons
             }, nextGlobalDiscount);

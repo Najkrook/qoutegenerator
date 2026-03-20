@@ -25,6 +25,11 @@ function normalizePositiveInt(value, fallback) {
     return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
 }
 
+function normalizeNonNegativeInt(value, fallback = 0) {
+    const parsed = Number.parseInt(value, 10);
+    return Number.isFinite(parsed) && parsed >= 0 ? parsed : fallback;
+}
+
 function parseValidityDays(value) {
     const match = String(value ?? '').match(/(\d+)/);
     if (!match) return null;
@@ -61,6 +66,49 @@ function normalizeInventoryData(value) {
         bahama: Array.isArray(value.bahama) ? clone(value.bahama) : [],
         clickitup: isObject(value.clickitup) ? clone(value.clickitup) : {}
     };
+}
+
+function normalizeGridCustomAddonsByCategory(value) {
+    if (!isObject(value)) {
+        return {};
+    }
+
+    return Object.entries(value).reduce((acc, [categoryId, rows]) => {
+        acc[categoryId] = Array.isArray(rows)
+            ? rows.map((row, index) => {
+                const safeRow = isObject(row) ? row : {};
+                return {
+                    id: String(safeRow.id || `custom_addon_${index}`),
+                    name: String(safeRow.name || ''),
+                    price: toNumber(safeRow.price, 0),
+                    qty: normalizeNonNegativeInt(safeRow.qty, 1),
+                    discountPct: toNumber(safeRow.discountPct, 0)
+                };
+            })
+            : [];
+        return acc;
+    }, {});
+}
+
+function normalizeGridSelections(value) {
+    if (!isObject(value)) {
+        return {};
+    }
+
+    return Object.entries(value).reduce((acc, [lineId, lineSelection]) => {
+        if (!isObject(lineSelection)) {
+            acc[lineId] = { items: {}, addons: {}, customAddonsByCategory: {} };
+            return acc;
+        }
+
+        acc[lineId] = {
+            ...clone(lineSelection),
+            items: isObject(lineSelection.items) ? clone(lineSelection.items) : {},
+            addons: isObject(lineSelection.addons) ? clone(lineSelection.addons) : {},
+            customAddonsByCategory: normalizeGridCustomAddonsByCategory(lineSelection.customAddonsByCategory)
+        };
+        return acc;
+    }, {});
 }
 
 function createBaseInitialState() {
@@ -134,7 +182,7 @@ function migrateV0ToV1(rawState = {}) {
         step: normalizeStep(next.step, 0),
         selectedLines: Array.isArray(next.selectedLines) ? clone(next.selectedLines) : [],
         builderItems: Array.isArray(next.builderItems) ? clone(next.builderItems) : [],
-        gridSelections: isObject(next.gridSelections) ? clone(next.gridSelections) : {},
+        gridSelections: normalizeGridSelections(next.gridSelections),
         customCosts: Array.isArray(next.customCosts) ? clone(next.customCosts) : [],
         includesVat: Boolean(next.includesVat),
         globalDiscountPct: toNumber(next.globalDiscountPct, 0),
@@ -241,7 +289,7 @@ export function hydrateQuoteState(input) {
         step: normalizeStep(mergedState.step, initialState.step),
         selectedLines: Array.isArray(mergedState.selectedLines) ? clone(mergedState.selectedLines) : [],
         builderItems: Array.isArray(mergedState.builderItems) ? clone(mergedState.builderItems) : [],
-        gridSelections: isObject(mergedState.gridSelections) ? clone(mergedState.gridSelections) : {},
+        gridSelections: normalizeGridSelections(mergedState.gridSelections),
         customCosts: Array.isArray(mergedState.customCosts) ? clone(mergedState.customCosts) : [],
         includesVat: Boolean(mergedState.includesVat),
         globalDiscountPct: normalizedGlobalDiscount,

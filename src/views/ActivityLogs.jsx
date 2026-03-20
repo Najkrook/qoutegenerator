@@ -393,9 +393,9 @@ export function ActivityLogs({ onBack }) {
                                     });
                                     const eventLabel = getActivityEventDefinition(row.eventType).label;
                                     const metadataSummary = formatActivityMetadata(row.metadata);
-                                    const targetValue = row.targetId && row.targetId !== '-'
+                                    const targetValue = row.metadata?.reference || (row.targetId && row.targetId !== '-'
                                         ? `${row.targetType}: ${row.targetId}`
-                                        : row.targetType;
+                                        : row.targetType);
 
                                     return (
                                         <tr key={row.id} className="hover:bg-white/5 transition-colors">

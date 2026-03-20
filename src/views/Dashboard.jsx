@@ -140,7 +140,8 @@ export function Dashboard({ onStartQuote, onOpenInventory, onOpenSketch, onOpenP
                                 const date = new Date(entry.resolvedMs || Date.now());
                                 const { icon, color, label } = getActivityLogVisual(entry);
                                 const metadataSummary = formatActivityMetadata(entry.metadata);
-                                const targetLabel = entry.targetId && entry.targetId !== '-' ? entry.targetId : entry.targetType;
+                                const targetIdLabel = entry.metadata?.reference || (entry.targetId && entry.targetId !== '-' ? entry.targetId : '');
+                                const targetLabel = targetIdLabel || entry.targetType;
                                 return (
                                     <div
                                         key={idx}

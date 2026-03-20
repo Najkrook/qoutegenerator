@@ -704,7 +704,11 @@ export function SketchTool({ onBack }) {
 
         const gridSelections = { ...state.gridSelections };
         // Build from scratch so each export reflects only the current sketch.
-        const cuGrid = { items: {}, addons: {} };
+        const preservedCustomAddons = Object.entries(state.gridSelections?.ClickitUP?.customAddonsByCategory || {}).reduce((acc, [categoryId, rows]) => {
+            acc[categoryId] = Array.isArray(rows) ? rows.map((row) => ({ ...row })) : [];
+            return acc;
+        }, {});
+        const cuGrid = { items: {}, addons: {}, customAddonsByCategory: preservedCustomAddons };
 
         layout.allSections.forEach((section) => {
             const doorSize = parseDoorSize(section);

@@ -1,14 +1,19 @@
 import { describe, expect, it } from 'vitest';
-import { applyGlobalDiscountToLineSelection, buildEffectiveGridSelections } from '../src/utils/gridAutoScale.js';
+import {
+    applyGlobalDiscountToGridCustomAddons,
+    applyGlobalDiscountToLineSelection,
+    buildEffectiveGridSelections
+} from '../src/utils/gridAutoScale.js';
 import { createCatalogFixture } from './fixtures/calculationFixtures.js';
 
-function createLineData() {
-    const catalog = createCatalogFixture();
-    catalog.ClickitUP.addonCategories.push({
-        items: [
-            { id: 'svartanodiserade', name: 'Svartanodiserade profiler', price: 340, autoScale: true },
-            { id: 'stoppknapp', name: 'Stoppknapp 140 cm', price: 564, autoScale: true }
-        ]
+    function createLineData() {
+        const catalog = createCatalogFixture();
+        catalog.ClickitUP.addonCategories.push({
+            id: 'recommended',
+            items: [
+                { id: 'svartanodiserade', name: 'Svartanodiserade profiler', price: 340, autoScale: true },
+                { id: 'stoppknapp', name: 'Stoppknapp 140 cm', price: 564, autoScale: true }
+            ]
     });
     return catalog.ClickitUP;
 }
@@ -58,5 +63,21 @@ describe('gridAutoScale discount follow', () => {
 
         expect(effectiveSelections.addons.svartanodiserade.discountPct).toBe(0);
         expect(effectiveSelections.addons.stoppknapp.discountPct).toBe(5);
+    });
+
+    it('updates only custom grid rows that still follow the previous global discount', () => {
+        const nextLineSelection = applyGlobalDiscountToGridCustomAddons({
+            customAddonsByCategory: {
+                recommended: [
+                    { id: 'c1', name: 'Egen rad 1', price: 500, qty: 1, discountPct: 5 },
+                    { id: 'c2', name: 'Egen rad 2', price: 700, qty: 1, discountPct: 2 }
+                ]
+            }
+        }, 5, 10);
+
+        expect(nextLineSelection.customAddonsByCategory.recommended).toEqual([
+            { id: 'c1', name: 'Egen rad 1', price: 500, qty: 1, discountPct: 10 },
+            { id: 'c2', name: 'Egen rad 2', price: 700, qty: 1, discountPct: 2 }
+        ]);
     });
 });

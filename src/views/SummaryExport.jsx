@@ -277,7 +277,7 @@ export function SummaryExport({ onPrev, onBackToSketch }) {
                             <button
                                 onClick={handleSaveQuote}
                                 disabled={isSavingQuote}
-                                className="px-6 py-2.5 bg-panel-bg border border-panel-border text-text-primary rounded-lg font-bold hover:bg-white/5 transition-all text-sm uppercase tracking-wide disabled:opacity-60 disabled:cursor-not-allowed"
+                                className="px-6 py-2.5 bg-success/10 border border-success/40 text-success rounded-lg font-bold hover:bg-success/20 hover:border-success/60 active:bg-success/30 transition-all text-sm uppercase tracking-wide disabled:opacity-50 disabled:cursor-not-allowed shadow-[0_0_15px_rgba(16,185,129,0.05)]"
                             >
                                 {isSavingQuote ? 'Sparar...' : 'Spara offert'}
                             </button>

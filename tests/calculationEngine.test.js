@@ -5,6 +5,7 @@ import { createCatalogFixture, createStateFixture } from './fixtures/calculation
 describe('computeQuoteTotals', () => {
     function addClickitUpAutoScaleAddons(catalogData) {
         catalogData.ClickitUP.addonCategories.push({
+            id: 'recommended',
             items: [
                 { id: 'svartanodiserade', name: 'Svartanodiserade profiler', price: 340, autoScale: true },
                 { id: 'stoppknapp', name: 'Stoppknapp 140 cm', price: 564, autoScale: true }
@@ -478,5 +479,70 @@ describe('computeQuoteTotals', () => {
         const svartanodiserade = summary.totals.find((row) => row.source.addonId === 'svartanodiserade');
 
         expect(svartanodiserade.discountPct).toBe(2);
+    });
+
+    it('includes custom grid add-ons as normal tillval rows', () => {
+        const state = createStateFixture({
+            builderItems: [],
+            customCosts: [],
+            exchangeRate: 1,
+            gridSelections: {
+                ClickitUP: {
+                    items: {
+                        'ClickitUP Section|1000': { qty: 1, discountPct: 0 }
+                    },
+                    addons: {},
+                    customAddonsByCategory: {
+                        doors: [
+                            { id: 'custom_1', name: 'Specialdörr', price: 1500, qty: 2, discountPct: 10 }
+                        ]
+                    }
+                }
+            }
+        });
+
+        const summary = computeQuoteTotals({ state, catalogData: createCatalogFixture() });
+        const customRow = summary.totals.find((row) => row.source.type === 'grid-custom-addon');
+
+        expect(customRow).toMatchObject({
+            model: '  + Tillval: Specialdörr',
+            unitPrice: 1500,
+            qty: 2,
+            gross: 3000,
+            discountPct: 10,
+            discountSek: 300,
+            net: 2700,
+            isAddon: true,
+            source: {
+                type: 'grid-custom-addon',
+                lineId: 'ClickitUP',
+                categoryId: 'doors',
+                rowId: 'custom_1'
+            }
+        });
+    });
+
+    it('falls back to Egen rad for unnamed custom grid add-ons', () => {
+        const state = createStateFixture({
+            builderItems: [],
+            customCosts: [],
+            exchangeRate: 1,
+            gridSelections: {
+                ClickitUP: {
+                    items: {},
+                    addons: {},
+                    customAddonsByCategory: {
+                        doors: [
+                            { id: 'custom_1', name: '', price: 500, qty: 1, discountPct: 0 }
+                        ]
+                    }
+                }
+            }
+        });
+
+        const summary = computeQuoteTotals({ state, catalogData: createCatalogFixture() });
+        const customRow = summary.totals.find((row) => row.source.type === 'grid-custom-addon');
+
+        expect(customRow.model).toBe('  + Tillval: Egen rad');
     });
 });

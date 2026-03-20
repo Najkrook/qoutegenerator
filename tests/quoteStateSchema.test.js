@@ -14,6 +14,7 @@ describe('quoteStateSchema', () => {
         expect(hydrated.stateVersion).toBe(CURRENT_STATE_VERSION);
         expect(hydrated.hideZeroDiscountReferencesInPdf).toBe(false);
         expect(hydrated.customerInfo.customerReference).toBe('');
+        expect(hydrated.gridSelections).toEqual({});
     });
 
     it('migrates an unversioned legacy blob to the current shape', () => {
@@ -42,6 +43,7 @@ describe('quoteStateSchema', () => {
         expect(hydrated.selectedLines).toEqual(['ClickitUP']);
         expect(hydrated.builderItems).toHaveLength(1);
         expect(hydrated.gridSelections.ClickitUP.items['ClickitUP Section|1500'].qty).toBe(3);
+        expect(hydrated.gridSelections.ClickitUP.customAddonsByCategory).toEqual({});
         expect(hydrated.customCosts).toHaveLength(1);
         expect(hydrated.customerInfo.name).toBe('Ada');
         expect(hydrated.customerInfo.customerReference).toBe('ER-14');
@@ -99,6 +101,37 @@ describe('quoteStateSchema', () => {
         expect(hydrated.gridSelections).toEqual({});
         expect(hydrated.inventoryData).toEqual({ bahama: [], clickitup: {} });
         expect(hydrated.scriveStatus).toBe('not_sent');
+    });
+
+    it('hydrates custom grid add-ons with safe defaults for older and partial state', () => {
+        const hydrated = hydrateQuoteState({
+            gridSelections: {
+                ClickitUP: {
+                    items: {},
+                    addons: {},
+                    customAddonsByCategory: {
+                        recommended: [
+                            { id: 'row_1', name: 'Egen profil', price: '680', qty: '0', discountPct: '5' },
+                            { name: 'Rad utan id', price: null }
+                        ]
+                    }
+                }
+            }
+        });
+
+        expect(hydrated.gridSelections.ClickitUP.customAddonsByCategory.recommended[0]).toEqual({
+            id: 'row_1',
+            name: 'Egen profil',
+            price: 680,
+            qty: 0,
+            discountPct: 5
+        });
+        expect(hydrated.gridSelections.ClickitUP.customAddonsByCategory.recommended[1]).toMatchObject({
+            name: 'Rad utan id',
+            price: 0,
+            qty: 1,
+            discountPct: 0
+        });
     });
 
     it('conservatively hydrates forward-version blobs and warns', () => {

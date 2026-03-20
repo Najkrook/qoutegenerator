@@ -80,4 +80,26 @@ describe('GridConfig auto-scale add-ons', () => {
         expect(html).toContain('aria-pressed="false"');
         expect(html).toContain('aria-pressed="true"');
     });
+
+    it('renders add-row actions and persisted custom add-ons inside categories', () => {
+        const html = renderGridConfig({
+            globalDiscountPct: 5,
+            gridSelections: {
+                ClickitUP: {
+                    items: {},
+                    addons: {},
+                    customAddonsByCategory: {
+                        recommended: [
+                            { id: 'custom_1', name: 'Egen profil', price: 680, qty: 2, discountPct: 5 }
+                        ]
+                    }
+                }
+            }
+        });
+
+        expect(html).toContain('Lägg till egen rad');
+        expect(html).toContain('Egen profil');
+        expect(html).toContain('value="680"');
+        expect(html).toContain('value="2"');
+    });
 });

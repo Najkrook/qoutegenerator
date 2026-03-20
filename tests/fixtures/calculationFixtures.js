@@ -32,6 +32,7 @@ export function createCatalogFixture() {
             ],
             addonCategories: [
                 {
+                    id: 'doors',
                     items: [
                         { id: 'door-right', name: 'Dorr hoger', price: 200 },
                         { id: 'door-left', name: 'Dorr vanster', price: 200 }
