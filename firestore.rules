@@ -28,11 +28,11 @@ service cloud.firestore {
     }
 
     match /users/{userId}/quotes/{quoteId} {
-      allow read, create, update, delete: if isSignedIn() && request.auth.uid == userId;
+      allow read, create, update, delete: if isSignedIn() && (request.auth.uid == userId || isAdmin());
     }
 
     match /users/{userId}/quotes/{quoteId}/revisions/{revisionId} {
-      allow read, create, update, delete: if isSignedIn() && request.auth.uid == userId;
+      allow read, create, update, delete: if isSignedIn() && (request.auth.uid == userId || isAdmin());
     }
 
     match /stock/{docId} {
@@ -58,6 +58,11 @@ service cloud.firestore {
 
     // Allow admins to read all templates via collectionGroup queries
     match /{path=**}/templates/{templateId} {
+      allow read: if isAdmin();
+    }
+
+    // Allow admins to read all quotes via collectionGroup queries
+    match /{path=**}/quotes/{quoteId} {
       allow read: if isAdmin();
     }
 

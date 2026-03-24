@@ -38,12 +38,15 @@ export function createFirestoreMock(initialDocs = {}) {
         db,
         doc: (_db, ...segments) => ({ path: segments.join('/') }),
         collection: (_db, ...segments) => ({ path: segments.join('/'), kind: 'collection' }),
+        collectionGroup: (_db, collectionId) => ({ path: collectionId, kind: 'collectionGroup', collectionId }),
         orderBy: (field, direction = 'asc') => ({ kind: 'orderBy', field, direction }),
         limit: (size) => ({ kind: 'limit', size }),
         query: (collectionRef, ...constraints) => ({
             path: collectionRef.path,
             kind: 'query',
-            constraints
+            constraints,
+            isGroup: collectionRef.kind === 'collectionGroup',
+            collectionId: collectionRef.collectionId
         }),
         async getDoc(ref) {
             const value = docs.get(ref.path);
@@ -103,11 +106,30 @@ export function createFirestoreMock(initialDocs = {}) {
         async getDocs(refOrQuery) {
             const path = refOrQuery.path;
             const constraints = refOrQuery.constraints || [];
+            const isGroup = refOrQuery.kind === 'collectionGroup' || refOrQuery.isGroup;
+            const collectionId = refOrQuery.collectionId;
             const rows = [];
 
             for (const [docPath, data] of docs.entries()) {
-                if (!isDirectChild(path, docPath)) continue;
-                rows.push(createDocSnap(docPath, data));
+                if (isGroup && collectionId) {
+                    // collectionGroup: match any doc whose parent collection name matches
+                    const parts = split(docPath);
+                    if (parts.length >= 2 && parts[parts.length - 2] === collectionId) {
+                        const snap = createDocSnap(docPath, data);
+                        const grandParentId = parts.length >= 3 ? parts[parts.length - 3] : 'unknown';
+                        snap.ref = {
+                            path: docPath,
+                            parent: {
+                                path: parts.slice(0, -1).join('/'),
+                                parent: { id: grandParentId }
+                            }
+                        };
+                        rows.push(snap);
+                    }
+                } else {
+                    if (!isDirectChild(path, docPath)) continue;
+                    rows.push(createDocSnap(docPath, data));
+                }
             }
 
             for (const constraint of constraints) {

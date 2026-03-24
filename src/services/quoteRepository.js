@@ -210,6 +210,7 @@ export function createQuoteRepository(deps) {
         updateDoc,
         deleteDoc,
         collection,
+        collectionGroup,
         getDocs,
         query,
         orderBy,
@@ -379,6 +380,30 @@ export function createQuoteRepository(deps) {
         const mapped = snap.docs.map((docSnap) =>
             normalizeQuoteMetadata(docSnap.id, docSnap.data() || {})
         );
+
+        const filtered = applyQuoteFilters(mapped, { status, search });
+        filtered.sort((a, b) => b.updatedAtMs - a.updatedAtMs);
+        return filtered;
+    }
+
+
+    async function getAllUsersQuotes({ status = '', search = '' }) {
+        if (typeof collectionGroup !== 'function') {
+            throw new Error('collectionGroup is required for cross-user quote queries.');
+        }
+        const quotesGroup = collectionGroup(db, 'quotes');
+        let snap;
+        try {
+            snap = await getDocs(query(quotesGroup, orderBy('updatedAtMs', 'desc')));
+        } catch (err) {
+            snap = await getDocs(query(quotesGroup, orderBy('timestamp', 'desc')));
+        }
+
+        const mapped = snap.docs.map((docSnap) => {
+            const ownerUid = docSnap.ref?.parent?.parent?.id || 'unknown';
+            const meta = normalizeQuoteMetadata(docSnap.id, docSnap.data() || {});
+            return { ...meta, ownerUid };
+        });
 
         const filtered = applyQuoteFilters(mapped, { status, search });
         filtered.sort((a, b) => b.updatedAtMs - a.updatedAtMs);
@@ -609,6 +634,7 @@ export function createQuoteRepository(deps) {
         getQuoteRevisions,
         deleteQuote,
         updateQuoteStatus,
-        updateQuoteScrive
+        updateQuoteScrive,
+        getAllUsersQuotes
     };
 }
