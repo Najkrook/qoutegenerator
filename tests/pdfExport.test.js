@@ -234,6 +234,43 @@ describe('pdfExport helpers', () => {
         expect(pdfMockState.textCalls.map((call) => call.value)).toContain('Total Rabatt:');
     });
 
+    it('includes custom builder add-ons in the generated PDF table body', () => {
+        const state = createZeroDiscountState({
+            builderItems: [
+                {
+                    id: 'builder_1',
+                    line: 'BaHaMa',
+                    model: 'Jumbrella',
+                    size: '4x4 Kvadrat',
+                    qty: 1,
+                    discountPct: 0,
+                    addons: [
+                        {
+                            id: 'custom_1',
+                            qty: 2,
+                            discountPct: 10,
+                            isCustom: true,
+                            name: 'Speciallack',
+                            price: 500,
+                            categoryId: 'installation'
+                        }
+                    ]
+                }
+            ],
+            gridSelections: {}
+        });
+        const summary = computeQuoteTotals({
+            state,
+            catalogData: createCatalogFixture()
+        });
+
+        const pdfBlob = generatePDF(state, summary, true);
+        const firstTableBody = pdfMockState.autoTableCalls[0].body;
+
+        expect(pdfBlob).toBeInstanceOf(Blob);
+        expect(firstTableBody.some((row) => row[0] === '  + Tillval: Speciallack')).toBe(true);
+    });
+
     it('paginates long terms text instead of truncating the last lines', () => {
         const termsText = Array.from({ length: 120 }, (_, index) => `Villkor rad ${index + 1}`).join('\n');
         const state = createZeroDiscountState({

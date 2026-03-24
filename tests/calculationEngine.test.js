@@ -55,6 +55,89 @@ describe('computeQuoteTotals', () => {
         expect(summary.globalDiscountAmt).toBe(0);
     });
 
+    it('includes custom builder add-ons as manual tillval rows without currency conversion', () => {
+        const state = createStateFixture({
+            builderItems: [
+                {
+                    id: 'builder_1',
+                    line: 'BaHaMa',
+                    model: 'Jumbrella',
+                    size: '3x3 Kvadrat',
+                    qty: 1,
+                    discountPct: 0,
+                    addons: [
+                        {
+                            id: 'custom_1',
+                            qty: 2,
+                            discountPct: 10,
+                            isCustom: true,
+                            name: 'Speciallack',
+                            price: 500,
+                            categoryId: 'installation'
+                        }
+                    ]
+                }
+            ],
+            gridSelections: {},
+            customCosts: [],
+            exchangeRate: 12
+        });
+        const catalogData = createCatalogFixture();
+        catalogData.BaHaMa.currency = 'EUR';
+
+        const summary = computeQuoteTotals({ state, catalogData });
+        const customRow = summary.totals.find((row) => row.source.type === 'builder-custom-addon');
+
+        expect(customRow).toMatchObject({
+            model: '  + Tillval: Speciallack',
+            unitPrice: 500,
+            qty: 2,
+            gross: 1000,
+            discountPct: 10,
+            discountSek: 100,
+            net: 900,
+            source: {
+                type: 'builder-custom-addon',
+                itemId: 'builder_1',
+                rowId: 'custom_1',
+                categoryId: 'installation'
+            }
+        });
+    });
+
+    it('falls back to Egen rad for unnamed custom builder add-ons', () => {
+        const state = createStateFixture({
+            builderItems: [
+                {
+                    id: 'builder_1',
+                    line: 'BaHaMa',
+                    model: 'Jumbrella',
+                    size: '3x3 Kvadrat',
+                    qty: 1,
+                    discountPct: 0,
+                    addons: [
+                        {
+                            id: 'custom_1',
+                            qty: 1,
+                            discountPct: 0,
+                            isCustom: true,
+                            name: '',
+                            price: 500,
+                            categoryId: 'installation'
+                        }
+                    ]
+                }
+            ],
+            gridSelections: {},
+            customCosts: []
+        });
+
+        const summary = computeQuoteTotals({ state, catalogData: createCatalogFixture() });
+        const customRow = summary.totals.find((row) => row.source.type === 'builder-custom-addon');
+
+        expect(customRow.model).toBe('  + Tillval: Egen rad');
+    });
+
     it('supports zero quantities, full discounts, and decimal exchange rates', () => {
         const state = createStateFixture({
             exchangeRate: 11.25,

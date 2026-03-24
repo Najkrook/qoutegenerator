@@ -1,4 +1,46 @@
-export const catalogData = {
+function slugifyBuilderCategoryId(value, fallback) {
+    const normalized = String(value || '')
+        .normalize('NFKD')
+        .replace(/[^\w\s-]/g, '')
+        .trim()
+        .toLowerCase()
+        .replace(/\s+/g, '_');
+
+    return normalized || fallback;
+}
+
+function withBuilderAddonCategoryIds(catalog) {
+    return Object.entries(catalog || {}).reduce((catalogAcc, [lineId, lineData]) => {
+        if (lineData?.type !== 'builder' || !lineData?.models) {
+            catalogAcc[lineId] = lineData;
+            return catalogAcc;
+        }
+
+        const models = Object.entries(lineData.models).reduce((modelsAcc, [modelId, modelData]) => {
+            if (!Array.isArray(modelData?.addonCategories)) {
+                modelsAcc[modelId] = modelData;
+                return modelsAcc;
+            }
+
+            modelsAcc[modelId] = {
+                ...modelData,
+                addonCategories: modelData.addonCategories.map((category, index) => ({
+                    ...category,
+                    id: String(category?.id || slugifyBuilderCategoryId(category?.name, `category_${index}`))
+                }))
+            };
+            return modelsAcc;
+        }, {});
+
+        catalogAcc[lineId] = {
+            ...lineData,
+            models
+        };
+        return catalogAcc;
+    }, {});
+}
+
+export const catalogData = withBuilderAddonCategoryIds({
     BaHaMa: {
         name: "BaHaMa",
         type: "builder",
@@ -341,7 +383,7 @@ export const catalogData = {
                             { id: "pure_flagstone", name: "Cementsten (flagstone)", price: 7 },
                             { id: "pure_flagstones_8", name: "8 Standard Flagstones", price: 220 },
                             { id: "pure_leveling_feet", name: "4 Leveling Feet", price: 130 },
-                            { id: "pure_powder_coat_crossframe", name: "Powder Coating for Cross-Frame", price: 0 }
+                            { id: "pure_powder_coat_crossframe", name: "Powder Coating for Cross-Frame", price: 270 }
                         ]
                     },
                     {
@@ -501,4 +543,4 @@ export const catalogData = {
             }
         }
     }
-};
+});

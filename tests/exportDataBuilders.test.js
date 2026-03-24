@@ -104,6 +104,44 @@ describe('export data builders', () => {
         expect(totalsRow[6]).toBe(Math.round(-summary.totalDiscountSek));
     });
 
+    it('includes custom builder add-ons in export rows', () => {
+        const state = createStateFixture({
+            builderItems: [
+                {
+                    id: 'builder_1',
+                    line: 'BaHaMa',
+                    model: 'Jumbrella',
+                    size: '3x3 Kvadrat',
+                    qty: 1,
+                    discountPct: 0,
+                    addons: [
+                        {
+                            id: 'custom_1',
+                            qty: 2,
+                            discountPct: 10,
+                            isCustom: true,
+                            name: 'Speciallack',
+                            price: 500,
+                            categoryId: 'installation'
+                        }
+                    ]
+                }
+            ],
+            gridSelections: {},
+            customCosts: []
+        });
+        const summary = computeQuoteTotals({
+            state,
+            catalogData: createCatalogFixture()
+        });
+
+        const wsData = buildExcelSheetData(state, summary);
+        const pdfRows = buildPdfTableData(summary.totals, formatSek);
+
+        expect(wsData.some((row) => row[0] === '  + Tillval: Speciallack')).toBe(true);
+        expect(pdfRows.some((row) => row[0] === '  + Tillval: Speciallack')).toBe(true);
+    });
+
     it('keeps backward compatibility when global discount amount is present', () => {
         const state = createStateFixture({
             includesVat: false,

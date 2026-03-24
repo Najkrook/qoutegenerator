@@ -27,6 +27,21 @@ export function PricingTable() {
                 return item;
             });
             dispatch({ type: 'SET_BUILDER_ITEMS', payload: newItems });
+        } else if (source.type === 'builder-custom-addon') {
+            const newItems = state.builderItems.map((item) => {
+                if (item.id !== source.itemId) {
+                    return item;
+                }
+
+                const newAddons = item.addons.map((addon) => (
+                    addon.isCustom === true && addon.id === source.rowId
+                        ? { ...addon, discountPct }
+                        : addon
+                ));
+
+                return { ...item, addons: newAddons };
+            });
+            dispatch({ type: 'SET_BUILDER_ITEMS', payload: newItems });
         } else if (source.type === 'grid') {
             const lineSelections = state.gridSelections[source.lineId];
             const newSelections = {

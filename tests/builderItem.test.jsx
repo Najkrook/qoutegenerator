@@ -43,7 +43,7 @@ function renderBuilderItem(item) {
     stubLocalStorage(JSON.stringify({
         exchangeRate: 12.2,
         globalDiscountPct: 5,
-        selectedLines: ['BaHaMa'],
+        selectedLines: [item.line],
         builderItems: [item]
     }));
 
@@ -102,5 +102,41 @@ describe('BuilderItem header add-on badge', () => {
         expect(htmlAfterRemoval).toContain('2 tillägg');
         expect(htmlAfterRemoval).toContain('2 valda');
         expect(htmlAfterRemoval).toContain('Installationsalternativ');
+    });
+
+    it('renders add-row actions and custom builder add-ons inside categories', () => {
+        const html = renderBuilderItem({
+            ...baseItem,
+            addons: [
+                {
+                    id: 'builder_custom_1',
+                    qty: 2,
+                    discountPct: 5,
+                    isCustom: true,
+                    name: 'Speciallack',
+                    price: 900,
+                    categoryId: 'installationsalternativ'
+                }
+            ]
+        });
+
+        expect(html).toContain('Lägg till egen rad');
+        expect(html).toContain('Speciallack');
+        expect(html).toContain('900');
+        expect(html).toContain('1 tillägg');
+    });
+
+    it('shows the pseudo category for models that only have flat add-ons', () => {
+        const html = renderBuilderItem({
+            id: 'fiesta-item',
+            line: 'Fiesta',
+            model: 'FIESTA Biogasstolpe 12 kW',
+            size: 'Standard',
+            qty: 1,
+            addons: []
+        });
+
+        expect(html).toContain('Övriga tillval');
+        expect(html).toContain('Lägg till egen rad');
     });
 });

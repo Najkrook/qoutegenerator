@@ -210,13 +210,49 @@ export function computeQuoteTotals({ state, catalogData }) {
         });
 
         for (const addon of item?.addons || []) {
+            const addonQty = toInt(addon?.qty, 1);
+            const addonDiscountPct = toFloat(addon?.discountPct || 0);
+
+            if (addon?.isCustom === true) {
+                const addonUnitPrice = toFloat(addon?.price || 0);
+                const addonGross = addonUnitPrice * addonQty;
+                const addonDiscountSek = addonGross * (addonDiscountPct / 100);
+                const addonNet = addonGross - addonDiscountSek;
+
+                grossTotalSek += addonGross;
+                totalDiscountSek += addonDiscountSek;
+
+                totals.push({
+                    model: `  + Tillval: ${String(addon?.name || '').trim() || 'Egen rad'}`,
+                    size: '-',
+                    unitPrice: addonUnitPrice,
+                    qty: addonQty,
+                    gross: addonGross,
+                    discountPct: addonDiscountPct,
+                    discountSek: addonDiscountSek,
+                    net: addonNet,
+                    isAddon: true,
+                    source: {
+                        type: 'builder-custom-addon',
+                        itemId: item.id,
+                        rowId: addon.id,
+                        categoryId: String(addon?.categoryId || '__uncategorized__')
+                    },
+                    line: item?.line || 'Övrigt',
+                    sortModel: `${item?.line || ''} ${item?.model || ''}`.trim(),
+                    sortSizeRaw: '-',
+                    sortKind: 'empty',
+                    sortDimensions: [],
+                    originalIndex: originalIndex++
+                });
+                continue;
+            }
+
             const modelData = safeCatalog?.[item.line]?.models?.[item.model];
             const addonDef = findBuilderAddonDefinition(modelData, addon?.id);
             const addonBasePrice = toFloat(addonDef?.price || 0);
             const addonUnitPrice = getUnitSekPrice(addonBasePrice, item?.line, safeCatalog, exchangeRate);
-            const addonQty = toInt(addon?.qty, 1);
             const addonGross = addonUnitPrice * addonQty;
-            const addonDiscountPct = toFloat(addon?.discountPct || 0);
             const addonDiscountSek = addonGross * (addonDiscountPct / 100);
             const addonNet = addonGross - addonDiscountSek;
 

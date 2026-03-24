@@ -2,12 +2,51 @@ import React from 'react';
 import { useQuote } from '../../store/QuoteContext';
 import { catalogData } from '../../data/catalog';
 
+const BUILDER_UNCATEGORIZED_CATEGORY_ID = '__uncategorized__';
+
+function createCustomAddon(itemQty, globalDiscountPct, categoryId) {
+    return {
+        id: `builder_custom_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+        qty: itemQty,
+        discountPct: globalDiscountPct,
+        isCustom: true,
+        name: '',
+        price: 0,
+        categoryId
+    };
+}
+
+function getBuilderCategoryId(category, index) {
+    return String(category?.id || `category_${index}`);
+}
+
+function getBuilderAddonCategories(modelData) {
+    const categories = Array.isArray(modelData?.addonCategories)
+        ? modelData.addonCategories.map((category, index) => ({
+            ...category,
+            id: getBuilderCategoryId(category, index),
+            items: Array.isArray(category.items) ? category.items : []
+        }))
+        : [];
+
+    if (Array.isArray(modelData?.addons) && modelData.addons.length > 0) {
+        categories.push({
+            id: BUILDER_UNCATEGORIZED_CATEGORY_ID,
+            name: 'Övriga tillval',
+            items: modelData.addons
+        });
+    }
+
+    return categories;
+}
+
 export function BuilderItem({ item, index, onRemove }) {
     const { state, dispatch } = useQuote();
     const { exchangeRate, globalDiscountPct } = state;
 
     const lineData = catalogData[item.line];
     const modelData = lineData?.models?.[item.model];
+    const addonCategories = getBuilderAddonCategories(modelData);
 
     const updateItem = (updates) => {
         const newItems = state.builderItems.map((i) => (i.id === item.id ? { ...i, ...updates } : i));
@@ -39,7 +78,7 @@ export function BuilderItem({ item, index, onRemove }) {
         const oldQty = item.qty;
         
         const newAddons = item.addons.map((a) => {
-            if (a.qty === oldQty) {
+            if (a.isCustom !== true && a.qty === oldQty) {
                 return { ...a, qty: newQty };
             }
             return a;
@@ -53,14 +92,38 @@ export function BuilderItem({ item, index, onRemove }) {
         if (isChecked) {
             newAddons.push({ id: addonId, qty: item.qty, discountPct: globalDiscountPct });
         } else {
-            newAddons = newAddons.filter((a) => a.id !== addonId);
+            newAddons = newAddons.filter((a) => a.isCustom === true || a.id !== addonId);
         }
         updateItem({ addons: newAddons });
     };
 
     const updateAddonQty = (addonId, qty) => {
-        const newAddons = item.addons.map((a) => (a.id === addonId ? { ...a, qty: parseInt(qty, 10) || 1 } : a));
+        const newAddons = item.addons.map((a) => (
+            a.isCustom !== true && a.id === addonId ? { ...a, qty: parseInt(qty, 10) || 1 } : a
+        ));
         updateItem({ addons: newAddons });
+    };
+
+    const addCustomAddon = (categoryId) => {
+        updateItem({
+            addons: [...item.addons, createCustomAddon(item.qty, globalDiscountPct, categoryId)]
+        });
+    };
+
+    const updateCustomAddon = (customAddonId, updates) => {
+        updateItem({
+            addons: item.addons.map((addon) => (
+                addon.isCustom === true && addon.id === customAddonId
+                    ? { ...addon, ...updates }
+                    : addon
+            ))
+        });
+    };
+
+    const removeCustomAddon = (customAddonId) => {
+        updateItem({
+            addons: item.addons.filter((addon) => !(addon.isCustom === true && addon.id === customAddonId))
+        });
     };
 
     const getPriceSEK = (price, line) => {
@@ -133,24 +196,31 @@ export function BuilderItem({ item, index, onRemove }) {
 
     let addonsTotal = 0;
     item.addons.forEach((addon) => {
+        if (addon.isCustom === true) {
+            addonsTotal += (parseFloat(addon.price) || 0) * (parseInt(addon.qty, 10) || 1);
+            return;
+        }
+
         let addonPrice = 0;
-        if (modelData.addonCategories) {
-            modelData.addonCategories.forEach((cat) => {
-                const found = cat.items.find((i) => i.id === addon.id);
-                if (found) addonPrice = found.price;
-            });
-        }
-        if (modelData.addons) {
-            const found = modelData.addons.find((i) => i.id === addon.id);
+        addonCategories.forEach((cat) => {
+            const found = cat.items.find((i) => i.id === addon.id);
             if (found) addonPrice = found.price;
-        }
+        });
         addonsTotal += getPriceSEK(addonPrice, item.line) * (parseInt(addon.qty, 10) || 1);
     });
 
     const itemGrandTotal = itemBaseTotal + addonsTotal;
     const selectedAddonCount = item.addons.length;
     const selectedAddonBadgeText = selectedAddonCount === 1 ? '1 tillägg' : `${selectedAddonCount} tillägg`;
-    const getSelectedCategoryCount = (category) => category.items.filter((addon) => item.addons.some((selected) => selected.id === addon.id)).length;
+    const getSelectedCategoryCount = (category) => {
+        const selectedCatalogCount = category.items.filter((addon) => (
+            item.addons.some((selected) => selected.isCustom !== true && selected.id === addon.id)
+        )).length;
+        const selectedCustomCount = item.addons.filter((selected) => (
+            selected.isCustom === true && selected.categoryId === category.id
+        )).length;
+        return selectedCatalogCount + selectedCustomCount;
+    };
     const getSelectedCategoryLabel = (count) => (count === 1 ? '1 vald' : `${count} valda`);
 
     return (
@@ -232,7 +302,7 @@ export function BuilderItem({ item, index, onRemove }) {
                 </div>
             </div>
 
-            {(modelData.addonCategories?.length > 0 || modelData.addons?.length > 0) && (
+            {addonCategories.length > 0 && (
                 <details className="mt-6 pt-6 border-t border-panel-border group">
                     <summary className="cursor-pointer list-none select-none flex items-center justify-between rounded-md border border-panel-border bg-black/10 px-4 py-3 hover:bg-black/20 transition-colors">
                         <span className="text-sm font-semibold uppercase tracking-wide text-text-primary">Tillägg</span>
@@ -243,11 +313,12 @@ export function BuilderItem({ item, index, onRemove }) {
                     </summary>
 
                     <div className="mt-4 space-y-4">
-                        {modelData.addonCategories?.map((cat) => {
+                        {addonCategories.map((cat) => {
                             const selectedCategoryCount = getSelectedCategoryCount(cat);
+                            const customAddons = item.addons.filter((addon) => addon.isCustom === true && addon.categoryId === cat.id);
 
                             return (
-                            <details key={cat.name} className="bg-black/10 border border-panel-border rounded-md overflow-hidden group">
+                            <details key={cat.id} className="bg-black/10 border border-panel-border rounded-md overflow-hidden group">
                                 <summary className="p-3 text-sm font-semibold text-primary uppercase cursor-pointer list-none flex justify-between items-center group-open:border-b group-open:border-panel-border">
                                     <span>{cat.name}</span>
                                     <span className="flex items-center gap-3">
@@ -260,8 +331,8 @@ export function BuilderItem({ item, index, onRemove }) {
                                     </span>
                                 </summary>
                                 <div className="p-4 space-y-3">
-                                    {cat.items.map((addon) => {
-                                        const existing = item.addons.find((a) => a.id === addon.id);
+                                        {cat.items.map((addon) => {
+                                        const existing = item.addons.find((a) => a.isCustom !== true && a.id === addon.id);
                                         const isChecked = !!existing;
                                         const priceSEK = getPriceSEK(addon.price, item.line);
                                         return (
@@ -290,45 +361,56 @@ export function BuilderItem({ item, index, onRemove }) {
                                             </div>
                                         );
                                     })}
+                                    {customAddons.map((addon) => {
+                                        const addonQty = parseInt(addon.qty, 10) || 1;
+                                        const addonPrice = parseFloat(addon.price) || 0;
+                                        return (
+                                            <div key={addon.id} className="grid grid-cols-[1fr_auto_auto_auto_auto] items-center gap-4">
+                                                <input
+                                                    type="text"
+                                                    value={addon.name || ''}
+                                                    onChange={(e) => updateCustomAddon(addon.id, { name: e.target.value })}
+                                                    placeholder="Egen rad"
+                                                    className="bg-input-bg border border-panel-border text-text-primary p-1.5 rounded-md outline-none focus:border-primary text-sm"
+                                                />
+                                                <input
+                                                    type="number"
+                                                    min="0"
+                                                    value={addonPrice}
+                                                    onChange={(e) => updateCustomAddon(addon.id, { price: parseFloat(e.target.value) || 0 })}
+                                                    className="bg-input-bg border border-panel-border text-text-primary p-1.5 rounded-md outline-none focus:border-primary w-24 text-sm text-right"
+                                                />
+                                                <input
+                                                    type="number"
+                                                    min="1"
+                                                    value={addonQty}
+                                                    onChange={(e) => updateCustomAddon(addon.id, { qty: parseInt(e.target.value, 10) || 1 })}
+                                                    className="bg-input-bg border border-panel-border text-text-primary p-1.5 rounded-md outline-none focus:border-primary w-16 text-sm"
+                                                />
+                                                <span className="text-sm font-semibold min-w-[100px] text-right">
+                                                    = {(addonPrice * addonQty).toLocaleString('sv-SE')} SEK
+                                                </span>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => removeCustomAddon(addon.id)}
+                                                    className="text-danger bg-transparent border-none text-sm font-medium cursor-pointer hover:underline justify-self-end"
+                                                >
+                                                    Ta bort
+                                                </button>
+                                            </div>
+                                        );
+                                    })}
+                                    <button
+                                        type="button"
+                                        onClick={() => addCustomAddon(cat.id)}
+                                        className="w-full rounded-md border border-dashed border-panel-border bg-white/[0.02] px-3 py-2 text-left text-sm font-medium text-primary hover:bg-white/[0.05] transition-colors"
+                                    >
+                                        + Lägg till egen rad
+                                    </button>
                                 </div>
                             </details>
                             );
                         })}
-
-                        {modelData.addons?.length > 0 && (
-                            <div className="bg-black/10 border border-panel-border rounded-md p-4 space-y-3">
-                                {modelData.addons.map((addon) => {
-                                    const existing = item.addons.find((a) => a.id === addon.id);
-                                    const isChecked = !!existing;
-                                    const priceSEK = getPriceSEK(addon.price, item.line);
-                                    return (
-                                        <div key={addon.id} className="grid grid-cols-[1fr_auto_auto_auto] items-center gap-4">
-                                            <label className="flex items-center gap-2 cursor-pointer text-sm">
-                                                <input
-                                                    type="checkbox"
-                                                    checked={isChecked}
-                                                    onChange={(e) => toggleAddon(addon.id, e.target.checked)}
-                                                    className="w-4 h-4 accent-primary"
-                                                />
-                                                {addon.name}
-                                            </label>
-                                            <span className="text-sm text-text-secondary whitespace-nowrap">{priceSEK.toLocaleString('sv-SE')} SEK</span>
-                                            <input
-                                                type="number"
-                                                min="1"
-                                                value={isChecked ? existing.qty : item.qty}
-                                                disabled={!isChecked}
-                                                onChange={(e) => updateAddonQty(addon.id, e.target.value)}
-                                                className="bg-input-bg border border-panel-border text-text-primary p-1.5 rounded-md outline-none focus:border-primary w-16 text-sm disabled:opacity-50"
-                                            />
-                                            <span className="text-sm font-semibold min-w-[100px] text-right">
-                                                {isChecked ? `= ${(priceSEK * (parseInt(existing.qty, 10) || 1)).toLocaleString('sv-SE')} SEK` : ''}
-                                            </span>
-                                        </div>
-                                    );
-                                })}
-                            </div>
-                        )}
                     </div>
                 </details>
             )}

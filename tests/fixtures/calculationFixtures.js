@@ -10,6 +10,8 @@ export function createCatalogFixture() {
                     },
                     addonCategories: [
                         {
+                            id: 'installation',
+                            name: 'Installation',
                             items: [
                                 { id: 'gutter-kit', name: 'Rannsystem', price: 5000 },
                                 { id: 'heater', name: 'Varmare', price: 9000 }

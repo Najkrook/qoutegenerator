@@ -111,6 +111,51 @@ function normalizeGridSelections(value) {
     }, {});
 }
 
+function normalizeBuilderAddon(addon, index) {
+    const safeAddon = isObject(addon) ? addon : {};
+    const isCustom = safeAddon.isCustom === true;
+
+    if (!isCustom) {
+        return {
+            id: String(safeAddon.id || `addon_${index}`),
+            qty: normalizePositiveInt(safeAddon.qty, 1),
+            discountPct: toNumber(safeAddon.discountPct, 0)
+        };
+    }
+
+    return {
+        id: String(safeAddon.id || `custom_builder_addon_${index}`),
+        qty: normalizePositiveInt(safeAddon.qty, 1),
+        discountPct: toNumber(safeAddon.discountPct, 0),
+        isCustom: true,
+        name: String(safeAddon.name || ''),
+        price: toNumber(safeAddon.price, 0),
+        categoryId: String(safeAddon.categoryId || '__uncategorized__')
+    };
+}
+
+function normalizeBuilderItems(value) {
+    if (!Array.isArray(value)) {
+        return [];
+    }
+
+    return value.map((item, index) => {
+        const safeItem = isObject(item) ? item : {};
+        return {
+            ...clone(safeItem),
+            id: String(safeItem.id || `builder_item_${index}`),
+            line: String(safeItem.line || ''),
+            model: String(safeItem.model || ''),
+            size: String(safeItem.size || ''),
+            qty: normalizePositiveInt(safeItem.qty, 1),
+            discountPct: toNumber(safeItem.discountPct, 0),
+            addons: Array.isArray(safeItem.addons)
+                ? safeItem.addons.map((addon, addonIndex) => normalizeBuilderAddon(addon, addonIndex))
+                : []
+        };
+    });
+}
+
 function createBaseInitialState() {
     const defaultTemplate = getTemplateById(DEFAULT_TEMPLATE_ID);
 
@@ -181,7 +226,7 @@ function migrateV0ToV1(rawState = {}) {
         stateVersion: 1,
         step: normalizeStep(next.step, 0),
         selectedLines: Array.isArray(next.selectedLines) ? clone(next.selectedLines) : [],
-        builderItems: Array.isArray(next.builderItems) ? clone(next.builderItems) : [],
+        builderItems: normalizeBuilderItems(next.builderItems),
         gridSelections: normalizeGridSelections(next.gridSelections),
         customCosts: Array.isArray(next.customCosts) ? clone(next.customCosts) : [],
         includesVat: Boolean(next.includesVat),
@@ -288,7 +333,7 @@ export function hydrateQuoteState(input) {
         stateVersion: CURRENT_STATE_VERSION,
         step: normalizeStep(mergedState.step, initialState.step),
         selectedLines: Array.isArray(mergedState.selectedLines) ? clone(mergedState.selectedLines) : [],
-        builderItems: Array.isArray(mergedState.builderItems) ? clone(mergedState.builderItems) : [],
+        builderItems: normalizeBuilderItems(mergedState.builderItems),
         gridSelections: normalizeGridSelections(mergedState.gridSelections),
         customCosts: Array.isArray(mergedState.customCosts) ? clone(mergedState.customCosts) : [],
         includesVat: Boolean(mergedState.includesVat),

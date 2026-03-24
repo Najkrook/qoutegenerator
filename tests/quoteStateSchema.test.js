@@ -134,6 +134,56 @@ describe('quoteStateSchema', () => {
         });
     });
 
+    it('hydrates custom builder add-ons with safe defaults while preserving catalog add-ons', () => {
+        const hydrated = hydrateQuoteState({
+            builderItems: [
+                {
+                    id: 'builder_1',
+                    line: 'BaHaMa',
+                    model: 'Jumbrella',
+                    size: '4x4 Kvadrat',
+                    qty: '2',
+                    discountPct: '4',
+                    addons: [
+                        { id: 'heater', qty: '3', discountPct: '5' },
+                        {
+                            id: 'custom_1',
+                            qty: '2',
+                            discountPct: '7',
+                            isCustom: true,
+                            name: 'Speciallack',
+                            price: '900',
+                            categoryId: 'installationsalternativ'
+                        }
+                    ]
+                }
+            ]
+        });
+
+        expect(hydrated.builderItems[0]).toMatchObject({
+            id: 'builder_1',
+            line: 'BaHaMa',
+            model: 'Jumbrella',
+            size: '4x4 Kvadrat',
+            qty: 2,
+            discountPct: 4
+        });
+        expect(hydrated.builderItems[0].addons[0]).toEqual({
+            id: 'heater',
+            qty: 3,
+            discountPct: 5
+        });
+        expect(hydrated.builderItems[0].addons[1]).toEqual({
+            id: 'custom_1',
+            qty: 2,
+            discountPct: 7,
+            isCustom: true,
+            name: 'Speciallack',
+            price: 900,
+            categoryId: 'installationsalternativ'
+        });
+    });
+
     it('conservatively hydrates forward-version blobs and warns', () => {
         const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
 
