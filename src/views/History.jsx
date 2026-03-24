@@ -369,7 +369,7 @@ export function History({ onBack, onOpenQuote }) {
                                             </select>
                                         </label>
                                     )}
-                                    <button className="primary px-4 py-2 text-sm w-full" onClick={() => openLatestQuote(quote)}>
+                                    <button className="px-4 py-2 text-sm w-full rounded font-semibold bg-blue-600 hover:bg-blue-500 text-white border border-blue-500 transition-colors" onClick={() => openLatestQuote(quote)}>
                                         {quoteLifecycleEnabled ? 'Öppna senaste' : 'Öppna offert'}
                                     </button>
                                     {quoteLifecycleEnabled && (

@@ -392,12 +392,7 @@ export function createQuoteRepository(deps) {
             throw new Error('collectionGroup is required for cross-user quote queries.');
         }
         const quotesGroup = collectionGroup(db, 'quotes');
-        let snap;
-        try {
-            snap = await getDocs(query(quotesGroup, orderBy('updatedAtMs', 'desc')));
-        } catch (err) {
-            snap = await getDocs(query(quotesGroup, orderBy('timestamp', 'desc')));
-        }
+        const snap = await getDocs(quotesGroup);
 
         const mapped = snap.docs.map((docSnap) => {
             const ownerUid = docSnap.ref?.parent?.parent?.id || 'unknown';
