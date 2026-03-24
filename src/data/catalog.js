@@ -533,7 +533,18 @@ export const catalogData = withBuilderAddonCategoryIds({
             "FIESTA Biogasstolpe 12 kW": {
                 name: "FIESTA Biogasstolpe 12 kW",
                 sizes: {
-                    "Standard": { price: 19115 }
+                    "Slim": { price: 19115 }
+                },
+                addons: [
+                    { id: "fiesta_foderrör", name: "Rostfritt Foderrör + Markplatta", price: 2815 },
+                    { id: "fiesta_passram", name: "Passram + Däxel", price: 3406 },
+                    { id: "fiesta_tipphylsa", name: "Tipphylsa", price: 2920 }
+                ]
+            },
+            "Vent-Twist": {
+                name: "Vent-Twist",
+                sizes: {
+                    "Slim": { price: 20886 }
                 },
                 addons: [
                     { id: "fiesta_foderrör", name: "Rostfritt Foderrör + Markplatta", price: 2815 },
