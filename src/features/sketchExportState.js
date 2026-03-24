@@ -1,6 +1,6 @@
 import { FIESTA_EXPORT_LINE } from '../utils/parasolGeometry.js';
 
-const CLICKITUP_LINE = 'ClickitUP';
+const CLICKITUP_LINE = 'ClickitUp';
 const BAHAMA_LINE = 'BaHaMa';
 const SKETCH_SOURCE = 'sketch';
 

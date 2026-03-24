@@ -29,7 +29,7 @@ function createFiesta(overrides = {}) {
 describe('buildSketchExportState', () => {
     it('removes stale sketch parasol selections and rows on re-export', () => {
         const next = buildSketchExportState({
-            selectedLines: ['ClickitUP', 'BaHaMa'],
+            selectedLines: ['ClickitUp', 'BaHaMa'],
             builderItems: [{
                 id: 'old-parasol',
                 line: 'BaHaMa',
@@ -50,7 +50,7 @@ describe('buildSketchExportState', () => {
             createId: createIdFactory()
         });
 
-        expect(next.selectedLines).toEqual(['ClickitUP']);
+        expect(next.selectedLines).toEqual(['ClickitUp']);
         expect(next.builderItems).toEqual([]);
         expect(next.sketchMeta).toMatchObject({
             addedBahamaLine: false,
@@ -60,7 +60,7 @@ describe('buildSketchExportState', () => {
 
     it('removes stale sketch fiesta selections and rows on re-export', () => {
         const next = buildSketchExportState({
-            selectedLines: ['ClickitUP', 'Fiesta'],
+            selectedLines: ['ClickitUp', 'Fiesta'],
             builderItems: [{
                 id: 'old-fiesta',
                 line: 'Fiesta',
@@ -81,7 +81,7 @@ describe('buildSketchExportState', () => {
             createId: createIdFactory()
         });
 
-        expect(next.selectedLines).toEqual(['ClickitUP']);
+        expect(next.selectedLines).toEqual(['ClickitUp']);
         expect(next.builderItems).toEqual([]);
         expect(next.sketchMeta).toMatchObject({
             addedBahamaLine: false,
@@ -91,7 +91,7 @@ describe('buildSketchExportState', () => {
 
     it('keeps remaining sketch line selections when only one sketch family is removed', () => {
         const next = buildSketchExportState({
-            selectedLines: ['ClickitUP', 'BaHaMa', 'Fiesta'],
+            selectedLines: ['ClickitUp', 'BaHaMa', 'Fiesta'],
             builderItems: [
                 {
                     id: 'old-parasol',
@@ -126,7 +126,7 @@ describe('buildSketchExportState', () => {
             createId: createIdFactory()
         });
 
-        expect(next.selectedLines).toEqual(['ClickitUP', 'Fiesta']);
+        expect(next.selectedLines).toEqual(['ClickitUp', 'Fiesta']);
         expect(next.builderItems).toEqual([{
             id: 'generated-1',
             line: 'Fiesta',
@@ -187,7 +187,7 @@ describe('buildSketchExportState', () => {
             createId: createIdFactory()
         });
 
-        expect(next.selectedLines).toEqual(['BaHaMa', 'Fiesta', 'ClickitUP']);
+        expect(next.selectedLines).toEqual(['BaHaMa', 'Fiesta', 'ClickitUp']);
         expect(next.builderItems).toEqual([
             {
                 id: 'manual-bahama',

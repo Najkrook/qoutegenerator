@@ -704,7 +704,7 @@ export function SketchTool({ onBack }) {
 
         const gridSelections = { ...state.gridSelections };
         // Build from scratch so each export reflects only the current sketch.
-        const preservedCustomAddons = Object.entries(state.gridSelections?.ClickitUP?.customAddonsByCategory || {}).reduce((acc, [categoryId, rows]) => {
+        const preservedCustomAddons = Object.entries(state.gridSelections?.ClickitUp?.customAddonsByCategory || {}).reduce((acc, [categoryId, rows]) => {
             acc[categoryId] = Array.isArray(rows) ? rows.map((row) => ({ ...row })) : [];
             return acc;
         }, {});
@@ -733,7 +733,7 @@ export function SketchTool({ onBack }) {
             cuGrid.addons.stodben_stort.qty += layout.stodbenCount;
         }
 
-        gridSelections.ClickitUP = cuGrid;
+        gridSelections.ClickitUp = cuGrid;
 
         dispatch({ type: 'SET_SELECTED_LINES', payload: nextSketchExportState.selectedLines });
         dispatch({ type: 'SET_GRID_SELECTIONS', payload: gridSelections });
@@ -895,7 +895,7 @@ export function SketchTool({ onBack }) {
                 <div>
                     <h2 className="text-3xl font-semibold text-text-primary m-0">Rita Uteservering</h2>
                     <p className="text-text-secondary mt-1 m-0">
-                        Skissa en rektangel och beräkna optimala ClickitUP-sektioner automatiskt.
+                        Skissa en rektangel och beräkna optimala ClickitUp-sektioner automatiskt.
                     </p>
                 </div>
                 <div className="flex items-center gap-3">

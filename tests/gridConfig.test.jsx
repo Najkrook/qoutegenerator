@@ -29,7 +29,7 @@ function renderGridConfig(state) {
     stubLocalStorage(JSON.stringify(state));
     return renderToStaticMarkup(
         <QuoteProvider>
-            <GridConfig lineId="ClickitUP" />
+            <GridConfig lineId="ClickitUp" />
         </QuoteProvider>
     );
 }
@@ -43,10 +43,10 @@ describe('GridConfig auto-scale add-ons', () => {
         const html = renderGridConfig({
             globalDiscountPct: 0,
             gridSelections: {
-                ClickitUP: {
+                ClickitUp: {
                     items: {
-                        'ClickitUP Section|1500': { qty: 4, discountPct: 0 },
-                        'ClickitUP Section|1600': { qty: 3, discountPct: 0 }
+                        'ClickitUp Section|1500': { qty: 4, discountPct: 0 },
+                        'ClickitUp Section|1600': { qty: 3, discountPct: 0 }
                     },
                     addons: {}
                 }
@@ -63,10 +63,10 @@ describe('GridConfig auto-scale add-ons', () => {
         const html = renderGridConfig({
             globalDiscountPct: 0,
             gridSelections: {
-                ClickitUP: {
+                ClickitUp: {
                     items: {
-                        'ClickitUP Section|1500': { qty: 4, discountPct: 0 },
-                        'ClickitUP Section|1600': { qty: 3, discountPct: 0 }
+                        'ClickitUp Section|1500': { qty: 4, discountPct: 0 },
+                        'ClickitUp Section|1600': { qty: 3, discountPct: 0 }
                     },
                     addons: {
                         svartanodiserade: { qty: 4, discountPct: 0, syncMode: 'manual' }
@@ -85,7 +85,7 @@ describe('GridConfig auto-scale add-ons', () => {
         const html = renderGridConfig({
             globalDiscountPct: 5,
             gridSelections: {
-                ClickitUP: {
+                ClickitUp: {
                     items: {},
                     addons: {},
                     customAddonsByCategory: {

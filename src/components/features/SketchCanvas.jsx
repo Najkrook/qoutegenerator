@@ -1017,7 +1017,7 @@ export function SketchCanvas({
                                 : 'bg-input-bg text-slate-300 border-panel-border hover:text-white hover:border-slate-400/60 hover:bg-slate-800/60'
                                 }`}
                         >
-                            ClickitUP
+                            ClickitUp
                         </button>
                         <button
                             type="button"

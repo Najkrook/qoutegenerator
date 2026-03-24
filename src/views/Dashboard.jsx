@@ -70,7 +70,7 @@ export function Dashboard({ onStartQuote, onOpenInventory, onOpenSketch, onOpenP
                         <div className="text-5xl mb-4 group-hover:scale-110 transition-transform">📦</div>
                         <h3 className="text-2xl font-semibold text-text-primary mb-2">Hantera Lagersaldo</h3>
                         <p className="text-text-secondary leading-relaxed m-0">
-                            Uppdatera lagersaldon för BaHaMa och ClickitUP. Se loggar och historik.
+                            Uppdatera lagersaldon för BaHaMa och ClickitUp. Se loggar och historik.
                         </p>
                     </button>
                 )}
@@ -83,7 +83,7 @@ export function Dashboard({ onStartQuote, onOpenInventory, onOpenSketch, onOpenP
                         <div className="text-5xl mb-4 group-hover:scale-110 transition-transform">✏️</div>
                         <h3 className="text-2xl font-semibold text-text-primary mb-2">Rita Uteservering</h3>
                         <p className="text-text-secondary leading-relaxed m-0">
-                            Skissa snabbt en rektangel för att automatiskt beräkna optimala ClickitUP-sektioner.
+                            Skissa snabbt en rektangel för att automatiskt beräkna optimala ClickitUp-sektioner.
                         </p>
                     </button>
                 )}

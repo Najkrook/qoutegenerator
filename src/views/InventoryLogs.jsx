@@ -220,7 +220,7 @@ export function InventoryLogs({ onBack }) {
 
     const categoryLabel = (category) => {
         if (category === 'bahama') return 'BaHaMa';
-        if (category === 'clickitup') return 'ClickitUP';
+        if (category === 'clickitup') return 'ClickitUp';
         return '-';
     };
 
@@ -274,7 +274,7 @@ export function InventoryLogs({ onBack }) {
                         >
                             <option value="">Alla</option>
                             <option value="bahama">BaHaMa</option>
-                            <option value="clickitup">ClickitUP</option>
+                            <option value="clickitup">ClickitUp</option>
                         </select>
                     </label>
                     <label className="flex flex-col gap-1 text-sm text-text-secondary">

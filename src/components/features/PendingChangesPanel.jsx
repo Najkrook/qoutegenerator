@@ -45,7 +45,7 @@ export function PendingChangesPanel({ inventoryData, cloudInventoryData, onCommi
         changes.push({ key: 'mass-update', title: 'BaHaMa', desc: 'Massuppdatering via Excel', icon: 'i', color: 'var(--primary)' });
     }
 
-    // ClickitUP diffs
+    // ClickitUp diffs
     const cLocal = inventoryData.clickitup || {};
     const cCloud = cloudInventoryData.clickitup || {};
 
@@ -59,7 +59,7 @@ export function PendingChangesPanel({ inventoryData, cloudInventoryData, onCommi
                 const fName = f.replace('_h', ' Höger').replace('_v', ' Vänster').replace('dorr', 'Dörr').replace('hane', 'Hane').replace('sektion', 'Sektion');
                 const sign = delta > 0 ? '+' : '';
                 const color = delta > 0 ? 'var(--success)' : 'var(--danger)';
-                changes.push({ key: `cu-${size}-${f}`, title: `ClickitUP ${size}`, desc: fName, icon: `${sign}${delta}`, color });
+                changes.push({ key: `cu-${size}-${f}`, title: `ClickitUp ${size}`, desc: fName, icon: `${sign}${delta}`, color });
             }
         });
     }

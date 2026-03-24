@@ -21,11 +21,11 @@ export function createCatalogFixture() {
                 }
             }
         },
-        ClickitUP: {
+        ClickitUp: {
             currency: 'EUR',
             gridItems: [
                 {
-                    model: 'ClickitUP Section',
+                    model: 'ClickitUp Section',
                     sizes: [
                         { size: '1000', price: 1000 },
                         { size: '1200', price: 1200 }
@@ -60,9 +60,9 @@ export function createStateFixture(overrides = {}) {
             }
         ],
         gridSelections: {
-            ClickitUP: {
+            ClickitUp: {
                 items: {
-                    'ClickitUP Section|1000': { qty: 1, discountPct: 5 }
+                    'ClickitUp Section|1000': { qty: 1, discountPct: 5 }
                 },
                 addons: {
                     'door-right': { qty: 1, discountPct: 0 }

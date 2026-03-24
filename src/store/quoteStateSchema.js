@@ -96,12 +96,13 @@ function normalizeGridSelections(value) {
     }
 
     return Object.entries(value).reduce((acc, [lineId, lineSelection]) => {
+        const key = lineId === 'ClickitUP' ? 'ClickitUp' : lineId;
         if (!isObject(lineSelection)) {
-            acc[lineId] = { items: {}, addons: {}, customAddonsByCategory: {} };
+            acc[key] = { items: {}, addons: {}, customAddonsByCategory: {} };
             return acc;
         }
 
-        acc[lineId] = {
+        acc[key] = {
             ...clone(lineSelection),
             items: isObject(lineSelection.items) ? clone(lineSelection.items) : {},
             addons: isObject(lineSelection.addons) ? clone(lineSelection.addons) : {},
@@ -225,7 +226,9 @@ function migrateV0ToV1(rawState = {}) {
         ...next,
         stateVersion: 1,
         step: normalizeStep(next.step, 0),
-        selectedLines: Array.isArray(next.selectedLines) ? clone(next.selectedLines) : [],
+        selectedLines: Array.isArray(next.selectedLines)
+            ? clone(next.selectedLines).map(l => l === 'ClickitUP' ? 'ClickitUp' : l)
+            : [],
         builderItems: normalizeBuilderItems(next.builderItems),
         gridSelections: normalizeGridSelections(next.gridSelections),
         customCosts: Array.isArray(next.customCosts) ? clone(next.customCosts) : [],
@@ -332,7 +335,9 @@ export function hydrateQuoteState(input) {
         ...mergedState,
         stateVersion: CURRENT_STATE_VERSION,
         step: normalizeStep(mergedState.step, initialState.step),
-        selectedLines: Array.isArray(mergedState.selectedLines) ? clone(mergedState.selectedLines) : [],
+        selectedLines: Array.isArray(mergedState.selectedLines)
+            ? clone(mergedState.selectedLines).map(l => l === 'ClickitUP' ? 'ClickitUp' : l)
+            : [],
         builderItems: normalizeBuilderItems(mergedState.builderItems),
         gridSelections: normalizeGridSelections(mergedState.gridSelections),
         customCosts: Array.isArray(mergedState.customCosts) ? clone(mergedState.customCosts) : [],

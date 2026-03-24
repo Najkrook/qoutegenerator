@@ -21,7 +21,7 @@ export function ProductLineSelection({ onNext }) {
         name: catalogData[key].name,
         description: key === 'BaHaMa'
             ? 'Premium Parasoller'
-            : key === 'ClickitUP'
+            : key === 'ClickitUp'
                 ? 'Höj- och sänkbara glaspartier.'
                 : 'Premium Biogas'
     }));

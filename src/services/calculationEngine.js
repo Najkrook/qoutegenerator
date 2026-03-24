@@ -394,7 +394,7 @@ export function computeQuoteTotals({ state, catalogData }) {
                         categoryId,
                         rowId: String(row?.id || `custom_${rowIndex}`)
                     },
-                    line: line || 'Ã–vrigt',
+                    line: line || 'Övrigt',
                     sortModel: line,
                     sortSizeRaw: '-',
                     sortKind: 'empty',
@@ -436,7 +436,7 @@ export function computeQuoteTotals({ state, catalogData }) {
                         categoryId,
                         rowId: String(row?.id || `custom_${rowIndex}`)
                     },
-                    line: line || 'Ã–vrigt',
+                    line: line || 'Övrigt',
                     sortModel: line,
                     sortSizeRaw: '-',
                     sortKind: 'empty',

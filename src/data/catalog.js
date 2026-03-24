@@ -448,8 +448,8 @@ export const catalogData = withBuilderAddonCategoryIds({
             }
         }
     },
-    ClickitUP: {
-        name: "ClickitUP",
+    ClickitUp: {
+        name: "ClickitUp",
         type: "grid",
         currency: "SEK",
         gridItems: [

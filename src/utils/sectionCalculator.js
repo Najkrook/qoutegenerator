@@ -1,5 +1,5 @@
 /**
- * Section calculator for ClickitUP outdoor seating layouts.
+ * Section calculator for ClickitUp outdoor seating layouts.
  * Pure logic - no UI dependencies.
  */
 

@@ -8,14 +8,14 @@ import { createCatalogFixture } from './fixtures/calculationFixtures.js';
 
     function createLineData() {
         const catalog = createCatalogFixture();
-        catalog.ClickitUP.addonCategories.push({
+        catalog.ClickitUp.addonCategories.push({
             id: 'recommended',
             items: [
                 { id: 'svartanodiserade', name: 'Svartanodiserade profiler', price: 340, autoScale: true },
                 { id: 'stoppknapp', name: 'Stoppknapp 140 cm', price: 564, autoScale: true }
             ]
     });
-    return catalog.ClickitUP;
+    return catalog.ClickitUp;
 }
 
 describe('gridAutoScale discount follow', () => {
@@ -23,8 +23,8 @@ describe('gridAutoScale discount follow', () => {
         const lineData = createLineData();
         const lineSelection = {
             items: {
-                'ClickitUP Section|1000': { qty: 4, discountPct: 0 },
-                'ClickitUP Section|1200': { qty: 3, discountPct: 0 }
+                'ClickitUp Section|1000': { qty: 4, discountPct: 0 },
+                'ClickitUp Section|1200': { qty: 3, discountPct: 0 }
             },
             addons: {}
         };
@@ -49,8 +49,8 @@ describe('gridAutoScale discount follow', () => {
         const lineData = createLineData();
         const lineSelection = {
             items: {
-                'ClickitUP Section|1000': { qty: 4, discountPct: 0 },
-                'ClickitUP Section|1200': { qty: 3, discountPct: 0 }
+                'ClickitUp Section|1000': { qty: 4, discountPct: 0 },
+                'ClickitUp Section|1200': { qty: 3, discountPct: 0 }
             },
             addons: {
                 svartanodiserade: { qty: 4, discountPct: 0 }

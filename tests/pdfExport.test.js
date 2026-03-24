@@ -98,9 +98,9 @@ function createZeroDiscountState(overrides = {}) {
             }
         ],
         gridSelections: {
-            ClickitUP: {
+            ClickitUp: {
                 items: {
-                    'ClickitUP Section|1000': { qty: 1, discountPct: 0 }
+                    'ClickitUp Section|1000': { qty: 1, discountPct: 0 }
                 },
                 addons: {
                     'door-right': { qty: 1, discountPct: 0 }

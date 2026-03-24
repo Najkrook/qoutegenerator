@@ -84,7 +84,7 @@ export function SketchBom({
                     return (
                         <li key={size} className="py-2.5 border-b border-panel-border flex justify-between items-center text-sm">
                             <span className="text-text-primary">
-                                {isDoor ? size : <>ClickitUP Sektion <b>{size}</b> mm</>}
+                                {isDoor ? size : <>ClickitUp Sektion <b>{size}</b> mm</>}
                             </span>
                             <span className="font-bold text-text-primary">{counts[size]} st</span>
                         </li>

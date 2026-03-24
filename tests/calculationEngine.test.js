@@ -4,7 +4,7 @@ import { createCatalogFixture, createStateFixture } from './fixtures/calculation
 
 describe('computeQuoteTotals', () => {
     function addClickitUpAutoScaleAddons(catalogData) {
-        catalogData.ClickitUP.addonCategories.push({
+        catalogData.ClickitUp.addonCategories.push({
             id: 'recommended',
             items: [
                 { id: 'svartanodiserade', name: 'Svartanodiserade profiler', price: 340, autoScale: true },
@@ -152,9 +152,9 @@ describe('computeQuoteTotals', () => {
                 }
             ],
             gridSelections: {
-                ClickitUP: {
+                ClickitUp: {
                     items: {
-                        'ClickitUP Section|1200': { qty: 2, discountPct: 100 }
+                        'ClickitUp Section|1200': { qty: 2, discountPct: 100 }
                     },
                     addons: {}
                 }
@@ -197,15 +197,15 @@ describe('computeQuoteTotals', () => {
             builderItems: [],
             customCosts: [],
             gridSelections: {
-                ClickitUP: {
+                ClickitUp: {
                     items: {
-                        'ClickitUP Section|2000': { qty: 1, discountPct: 0 },
-                        'ClickitUP Section|1400': { qty: 1, discountPct: 0 },
-                        'ClickitUP Section|1700': { qty: 1, discountPct: 0 },
-                        'ClickitUP Hane|1100': { qty: 1, discountPct: 0 },
-                        'ClickitUP Hane|1000': { qty: 1, discountPct: 0 },
-                        'ClickitUP Dörr|1100': { qty: 1, discountPct: 0 },
-                        'ClickitUP Dörr|700': { qty: 1, discountPct: 0 }
+                        'ClickitUp Section|2000': { qty: 1, discountPct: 0 },
+                        'ClickitUp Section|1400': { qty: 1, discountPct: 0 },
+                        'ClickitUp Section|1700': { qty: 1, discountPct: 0 },
+                        'ClickitUp Hane|1100': { qty: 1, discountPct: 0 },
+                        'ClickitUp Hane|1000': { qty: 1, discountPct: 0 },
+                        'ClickitUp Dörr|1100': { qty: 1, discountPct: 0 },
+                        'ClickitUp Dörr|700': { qty: 1, discountPct: 0 }
                     },
                     addons: {}
                 }
@@ -213,9 +213,9 @@ describe('computeQuoteTotals', () => {
         });
 
         const catalogData = createCatalogFixture();
-        catalogData.ClickitUP.gridItems = [
+        catalogData.ClickitUp.gridItems = [
             {
-                model: 'ClickitUP Section',
+                model: 'ClickitUp Section',
                 sizes: [
                     { size: '1400', price: 1400 },
                     { size: '1700', price: 1700 },
@@ -223,14 +223,14 @@ describe('computeQuoteTotals', () => {
                 ]
             },
             {
-                model: 'ClickitUP Hane',
+                model: 'ClickitUp Hane',
                 sizes: [
                     { size: '1000', price: 1000 },
                     { size: '1100', price: 1100 }
                 ]
             },
             {
-                model: 'ClickitUP Dörr',
+                model: 'ClickitUp Dörr',
                 sizes: [
                     { size: '700', price: 700 },
                     { size: '1100', price: 1100 }
@@ -241,13 +241,13 @@ describe('computeQuoteTotals', () => {
         const summary = computeQuoteTotals({ state, catalogData });
 
         expect(summary.totals.filter((row) => !row.isAddon && !row.isCustom).map((row) => `${row.model}|${row.size}`)).toEqual([
-            'ClickitUP Section|1400',
-            'ClickitUP Section|1700',
-            'ClickitUP Section|2000',
-            'ClickitUP Hane|1000',
-            'ClickitUP Hane|1100',
-            'ClickitUP Dörr|700',
-            'ClickitUP Dörr|1100'
+            'ClickitUp Section|1400',
+            'ClickitUp Section|1700',
+            'ClickitUp Section|2000',
+            'ClickitUp Hane|1000',
+            'ClickitUp Hane|1100',
+            'ClickitUp Dörr|700',
+            'ClickitUp Dörr|1100'
         ]);
     });
 
@@ -264,9 +264,9 @@ describe('computeQuoteTotals', () => {
                 }
             ],
             gridSelections: {
-                ClickitUP: {
+                ClickitUp: {
                     items: {
-                        'ClickitUP Section|1200': { qty: 1, discountPct: 0 }
+                        'ClickitUp Section|1200': { qty: 1, discountPct: 0 }
                     },
                     addons: {
                         'door-right': { qty: 1, discountPct: 0 }
@@ -343,10 +343,10 @@ describe('computeQuoteTotals', () => {
             customCosts: [],
             exchangeRate: 1,
             gridSelections: {
-                ClickitUP: {
+                ClickitUp: {
                     items: {
-                        'ClickitUP Section|1000': { qty: 4, discountPct: 0 },
-                        'ClickitUP Section|1200': { qty: 3, discountPct: 0 }
+                        'ClickitUp Section|1000': { qty: 4, discountPct: 0 },
+                        'ClickitUp Section|1200': { qty: 3, discountPct: 0 }
                     },
                     addons: {}
                 }
@@ -369,10 +369,10 @@ describe('computeQuoteTotals', () => {
             customCosts: [],
             exchangeRate: 1,
             gridSelections: {
-                ClickitUP: {
+                ClickitUp: {
                     items: {
-                        'ClickitUP Section|1000': { qty: 4, discountPct: 0 },
-                        'ClickitUP Section|1200': { qty: 3, discountPct: 0 }
+                        'ClickitUp Section|1000': { qty: 4, discountPct: 0 },
+                        'ClickitUp Section|1200': { qty: 3, discountPct: 0 }
                     },
                     addons: {
                         svartanodiserade: { qty: 3, discountPct: 0, syncMode: 'manual' }
@@ -396,10 +396,10 @@ describe('computeQuoteTotals', () => {
             customCosts: [],
             exchangeRate: 1,
             gridSelections: {
-                ClickitUP: {
+                ClickitUp: {
                     items: {
-                        'ClickitUP Section|1000': { qty: 4, discountPct: 0 },
-                        'ClickitUP Section|1200': { qty: 3, discountPct: 0 }
+                        'ClickitUp Section|1000': { qty: 4, discountPct: 0 },
+                        'ClickitUp Section|1200': { qty: 3, discountPct: 0 }
                     },
                     addons: {
                         stoppknapp: { qty: 2, discountPct: 0, syncMode: 'auto' }
@@ -421,10 +421,10 @@ describe('computeQuoteTotals', () => {
             customCosts: [],
             exchangeRate: 1,
             gridSelections: {
-                ClickitUP: {
+                ClickitUp: {
                     items: {
-                        'ClickitUP Section|1000': { qty: 4, discountPct: 0 },
-                        'ClickitUP Section|1200': { qty: 3, discountPct: 0 }
+                        'ClickitUp Section|1000': { qty: 4, discountPct: 0 },
+                        'ClickitUp Section|1200': { qty: 3, discountPct: 0 }
                     },
                     addons: {
                         svartanodiserade: { qty: 4, discountPct: 0 }
@@ -446,7 +446,7 @@ describe('computeQuoteTotals', () => {
             customCosts: [],
             exchangeRate: 1,
             gridSelections: {
-                ClickitUP: {
+                ClickitUp: {
                     items: {},
                     addons: {}
                 }
@@ -466,10 +466,10 @@ describe('computeQuoteTotals', () => {
             exchangeRate: 1,
             globalDiscountPct: 5,
             gridSelections: {
-                ClickitUP: {
+                ClickitUp: {
                     items: {
-                        'ClickitUP Section|1000': { qty: 4, discountPct: 0 },
-                        'ClickitUP Section|1200': { qty: 3, discountPct: 0 }
+                        'ClickitUp Section|1000': { qty: 4, discountPct: 0 },
+                        'ClickitUp Section|1200': { qty: 3, discountPct: 0 }
                     },
                     addons: {}
                 }
@@ -493,10 +493,10 @@ describe('computeQuoteTotals', () => {
             exchangeRate: 1,
             globalDiscountPct: 5,
             gridSelections: {
-                ClickitUP: {
+                ClickitUp: {
                     items: {
-                        'ClickitUP Section|1000': { qty: 4, discountPct: 0 },
-                        'ClickitUP Section|1200': { qty: 3, discountPct: 0 }
+                        'ClickitUp Section|1000': { qty: 4, discountPct: 0 },
+                        'ClickitUp Section|1200': { qty: 3, discountPct: 0 }
                     },
                     addons: {
                         svartanodiserade: { qty: 7, discountPct: 0 }
@@ -519,10 +519,10 @@ describe('computeQuoteTotals', () => {
             exchangeRate: 1,
             globalDiscountPct: 5,
             gridSelections: {
-                ClickitUP: {
+                ClickitUp: {
                     items: {
-                        'ClickitUP Section|1000': { qty: 4, discountPct: 0 },
-                        'ClickitUP Section|1200': { qty: 3, discountPct: 0 }
+                        'ClickitUp Section|1000': { qty: 4, discountPct: 0 },
+                        'ClickitUp Section|1200': { qty: 3, discountPct: 0 }
                     },
                     addons: {
                         stoppknapp: { qty: 7, discountPct: 0, discountSyncMode: 'global' }
@@ -545,10 +545,10 @@ describe('computeQuoteTotals', () => {
             exchangeRate: 1,
             globalDiscountPct: 5,
             gridSelections: {
-                ClickitUP: {
+                ClickitUp: {
                     items: {
-                        'ClickitUP Section|1000': { qty: 4, discountPct: 0 },
-                        'ClickitUP Section|1200': { qty: 3, discountPct: 0 }
+                        'ClickitUp Section|1000': { qty: 4, discountPct: 0 },
+                        'ClickitUp Section|1200': { qty: 3, discountPct: 0 }
                     },
                     addons: {
                         svartanodiserade: { qty: 7, discountPct: 2, discountSyncMode: 'manual' }
@@ -570,9 +570,9 @@ describe('computeQuoteTotals', () => {
             customCosts: [],
             exchangeRate: 1,
             gridSelections: {
-                ClickitUP: {
+                ClickitUp: {
                     items: {
-                        'ClickitUP Section|1000': { qty: 1, discountPct: 0 }
+                        'ClickitUp Section|1000': { qty: 1, discountPct: 0 }
                     },
                     addons: {},
                     customAddonsByCategory: {
@@ -598,7 +598,7 @@ describe('computeQuoteTotals', () => {
             isAddon: true,
             source: {
                 type: 'grid-custom-addon',
-                lineId: 'ClickitUP',
+                lineId: 'ClickitUp',
                 categoryId: 'doors',
                 rowId: 'custom_1'
             }
@@ -611,7 +611,7 @@ describe('computeQuoteTotals', () => {
             customCosts: [],
             exchangeRate: 1,
             gridSelections: {
-                ClickitUP: {
+                ClickitUp: {
                     items: {},
                     addons: {},
                     customAddonsByCategory: {

@@ -20,12 +20,12 @@ describe('quoteStateSchema', () => {
     it('migrates an unversioned legacy blob to the current shape', () => {
         const hydrated = hydrateQuoteState({
             step: 3,
-            selectedLines: ['ClickitUP'],
+            selectedLines: ['ClickitUp'],
             builderItems: [{ id: 'b1', line: 'BaHaMa', model: 'Jumbrella', size: '4x4 Kvadrat', qty: 2 }],
             gridSelections: {
-                ClickitUP: {
+                ClickitUp: {
                     items: {
-                        'ClickitUP Section|1500': { qty: 3, discountPct: 0 }
+                        'ClickitUp Section|1500': { qty: 3, discountPct: 0 }
                     },
                     addons: {}
                 }
@@ -40,10 +40,10 @@ describe('quoteStateSchema', () => {
 
         expect(hydrated.stateVersion).toBe(1);
         expect(hydrated.step).toBe(3);
-        expect(hydrated.selectedLines).toEqual(['ClickitUP']);
+        expect(hydrated.selectedLines).toEqual(['ClickitUp']);
         expect(hydrated.builderItems).toHaveLength(1);
-        expect(hydrated.gridSelections.ClickitUP.items['ClickitUP Section|1500'].qty).toBe(3);
-        expect(hydrated.gridSelections.ClickitUP.customAddonsByCategory).toEqual({});
+        expect(hydrated.gridSelections.ClickitUp.items['ClickitUp Section|1500'].qty).toBe(3);
+        expect(hydrated.gridSelections.ClickitUp.customAddonsByCategory).toEqual({});
         expect(hydrated.customCosts).toHaveLength(1);
         expect(hydrated.customerInfo.name).toBe('Ada');
         expect(hydrated.customerInfo.customerReference).toBe('ER-14');
@@ -72,7 +72,7 @@ describe('quoteStateSchema', () => {
 
     it('hydrates revision payloads into the current shape', () => {
         const hydrated = hydrateQuoteState({
-            selectedLines: ['ClickitUP'],
+            selectedLines: ['ClickitUp'],
             customerInfo: {
                 name: 'Revision Kund'
             },
@@ -106,7 +106,7 @@ describe('quoteStateSchema', () => {
     it('hydrates custom grid add-ons with safe defaults for older and partial state', () => {
         const hydrated = hydrateQuoteState({
             gridSelections: {
-                ClickitUP: {
+                ClickitUp: {
                     items: {},
                     addons: {},
                     customAddonsByCategory: {
@@ -119,14 +119,14 @@ describe('quoteStateSchema', () => {
             }
         });
 
-        expect(hydrated.gridSelections.ClickitUP.customAddonsByCategory.recommended[0]).toEqual({
+        expect(hydrated.gridSelections.ClickitUp.customAddonsByCategory.recommended[0]).toEqual({
             id: 'row_1',
             name: 'Egen profil',
             price: 680,
             qty: 0,
             discountPct: 5
         });
-        expect(hydrated.gridSelections.ClickitUP.customAddonsByCategory.recommended[1]).toMatchObject({
+        expect(hydrated.gridSelections.ClickitUp.customAddonsByCategory.recommended[1]).toMatchObject({
             name: 'Rad utan id',
             price: 0,
             qty: 1,
@@ -189,13 +189,13 @@ describe('quoteStateSchema', () => {
 
         const hydrated = hydrateQuoteState({
             stateVersion: 99,
-            selectedLines: ['ClickitUP'],
+            selectedLines: ['ClickitUp'],
             customerInfo: { name: 'Future' }
         });
 
         expect(warnSpy).toHaveBeenCalled();
         expect(hydrated.stateVersion).toBe(CURRENT_STATE_VERSION);
-        expect(hydrated.selectedLines).toEqual(['ClickitUP']);
+        expect(hydrated.selectedLines).toEqual(['ClickitUp']);
         expect(hydrated.customerInfo.name).toBe('Future');
         expect(hydrated.customerInfo.customerReference).toBe('');
 
@@ -206,7 +206,7 @@ describe('quoteStateSchema', () => {
         const initial = createInitialQuoteState();
         const dirtyState = hydrateQuoteState({
             step: 4,
-            selectedLines: ['ClickitUP'],
+            selectedLines: ['ClickitUp'],
             customerInfo: { name: 'Dirty' }
         });
 
@@ -222,13 +222,13 @@ describe('quoteStateSchema', () => {
         const nextState = quoteReducer(initial, {
             type: 'HYDRATE_STATE',
             payload: {
-                selectedLines: ['ClickitUP'],
+                selectedLines: ['ClickitUp'],
                 customerInfo: { validity: '60 dagar' }
             }
         });
 
         expect(nextState.stateVersion).toBe(CURRENT_STATE_VERSION);
-        expect(nextState.selectedLines).toEqual(['ClickitUP']);
+        expect(nextState.selectedLines).toEqual(['ClickitUp']);
         expect(nextState.quoteValidityDays).toBe(60);
         expect(nextState.customerInfo.validity).toBe('60 dagar');
         expect(nextState.customerInfo.customerReference).toBe('');

@@ -146,7 +146,7 @@ export function InventoryManager({ onBack }) {
         toast.success(`${item.ID || 'Artikel'} tillagd i korg`);
     };
 
-    // ClickitUP stock update
+    // ClickitUp stock update
     const handleUpdateStock = (size, field, delta) => {
         const clickitup = JSON.parse(JSON.stringify(state.inventoryData.clickitup || {}));
         if (!clickitup[size]) clickitup[size] = { sektion: 0, dorr_h: 0, dorr_v: 0, hane_h: 0, hane_v: 0 };
@@ -224,7 +224,7 @@ export function InventoryManager({ onBack }) {
                 });
             }
 
-            // ClickitUP diffs
+            // ClickitUp diffs
             const cLocal = state.inventoryData.clickitup || {};
             const cCloud = state.cloudInventoryData.clickitup || {};
             for (const size in cLocal) {
@@ -237,7 +237,7 @@ export function InventoryManager({ onBack }) {
                         const sign = delta > 0 ? '+' : '';
                         const logRef = doc(logsRef);
                         batch.set(logRef, {
-                            timestamp: now, createdAt: nowMs, action: "Justering", system: "ClickitUP", category: "clickitup",
+                            timestamp: now, createdAt: nowMs, action: "Justering", system: "ClickitUp", category: "clickitup",
                             targetType: "size", targetId: String(size), element: size,
                             details: `${fName} (${sign}${delta})`, user: userEmail, userUid, delta
                         });
@@ -272,7 +272,7 @@ export function InventoryManager({ onBack }) {
             <div className="flex justify-between items-center mb-8 gap-4 flex-wrap">
                 <div>
                     <h2 className="text-3xl font-semibold text-text-primary m-0">Hantera Lagersaldo</h2>
-                    <p className="text-text-secondary mt-1 m-0">Uppdatera lagersaldon för BaHaMa och ClickitUP. Se loggar och historik.</p>
+                    <p className="text-text-secondary mt-1 m-0">Uppdatera lagersaldon för BaHaMa och ClickitUp. Se loggar och historik.</p>
                 </div>
                 <button
                     onClick={onBack}
@@ -341,14 +341,14 @@ export function InventoryManager({ onBack }) {
                         )}
                     </section>
 
-                    {/* ClickitUP Section */}
+                    {/* ClickitUp Section */}
                     <section className="bg-panel-bg border border-panel-border rounded-xl overflow-hidden">
                         <button
                             onClick={() => setShowClickitup(!showClickitup)}
                             className="w-full flex justify-between items-center p-5 bg-transparent border-none text-text-primary cursor-pointer hover:bg-white/5 transition-colors"
                         >
                             <div className="flex items-center gap-3">
-                                <h3 className="text-lg font-semibold m-0">🔩 ClickitUP Lagersaldo</h3>
+                                <h3 className="text-lg font-semibold m-0">🔩 ClickitUp Lagersaldo</h3>
                             </div>
                             <span className={`text-text-secondary transition-transform ${showClickitup ? 'rotate-180' : ''}`}>▼</span>
                         </button>
