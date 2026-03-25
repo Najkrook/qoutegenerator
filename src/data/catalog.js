@@ -497,8 +497,8 @@ export const catalogData = withBuilderAddonCategoryIds({
                 id: "required",
                 name: "Nödvändiga Tillval",
                 items: [
-                    { id: "stodben_stort", name: "Stödben stort (45°)", price: 1074 },
-                    { id: "stodben_litet", name: "Stödben litet (Slimline)", price: 404 },
+                    { id: "stodben_stort", name: "Stödben stort (45°)", price: 1024 },
+                    { id: "stodben_litet", name: "Stödben litet (Slimline)", price: 364 },
                     { id: "passbit_alu", name: "Passbit Alu stolpe (50x80mm) inkl. Täcklock", price: 1233 }
                 ]
             },
