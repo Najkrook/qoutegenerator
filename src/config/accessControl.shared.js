@@ -17,7 +17,8 @@ export const ACCESS_LEVELS = Object.freeze({
     GUEST: 'guest',
     FULL: 'full',
     QUOTE_ONLY: 'quote-only',
-    SKETCH_ONLY: 'sketch-only'
+    SKETCH_ONLY: 'sketch-only',
+    RETAILER: 'retailer'
 });
 
 export function isFullAccessUser(user) {
@@ -40,7 +41,7 @@ export function canViewEverythingLevel(accessLevel) {
 }
 
 export function canStartQuoteLevel(accessLevel) {
-    return accessLevel === ACCESS_LEVELS.FULL || accessLevel === ACCESS_LEVELS.QUOTE_ONLY;
+    return accessLevel === ACCESS_LEVELS.FULL || accessLevel === ACCESS_LEVELS.QUOTE_ONLY || accessLevel === ACCESS_LEVELS.RETAILER;
 }
 
 export function canAccessSketchLevel(accessLevel) {
@@ -48,7 +49,7 @@ export function canAccessSketchLevel(accessLevel) {
 }
 
 export function canAccessQuoteHistoryLevel(accessLevel) {
-    return accessLevel === ACCESS_LEVELS.FULL || accessLevel === ACCESS_LEVELS.QUOTE_ONLY;
+    return accessLevel === ACCESS_LEVELS.FULL || accessLevel === ACCESS_LEVELS.QUOTE_ONLY || accessLevel === ACCESS_LEVELS.RETAILER;
 }
 
 export function canExportSketchToQuoteLevel(accessLevel) {
@@ -59,14 +60,35 @@ export function canAccessQuoteHistoryUser(user) {
     return canAccessQuoteHistoryLevel(resolveAccessLevelFromUser(user));
 }
 
-export function getAccessCapabilities(accessLevel) {
-    return {
-        canViewEverything: canViewEverythingLevel(accessLevel),
-        canStartQuote: canStartQuoteLevel(accessLevel),
-        canAccessSketch: canAccessSketchLevel(accessLevel),
-        canAccessQuoteHistory: canAccessQuoteHistoryLevel(accessLevel),
-        canExportSketchToQuote: canExportSketchToQuoteLevel(accessLevel)
-    };
+export function getAccessCapabilities(level) {
+    switch (level) {
+        case ACCESS_LEVELS.FULL:
+            return {
+                canViewEverything: true,
+                canStartQuote: true,
+                canAccessSketch: true,
+                canAccessQuoteHistory: true,
+                canExportSketchToQuote: true
+            };
+        case ACCESS_LEVELS.RETAILER:
+        case ACCESS_LEVELS.QUOTE_ONLY:
+            return {
+                canViewEverything: false,
+                canStartQuote: true,
+                canAccessSketch: false,
+                canAccessQuoteHistory: true,
+                canExportSketchToQuote: false
+            };
+        case ACCESS_LEVELS.GUEST:
+        default:
+            return {
+                canViewEverything: false,
+                canStartQuote: false,
+                canAccessSketch: false,
+                canAccessQuoteHistory: false,
+                canExportSketchToQuote: false
+            };
+    }
 }
 
 export function isQuoteFlowStep(step) {

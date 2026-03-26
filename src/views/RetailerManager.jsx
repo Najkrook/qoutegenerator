@@ -21,6 +21,7 @@ function buildEmptyProductLines() {
 function buildFormState(retailer = null) {
     return {
         name: retailer?.name || '',
+        emails: (retailer?.emails || []).join(', '),
         notes: retailer?.notes || '',
         productLines: retailer
             ? PRODUCT_LINE_IDS.reduce((acc, id) => {
@@ -95,6 +96,17 @@ function RetailerForm({ initial, onSave, onCancel, saving }) {
                     placeholder="T.ex. Markishuset"
                     required
                     className="w-full bg-input-bg border border-panel-border text-text-primary p-2.5 rounded-md outline-none focus:border-primary transition-colors"
+                />
+            </div>
+
+            <div>
+                <label className="block text-xs font-bold text-text-secondary uppercase mb-1.5">Användare (E-post)</label>
+                <textarea
+                    value={form.emails}
+                    onChange={(e) => setForm((prev) => ({ ...prev, emails: e.target.value }))}
+                    rows={2}
+                    placeholder="E-postadresser, separerade med kommatecken eller ny rad"
+                    className="w-full bg-input-bg border border-panel-border text-text-primary p-2.5 rounded-md outline-none focus:border-primary transition-colors resize-y text-sm"
                 />
             </div>
 
@@ -374,6 +386,15 @@ export function RetailerManager({ onBack }) {
                                             ))
                                         )}
                                     </div>
+                                    {(retailer.emails && retailer.emails.length > 0) && (
+                                        <div className="flex flex-wrap gap-1 mt-2">
+                                            {retailer.emails.map(email => (
+                                                <span key={email} className="bg-panel-bg border border-panel-border text-text-secondary rounded text-[10px] px-1.5 py-0.5" title={email}>
+                                                    {email}
+                                                </span>
+                                            ))}
+                                        </div>
+                                    )}
                                     {retailer.notes && (
                                         <p className="text-xs text-text-secondary mt-1.5 m-0 truncate">{retailer.notes}</p>
                                     )}

@@ -16,6 +16,16 @@ describe('accessControl.shared', () => {
         });
     });
 
+    it('exposes quote history and quoting for retailer users without full admin access', () => {
+        expect(getAccessCapabilities(ACCESS_LEVELS.RETAILER)).toEqual({
+            canViewEverything: false,
+            canStartQuote: true,
+            canAccessSketch: false,
+            canAccessQuoteHistory: true,
+            canExportSketchToQuote: false
+        });
+    });
+
     it('blocks unauthorized step transitions through the shared step gate', () => {
         expect(getAuthorizedStepForAccess('history', ACCESS_LEVELS.SKETCH_ONLY)).toBe(0);
         expect(getAuthorizedStepForAccess(3, ACCESS_LEVELS.SKETCH_ONLY)).toBe(0);
@@ -34,6 +44,7 @@ describe('accessControl.shared', () => {
         expect(getAuthorizedStepForAccess('retailers', ACCESS_LEVELS.QUOTE_ONLY)).toBe(0);
         expect(getAuthorizedStepForAccess('retailers', ACCESS_LEVELS.SKETCH_ONLY)).toBe(0);
         expect(getAuthorizedStepForAccess('retailers', ACCESS_LEVELS.GUEST)).toBe(0);
+        expect(getAuthorizedStepForAccess('retailers', ACCESS_LEVELS.RETAILER)).toBe(0);
         expect(getAuthorizedStepForAccess('retailers', ACCESS_LEVELS.FULL)).toBe('retailers');
     });
 });

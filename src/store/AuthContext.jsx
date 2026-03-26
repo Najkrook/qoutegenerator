@@ -1,19 +1,41 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { onAuthChange, login as firebaseLogin, logout as firebaseLogout } from '../services/authService';
 import { ACCESS_LEVELS, getAccessCapabilities, resolveAccessLevelFromUser } from '../config/accessControl.shared.js';
+import { db, collection, query, where, limit, getDocs } from '../services/firebase';
 
 export const AuthContext = createContext();
 
 export function AuthProvider({ children }) {
     const [user, setUser] = useState(null);
     const [accessLevel, setAccessLevel] = useState(ACCESS_LEVELS.GUEST);
+    const [retailer, setRetailer] = useState(null);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        const unsubscribe = onAuthChange((u) => {
+        const unsubscribe = onAuthChange(async (u) => {
             setLoading(true);
             setUser(u);
-            const resolvedLevel = resolveAccessLevelFromUser(u);
+            setRetailer(null);
+
+            let resolvedLevel = resolveAccessLevelFromUser(u);
+
+            if (u && resolvedLevel !== ACCESS_LEVELS.FULL && u.email) {
+                try {
+                    const emailLower = u.email.toLowerCase();
+                    const retailersRef = collection(db, 'retailers');
+                    const q = query(retailersRef, where('emails', 'array-contains', emailLower), limit(1));
+                    const snap = await getDocs(q);
+
+                    if (!snap.empty) {
+                        const docSnap = snap.docs[0];
+                        setRetailer({ id: docSnap.id, ...docSnap.data() });
+                        resolvedLevel = ACCESS_LEVELS.RETAILER;
+                    }
+                } catch (err) {
+                    console.error('Failed to load retailer profile:', err);
+                }
+            }
+
             setAccessLevel(resolvedLevel);
             setLoading(false);
         });
@@ -47,7 +69,9 @@ export function AuthProvider({ children }) {
             canAccessQuoteHistory,
             canExportSketchToQuote,
             login,
-            logout
+            logout,
+            retailer,
+            isRetailer: accessLevel === ACCESS_LEVELS.RETAILER
         }}>
             {children}
         </AuthContext.Provider>

@@ -58,6 +58,9 @@ service cloud.firestore {
 
     match /retailers/{retailerId} {
       allow read, write: if isAdmin();
+      allow read: if isSignedIn()
+        && request.auth.token.email != null
+        && request.auth.token.email in resource.data.emails;
     }
 
     // Allow admins to read all templates via collectionGroup queries

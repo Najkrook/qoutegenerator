@@ -1,12 +1,19 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { useQuote } from '../store/QuoteContext';
+import { useAuth } from '../store/AuthContext';
 import { catalogData } from '../data/catalog';
 
 export function ProductLineSelection({ onNext }) {
     const { state, dispatch } = useQuote();
+    const { isRetailer, retailer } = useAuth();
     const { selectedLines } = state;
 
     const toggleLine = (lineId) => {
+        if (isRetailer) {
+            dispatch({ type: 'SET_SELECTED_LINES', payload: [lineId] });
+            return;
+        }
+
         let newSelection;
         if (selectedLines.includes(lineId)) {
             newSelection = selectedLines.filter((id) => id !== lineId);
@@ -16,15 +23,41 @@ export function ProductLineSelection({ onNext }) {
         dispatch({ type: 'SET_SELECTED_LINES', payload: newSelection });
     };
 
-    const productLines = Object.keys(catalogData).map((key) => ({
-        id: key,
-        name: catalogData[key].name,
-        description: key === 'BaHaMa'
-            ? 'Premium Parasoller'
-            : key === 'ClickitUp'
-                ? 'Höj- och sänkbara glaspartier.'
-                : 'Premium Biogas'
-    }));
+    const handleNext = () => {
+        if (isRetailer && selectedLines.length === 1 && retailer) {
+            const selectedLineId = selectedLines[0];
+            const lineConfig = retailer.productLines?.[selectedLineId];
+            if (lineConfig) {
+                const discountPct = Number(lineConfig.discountPct) || 0;
+                dispatch({ type: 'SET_GLOBAL_DISCOUNT', payload: discountPct });
+            }
+        }
+        onNext();
+    };
+
+    const productLines = Object.keys(catalogData)
+        .filter((key) => {
+            if (!isRetailer) return true;
+            return retailer?.productLines?.[key]?.enabled === true;
+        })
+        .map((key) => ({
+            id: key,
+            name: catalogData[key].name,
+            description: key === 'BaHaMa'
+                ? 'Premium Parasoller'
+                : key === 'ClickitUp'
+                    ? 'Höj- och sänkbara glaspartier.'
+                    : 'Premium Biogas'
+        }));
+
+    // Auto-select first available line for retailers if none selected or multiple selected (sanitization)
+    useEffect(() => {
+        if (isRetailer && productLines.length > 0) {
+            if (selectedLines.length !== 1 || !productLines.some(l => l.id === selectedLines[0])) {
+                dispatch({ type: 'SET_SELECTED_LINES', payload: [productLines[0].id] });
+            }
+        }
+    }, [isRetailer, productLines, selectedLines, dispatch]);
 
     return (
         <div className="max-w-[1200px] mx-auto animate-fade-in">
@@ -43,7 +76,8 @@ export function ProductLineSelection({ onNext }) {
                             }`}
                     >
                         <input
-                            type="checkbox"
+                            type={isRetailer ? "radio" : "checkbox"}
+                            name={isRetailer ? "productLine" : line.id}
                             checked={selectedLines.includes(line.id)}
                             onChange={() => toggleLine(line.id)}
                             className="mt-1 w-5 h-5 accent-primary cursor-pointer"
@@ -58,7 +92,7 @@ export function ProductLineSelection({ onNext }) {
 
             <div className="flex justify-end mt-8 border-t border-panel-border pt-6">
                 <button
-                    onClick={onNext}
+                    onClick={handleNext}
                     disabled={selectedLines.length === 0}
                     className={`px-8 py-3 rounded-md font-medium text-base transition-colors shadow shadow-primary/20 ${selectedLines.length === 0
                             ? 'bg-gray-600 cursor-not-allowed text-gray-400'
