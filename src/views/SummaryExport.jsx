@@ -59,7 +59,7 @@ function warnIfActivityLogFailed(result, message) {
 
 export function SummaryExport({ onPrev, onBackToSketch }) {
     const { state, dispatch } = useQuote();
-    const { user } = useAuth();
+    const { user, retailer } = useAuth();
     const summaryData = useMemo(() => computeQuoteTotals({ state, catalogData }), [state]);
     const [previewUrl, setPreviewUrl] = useState('');
     const [previewError, setPreviewError] = useState('');
@@ -217,6 +217,7 @@ export function SummaryExport({ onPrev, onBackToSketch }) {
             const { saved, isNewQuote, statePatch } = await saveQuoteToRepository({
                 quoteRepository,
                 user,
+                retailer,
                 state,
                 summary: summaryData
             });

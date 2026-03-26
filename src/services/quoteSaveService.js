@@ -17,7 +17,7 @@ export function buildSavedQuoteStatePatch(saved, state = {}) {
     };
 }
 
-export async function saveQuoteToRepository({ quoteRepository, user, state, summary }) {
+export async function saveQuoteToRepository({ quoteRepository, user, retailer, state, summary }) {
     if (!user?.uid) {
         throw new Error('Du måste vara inloggad för att spara offerter.');
     }
@@ -27,7 +27,8 @@ export async function saveQuoteToRepository({ quoteRepository, user, state, summ
         state,
         summary,
         customerInfo: state.customerInfo || {},
-        status: state.quoteStatus || 'draft'
+        status: state.quoteStatus || 'draft',
+        retailerName: retailer?.name || null
     };
 
     const isNewQuote = !state.activeQuoteId;

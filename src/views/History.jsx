@@ -3,6 +3,7 @@ import { useAuth } from '../store/AuthContext';
 import { quoteRepository } from '../services/quoteRepositoryClient';
 import { normalizeQuoteStatus } from '../services/quoteRepository';
 import { notifyError, notifyInfo, notifySuccess, confirmAction } from '../services/notificationService';
+import { db, collection, getDocs } from '../services/firebase';
 
 const STATUS_LABELS = {
     draft: 'Utkast',
@@ -41,6 +42,28 @@ export function History({ onBack, onOpenQuote }) {
             try {
                 const data = await quoteRepository.getAllUsersQuotes({ status: '', search: '' });
                 if (cancelled) return;
+
+                let retailersMap = new Map();
+                try {
+                    const snap = await getDocs(collection(db, 'retailers'));
+                    snap.forEach(docSnap => {
+                        const r = docSnap.data();
+                        if (r.email) retailersMap.set(r.email.toLowerCase(), r.name);
+                    });
+                } catch (e) {
+                    console.error('Failed to load retailers for history', e);
+                }
+
+                // Inject retailerName where matching email
+                data.forEach(q => {
+                    if (!q.retailerName) {
+                        const email = (q.savedBy || q.ownerUid || '').toLowerCase();
+                        if (retailersMap.has(email)) {
+                            q.retailerName = retailersMap.get(email);
+                        }
+                    }
+                });
+
                 setAllUsersQuotes(data);
 
                 // Build unique user list from ownerUid + savedBy (email)
@@ -50,6 +73,7 @@ export function History({ onBack, onOpenQuote }) {
                         userMap.set(q.ownerUid, {
                             uid: q.ownerUid,
                             email: q.savedBy || q.ownerUid,
+                            retailerName: q.retailerName,
                             quoteCount: 0
                         });
                     }
@@ -282,7 +306,7 @@ export function History({ onBack, onOpenQuote }) {
                                 .filter(u => u.uid !== user.uid)
                                 .map(u => (
                                     <option key={u.uid} value={u.uid}>
-                                        {u.email} ({u.quoteCount})
+                                        {u.retailerName ? `[ÅF] ${u.retailerName}` : u.email} ({u.quoteCount})
                                     </option>
                                 ))}
                         </select>
@@ -349,7 +373,7 @@ export function History({ onBack, onOpenQuote }) {
                                     </p>
                                     {showOwnerBadge && (
                                         <p className="m-0 text-text-secondary text-xs leading-relaxed mt-1 opacity-70">
-                                            <strong>Användare:</strong> {quote.savedBy || quote.ownerUid}
+                                            <strong>Användare:</strong> {quote.retailerName ? `[ÅF] ${quote.retailerName}` : (quote.savedBy || quote.ownerUid)}
                                         </p>
                                     )}
                                     <div className="mt-2 text-success-color font-semibold">Totalt: {formatSek(quote.totalSek || 0)} SEK</div>

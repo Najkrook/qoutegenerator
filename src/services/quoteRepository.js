@@ -118,7 +118,8 @@ export function buildQuoteMetadata({
     user,
     latestVersion,
     latestRevisionId,
-    existing = {}
+    existing = {},
+    retailerName = null
 }) {
     const normalizedStatus = normalizeQuoteStatus(status || existing.status);
     const company = String(customerInfo.company || existing.company || '');
@@ -170,6 +171,7 @@ export function buildQuoteMetadata({
         latestVersion: Math.max(1, toNumber(latestVersion, 1)),
         latestRevisionId: String(latestRevisionId || existing.latestRevisionId || ''),
         totalSek: toNumber(summary?.finalTotalSek, existing.totalSek || 0),
+        retailerName: retailerName != null ? String(retailerName) : (existing.retailerName || null),
         scriveEnabled,
         scriveStatus: normalizedScriveStatus,
         scriveDocumentId,
@@ -235,7 +237,8 @@ export function createQuoteRepository(deps) {
         customerInfo,
         status,
         scrive,
-        changeNote
+        changeNote,
+        retailerName = null
     }) => {
         const quoteRef = quoteDocRef(user.uid, quoteId);
         const nowMs = Date.now();
@@ -266,7 +269,8 @@ export function createQuoteRepository(deps) {
             user,
             latestVersion: version,
             latestRevisionId: revisionId,
-            existing
+            existing,
+            retailerName
         });
 
         await setDoc(revisionRef, revisionData);
@@ -283,7 +287,8 @@ export function createQuoteRepository(deps) {
         customerInfo = {},
         status = 'draft',
         scrive = {},
-        changeNote = ''
+        changeNote = '',
+        retailerName = null
     }) {
         if (!user?.uid) throw new Error('Missing authenticated user.');
         if (!quoteId) throw new Error('quoteId is required.');
@@ -297,7 +302,8 @@ export function createQuoteRepository(deps) {
                 customerInfo,
                 status,
                 scrive,
-                changeNote
+                changeNote,
+                retailerName
             });
         }
 
@@ -333,7 +339,8 @@ export function createQuoteRepository(deps) {
                 user,
                 latestVersion: version,
                 latestRevisionId: revisionId,
-                existing
+                existing,
+                retailerName
             });
 
             transaction.set(revisionRef, revisionData);
@@ -350,7 +357,8 @@ export function createQuoteRepository(deps) {
         customerInfo = {},
         status = 'draft',
         scrive = {},
-        changeNote = 'Initial save'
+        changeNote = 'Initial save',
+        retailerName = null
     }) {
         if (!user?.uid) throw new Error('Missing authenticated user.');
         const quoteId = `quote_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
@@ -362,7 +370,8 @@ export function createQuoteRepository(deps) {
             customerInfo,
             status,
             scrive,
-            changeNote
+            changeNote,
+            retailerName
         });
         return { quoteId, ...saved };
     }
