@@ -18,7 +18,7 @@ function nearlyEqual(a, b) {
 
 export function Pricing({ onNext, onPrev }) {
     const { state, dispatch } = useQuote();
-    const { canViewEverything } = useAuth();
+    const { canViewEverything, isRetailer } = useAuth();
     const { globalDiscountPct, exchangeRate, prevGlobalDiscountPct } = state;
 
     const handleGlobalDiscountChange = (e) => {
@@ -113,8 +113,11 @@ export function Pricing({ onNext, onPrev }) {
             <CustomCosts />
 
             <div className={`grid grid-cols-1 ${canViewEverything ? 'md:grid-cols-2' : ''} gap-6 mt-8`}>
-                <div className="bg-panel-bg border border-panel-border rounded-lg p-6 shadow-sm">
-                    <label className="block text-xs font-bold text-text-secondary uppercase mb-2">Övergripande Offertrabatt (%)</label>
+                <div className={`bg-panel-bg border border-panel-border rounded-lg p-6 shadow-sm ${isRetailer ? 'opacity-90' : ''}`}>
+                    <label className="flex items-center justify-between text-xs font-bold text-text-secondary uppercase mb-2">
+                        <span>Övergripande Offertrabatt (%)</span>
+                        {isRetailer && <span className="text-danger-color bg-danger-color/10 px-2 py-0.5 rounded text-[10px] tracking-wider">LÅST</span>}
+                    </label>
                     <div className="flex items-center gap-3">
                         <input
                             type="range"
@@ -123,7 +126,8 @@ export function Pricing({ onNext, onPrev }) {
                             step="1"
                             value={globalDiscountPct}
                             onChange={handleGlobalDiscountChange}
-                            className="flex-1 accent-primary"
+                            disabled={isRetailer}
+                            className={`flex-1 accent-primary ${isRetailer ? 'opacity-50 cursor-not-allowed grayscale' : ''}`}
                         />
                         <input
                             type="number"
@@ -132,7 +136,8 @@ export function Pricing({ onNext, onPrev }) {
                             max="100"
                             value={globalDiscountPct}
                             onChange={handleGlobalDiscountChange}
-                            className="w-20 bg-input-bg border border-panel-border text-text-primary p-2 rounded-md font-bold text-center outline-none focus:border-primary"
+                            disabled={isRetailer}
+                            className={`w-20 bg-input-bg border border-panel-border text-text-primary p-2 rounded-md font-bold text-center outline-none focus:border-primary ${isRetailer ? 'opacity-50 cursor-not-allowed text-text-secondary' : ''}`}
                         />
                     </div>
                     <p className="text-[10px] text-text-secondary mt-2 italic">

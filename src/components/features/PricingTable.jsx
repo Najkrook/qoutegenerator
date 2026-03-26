@@ -1,11 +1,13 @@
 import React from 'react';
 import { useQuote } from '../../store/QuoteContext';
+import { useAuth } from '../../store/AuthContext';
 import { catalogData } from '../../data/catalog';
 import { computeQuoteTotals } from '../../services/calculationEngine';
 import { buildEffectiveGridSelections } from '../../utils/gridAutoScale.js';
 
 export function PricingTable() {
     const { state, dispatch } = useQuote();
+    const { isRetailer } = useAuth();
     const { totals, grossTotalSek, totalDiscountSek, finalTotalSek } = computeQuoteTotals({ state, catalogData });
 
     const handleDiscountChange = (source, value) => {
@@ -136,8 +138,9 @@ export function PricingTable() {
                                     type="number"
                                     step="1"
                                     value={row.discountPct}
+                                    disabled={isRetailer}
                                     onChange={(e) => handleDiscountChange(row.source, e.target.value)}
-                                    className={`w-16 text-center bg-black/20 border border-panel-border rounded p-1 text-sm outline-none focus:border-primary ${row.discountPct > 0 ? 'text-primary' : ''}`}
+                                    className={`w-16 text-center bg-black/20 border border-panel-border rounded p-1 text-sm outline-none focus:border-primary ${row.discountPct > 0 ? 'text-primary' : ''} ${isRetailer ? 'opacity-50 cursor-not-allowed' : ''}`}
                                 />
                             </td>
                             <td className="p-4 text-sm text-right font-bold text-primary">
