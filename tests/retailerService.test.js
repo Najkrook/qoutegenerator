@@ -71,6 +71,7 @@ describe('normalizeRetailerData', () => {
     it('preserves valid data unchanged', () => {
         const result = normalizeRetailerData({
             name: 'Solklar',
+            email: 'test@example.com',
             notes: 'VIP retailer',
             productLines: {
                 BaHaMa: { enabled: true, discountPct: 22 },
@@ -80,7 +81,7 @@ describe('normalizeRetailerData', () => {
         }, mockCatalog);
         expect(result).toEqual({
             name: 'Solklar',
-            emails: [],
+            email: 'test@example.com',
             notes: 'VIP retailer',
             productLines: {
                 BaHaMa: { enabled: true, discountPct: 22 },
@@ -110,40 +111,27 @@ describe('normalizeRetailerData', () => {
         expect(result.notes).toBe('some notes');
     });
 
-    it('only includes name, emails, productLines, and notes in output', () => {
+    it('only includes name, email, productLines, and notes in output', () => {
         const result = normalizeRetailerData({
             name: 'Test',
+            email: 'test@example.com',
             extraField: 'should be stripped',
             productLines: {}
         }, mockCatalog);
-        expect(Object.keys(result)).toEqual(['name', 'emails', 'productLines', 'notes']);
+        expect(Object.keys(result)).toEqual(['name', 'email', 'productLines', 'notes']);
     });
 
-    it('parses, lowercases, and deduplicates emails from a string', () => {
+    it('parses and lowercases email', () => {
         const result = normalizeRetailerData({
             name: 'Test',
-            emails: ' USER1@test.com , user2@Test.com; user1@test.com\nuser3@test.com '
+            email: ' USER1@Test.com '
         }, mockCatalog);
-        expect(result.emails).toEqual(['user1@test.com', 'user2@test.com', 'user3@test.com']);
+        expect(result.email).toBe('user1@test.com');
     });
 
-    it('handles emails as an array', () => {
-        const result = normalizeRetailerData({
-            name: 'Test',
-            emails: [' User1@test.com ', 'user2@test.com', 'user1@test.com']
-        }, mockCatalog);
-        expect(result.emails).toEqual(['user1@test.com', 'user2@test.com']);
-    });
-
-    it('handles empty or missing emails', () => {
-        const result1 = normalizeRetailerData({ name: 'Test' }, mockCatalog);
-        expect(result1.emails).toEqual([]);
-
-        const result2 = normalizeRetailerData({ name: 'Test', emails: '   ,, ; \n ' }, mockCatalog);
-        expect(result2.emails).toEqual([]);
-
-        const result3 = normalizeRetailerData({ name: 'Test', emails: [' ', ''] }, mockCatalog);
-        expect(result3.emails).toEqual([]);
+    it('rejects empty or missing email', () => {
+        expect(() => normalizeRetailerData({ name: 'Test' }, mockCatalog)).toThrow('Användare (E-post) är obligatoriskt.');
+        expect(() => normalizeRetailerData({ name: 'Test', email: '   ' }, mockCatalog)).toThrow('Användare (E-post) är obligatoriskt.');
     });
 });
 

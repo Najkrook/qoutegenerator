@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../store/AuthContext';
 import { catalogData } from '../data/catalog';
+import { createRetailerAuthUser } from '../services/authService';
 import {
     fetchRetailers,
     createRetailer,
@@ -21,7 +22,8 @@ function buildEmptyProductLines() {
 function buildFormState(retailer = null) {
     return {
         name: retailer?.name || '',
-        emails: (retailer?.emails || []).join(', '),
+        email: retailer?.email || '',
+        password: '',
         notes: retailer?.notes || '',
         productLines: retailer
             ? PRODUCT_LINE_IDS.reduce((acc, id) => {
@@ -100,15 +102,32 @@ function RetailerForm({ initial, onSave, onCancel, saving }) {
             </div>
 
             <div>
-                <label className="block text-xs font-bold text-text-secondary uppercase mb-1.5">Användare (E-post)</label>
-                <textarea
-                    value={form.emails}
-                    onChange={(e) => setForm((prev) => ({ ...prev, emails: e.target.value }))}
-                    rows={2}
-                    placeholder="E-postadresser, separerade med kommatecken eller ny rad"
-                    className="w-full bg-input-bg border border-panel-border text-text-primary p-2.5 rounded-md outline-none focus:border-primary transition-colors resize-y text-sm"
+                <label className="block text-xs font-bold text-text-secondary uppercase mb-1.5">E-post *</label>
+                <input
+                    type="email"
+                    value={form.email}
+                    onChange={(e) => setForm((prev) => ({ ...prev, email: e.target.value }))}
+                    placeholder="E-postadress för inloggning"
+                    required
+                    readOnly={!!initial}
+                    className={`w-full bg-input-bg border border-panel-border text-text-primary p-2.5 rounded-md outline-none focus:border-primary transition-colors ${initial ? 'opacity-60 cursor-not-allowed' : ''}`}
                 />
             </div>
+
+            {!initial && (
+                <div>
+                    <label className="block text-xs font-bold text-text-secondary uppercase mb-1.5">Lösenord *</label>
+                    <input
+                        type="text"
+                        value={form.password}
+                        onChange={(e) => setForm((prev) => ({ ...prev, password: e.target.value }))}
+                        placeholder="Minst 6 tecken"
+                        required
+                        minLength={6}
+                        className="w-full bg-input-bg border border-panel-border text-text-primary p-2.5 rounded-md outline-none focus:border-primary transition-colors"
+                    />
+                </div>
+            )}
 
             <div>
                 <label className="block text-xs font-bold text-text-secondary uppercase mb-3">Produktlinjer & Rabatter</label>
@@ -251,6 +270,18 @@ export function RetailerManager({ onBack }) {
             if (editingRetailer) {
                 await updateRetailer(editingRetailer.id, formData, user, catalogData);
             } else {
+                try {
+                    await createRetailerAuthUser(formData.email, formData.password);
+                } catch (authErr) {
+                    if (authErr.code === 'auth/email-already-in-use') {
+                        throw new Error('E-postadressen används redan av ett annat konto.');
+                    } else if (authErr.code === 'auth/weak-password') {
+                        throw new Error('Lösenordet är för svagt (minst 6 tecken).');
+                    } else if (authErr.code === 'auth/invalid-email') {
+                        throw new Error('Ogiltig e-postadress.');
+                    }
+                    throw new Error('Kunde inte skapa inloggningskonto: ' + authErr.message);
+                }
                 await createRetailer(formData, user, catalogData);
             }
             setShowForm(false);
@@ -386,13 +417,11 @@ export function RetailerManager({ onBack }) {
                                             ))
                                         )}
                                     </div>
-                                    {(retailer.emails && retailer.emails.length > 0) && (
+                                    {retailer.email && (
                                         <div className="flex flex-wrap gap-1 mt-2">
-                                            {retailer.emails.map(email => (
-                                                <span key={email} className="bg-panel-bg border border-panel-border text-text-secondary rounded text-[10px] px-1.5 py-0.5" title={email}>
-                                                    {email}
-                                                </span>
-                                            ))}
+                                            <span className="bg-panel-bg border border-panel-border text-text-secondary rounded text-[10px] px-1.5 py-0.5" title={retailer.email}>
+                                                {retailer.email}
+                                            </span>
                                         </div>
                                     )}
                                     {retailer.notes && (

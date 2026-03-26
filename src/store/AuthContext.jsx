@@ -23,7 +23,7 @@ export function AuthProvider({ children }) {
                 try {
                     const emailLower = u.email.toLowerCase();
                     const retailersRef = collection(db, 'retailers');
-                    const q = query(retailersRef, where('emails', 'array-contains', emailLower), limit(1));
+                    const q = query(retailersRef, where('email', '==', emailLower), limit(1));
                     const snap = await getDocs(q);
 
                     if (!snap.empty) {

@@ -33,22 +33,14 @@ export function normalizeRetailerData(data, catalogData) {
         productLines[lineId] = { enabled, discountPct };
     }
 
-    let emails = [];
-    if (Array.isArray(data?.emails)) {
-        emails = data.emails;
-    } else if (typeof data?.emails === 'string') {
-        emails = data.emails.split(/[\n,;]+/);
+    const email = String(data?.email ?? '').trim().toLowerCase();
+    if (!email) {
+        throw new Error('Användare (E-post) är obligatoriskt.');
     }
-
-    emails = emails
-        .map(e => String(e).trim().toLowerCase())
-        .filter(e => e.length > 0);
-
-    emails = [...new Set(emails)];
 
     return {
         name,
-        emails,
+        email,
         productLines,
         notes: String(data?.notes ?? '').trim()
     };
