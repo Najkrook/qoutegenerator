@@ -29,4 +29,11 @@ describe('accessControl.shared', () => {
         expect(getAuthorizedStepForAccess('activity-logs', ACCESS_LEVELS.FULL)).toBe('activity-logs');
         expect(getAuthorizedStepForAccess(4, ACCESS_LEVELS.QUOTE_ONLY)).toBe(4);
     });
+
+    it('gates retailers step to full-access users only', () => {
+        expect(getAuthorizedStepForAccess('retailers', ACCESS_LEVELS.QUOTE_ONLY)).toBe(0);
+        expect(getAuthorizedStepForAccess('retailers', ACCESS_LEVELS.SKETCH_ONLY)).toBe(0);
+        expect(getAuthorizedStepForAccess('retailers', ACCESS_LEVELS.GUEST)).toBe(0);
+        expect(getAuthorizedStepForAccess('retailers', ACCESS_LEVELS.FULL)).toBe('retailers');
+    });
 });

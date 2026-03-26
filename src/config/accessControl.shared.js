@@ -11,7 +11,7 @@ export const SKETCH_ONLY_UIDS = Object.freeze([
 
 const ADMIN_UID_SET = new Set(ADMIN_UIDS);
 const SKETCH_ONLY_UID_SET = new Set(SKETCH_ONLY_UIDS);
-const FULL_ONLY_STEPS = new Set(['inventory', 'inventory-logs', 'activity-logs', 'planner']);
+const FULL_ONLY_STEPS = new Set(['inventory', 'inventory-logs', 'activity-logs', 'planner', 'retailers']);
 
 export const ACCESS_LEVELS = Object.freeze({
     GUEST: 'guest',

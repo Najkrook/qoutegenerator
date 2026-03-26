@@ -7,7 +7,7 @@ import {
     normalizeActivityLog
 } from '../services/activityLogService';
 
-export function Dashboard({ onStartQuote, onOpenInventory, onOpenSketch, onOpenPlanner, onOpenActivity }) {
+export function Dashboard({ onStartQuote, onOpenInventory, onOpenSketch, onOpenPlanner, onOpenActivity, onOpenRetailers }) {
     const { canViewEverything, canStartQuote, canAccessSketch } = useAuth();
     const [logs, setLogs] = useState([]);
     const [logsLoading, setLogsLoading] = useState(false);
@@ -110,6 +110,19 @@ export function Dashboard({ onStartQuote, onOpenInventory, onOpenSketch, onOpenP
                         <h3 className="text-2xl font-semibold text-text-primary mb-2">Projektplanerare</h3>
                         <p className="text-text-secondary leading-relaxed m-0">
                             Planera och följ upp projekt. Lägg till, checka av och håll koll på framsteg.
+                        </p>
+                    </button>
+                )}
+
+                {canViewEverything && onOpenRetailers && (
+                    <button
+                        onClick={onOpenRetailers}
+                        className="flex-1 min-w-[250px] max-w-[350px] bg-panel-bg border border-panel-border rounded-xl p-12 cursor-pointer text-center transition-all hover:-translate-y-1 hover:shadow-lg hover:border-primary group"
+                    >
+                        <div className="text-5xl mb-4 group-hover:scale-110 transition-transform">🏪</div>
+                        <h3 className="text-2xl font-semibold text-text-primary mb-2">Återförsäljare</h3>
+                        <p className="text-text-secondary leading-relaxed m-0">
+                            Hantera återförsäljare, produktlinjer och rabatter.
                         </p>
                     </button>
                 )}

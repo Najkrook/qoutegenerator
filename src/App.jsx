@@ -16,6 +16,7 @@ const InventoryManager = lazy(() => import('./views/InventoryManager').then((mod
 const SketchTool = lazy(() => import('./views/SketchTool').then((module) => ({ default: module.SketchTool })));
 const Planner = lazy(() => import('./views/Planner').then((module) => ({ default: module.Planner })));
 const History = lazy(() => import('./views/History').then((module) => ({ default: module.History })));
+const RetailerManager = lazy(() => import('./views/RetailerManager').then((module) => ({ default: module.RetailerManager })));
 
 function ViewLoader() {
     return (
@@ -80,6 +81,7 @@ function App() {
                             }
                             onOpenPlanner={canViewEverything ? () => setStep('planner') : undefined}
                             onOpenActivity={canViewEverything ? () => setStep('activity-logs') : undefined}
+                            onOpenRetailers={canViewEverything ? () => setStep('retailers') : undefined}
                         />
                     )}
                     {canStartQuote && step === 1 && <ProductLineSelection onNext={() => setStep(2)} />}
@@ -155,6 +157,7 @@ function App() {
                     )}
                     {canViewEverything && step === 'activity-logs' && <ActivityLogs onBack={() => setStep(0)} />}
                     {canViewEverything && step === 'inventory-logs' && <InventoryLogs onBack={() => setStep(0)} />}
+                    {canViewEverything && step === 'retailers' && <RetailerManager onBack={() => setStep(0)} />}
                     </Suspense>
                 </main>
             </div>

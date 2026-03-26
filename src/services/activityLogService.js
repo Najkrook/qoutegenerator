@@ -5,7 +5,8 @@ export const ACTIVITY_SYSTEM_DEFINITIONS = {
     sketch: { label: 'Ritning' },
     planner: { label: 'Projekt' },
     template: { label: 'Mall' },
-    auth: { label: 'Auth' }
+    auth: { label: 'Auth' },
+    retailer: { label: 'Återförsäljare' }
 };
 
 export const ACTIVITY_EVENT_DEFINITIONS = {
@@ -14,7 +15,10 @@ export const ACTIVITY_EVENT_DEFINITIONS = {
     quote_export_pdf: { label: 'PDF exporterad', icon: '📄', color: 'var(--color-primary)' },
     quote_export_excel: { label: 'Excel exporterad', icon: '📊', color: 'var(--color-success)' },
     sketch_export_to_quote: { label: 'Ritning exporterad till offert', icon: '✏️', color: 'var(--color-primary)' },
-    sketch_export_image: { label: 'Ritningsbild nedladdad', icon: '🖼️', color: 'var(--color-success)' }
+    sketch_export_image: { label: 'Ritningsbild nedladdad', icon: '🖼️', color: 'var(--color-success)' },
+    retailer_created: { label: 'Återförsäljare skapad', icon: '🏪', color: 'var(--color-success)' },
+    retailer_updated: { label: 'Återförsäljare uppdaterad', icon: '🏪', color: 'var(--color-primary)' },
+    retailer_deleted: { label: 'Återförsäljare borttagen', icon: '🗑️', color: 'var(--color-error, #e74c3c)' }
 };
 
 function buildActivityLogError(error) {
