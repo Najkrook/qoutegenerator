@@ -522,6 +522,20 @@ export const catalogData = withBuilderAddonCategoryIds({
                     { id: "panikregel", name: "Panikregel", price: 5000 },
                     { id: "projektering", name: "Projektering. (Fast timpris)", price: 720 }
                 ]
+            },
+            {
+                id: "blomsterlada",
+                name: "Blomsterlåda (svartlackad)",
+                items: [
+                    { id: "blomsterlada_1800", name: "Blomsterlåda 1800 mm", price: 6150 },
+                    { id: "blomsterlada_1500", name: "Blomsterlåda 1500 mm", price: 6000 },
+                    { id: "blomsterlada_1000", name: "Blomsterlåda 1000 mm", price: 5850 },
+                    { id: "tillval_hjul", name: "Tillval hjul", price: 600 },
+                    { id: "tillval_tralav", name: "Tillval Trälav", price: 2200 },
+                    { id: "startkostnad_special", name: "Startkostnad specialmått (närmast större sektionsstorlek + en startkostnad)", price: 3000 },
+                    { id: "startkostnad_ral", name: "Startkostnad RAL-lack (antal RAL + en startkostnad)", price: 4900 },
+                    { id: "ral_blomsterlador", name: "RAL (antal blomsterlådor)", price: 340 }
+                ]
             }
         ]
     },
