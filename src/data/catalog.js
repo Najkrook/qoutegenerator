@@ -151,6 +151,17 @@ export const catalogData = withBuilderAddonCategoryIds({
                         ]
                     },
                     {
+                        name: "Hängränna Kvadrat",
+                        items: [
+                            { id: "jumb_hang_kv_3x3", name: "Hängränna 3x3", price: 620 },
+                            { id: "jumb_hang_kv_35x35", name: "Hängränna 3,5x3,5", price: 670 },
+                            { id: "jumb_hang_kv_4x4", name: "Hängränna 4x4", price: 710 },
+                            { id: "jumb_hang_kv_45x45", name: "Hängränna 4,5x4,5", price: 810 },
+                            { id: "jumb_hang_kv_5x5", name: "Hängränna 5x5", price: 830 },
+                            { id: "jumb_hang_kv_6x6", name: "Hängränna 6x6", price: 1060 }
+                        ]
+                    },
+                    {
                         name: "Textilduk Rektangel",
                         items: [
                             { id: "jumb_textil_3x15", name: "JUMBRELLA Textilduk 3x1,5", price: 620 },

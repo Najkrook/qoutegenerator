@@ -18,6 +18,9 @@ const baseItem = {
 const installationItems = catalogData.BaHaMa.models.Jumbrella.addonCategories.find(
     (category) => category.name === 'Installationsalternativ'
 )?.items ?? [];
+const squareGutterItems = catalogData.BaHaMa.models.Jumbrella.addonCategories.find(
+    (category) => category.name === 'Hängränna Kvadrat'
+)?.items ?? [];
 
 function stubLocalStorage(serializedState) {
     const storage = new Map();
@@ -124,6 +127,17 @@ describe('BuilderItem header add-on badge', () => {
         expect(html).toContain('Speciallack');
         expect(html).toContain('900');
         expect(html).toContain('1 tillägg');
+    });
+
+    it('includes the Jumbrella square gutter category with the expected sizes and prices', () => {
+        expect(squareGutterItems).toEqual([
+            { id: 'jumb_hang_kv_3x3', name: 'Hängränna 3x3', price: 620 },
+            { id: 'jumb_hang_kv_35x35', name: 'Hängränna 3,5x3,5', price: 670 },
+            { id: 'jumb_hang_kv_4x4', name: 'Hängränna 4x4', price: 710 },
+            { id: 'jumb_hang_kv_45x45', name: 'Hängränna 4,5x4,5', price: 810 },
+            { id: 'jumb_hang_kv_5x5', name: 'Hängränna 5x5', price: 830 },
+            { id: 'jumb_hang_kv_6x6', name: 'Hängränna 6x6', price: 1060 }
+        ]);
     });
 
     it('shows the pseudo category for models that only have flat add-ons', () => {

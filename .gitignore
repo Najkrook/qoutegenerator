@@ -36,3 +36,8 @@ cloudflared.exe
 dist/
 *.pdf
 *.xlsx
+
+# ireevlevant Scripts
+scripts/build_parasollkostnad_excel.py
+scripts/build_parasollkostnad.mjs
+scripts/patch_parasollkostnad_current_workbook.py
