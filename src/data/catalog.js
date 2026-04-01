@@ -225,7 +225,8 @@ export const catalogData = withBuilderAddonCategoryIds({
                         name: "Annat",
                         items: [
                             { id: "jumb_tophatt", name: "Tophatt", price: 358 },
-                            { id: "jumb_topboll", name: "Topboll", price: 186 }
+                            { id: "jumb_topboll", name: "Topboll", price: 186 },
+                            { id: "jumb_textil_roll_1m", name: "1m textile on roll", price: 50 }
                         ]
                     }
                 ]

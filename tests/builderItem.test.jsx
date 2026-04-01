@@ -21,6 +21,9 @@ const installationItems = catalogData.BaHaMa.models.Jumbrella.addonCategories.fi
 const squareGutterItems = catalogData.BaHaMa.models.Jumbrella.addonCategories.find(
     (category) => category.name === 'Hängränna Kvadrat'
 )?.items ?? [];
+const miscItems = catalogData.BaHaMa.models.Jumbrella.addonCategories.find(
+    (category) => category.name === 'Annat'
+)?.items ?? [];
 
 function stubLocalStorage(serializedState) {
     const storage = new Map();
@@ -138,6 +141,14 @@ describe('BuilderItem header add-on badge', () => {
             { id: 'jumb_hang_kv_5x5', name: 'Hängränna 5x5', price: 830 },
             { id: 'jumb_hang_kv_6x6', name: 'Hängränna 6x6', price: 1060 }
         ]);
+    });
+
+    it('includes the 1m textile roll item under the Jumbrella misc category', () => {
+        expect(miscItems).toEqual(
+            expect.arrayContaining([
+                { id: 'jumb_textil_roll_1m', name: '1m textile on roll', price: 50 }
+            ])
+        );
     });
 
     it('shows the pseudo category for models that only have flat add-ons', () => {
