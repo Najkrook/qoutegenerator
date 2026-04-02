@@ -222,6 +222,16 @@ export const catalogData = withBuilderAddonCategoryIds({
                         ]
                     },
                     {
+                        name: "Cosmetic",
+                        items: [
+                            { id: "jumb_frame_fancy", name: "Frame Color fancy designs", price: 670 },
+                            { id: "jumb_frame_custom", name: "Frame Color custom finish", price: 540 },
+                            { id: "jumb_v4a_maritime", name: "V4A | Maritime Edition", price: 280 },
+                            { id: "jumb_pole_extension", name: "Umbrella Center Pole Extension", price: 180 },
+                            { id: "jumb_pole_reduction", name: "Umbrella Center Pole Reduction", price: 180 }
+                        ]
+                    },
+                    {
                         name: "Annat",
                         items: [
                             { id: "jumb_tophatt", name: "Tophatt", price: 358 },
