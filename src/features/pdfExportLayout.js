@@ -200,6 +200,39 @@ export function renderCustomerInfoBlock(doc, { customerInfo = {}, pageWidth, lay
     return layout.customerBoxY + customerBoxHeight + 6;
 }
 
+export function renderExtraNotesBlock(doc, { customerInfo = {}, pageWidth, pageHeight, drawMainHeader, currentY, layout = PDF_LAYOUT }) {
+    if (!customerInfo.extraNotes || !customerInfo.extraNotes.trim()) {
+        return currentY;
+    }
+
+    const marginX = layout.pageMarginX;
+    const notesText = customerInfo.extraNotes.trim();
+
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(9);
+    const lines = doc.splitTextToSize(notesText, pageWidth - (marginX * 2));
+    const requiredHeight = 6 + (lines.length * 4.5) + 4;
+    
+    currentY = ensurePageSpace(doc, currentY, requiredHeight, pageHeight, drawMainHeader, layout.contentStartY);
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(10);
+    doc.setTextColor(...layout.colors.darkText);
+    doc.text('Noteringar', marginX, currentY);
+    
+    let y = currentY + 6;
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(9);
+    doc.setTextColor(...layout.colors.grayText);
+    
+    lines.forEach(line => {
+        doc.text(line, marginX, y);
+        y += 4.5;
+    });
+
+    return y + 4;
+}
+
 export function renderGroupedTables(doc, {
     summaryData,
     formatSEK,

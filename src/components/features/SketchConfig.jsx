@@ -118,7 +118,9 @@ export function SketchConfig({
     edgeSummaries,
     onDeleteParasol,
     onRotateParasol,
-    onDeleteFiesta
+    onDeleteFiesta,
+    onSetSectionCount,
+    onClearSectionCount
 }) {
     const {
         activeMode = 'clickitup',
@@ -136,7 +138,8 @@ export function SketchConfig({
         prioMode,
         targetLength,
         doorSegmentsByEdge = {},
-        manualSectionsByEdge = {}
+        manualSectionsByEdge = {},
+        sectionCountByEdge = {}
     } = config;
     const hasLeftDepth = depthLeft > 0;
     const hasRightDepth = depthRight > 0;
@@ -438,6 +441,59 @@ export function SketchConfig({
                     </select>
                 </div>
             )}
+
+            {/* ── Per-edge section count override ── */}
+            <div className="flex flex-col gap-1.5">
+                <label className="text-xs font-semibold text-text-secondary uppercase">Antal sektioner per kant</label>
+                <p className="text-xs text-text-secondary m-0">Lämna tomt för automatisk beräkning.</p>
+                <div className="grid grid-cols-2 gap-3 mt-1">
+                    {EDGE_META.map(({ key, label }) => {
+                        const summary = edgeSummaries?.[key];
+                        if (!summary?.enabled) return null;
+                        const currentCount = sectionCountByEdge[key];
+                        const autoCount = summary?.segments?.length ?? null;
+                        const hasOverride = currentCount !== undefined && currentCount !== null;
+                        return (
+                            <div key={key} className="flex flex-col gap-1">
+                                <span className="text-xs text-text-secondary">{label}</span>
+                                <div className="flex items-center gap-1.5">
+                                    <DelayedInput
+                                        value={hasOverride ? currentCount : ''}
+                                        step={1}
+                                        min={1}
+                                        onValueCommit={(val) => {
+                                            const parsed = Number.parseInt(val, 10);
+                                            if (Number.isFinite(parsed) && parsed > 0) {
+                                                onSetSectionCount?.(key, parsed);
+                                            } else {
+                                                onClearSectionCount?.(key);
+                                            }
+                                        }}
+                                        className={`bg-input-bg border text-text-primary p-2 rounded-lg outline-none text-sm w-full ${
+                                            hasOverride ? 'border-amber-500/60 focus:border-amber-400' : 'border-panel-border focus:border-primary'
+                                        }`}
+                                    />
+                                    {hasOverride && (
+                                        <button
+                                            type="button"
+                                            onClick={() => onClearSectionCount?.(key)}
+                                            className="text-xs text-amber-400 hover:text-amber-300 whitespace-nowrap"
+                                            title="Återställ till automatisk"
+                                        >
+                                            ↺
+                                        </button>
+                                    )}
+                                </div>
+                                {autoCount !== null && (
+                                    <span className="text-[10px] text-text-secondary">
+                                        {hasOverride ? `Auto: ${autoCount}` : `${autoCount} st`}
+                                    </span>
+                                )}
+                            </div>
+                        );
+                    })}
+                </div>
+            </div>
 
             {selectedSegment && (
                 <div className="border border-amber-500/40 bg-amber-500/10 rounded-xl p-4 space-y-3">

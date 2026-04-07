@@ -144,11 +144,17 @@ function isBetterCandidate(candidate, incumbent, mode, target) {
     return isLexicographicallyBetter(candidate, incumbent);
 }
 
-function solveExactFill(total, mode, targetLength) {
+function solveExactFill(total, mode, targetLength, targetCount) {
     if (!Number.isFinite(total) || total < 0) return null;
-    if (total === 0) return [];
+    if (total === 0) {
+        // With a count constraint, 0 remaining is only valid if count is also 0
+        if (Number.isFinite(targetCount) && targetCount > 0 && targetCount !== 0) return null;
+        return [];
+    }
     if (total < MIN_SECTION_SIZE) return null;
     if (total % STEP_MM !== 0) return null;
+
+    const hasCountConstraint = Number.isFinite(targetCount) && targetCount > 0;
 
     const normalizedTarget = nearestFromList(
         normalizeNumber(targetLength, { fallback: 1500, min: 700, max: 2000 }),
@@ -156,11 +162,14 @@ function solveExactFill(total, mode, targetLength) {
     );
     const memo = new Map();
 
-    function walk(remaining, startIdx) {
-        if (remaining === 0) return [];
+    function walk(remaining, startIdx, slotsLeft) {
+        if (remaining === 0) {
+            return (!hasCountConstraint || slotsLeft === 0) ? [] : null;
+        }
         if (remaining < MIN_SECTION_SIZE) return null;
+        if (hasCountConstraint && slotsLeft <= 0) return null;
 
-        const memoKey = `${remaining}|${startIdx}`;
+        const memoKey = hasCountConstraint ? `${remaining}|${startIdx}|${slotsLeft}` : `${remaining}|${startIdx}`;
         if (memo.has(memoKey)) return memo.get(memoKey);
 
         let best = null;
@@ -168,7 +177,7 @@ function solveExactFill(total, mode, targetLength) {
             const size = SECTION_SIZES[i];
             if (size > remaining) continue;
 
-            const tail = walk(remaining - size, i);
+            const tail = walk(remaining - size, i, hasCountConstraint ? slotsLeft - 1 : slotsLeft);
             if (!tail) continue;
 
             const candidate = [size, ...tail];
@@ -181,7 +190,7 @@ function solveExactFill(total, mode, targetLength) {
         return best;
     }
 
-    return walk(total, 0);
+    return walk(total, 0, hasCountConstraint ? targetCount : -1);
 }
 
 function normalizeDoorSize(rawDoorSize) {
@@ -279,6 +288,8 @@ function solveEdge(totalLength, options = {}) {
     const normalizedTotal = Math.max(0, roundToStep(totalLength, STEP_MM));
     const doorSegments = normalizeDoorSegments(options.doorSegments);
     const sectionPins = normalizeManualPins(options.sectionPins, doorSegments);
+    const rawSectionCount = options.sectionCount;
+    const hasSectionCount = Number.isFinite(rawSectionCount) && rawSectionCount > 0;
 
     if (normalizedTotal === 0) {
         return {
@@ -306,15 +317,17 @@ function solveEdge(totalLength, options = {}) {
         };
     }
 
-    const freeSections = solveExactFill(remaining, mode, targetLength);
+    const freeTargetCount = hasSectionCount ? Math.max(0, rawSectionCount - occupiedEntries.length) : undefined;
+    const freeSections = solveExactFill(remaining, mode, targetLength, freeTargetCount);
     if (!freeSections && remaining !== 0) {
+        const baseErrorCode = doorSegments.length > 0 ? 'NO_DOOR_COMBINATION' : 'NO_SECTION_SOLUTION';
         return {
             sections: [],
             valid: false,
             requestedDoorSize: null,
             resolvedDoorSize: null,
             autoAdjusted: false,
-            errorCode: doorSegments.length > 0 ? 'NO_DOOR_COMBINATION' : 'NO_SECTION_SOLUTION'
+            errorCode: hasSectionCount ? 'WRONG_COUNT' : baseErrorCode
         };
     }
 
@@ -416,13 +429,28 @@ function normalizeManualSectionsByEdge(rawManualSectionsByEdge, doorSegmentsByEd
     return normalized;
 }
 
+function normalizeSectionCountByEdge(rawCounts, enabledEdges) {
+    const normalized = {};
+    if (!rawCounts || typeof rawCounts !== 'object') return normalized;
+
+    EDGE_KEYS.forEach((edge) => {
+        if (!enabledEdges[edge]) return;
+        const parsed = Number.parseInt(rawCounts[edge], 10);
+        if (Number.isFinite(parsed) && parsed > 0) {
+            normalized[edge] = parsed;
+        }
+    });
+
+    return normalized;
+}
+
 function determineWarningLevel(diagnostics) {
     if (!diagnostics.valid) return 'critical';
     if (diagnostics.autoAdjusted) return 'warning';
     return 'none';
 }
 
-function buildNearestLengthSuggestion(requestedLength, doorSegments, sectionPins, mode, targetLength, edgeKey) {
+function buildNearestLengthSuggestion(requestedLength, doorSegments, sectionPins, mode, targetLength, edgeKey, sectionCount) {
     const maxDelta = 5000;
     const minRequestedLength = getEdgeRequestedMin(edgeKey);
 
@@ -438,7 +466,8 @@ function buildNearestLengthSuggestion(requestedLength, doorSegments, sectionPins
                 prioMode: mode,
                 targetLength,
                 doorSegments,
-                sectionPins
+                sectionPins,
+                sectionCount
             });
 
             if (solved.valid) {
@@ -450,7 +479,7 @@ function buildNearestLengthSuggestion(requestedLength, doorSegments, sectionPins
     return null;
 }
 
-function findDoorAdjustmentSuggestion(edgeKey, lengths, doorSegments, sectionPins, mode, targetLength) {
+function findDoorAdjustmentSuggestion(edgeKey, lengths, doorSegments, sectionPins, mode, targetLength, sectionCount) {
     for (const segment of doorSegments) {
         for (const candidateSize of DOOR_SIZES.filter((size) => size < segment.size)) {
             const updatedSegments = doorSegments.map((entry) =>
@@ -460,7 +489,8 @@ function findDoorAdjustmentSuggestion(edgeKey, lengths, doorSegments, sectionPin
                 prioMode: mode,
                 targetLength,
                 doorSegments: updatedSegments,
-                sectionPins
+                sectionPins,
+                sectionCount
             });
             if (solved.valid) {
                 return {
@@ -479,8 +509,41 @@ function findDoorAdjustmentSuggestion(edgeKey, lengths, doorSegments, sectionPin
     return null;
 }
 
-function buildEdgeWarningsAndSuggestions(edgeKey, lengths, doorSegments, sectionPins, diagnostics, mode, targetLength) {
+function buildNearestCountSuggestions(edgeKey, lengths, doorSegments, sectionPins, mode, targetLength, requestedCount) {
+    const suggestions = [];
+    const maxDelta = 10;
+
+    for (let delta = 1; delta <= maxDelta; delta += 1) {
+        for (const candidateCount of [requestedCount - delta, requestedCount + delta]) {
+            if (candidateCount < 1) continue;
+
+            const solved = solveEdge(lengths.solver, {
+                prioMode: mode,
+                targetLength,
+                doorSegments,
+                sectionPins,
+                sectionCount: candidateCount
+            });
+            if (solved.valid) {
+                suggestions.push({
+                    id: `suggestion-${edgeKey}-set-count-${candidateCount}`,
+                    type: 'setSectionCount',
+                    edge: edgeKey,
+                    value: candidateCount,
+                    priority: 'high',
+                    text: `Ändra antal sektioner på ${EDGE_LENGTH_LABEL[edgeKey]} till ${candidateCount} st.`
+                });
+                if (suggestions.length >= 2) return suggestions;
+            }
+        }
+    }
+
+    return suggestions;
+}
+
+function buildEdgeWarningsAndSuggestions(edgeKey, lengths, doorSegments, sectionPins, diagnostics, mode, targetLength, sectionCount) {
     const edgeRequestedLength = lengths.requested;
+    const hasSectionCount = Number.isFinite(sectionCount) && sectionCount > 0;
 
     const warnings = [];
     const suggestions = [];
@@ -488,9 +551,14 @@ function buildEdgeWarningsAndSuggestions(edgeKey, lengths, doorSegments, section
     const hasDoors = doorSegments.length > 0;
 
     if (!diagnostics.valid) {
-        const errorText = hasDoors && diagnostics.errorCode === 'NO_DOOR_COMBINATION'
-            ? `Ingen giltig kombination hittades för ${EDGE_LENGTH_LABEL[edgeKey]} med vald dörrstorlek.`
-            : `Ingen giltig sektionskombination hittades för ${EDGE_LENGTH_LABEL[edgeKey]}.`;
+        let errorText;
+        if (diagnostics.errorCode === 'WRONG_COUNT') {
+            errorText = `Kan inte fylla ${EDGE_LENGTH_LABEL[edgeKey]} med exakt ${sectionCount} sektioner.`;
+        } else if (hasDoors && diagnostics.errorCode === 'NO_DOOR_COMBINATION') {
+            errorText = `Ingen giltig kombination hittades för ${EDGE_LENGTH_LABEL[edgeKey]} med vald dörrstorlek.`;
+        } else {
+            errorText = `Ingen giltig sektionskombination hittades för ${EDGE_LENGTH_LABEL[edgeKey]}.`;
+        }
 
         warnings.push({
             id: `warning-${edgeKey}-${diagnostics.errorCode || 'invalid'}`,
@@ -500,7 +568,21 @@ function buildEdgeWarningsAndSuggestions(edgeKey, lengths, doorSegments, section
             text: errorText
         });
 
-        const nearestLength = buildNearestLengthSuggestion(edgeRequestedLength, doorSegments, sectionPins, mode, targetLength, edgeKey);
+        if (hasSectionCount && diagnostics.errorCode === 'WRONG_COUNT') {
+            const countSuggestions = buildNearestCountSuggestions(edgeKey, lengths, doorSegments, sectionPins, mode, targetLength, sectionCount);
+            suggestions.push(...countSuggestions);
+
+            // Also suggest removing the count constraint
+            suggestions.push({
+                id: `suggestion-${edgeKey}-clear-count`,
+                type: 'clearSectionCount',
+                edge: edgeKey,
+                priority: 'medium',
+                text: `Ta bort manuellt antal på ${EDGE_LENGTH_LABEL[edgeKey]} (låt beräknas automatiskt).`
+            });
+        }
+
+        const nearestLength = buildNearestLengthSuggestion(edgeRequestedLength, doorSegments, sectionPins, mode, targetLength, edgeKey, sectionCount);
         const dimensionKey = EDGE_TO_DIMENSION[edgeKey];
         if (Number.isFinite(nearestLength) && nearestLength !== edgeRequestedLength) {
             suggestions.push({
@@ -515,7 +597,7 @@ function buildEdgeWarningsAndSuggestions(edgeKey, lengths, doorSegments, section
         }
 
         if (hasDoors) {
-            const sizeSuggestion = findDoorAdjustmentSuggestion(edgeKey, lengths, doorSegments, sectionPins, mode, targetLength);
+            const sizeSuggestion = findDoorAdjustmentSuggestion(edgeKey, lengths, doorSegments, sectionPins, mode, targetLength, sectionCount);
             if (sizeSuggestion) {
                 suggestions.push(sizeSuggestion);
             }
@@ -623,11 +705,13 @@ export function computeLayout(config = {}) {
 
         const doorSegments = doorSegmentsByEdge[edgeKey] || [];
         const sectionPins = manualSectionsByEdge[edgeKey] || [];
+        const edgeSectionCount = sectionCountByEdge[edgeKey];
         const edgeResult = solveEdge(lengths.solver, {
             prioMode,
             targetLength,
             doorSegments,
-            sectionPins
+            sectionPins,
+            sectionCount: edgeSectionCount
         });
 
         const diagnostics = {
@@ -645,7 +729,8 @@ export function computeLayout(config = {}) {
             sectionPins,
             diagnostics,
             prioMode,
-            targetLength
+            targetLength,
+            edgeSectionCount
         );
 
         return {
@@ -694,6 +779,7 @@ export function computeLayout(config = {}) {
         enabledEdges
     );
     const manualSectionsByEdge = normalizeManualSectionsByEdge(config.manualSectionsByEdge, doorSegmentsByEdge);
+    const sectionCountByEdge = normalizeSectionCountByEdge(config.sectionCountByEdge, enabledEdges);
 
     const left = solveNamedEdge('left', { requested: edges.left.requestedLength, effective: edges.left.effectiveLength, solver: edges.left.solverLength }, edges.left.enabled);
     const right = solveNamedEdge('right', { requested: edges.right.requestedLength, effective: edges.right.effectiveLength, solver: edges.right.solverLength }, edges.right.enabled);
@@ -737,7 +823,8 @@ export function computeLayout(config = {}) {
             manualSectionsByEdge[edgeKey] || [],
             edgeDiagnostics[edgeKey],
             prioMode,
-            targetLength
+            targetLength,
+            sectionCountByEdge[edgeKey]
         );
 
         layoutWarnings.push(...info.warnings);
@@ -748,13 +835,22 @@ export function computeLayout(config = {}) {
     const allSections = [...leftEdge, ...rightEdge, ...frontEdge, ...backEdge];
     const doorCount = allSections.filter((section) => String(section).includes(DOOR_LABEL)).length;
     const slimlineCount = doorCount;
-    const stodbenCount = includeBack ? 0 : 2;
+
+    // Stödben are needed at open (free-standing) side ends, not unconditionally.
+    // If includeBack → fully enclosed, no stödben.
+    // Otherwise, count sides that have no depth (open ends).
+    let stodbenCount = 0;
+    if (!includeBack && allSections.length > 0) {
+        if (depthLeft <= 0) stodbenCount += 1;
+        if (depthRight <= 0) stodbenCount += 1;
+    }
 
     const counts = {};
     let totalGlassLength = 0;
     allSections.forEach((section) => {
         counts[section] = (counts[section] || 0) + 1;
-        if (typeof section === 'number') totalGlassLength += section;
+        const parsed = parseSection(section);
+        totalGlassLength += parsed.length;
     });
 
     return {
@@ -784,6 +880,7 @@ export function computeLayout(config = {}) {
         targetLength,
         doorSegmentsByEdge,
         manualSectionsByEdge,
+        sectionCountByEdge,
         leftEdge,
         rightEdge,
         frontEdge,

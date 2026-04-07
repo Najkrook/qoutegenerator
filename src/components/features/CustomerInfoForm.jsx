@@ -1,4 +1,4 @@
-﻿import React from 'react';
+import React from 'react';
 import { useQuote } from '../../store/QuoteContext';
 
 export function CustomerInfoForm() {
@@ -78,6 +78,15 @@ export function CustomerInfoForm() {
                         className="bg-black/20 border border-panel-border rounded-md px-3 py-2 text-sm focus:border-primary outline-none transition-colors"
                     />
                 </div>
+            </div>
+            <div className="mt-6 flex flex-col gap-1.5">
+                <label className="text-xs font-semibold uppercase text-text-secondary tracking-wider">Extra noteringar (visas på PDF)</label>
+                <textarea
+                    value={customerInfo.extraNotes || ''}
+                    onChange={(e) => handleChange('extraNotes', e.target.value)}
+                    placeholder='T.ex. "Gäller lagerparasoller"'
+                    className="bg-black/20 border border-panel-border rounded-md px-3 py-2 text-sm focus:border-primary outline-none transition-colors min-h-[80px] resize-y"
+                />
             </div>
         </div>
     );

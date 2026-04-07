@@ -179,6 +179,20 @@ function normalizeManualSectionsByEdge(rawManualSectionsByEdge, doorSegmentsByEd
     return normalized;
 }
 
+function normalizeSectionCountByEdge(rawCounts) {
+    const normalized = {};
+    if (!rawCounts || typeof rawCounts !== 'object') return normalized;
+
+    EDGE_KEYS.forEach((edge) => {
+        const parsed = Number.parseInt(rawCounts[edge], 10);
+        if (Number.isFinite(parsed) && parsed > 0) {
+            normalized[edge] = parsed;
+        }
+    });
+
+    return normalized;
+}
+
 function normalizeParasol(parasol) {
     if (!parasol) return parasol;
 
@@ -224,6 +238,7 @@ function sanitizeConfig(config) {
 
     next.doorSegmentsByEdge = normalizeDoorSegmentsByEdge(next, next.includeBack, hasLeftDepth, hasRightDepth);
     next.manualSectionsByEdge = normalizeManualSectionsByEdge(config.manualSectionsByEdge, next.doorSegmentsByEdge);
+    next.sectionCountByEdge = normalizeSectionCountByEdge(config.sectionCountByEdge);
     delete next.doorEdges;
     delete next.doorSizeByEdge;
     next.activeMode = config.activeMode || 'clickitup';
@@ -277,6 +292,7 @@ function createDefaultSketchConfig() {
         targetLength: 1500,
         doorSegmentsByEdge: {},
         manualSectionsByEdge: {},
+        sectionCountByEdge: {},
         activeMode: 'clickitup',
         parasols: [],
         selectedParasolId: null,
@@ -482,6 +498,21 @@ export function SketchTool({ onBack }) {
         setWorkspace(cloneWorkspace(initialWorkspaceRef.current));
     }, []);
 
+    const setSectionCount = useCallback((edgeKey, count) => {
+        updateConfig({
+            sectionCountByEdge: {
+                ...config.sectionCountByEdge,
+                [edgeKey]: count
+            }
+        });
+    }, [config.sectionCountByEdge, updateConfig]);
+
+    const clearSectionCount = useCallback((edgeKey) => {
+        const next = { ...config.sectionCountByEdge };
+        delete next[edgeKey];
+        updateConfig({ sectionCountByEdge: next });
+    }, [config.sectionCountByEdge, updateConfig]);
+
     const applySuggestion = useCallback(
         (suggestionId) => {
             const suggestion = (layout.suggestions || []).find((entry) => entry.id === suggestionId);
@@ -503,6 +534,10 @@ export function SketchTool({ onBack }) {
                                 : { depth: suggestion.value };
                 }
                 updateConfig(nextDimensionUpdate);
+            } else if (suggestion.type === 'setSectionCount') {
+                setSectionCount(suggestion.edge, suggestion.value);
+            } else if (suggestion.type === 'clearSectionCount') {
+                clearSectionCount(suggestion.edge);
             }
 
             setWorkspace((prev) => ({
@@ -512,7 +547,7 @@ export function SketchTool({ onBack }) {
 
             toast.success('Förslag applicerat.');
         },
-        [config.equalDepth, layout.suggestions, resetDoorSegment, setDoorSegmentSize, updateConfig]
+        [clearSectionCount, config.equalDepth, layout.suggestions, resetDoorSegment, setDoorSegmentSize, setSectionCount, updateConfig]
     );
 
     const parasolWarnings = useMemo(
@@ -970,6 +1005,8 @@ export function SketchTool({ onBack }) {
                         onDeleteParasol={handleDeleteParasol}
                         onRotateParasol={handleRotateParasol}
                         onDeleteFiesta={handleDeleteFiesta}
+                        onSetSectionCount={setSectionCount}
+                        onClearSectionCount={clearSectionCount}
                     />
 
                     <div className="bg-panel-bg border border-panel-border rounded-xl p-5">

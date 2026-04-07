@@ -178,7 +178,8 @@ function createBaseInitialState() {
             reference: '',
             customerReference: '',
             date: '',
-            validity: '30 dagar'
+            validity: '30 dagar',
+            extraNotes: ''
         },
         inventoryData: { bahama: [], clickitup: {} },
         cloudInventoryData: { bahama: [], clickitup: {} },
@@ -244,7 +245,8 @@ function migrateV0ToV1(rawState = {}) {
             reference: String(customerInfo.reference || ''),
             customerReference: String(customerInfo.customerReference || ''),
             date: String(customerInfo.date || ''),
-            validity: String(customerInfo.validity || formatValidityLabel(normalizePositiveInt(next.quoteValidityDays, validityFromCustomer || 30)))
+            validity: String(customerInfo.validity || formatValidityLabel(normalizePositiveInt(next.quoteValidityDays, validityFromCustomer || 30))),
+            extraNotes: String(customerInfo.extraNotes || '')
         },
         inventoryData,
         cloudInventoryData,
@@ -354,7 +356,8 @@ export function hydrateQuoteState(input) {
             reference: String(customerInfoSource.reference || ''),
             customerReference: String(customerInfoSource.customerReference || ''),
             date: String(customerInfoSource.date || ''),
-            validity: formatValidityLabel(normalizedValidityDays)
+            validity: formatValidityLabel(normalizedValidityDays),
+            extraNotes: String(customerInfoSource.extraNotes || '')
         },
         inventoryData,
         cloudInventoryData,

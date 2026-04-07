@@ -10,6 +10,7 @@ import {
     drawTermsPageHeader,
     normalizePositiveInt,
     renderCustomerInfoBlock,
+    renderExtraNotesBlock,
     renderFooters,
     renderGroupedTables,
     renderSignatureBlock,
@@ -106,6 +107,15 @@ export function generatePDF(state, summaryData, returnBlob = false) {
             formatSEK,
             shouldRenderPaymentBox,
             drawMainHeader,
+            layout: PDF_LAYOUT
+        });
+
+        finalY = renderExtraNotesBlock(doc, {
+            customerInfo,
+            pageWidth,
+            pageHeight,
+            drawMainHeader,
+            currentY: finalY + 12,
             layout: PDF_LAYOUT
         });
 
