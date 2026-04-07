@@ -35,10 +35,10 @@ function getEdgeRequestedMin(edgeKey) {
 
 export function computeEdgeRequestedLength(edgeKey, config) {
     switch (edgeKey) {
-        case 'front': return normalizeNumber(config.width, { fallback: 4000, min: MIN_DIMENSION_MM, max: 20000 });
-        case 'back': return normalizeNumber(config.width, { fallback: 4000, min: MIN_DIMENSION_MM, max: 20000 });
-        case 'left': return normalizeNumber(config.depthLeft ?? config.depth, { fallback: 3000, min: 0, max: 10000 });
-        case 'right': return normalizeNumber(config.depthRight ?? config.depth, { fallback: 3000, min: 0, max: 10000 });
+        case 'front': return normalizeNumber(config.width, { fallback: 4000, min: MIN_DIMENSION_MM, max: 50000 });
+        case 'back': return normalizeNumber(config.width, { fallback: 4000, min: MIN_DIMENSION_MM, max: 50000 });
+        case 'left': return normalizeNumber(config.depthLeft ?? config.depth, { fallback: 3000, min: 0, max: 50000 });
+        case 'right': return normalizeNumber(config.depthRight ?? config.depth, { fallback: 3000, min: 0, max: 50000 });
         default: return 0;
     }
 }
