@@ -13,6 +13,17 @@ function createCustomAddonRow(globalDiscountPct) {
     };
 }
 
+function createCustomItemRow(globalDiscountPct) {
+    return {
+        id: `custom_item_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+        name: '',
+        size: '',
+        price: 0,
+        qty: 1,
+        discountPct: globalDiscountPct
+    };
+}
+
 function getCategoryId(category, index) {
     return String(category?.id || category?.categoryId || `category_${index}`);
 }
@@ -30,6 +41,33 @@ export function GridConfig({ lineId }) {
     const updateGrid = (updates) => {
         const newSelections = { ...gridSelections, [lineId]: { ...selections, ...updates } };
         dispatch({ type: 'SET_GRID_SELECTIONS', payload: newSelections });
+    };
+
+    const addCustomItem = () => {
+        const existingRows = selections.customItems || [];
+        updateGrid({
+            customItems: [...existingRows, createCustomItemRow(globalDiscountPct)]
+        });
+    };
+
+    const updateCustomItem = (rowId, updates) => {
+        const existingRows = selections.customItems || [];
+        updateGrid({
+            customItems: existingRows.map((row) => (
+                row.id === rowId ? { ...row, ...updates } : row
+            ))
+        });
+    };
+
+    const removeCustomItem = (rowId) => {
+        const existingRows = selections.customItems || [];
+        updateGrid({
+            customItems: existingRows.filter((row) => row.id !== rowId)
+        });
+    };
+
+    const setCustomItemQty = (rowId, qty) => {
+        updateCustomItem(rowId, { qty: Math.max(0, qty) });
     };
 
     const addCustomAddon = (categoryId) => {
@@ -129,6 +167,9 @@ export function GridConfig({ lineId }) {
             const price = group?.sizes.find(s => s.size === size)?.price || 0;
             total += price * val.qty;
         });
+        (selections.customItems || []).forEach((row) => {
+            total += (Number(row?.price) || 0) * (Number(row?.qty) || 0);
+        });
         Object.entries(effectiveSelections.addons).forEach(([id, val]) => {
             let price = 0;
             lineData.addonCategories.forEach(cat => {
@@ -153,16 +194,19 @@ export function GridConfig({ lineId }) {
             const price = group?.sizes.find(s => s.size === size)?.price || 0;
             total += price * val.qty;
         });
+        (selections.customItems || []).forEach((row) => {
+            total += (Number(row?.price) || 0) * (Number(row?.qty) || 0);
+        });
         return total;
     };
 
     const itemsSubtotal = getItemsSubtotal();
-    const itemsQtyTotal = effectiveSelections.itemsQtyTotal;
+    const itemsQtyTotal = effectiveSelections.itemsQtyTotal + (selections.customItems || []).reduce((acc, row) => acc + (Number(row.qty) || 0), 0);
 
     return (
         <div className="bg-panel-bg border border-panel-border rounded-lg p-6 mb-8 bg-black/5 animate-fade-in">
             <h3 className="text-lg font-semibold mb-2">Grid View: {lineData.name}</h3>
-            <p className="text-sm text-text-secondary mb-6 italic">Fyll i antal f\u00F6r de artiklar som ska ing\u00E5 i offerten.</p>
+            <p className="text-sm text-text-secondary mb-6 italic">Fyll i antal för de artiklar som ska ingå i offerten.</p>
 
             <div className="overflow-x-auto">
                 <table className="w-full text-left border-collapse min-w-[800px]">
@@ -222,6 +266,95 @@ export function GridConfig({ lineId }) {
                                 })}
                             </React.Fragment>
                         ))}
+
+                        {/* Custom Items */}
+                        {(selections.customItems || []).map((row) => {
+                            const qty = Number(row.qty) || 0;
+                            const price = Number(row.price) || 0;
+                            const total = price * qty;
+                            return (
+                                <tr key={row.id} className="bg-white/[0.025] hover:bg-white/[0.04] transition-colors">
+                                    <td className="p-3">
+                                        <div className="flex items-center gap-2">
+                                            <input
+                                                type="text"
+                                                value={row.name}
+                                                onChange={(e) => updateCustomItem(row.id, { name: e.target.value })}
+                                                placeholder="Egen modell"
+                                                className="w-full bg-black/20 border border-panel-border text-text-primary rounded p-2 text-sm outline-none focus:border-primary"
+                                            />
+                                            <button
+                                                type="button"
+                                                onClick={() => removeCustomItem(row.id)}
+                                                className="h-9 w-9 shrink-0 rounded border border-danger/30 bg-danger/10 text-danger hover:bg-danger/20 transition-colors"
+                                                aria-label="Ta bort egen rad"
+                                            >
+                                                ×
+                                            </button>
+                                        </div>
+                                    </td>
+                                    <td className="p-3">
+                                        <input
+                                            type="text"
+                                            value={row.size}
+                                            onChange={(e) => updateCustomItem(row.id, { size: e.target.value })}
+                                            placeholder="Storlek"
+                                            className="w-full bg-black/20 border border-panel-border text-text-primary rounded p-2 text-sm outline-none focus:border-primary"
+                                        />
+                                    </td>
+                                    <td className="p-3">
+                                        <input
+                                            type="number"
+                                            min="0"
+                                            value={price}
+                                            onChange={(e) => updateCustomItem(row.id, { price: parseFloat(e.target.value) || 0 })}
+                                            className="w-full bg-black/20 border border-panel-border text-text-primary rounded p-2 text-sm text-right outline-none focus:border-primary"
+                                        />
+                                    </td>
+                                    <td className="p-3">
+                                        <div className="flex items-center justify-center gap-2">
+                                            <button
+                                                onClick={() => setCustomItemQty(row.id, qty - 6)}
+                                                className="bg-panel-bg border border-panel-border text-text-primary px-1.5 py-1 rounded text-[10px] hover:bg-panel-border cursor-pointer"
+                                            >-6</button>
+                                            <button
+                                                onClick={() => setCustomItemQty(row.id, qty - 1)}
+                                                className="bg-panel-bg border border-panel-border text-text-primary px-2 py-1 rounded text-xs hover:bg-panel-border cursor-pointer"
+                                            >-</button>
+                                            <input
+                                                type="number"
+                                                min="0"
+                                                value={qty}
+                                                onChange={(e) => setCustomItemQty(row.id, parseInt(e.target.value, 10) || 0)}
+                                                className={`w-12 text-center font-bold bg-black/20 border border-panel-border rounded p-1 text-sm outline-none focus:border-primary ${qty > 0 ? 'text-primary' : ''}`}
+                                            />
+                                            <button
+                                                onClick={() => setCustomItemQty(row.id, qty + 1)}
+                                                className="bg-panel-bg border border-panel-border text-text-primary px-2 py-1 rounded text-xs hover:bg-panel-border cursor-pointer"
+                                            >+</button>
+                                            <button
+                                                onClick={() => setCustomItemQty(row.id, qty + 6)}
+                                                className="bg-panel-bg border border-panel-border text-text-primary px-1.5 py-1 rounded text-[10px] hover:bg-panel-border cursor-pointer"
+                                            >+6</button>
+                                        </div>
+                                    </td>
+                                    <td className="p-3 text-sm text-right font-semibold">
+                                        {total > 0 ? `${total.toLocaleString('sv-SE')} SEK` : ''}
+                                    </td>
+                                </tr>
+                            );
+                        })}
+                        <tr className="bg-white/[0.02]">
+                            <td colSpan="5" className="p-0 border-b border-panel-border">
+                                <button
+                                    type="button"
+                                    onClick={() => addCustomItem()}
+                                    className="w-full px-6 py-3 text-left text-sm font-medium text-primary hover:bg-white/[0.04] transition-colors"
+                                >
+                                    + Lägg till egen sektion
+                                </button>
+                            </td>
+                        </tr>
 
                         <tr className="bg-white/[0.035] border-y border-panel-border">
                             <td colSpan="3" className="px-4 py-4 pl-5 text-sm font-semibold uppercase tracking-[0.08em] text-text-secondary">

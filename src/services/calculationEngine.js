@@ -359,6 +359,41 @@ export function computeQuoteTotals({ state, catalogData }) {
             });
         }
 
+        const customItems = Array.isArray(gridState.customItems) ? gridState.customItems : [];
+        customItems.forEach((row, rowIndex) => {
+            const unitPrice = getUnitSekPrice(toFloat(row?.price || 0), line, safeCatalog, exchangeRate);
+            const qty = toInt(row?.qty, 0);
+            if (qty <= 0) return;
+            const gross = unitPrice * qty;
+            const discountPct = toFloat(row?.discountPct || 0);
+            const discountSek = gross * (discountPct / 100);
+            const net = gross - discountSek;
+            const formattedSize = formatSizeDisplay(row?.size);
+            const sizeMeta = parseSortableSize(formattedSize);
+
+            grossTotalSek += gross;
+            totalDiscountSek += discountSek;
+
+            totals.push({
+                model: String(row?.name || '').trim() || 'Egen sektion',
+                size: formattedSize,
+                unitPrice,
+                qty,
+                gross,
+                discountPct,
+                discountSek,
+                net,
+                isAddon: false,
+                source: { type: 'grid-custom-item', lineId: line, rowId: String(row?.id || `custom_item_${rowIndex}`) },
+                line: line || 'Övrigt',
+                sortModel: String(row?.name || '').trim() || 'Egen sektion',
+                sortSizeRaw: row?.size || formattedSize,
+                sortKind: sizeMeta.sortKind,
+                sortDimensions: sizeMeta.sortDimensions,
+                originalIndex: originalIndex++
+            });
+        });
+
         const customAddonsByCategory = gridState.customAddonsByCategory || {};
         const seenCategoryIds = new Set();
 

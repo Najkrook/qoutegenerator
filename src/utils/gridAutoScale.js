@@ -169,3 +169,21 @@ export function applyGlobalDiscountToGridCustomAddons(lineSelection = {}, previo
         customAddonsByCategory: nextCustomAddonsByCategory
     };
 }
+
+export function applyGlobalDiscountToGridCustomItems(lineSelection = {}, previousGlobalDiscount = 0, nextGlobalDiscount = 0) {
+    const previousDiscount = normalizeDiscountPct(previousGlobalDiscount);
+    const nextDiscount = normalizeDiscountPct(nextGlobalDiscount);
+    const customItems = Array.isArray(lineSelection.customItems) ? lineSelection.customItems : [];
+
+    const nextCustomItems = customItems.map((row) => {
+        const currentDiscount = normalizeDiscountPct(row?.discountPct);
+        return nearlyEqual(currentDiscount, previousDiscount)
+            ? { ...row, discountPct: nextDiscount }
+            : row;
+    });
+
+    return {
+        ...lineSelection,
+        customItems: nextCustomItems
+    };
+}
