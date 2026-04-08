@@ -23,8 +23,10 @@ function getCatalogAddonMap(lineData = {}) {
     return addonMap;
 }
 
-export function getGridItemsQtyTotal(items = {}) {
-    return Object.values(items).reduce((sum, entry) => sum + normalizeNonNegativeInt(entry?.qty), 0);
+export function getGridItemsQtyTotal(selections = {}) {
+    const itemsTotal = Object.values(selections.items || {}).reduce((sum, entry) => sum + normalizeNonNegativeInt(entry?.qty), 0);
+    const customItemsTotal = (selections.customItems || []).reduce((sum, entry) => sum + normalizeNonNegativeInt(entry?.qty), 0);
+    return itemsTotal + customItemsTotal;
 }
 
 export function getGridAddonSyncMode({ addonDef, addonState }) {
@@ -72,7 +74,7 @@ export function getEffectiveGridAddonDiscountPct({ addonDef, addonState, globalD
 export function buildEffectiveGridSelections(lineData = {}, selections = {}, options = {}) {
     const items = selections.items || {};
     const persistedAddons = selections.addons || {};
-    const itemsQtyTotal = getGridItemsQtyTotal(items);
+    const itemsQtyTotal = getGridItemsQtyTotal(selections);
     const catalogAddonMap = getCatalogAddonMap(lineData);
     const addons = {};
     const globalDiscountPct = normalizeDiscountPct(options.globalDiscountPct);

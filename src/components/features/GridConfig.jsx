@@ -201,7 +201,7 @@ export function GridConfig({ lineId }) {
     };
 
     const itemsSubtotal = getItemsSubtotal();
-    const itemsQtyTotal = effectiveSelections.itemsQtyTotal + (selections.customItems || []).reduce((acc, row) => acc + (Number(row.qty) || 0), 0);
+    const itemsQtyTotal = effectiveSelections.itemsQtyTotal;
 
     return (
         <div className="bg-panel-bg border border-panel-border rounded-lg p-6 mb-8 bg-black/5 animate-fade-in">
