@@ -56,7 +56,7 @@ export function Header() {
                     <h1 className="text-2xl font-semibold m-0">Brixx portal</h1>
                 </div>
 
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-3 flex-wrap">
                     {canAccessQuoteHistory && (
                         <button 
                             type="button" 

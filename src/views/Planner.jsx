@@ -201,9 +201,9 @@ export function Planner({ onBack }) {
     const totalCount = projects.length;
 
     return (
-        <div className="flex animate-slide-in h-full w-full min-h-[800px] -m-8">
+        <div className="flex flex-col md:flex-row animate-slide-in h-full w-full min-h-[800px] -m-8">
             {/* Sidebar */}
-            <div className="w-64 border-r border-panel-border bg-bg p-6 flex flex-col gap-4 overflow-y-auto">
+            <div className="w-full md:w-64 border-b md:border-r md:border-b-0 border-panel-border bg-bg p-6 flex flex-col gap-4 overflow-y-auto shrink-0">
                 <button
                     onClick={onBack}
                     className="w-full bg-panel-bg border border-panel-border text-text-primary text-sm font-medium px-4 py-2 rounded-lg cursor-pointer hover:bg-panel-border transition-all mb-4"
