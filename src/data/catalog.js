@@ -103,13 +103,13 @@ export const catalogData = withBuilderAddonCategoryIds({
                     {
                         name: "Classic Light",
                         items: [
-                            { id: "classic_light", name: "4 Lampor längs centrumstativet", price: 640 }
+                            { id: "classic_light", name: "4 LED Lampor längs centrumstativet", price: 640 }
                         ]
                     },
                     {
                         name: "Magic Light",
                         items: [
-                            { id: "magic_light", name: "Med 8 RGBW led-strips integrerade i armarna", price: 1400 }
+                            { id: "magic_light", name: "8 RGBW LED-strips integrerade i armarna", price: 1400 }
                         ]
                     },
                     {
@@ -276,14 +276,14 @@ export const catalogData = withBuilderAddonCategoryIds({
                     {
                         name: "Classic Light",
                         items: [
-                            { id: "xl_classic_light_4", name: "4 Lampor längs centrumstativet", price: 720 },
-                            { id: "xl_classic_light_6", name: "6 Lampor längs centrumstativet", price: 910 }
+                            { id: "xl_classic_light_4", name: "4 LED Lampor längs centrumstativet", price: 720 },
+                            { id: "xl_classic_light_6", name: "6 LED Lampor längs centrumstativet", price: 910 }
                         ]
                     },
                     {
                         name: "Magic Light",
                         items: [
-                            { id: "xl_magic_light", name: "Med 8 RGBW led-strips integrerade i armarna", price: 1690 }
+                            { id: "xl_magic_light", name: "8 RGBW LED-strips integrerade i armarna", price: 1690 }
                         ]
                     },
                     {
@@ -557,6 +557,19 @@ export const catalogData = withBuilderAddonCategoryIds({
                     { id: "startkostnad_special", name: "Startkostnad specialmått (närmast större sektionsstorlek + en startkostnad)", price: 3000 },
                     { id: "startkostnad_ral", name: "Startkostnad RAL-lack (antal RAL + en startkostnad)", price: 4900 },
                     { id: "ral_blomsterlador", name: "RAL (antal blomsterlådor)", price: 340 }
+                ]
+            },
+            {
+                id: "stickfotter",
+                name: "Stickfötter",
+                items: [
+                    { id: "stickfot_std_singel", name: "Stickfot Standard Singel", price: 222 },
+                    { id: "stickfot_std_dubbel", name: "Stickfot Standard Dubbel", price: 349 },
+                    { id: "stickfot_std_kapad", name: "Stickfot Standard Kapad", price: 295 },
+                    { id: "stickfot_plus30_singel", name: "Stickfot +30 Singel", price: 251 },
+                    { id: "stickfot_plus30_dubbel", name: "Stickfot +30 Dubbel", price: 412 },
+                    { id: "stickfot_plus60_singel", name: "Stickfot +60 Singel", price: 263 },
+                    { id: "stickfot_plus60_dubbel", name: "Stickfot +60 Dubbel", price: 414 }
                 ]
             }
         ]
