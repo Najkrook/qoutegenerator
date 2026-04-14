@@ -587,7 +587,7 @@ export const catalogData = withBuilderAddonCategoryIds({
                 addons: [
                     { id: "fiesta_foderrör", name: "Rostfritt Foderrör + Markplatta", price: 2815 },
                     { id: "fiesta_passram", name: "Passram + Däxel", price: 3406 },
-                    { id: "fiesta_tipphylsa", name: "Tipphylsa", price: 2920 }
+                    { id: "fiesta_tipphylsa", name: "Tipphylsa", price: 3260 }
                 ]
             },
             "Vent-Twist": {
@@ -598,7 +598,7 @@ export const catalogData = withBuilderAddonCategoryIds({
                 addons: [
                     { id: "fiesta_foderrör", name: "Rostfritt Foderrör + Markplatta", price: 2815 },
                     { id: "fiesta_passram", name: "Passram + Däxel", price: 3406 },
-                    { id: "fiesta_tipphylsa", name: "Tipphylsa", price: 2920 }
+                    { id: "fiesta_tipphylsa", name: "Tipphylsa", price: 3260 }
                 ]
             }
         }

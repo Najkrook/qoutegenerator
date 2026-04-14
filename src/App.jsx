@@ -1,5 +1,6 @@
 import React, { Suspense, lazy, useEffect, useState } from 'react';
 import { Header } from './components/layout/Header';
+import { ErrorBoundary } from './components/layout/ErrorBoundary';
 import { Dashboard } from './views/Dashboard';
 import { ProductLineSelection } from './views/ProductLineSelection';
 import { Configuration } from './views/Configuration';
@@ -63,9 +64,10 @@ function App() {
     return (
         <div className="min-h-screen bg-bg text-text-primary p-4 md:p-8 font-sans antialiased">
             <div className={`${step === 4 ? 'max-w-[1920px]' : 'max-w-[1400px]'} mx-auto relative`}>
-                <Header currentStep={step} />
+                <ErrorBoundary>
+                    <Header currentStep={step} />
 
-                <main>
+                    <main>
                     <Suspense fallback={<ViewLoader />}>
                     {step === 0 && (
                         <Dashboard
@@ -160,6 +162,7 @@ function App() {
                     {canViewEverything && step === 'retailers' && <RetailerManager onBack={() => setStep(0)} />}
                     </Suspense>
                 </main>
+                </ErrorBoundary>
             </div>
         </div>
     );
