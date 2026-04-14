@@ -1,4 +1,4 @@
-const STANDARD_TERMS_BODY = `OFFERT OCH PRISER
+﻿const STANDARD_TERMS_BODY = `OFFERT OCH PRISER
 - Samtliga priser i offerten anges i SEK exklusive moms om inget annat uttryckligen anges.
 - Offerten gäller under den giltighetstid som anges i offerten. Därefter förbehåller sig BRIXX rätten att justera pris och leveransvillkor.
 

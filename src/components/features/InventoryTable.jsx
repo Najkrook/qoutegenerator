@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 
 function getGrenstallPrefix(id) {
-    if (!id || id === '-') return 'Övrigt';
+    if (!id || id === '-') return '\u00D6vrigt';
     const upperId = id.toUpperCase();
 
     if (id.includes('.')) {
@@ -16,7 +16,7 @@ function getGrenstallPrefix(id) {
         if (upperId === 'BLACK' || upperId.startsWith('B')) return 'Black';
         if (['3', '4', '5', '6'].includes(id)) return id;
     }
-    return 'Övrigt';
+    return '\u00D6vrigt';
 }
 
 function getRowStatus(kommentar) {
@@ -34,9 +34,6 @@ function normalizeSizeValue(size) {
 function isUnknownSizeValue(size) {
     const normalized = normalizeSizeValue(size)
         .toLowerCase()
-        .replaceAll('ã¤', 'ä')
-        .replaceAll('ã¶', 'ö')
-        .replaceAll('ã¥', 'å')
         .normalize('NFD')
         .replace(/[\u0300-\u036f]/g, '');
 

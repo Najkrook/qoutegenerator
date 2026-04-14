@@ -8,6 +8,7 @@ import { InventoryItemModal } from '../components/features/InventoryItemModal';
 import { PendingChangesPanel } from '../components/features/PendingChangesPanel';
 import * as XLSX from 'xlsx';
 import toast from 'react-hot-toast';
+import { normalizeInventoryItem, normalizeInventoryText } from '../utils/csvNormalizer';
 
 export function InventoryManager({ onBack }) {
     const { state, dispatch } = useQuote();
@@ -83,11 +84,11 @@ export function InventoryManager({ onBack }) {
                 }
 
                 if (headerIdx === -1) {
-                    toast.error("Kunde inte hitta kolumnen 'BESKRIVNING'. Kontrollera att det är rätt lagersaldo-fil.");
+                    toast.error("Kunde inte hitta kolumnen 'BESKRIVNING'. Kontrollera att det \u00E4r r\u00E4tt lagersaldo-fil.");
                     return;
                 }
 
-                const headers = jsonArr[headerIdx];
+                const headers = jsonArr[headerIdx].map(h => typeof h === 'string' ? normalizeInventoryText(h.trim()) : h);
                 const inventory = [];
 
                 for (let i = headerIdx + 1; i < jsonArr.length; i++) {
@@ -98,12 +99,14 @@ export function InventoryManager({ onBack }) {
                     headers.forEach((h, colIdx) => {
                         if (h && typeof h === 'string') {
                             const val = row[colIdx];
-                            item[h.trim()] = val;
+                            item[h] = val;
                             if (val !== undefined && val !== "") hasData = true;
                         }
                     });
-                    if (hasData && item['BESKRIVNING']) {
-                        inventory.push(item);
+                    
+                    const cleanItem = normalizeInventoryItem(item);
+                    if (hasData && cleanItem['BESKRIVNING']) {
+                        inventory.push(cleanItem);
                     }
                 }
 
@@ -112,7 +115,7 @@ export function InventoryManager({ onBack }) {
                 toast.success(`Lagersaldo inläst: ${inventory.length} artiklar. Klicka "Spara ändringar" för att synkronisera.`);
             } catch (err) {
                 console.error(err);
-                toast.error("Fel vid inläsning: " + err.message);
+                toast.error("Fel vid inl\u00E4sning: " + err.message);
             }
         };
         reader.readAsArrayBuffer(file);
@@ -278,7 +281,7 @@ export function InventoryManager({ onBack }) {
                     onClick={onBack}
                     className="px-5 py-2.5 border border-panel-border bg-panel-bg text-text-primary rounded-lg cursor-pointer hover:bg-white/5 transition-colors"
                 >
-                    ← Tillbaka
+                    &larr; Tillbaka
                 </button>
             </div>
 

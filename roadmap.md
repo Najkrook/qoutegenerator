@@ -17,21 +17,21 @@ This roadmap focuses on improving reliability, internal usability, and sales wor
 
 ## Phase 1: Foundations
 
-### 1. Mojibake / Encoding Cleanup
+### [x] 1. Mojibake / Encoding Cleanup
 Audit and fix corrupted Swedish text in the core views and services first, starting with the highest-traffic quote and admin surfaces. Normalize file encodings, tighten text-handling guardrails in the main quote/admin flows, and expand text-integrity coverage where the current tests are too narrow. Add a lightweight verification checklist for future copy changes so encoding regressions are harder to reintroduce during routine edits.
 
 Success signals:
 - No visible mojibake remains in dashboard, planner, inventory, sketch, or summary/save paths.
 - Text-related regressions become easier to catch before merge.
 
-### 2. Error Boundaries and Runtime Safety
+### [x] 2. Error Boundaries and Runtime Safety
 Add a top-level React error boundary around the main content area in `App.jsx` so that unhandled errors in any view produce a recoverable fallback UI rather than a white screen crash. Users currently have no recovery path short of manually clearing localStorage. The fallback should offer a "reset and return to dashboard" action. This is a small investment that prevents the worst possible UX failure across every view in the app.
 
 Success signals:
 - Runtime errors in any view never produce an unrecoverable white screen.
 - Users can self-recover from unexpected state without external help.
 
-### 3. Dead Code and Dev Artifact Removal
+### [x] 3. Dead Code and Dev Artifact Removal
 Remove leftover development artifacts that pose real operational risk. The Planner view currently includes a live "Generera Test-data" button that writes dummy records to the production Firestore database, plus a commented-out old delete handler. These should be cleaned up before any Phase 2 workflow work touches the Planner.
 
 Success signals:
@@ -107,7 +107,7 @@ Success signals:
 - Internal users trust the default output quality more often.
 
 ### 3. Dashboard Analytics
-Add at-a-glance operational visibility to the admin dashboard. The data already exists in Firestore — surface it as summary cards and simple charts covering quote pipeline by status (draft/sent/won/lost), total SEK in pipeline, quotes created this week/month, and retailer activity. The goal is to make the dashboard useful for daily decision-making rather than just a navigation hub.
+Add at-a-glance operational visibility to the admin dashboard. The data already exists in Firestore - surface it as summary cards and simple charts covering quote pipeline by status (draft/sent/won/lost), total SEK in pipeline, quotes created this week/month, and retailer activity. The goal is to make the dashboard useful for daily decision-making rather than just a navigation hub.
 
 Success signals:
 - Admins can see pipeline health without opening individual quotes.

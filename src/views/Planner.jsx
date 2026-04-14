@@ -154,48 +154,13 @@ export function Planner({ onBack }) {
         setToastMessage(null);
     };
 
-    /* old delete
-    const handleDeleteOld = async (project) => {
-        if (!collectionPath) return;
-        setProjects((prev) => prev.filter((p) => p.id !== project.id));
-        try {
-            await deleteDoc(doc(db, collectionPath, project.id));
-        } catch (err) {
-            console.error('Failed to delete project:', err);
-            setProjects((prev) => [...prev, project].sort((a, b) => b.createdAt - a.createdAt));
-        }
-    };
-    */
+
 
     const handleKeyDown = (e) => {
         if (e.key === 'Enter' && !saving) handleAdd();
     };
     
-    // Testing dummy: Generate tasks for 2 weeks ago
-    const generateDummyData = async () => {
-        setSaving(true);
-        const twoWeeksAgoStr = availableWeeks[availableWeeks.length - 2 - 3]; // approx 2 weeks ago index = (7) - 2 - 3 ? Wait. generateWeeksList is -4 to +2. Current is index 4. -2 weeks is index 2.
-        const twoWeeksAgoDate = new Date();
-        twoWeeksAgoDate.setDate(twoWeeksAgoDate.getDate() - 14);
-        const dummyWeek = getISOWeekString(twoWeeksAgoDate);
-        
-        try {
-            const ref = collection(db, collectionPath);
-            const dummies = [
-                { title: 'Dummy Project Alpha', contractor: 'Stabil', createdAt: twoWeeksAgoDate.getTime(), week: dummyWeek },
-                { title: 'Dummy Project Beta', contractor: 'Tavi', createdAt: twoWeeksAgoDate.getTime() + 1000 * 60 * 60, week: dummyWeek }
-            ];
-            for (const d of dummies) {
-                await addDoc(ref, { ...d, done: false, createdBy: user?.email || 'admin' });
-            }
-            alert(`Generated 2 dummies for ${dummyWeek}`);
-            if (selectedWeek === dummyWeek) fetchProjects();
-        } catch (e) {
-            console.error(e);
-        } finally {
-            setSaving(false);
-        }
-    };
+
 
     const doneCount = projects.filter((p) => p.done).length;
     const totalCount = projects.length;
@@ -230,15 +195,7 @@ export function Planner({ onBack }) {
                     ))}
                 </div>
                 
-                <div className="mt-8 border-t border-panel-border pt-4">
-                    <button
-                        onClick={generateDummyData}
-                        disabled={saving}
-                        className="w-full bg-danger/10 text-danger border border-danger/20 text-xs font-semibold px-4 py-2 rounded cursor-pointer hover:bg-danger/20 transition-all opacity-50"
-                    >
-                        Generera Test-data (-2 veckor)
-                    </button>
-                </div>
+
             </div>
 
             {/* Main Content */}
