@@ -3,6 +3,7 @@ import { useQuote } from '../../store/QuoteContext';
 import { catalogData } from '../../data/catalog';
 
 const BUILDER_UNCATEGORIZED_CATEGORY_ID = '__uncategorized__';
+export const ADDONS_ONLY_SIZE = '__addons_only__';
 
 function createCustomAddon(itemQty, globalDiscountPct, categoryId) {
     return {
@@ -53,19 +54,19 @@ export function BuilderItem({ item, index, onRemove }) {
         dispatch({ type: 'SET_BUILDER_ITEMS', payload: newItems });
     };
 
+    const isAddonsOnly = item.size === ADDONS_ONLY_SIZE;
+
     const handleLineChange = (e) => {
         const newLine = e.target.value;
         const newModels = Object.keys(catalogData[newLine].models);
         const newModel = newModels[0];
-        const newSizes = Object.keys(catalogData[newLine].models[newModel].sizes);
-        const newSize = newSizes[0];
+        const newSize = isAddonsOnly ? ADDONS_ONLY_SIZE : Object.keys(catalogData[newLine].models[newModel].sizes)[0];
         updateItem({ line: newLine, model: newModel, size: newSize, addons: [] });
     };
 
     const handleModelChange = (e) => {
         const newModel = e.target.value;
-        const newSizes = Object.keys(lineData.models[newModel].sizes);
-        const newSize = newSizes[0];
+        const newSize = isAddonsOnly ? ADDONS_ONLY_SIZE : Object.keys(lineData.models[newModel].sizes)[0];
         updateItem({ model: newModel, size: newSize, addons: [] });
     };
 
@@ -131,6 +132,8 @@ export function BuilderItem({ item, index, onRemove }) {
         return currency === 'EUR' ? Math.round(price * exchangeRate) : price;
     };
 
+    const supportsAddonsOnly = item.line === 'BaHaMa';
+
     const renderSizeOptions = (sizesObj) => {
         const groups = {};
         const noGroup = [];
@@ -167,6 +170,17 @@ export function BuilderItem({ item, index, onRemove }) {
         });
 
         const elements = [];
+
+        if (supportsAddonsOnly) {
+            elements.push(
+                <optgroup key="addons-only-group" label="--- UTAN PARASOLL ---" className="bg-panel-bg text-primary font-bold italic">
+                    <option value={ADDONS_ONLY_SIZE} className="bg-panel-bg text-text-primary font-normal not-italic">
+                        Endast tillägg
+                    </option>
+                </optgroup>
+            );
+        }
+
         noGroup.forEach((s) => {
             elements.push(
                 <option key={s} value={s} className="bg-panel-bg text-text-primary">
@@ -224,11 +238,16 @@ export function BuilderItem({ item, index, onRemove }) {
     const getSelectedCategoryLabel = (count) => (count === 1 ? '1 vald' : `${count} valda`);
 
     return (
-        <div className="bg-panel-bg border border-panel-border rounded-lg p-6 mb-6 relative animate-slide-in">
+        <div className={`bg-panel-bg border rounded-lg p-6 mb-6 relative animate-slide-in ${isAddonsOnly ? 'border-primary/40' : 'border-panel-border'}`}>
             <div className="flex justify-between items-center mb-4 pb-4 border-bottom border-panel-border">
                 <h3 className="text-lg font-semibold m-0 flex items-center gap-2">
                     <span className="text-text-secondary cursor-grab">=</span>
-                    Produkt {index + 1} ({item.line})
+                    {isAddonsOnly ? `Enbart Tillägg (${item.model})` : `Produkt ${index + 1} (${item.line})`}
+                    {isAddonsOnly && (
+                        <span className="inline-flex items-center rounded-full bg-secondary/20 px-2.5 py-1 text-xs font-semibold text-secondary">
+                            Utan parasoll
+                        </span>
+                    )}
                     {selectedAddonCount > 0 && (
                         <span className="inline-flex items-center rounded-full bg-primary/20 px-2.5 py-1 text-xs font-semibold text-primary">
                             {selectedAddonBadgeText}
@@ -296,14 +315,16 @@ export function BuilderItem({ item, index, onRemove }) {
                     />
                 </div>
 
-                <div className="flex flex-col gap-1.5">
-                    <label className="text-xs font-semibold text-text-secondary uppercase">Summa</label>
-                    <div className="font-bold text-lg text-text-primary flex items-center h-10">{itemBaseTotal.toLocaleString('sv-SE')} SEK</div>
-                </div>
+                {!isAddonsOnly && (
+                    <div className="flex flex-col gap-1.5">
+                        <label className="text-xs font-semibold text-text-secondary uppercase">Summa</label>
+                        <div className="font-bold text-lg text-text-primary flex items-center h-10">{itemBaseTotal.toLocaleString('sv-SE')} SEK</div>
+                    </div>
+                )}
             </div>
 
             {addonCategories.length > 0 && (
-                <details className="mt-6 pt-6 border-t border-panel-border group">
+                <details open={isAddonsOnly || undefined} className="mt-6 pt-6 border-t border-panel-border group">
                     <summary className="cursor-pointer list-none select-none flex items-center justify-between rounded-md border border-panel-border bg-black/10 px-4 py-3 hover:bg-black/20 transition-colors">
                         <span className="text-sm font-semibold uppercase tracking-wide text-text-primary">Tillägg</span>
                         <span className="flex items-center gap-3 text-xs text-text-secondary">

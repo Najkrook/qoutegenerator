@@ -1,5 +1,7 @@
 import { buildEffectiveGridSelections } from '../utils/gridAutoScale.js';
 
+const ADDONS_ONLY_SIZE = '__addons_only__';
+
 function toFloat(value) {
     if (typeof value === 'number') return Number.isFinite(value) ? value : 0;
     if (value === null || value === undefined) return 0;
@@ -171,8 +173,10 @@ export function computeQuoteTotals({ state, catalogData }) {
     let originalIndex = 0;
 
     for (const item of safeState.builderItems || []) {
+        const isAddonsOnly = item?.size === ADDONS_ONLY_SIZE;
+
         let basePrice = 0;
-        if (item?.line && item?.model && item?.size) {
+        if (!isAddonsOnly && item?.line && item?.model && item?.size) {
             basePrice = toFloat(
                 safeCatalog?.[item.line]?.models?.[item.model]?.sizes?.[item.size]?.price || 0
             );
@@ -184,30 +188,33 @@ export function computeQuoteTotals({ state, catalogData }) {
         const discountPct = toFloat(item?.discountPct || 0);
         const discountSek = gross * (discountPct / 100);
         const net = gross - discountSek;
-        const formattedSize = formatSizeDisplay(item?.size);
+        const formattedSize = isAddonsOnly ? '-' : formatSizeDisplay(item?.size);
         const sizeMeta = parseSortableSize(formattedSize);
 
-        grossTotalSek += gross;
-        totalDiscountSek += discountSek;
+        // Skip the 0 SEK base row for addon-only items — only their addons matter
+        if (!isAddonsOnly) {
+            grossTotalSek += gross;
+            totalDiscountSek += discountSek;
 
-        totals.push({
-            model: `${item?.line || ''} ${item?.model || ''}`.trim(),
-            size: formattedSize,
-            unitPrice,
-            qty,
-            gross,
-            discountPct,
-            discountSek,
-            net,
-            isAddon: false,
-            source: { type: 'builder', itemId: item.id },
-            line: item?.line || 'Övrigt',
-            sortModel: `${item?.line || ''} ${item?.model || ''}`.trim(),
-            sortSizeRaw: item?.size || formattedSize,
-            sortKind: sizeMeta.sortKind,
-            sortDimensions: sizeMeta.sortDimensions,
-            originalIndex: originalIndex++
-        });
+            totals.push({
+                model: `${item?.line || ''} ${item?.model || ''}`.trim(),
+                size: formattedSize,
+                unitPrice,
+                qty,
+                gross,
+                discountPct,
+                discountSek,
+                net,
+                isAddon: false,
+                source: { type: 'builder', itemId: item.id },
+                line: item?.line || 'Övrigt',
+                sortModel: `${item?.line || ''} ${item?.model || ''}`.trim(),
+                sortSizeRaw: item?.size || formattedSize,
+                sortKind: sizeMeta.sortKind,
+                sortDimensions: sizeMeta.sortDimensions,
+                originalIndex: originalIndex++
+            });
+        }
 
         for (const addon of item?.addons || []) {
             const addonQty = toInt(addon?.qty, 1);
