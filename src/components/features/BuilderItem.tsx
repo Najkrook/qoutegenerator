@@ -1,0 +1,446 @@
+// @ts-nocheck
+import React from 'react';
+import { useQuote } from '../../store/QuoteContext';
+import { catalogData } from '../../data/catalog';
+
+const BUILDER_UNCATEGORIZED_CATEGORY_ID = '__uncategorized__';
+export const ADDONS_ONLY_SIZE = '__addons_only__';
+
+function createCustomAddon(itemQty, globalDiscountPct, categoryId) {
+    return {
+        id: `builder_custom_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+        qty: itemQty,
+        discountPct: globalDiscountPct,
+        isCustom: true,
+        name: '',
+        price: 0,
+        categoryId
+    };
+}
+
+function getBuilderCategoryId(category, index) {
+    return String(category?.id || `category_${index}`);
+}
+
+function getBuilderAddonCategories(modelData) {
+    const categories = Array.isArray(modelData?.addonCategories)
+        ? modelData.addonCategories.map((category, index) => ({
+            ...category,
+            id: getBuilderCategoryId(category, index),
+            items: Array.isArray(category.items) ? category.items : []
+        }))
+        : [];
+
+    if (Array.isArray(modelData?.addons) && modelData.addons.length > 0) {
+        categories.push({
+            id: BUILDER_UNCATEGORIZED_CATEGORY_ID,
+            name: 'Övriga tillval',
+            items: modelData.addons
+        });
+    }
+
+    return categories;
+}
+
+export function BuilderItem({ item, index, onRemove }) {
+    const { state, dispatch } = useQuote();
+    const { exchangeRate, globalDiscountPct } = state;
+
+    const lineData = catalogData[item.line];
+    const modelData = lineData?.models?.[item.model];
+    const addonCategories = getBuilderAddonCategories(modelData);
+
+    const updateItem = (updates) => {
+        const newItems = state.builderItems.map((i) => (i.id === item.id ? { ...i, ...updates } : i));
+        dispatch({ type: 'SET_BUILDER_ITEMS', payload: newItems });
+    };
+
+    const isAddonsOnly = item.size === ADDONS_ONLY_SIZE;
+
+    const handleLineChange = (e) => {
+        const newLine = e.target.value;
+        const newModels = Object.keys(catalogData[newLine].models);
+        const newModel = newModels[0];
+        const newSize = isAddonsOnly ? ADDONS_ONLY_SIZE : Object.keys(catalogData[newLine].models[newModel].sizes)[0];
+        updateItem({ line: newLine, model: newModel, size: newSize, addons: [] });
+    };
+
+    const handleModelChange = (e) => {
+        const newModel = e.target.value;
+        const newSize = isAddonsOnly ? ADDONS_ONLY_SIZE : Object.keys(lineData.models[newModel].sizes)[0];
+        updateItem({ model: newModel, size: newSize, addons: [] });
+    };
+
+    const handleSizeChange = (e) => {
+        updateItem({ size: e.target.value });
+    };
+
+    const handleQtyChange = (e) => {
+        const newQty = parseInt(e.target.value, 10) || 1;
+        const oldQty = item.qty;
+        
+        const newAddons = item.addons.map((a) => {
+            if (a.isCustom !== true && a.qty === oldQty) {
+                return { ...a, qty: newQty };
+            }
+            return a;
+        });
+
+        updateItem({ qty: newQty, addons: newAddons });
+    };
+
+    const toggleAddon = (addonId, isChecked) => {
+        let newAddons = [...item.addons];
+        if (isChecked) {
+            newAddons.push({ id: addonId, qty: item.qty, discountPct: globalDiscountPct });
+        } else {
+            newAddons = newAddons.filter((a) => a.isCustom === true || a.id !== addonId);
+        }
+        updateItem({ addons: newAddons });
+    };
+
+    const updateAddonQty = (addonId, qty) => {
+        const newAddons = item.addons.map((a) => (
+            a.isCustom !== true && a.id === addonId ? { ...a, qty: parseInt(qty, 10) || 1 } : a
+        ));
+        updateItem({ addons: newAddons });
+    };
+
+    const addCustomAddon = (categoryId) => {
+        updateItem({
+            addons: [...item.addons, createCustomAddon(item.qty, globalDiscountPct, categoryId)]
+        });
+    };
+
+    const updateCustomAddon = (customAddonId, updates) => {
+        updateItem({
+            addons: item.addons.map((addon) => (
+                addon.isCustom === true && addon.id === customAddonId
+                    ? { ...addon, ...updates }
+                    : addon
+            ))
+        });
+    };
+
+    const removeCustomAddon = (customAddonId) => {
+        updateItem({
+            addons: item.addons.filter((addon) => !(addon.isCustom === true && addon.id === customAddonId))
+        });
+    };
+
+    const getPriceSEK = (price, line) => {
+        const currency = catalogData[line]?.currency;
+        return currency === 'EUR' ? Math.round(price * exchangeRate) : price;
+    };
+
+    const supportsAddonsOnly = item.line === 'BaHaMa';
+
+    const renderSizeOptions = (sizesObj) => {
+        const groups = {};
+        const noGroup = [];
+
+        Object.keys(sizesObj).forEach((s) => {
+            let matchedGroup = null;
+
+            // Explicit shape in name
+            if (s.toLowerCase().includes('kvadrat') || s.includes('Kvadrat')) {
+                matchedGroup = 'Kvadrat';
+            } else if (s.toLowerCase().includes('runda') || s.includes('Runda') || s.includes('*') || s.includes('Ø')) {
+                matchedGroup = 'Runda';
+            } else if (s.toLowerCase().includes('rektangel') || s.includes('Rektangel')) {
+                matchedGroup = 'Rektangel';
+            }
+            // Implicit shape from dimensions (like 2x2 or 2,5x2)
+            else if (s.includes('x')) {
+                const parts = s.split('x').map(p => p.trim());
+                if (parts.length === 2) {
+                    if (parts[0] === parts[1]) {
+                        matchedGroup = 'Kvadrat';
+                    } else {
+                        matchedGroup = 'Rektangel';
+                    }
+                }
+            }
+
+            if (matchedGroup) {
+                if (!groups[matchedGroup]) groups[matchedGroup] = [];
+                groups[matchedGroup].push(s);
+            } else {
+                noGroup.push(s);
+            }
+        });
+
+        const elements = [];
+
+        if (supportsAddonsOnly) {
+            elements.push(
+                <optgroup key="addons-only-group" label="--- UTAN PARASOLL ---" className="bg-panel-bg text-primary font-bold italic">
+                    <option value={ADDONS_ONLY_SIZE} className="bg-panel-bg text-text-primary font-normal not-italic">
+                        Endast tillägg
+                    </option>
+                </optgroup>
+            );
+        }
+
+        noGroup.forEach((s) => {
+            elements.push(
+                <option key={s} value={s} className="bg-panel-bg text-text-primary">
+                    {s}
+                </option>
+            );
+        });
+
+        Object.keys(groups).forEach((gName) => {
+            elements.push(
+                <optgroup key={gName} label={`--- ${gName.toUpperCase()} ---`} className="bg-panel-bg text-primary font-bold italic">
+                    {groups[gName].map((s) => (
+                        <option key={s} value={s} className="bg-panel-bg text-text-primary font-normal not-italic">
+                            {s}
+                        </option>
+                    ))}
+                </optgroup>
+            );
+        });
+
+        return elements;
+    };
+
+    const itemBasePrice = modelData?.sizes?.[item.size]?.price || 0;
+    const itemUnitPrice = getPriceSEK(itemBasePrice, item.line);
+    const itemBaseTotal = itemUnitPrice * item.qty;
+
+    let addonsTotal = 0;
+    item.addons.forEach((addon) => {
+        if (addon.isCustom === true) {
+            addonsTotal += (parseFloat(addon.price) || 0) * (parseInt(addon.qty, 10) || 1);
+            return;
+        }
+
+        let addonPrice = 0;
+        addonCategories.forEach((cat) => {
+            const found = cat.items.find((i) => i.id === addon.id);
+            if (found) addonPrice = found.price;
+        });
+        addonsTotal += getPriceSEK(addonPrice, item.line) * (parseInt(addon.qty, 10) || 1);
+    });
+
+    const itemGrandTotal = itemBaseTotal + addonsTotal;
+    const selectedAddonCount = item.addons.length;
+    const selectedAddonBadgeText = selectedAddonCount === 1 ? '1 tillägg' : `${selectedAddonCount} tillägg`;
+    const getSelectedCategoryCount = (category) => {
+        const selectedCatalogCount = category.items.filter((addon) => (
+            item.addons.some((selected) => selected.isCustom !== true && selected.id === addon.id)
+        )).length;
+        const selectedCustomCount = item.addons.filter((selected) => (
+            selected.isCustom === true && selected.categoryId === category.id
+        )).length;
+        return selectedCatalogCount + selectedCustomCount;
+    };
+    const getSelectedCategoryLabel = (count) => (count === 1 ? '1 vald' : `${count} valda`);
+
+    return (
+        <div className={`bg-panel-bg border rounded-lg p-6 mb-6 relative animate-slide-in ${isAddonsOnly ? 'border-primary/40' : 'border-panel-border'}`}>
+            <div className="flex justify-between items-center mb-4 pb-4 border-bottom border-panel-border">
+                <h3 className="text-lg font-semibold m-0 flex items-center gap-2">
+                    <span className="text-text-secondary cursor-grab">=</span>
+                    {isAddonsOnly ? `Enbart Tillägg (${item.model})` : `Produkt ${index + 1} (${item.line})`}
+                    {isAddonsOnly && (
+                        <span className="inline-flex items-center rounded-full bg-secondary/20 px-2.5 py-1 text-xs font-semibold text-secondary">
+                            Utan parasoll
+                        </span>
+                    )}
+                    {selectedAddonCount > 0 && (
+                        <span className="inline-flex items-center rounded-full bg-primary/20 px-2.5 py-1 text-xs font-semibold text-primary">
+                            {selectedAddonBadgeText}
+                        </span>
+                    )}
+                </h3>
+                <button
+                    onClick={() => onRemove(item.id)}
+                    className="text-danger bg-transparent border-none text-sm font-medium cursor-pointer hover:underline"
+                >
+                    Ta bort
+                </button>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
+                <div className="flex flex-col gap-1.5">
+                    <label className="text-xs font-semibold text-text-secondary uppercase">Produktlinje</label>
+                    <select
+                        value={item.line}
+                        onChange={handleLineChange}
+                        className="bg-input-bg border border-panel-border text-text-primary p-2 rounded-md outline-none focus:border-primary"
+                    >
+                        {Array.from(new Set([...state.selectedLines.filter((l) => catalogData[l].type === 'builder'), item.line])).map((l) => (
+                            <option key={l} value={l} className="bg-panel-bg text-text-primary">
+                                {catalogData[l] ? catalogData[l].name : l}
+                            </option>
+                        ))}
+                    </select>
+                </div>
+
+                <div className="flex flex-col gap-1.5">
+                    <label className="text-xs font-semibold text-text-secondary uppercase">Modell</label>
+                    <select
+                        value={item.model}
+                        onChange={handleModelChange}
+                        className="bg-input-bg border border-panel-border text-text-primary p-2 rounded-md outline-none focus:border-primary"
+                    >
+                        {Object.keys(lineData.models).map((m) => (
+                            <option key={m} value={m} className="bg-panel-bg text-text-primary">
+                                {lineData.models[m].name}
+                            </option>
+                        ))}
+                    </select>
+                </div>
+
+                <div className="flex flex-col gap-1.5">
+                    <label className="text-xs font-semibold text-text-secondary uppercase">Storlek</label>
+                    <select
+                        value={item.size}
+                        onChange={handleSizeChange}
+                        className="bg-input-bg border border-panel-border text-text-primary p-2 rounded-md outline-none focus:border-primary"
+                    >
+                        {renderSizeOptions(modelData.sizes)}
+                    </select>
+                </div>
+
+                <div className="flex flex-col gap-1.5">
+                    <label className="text-xs font-semibold text-text-secondary uppercase">Antal</label>
+                    <input
+                        type="number"
+                        min="1"
+                        value={item.qty}
+                        onChange={handleQtyChange}
+                        className="bg-input-bg border border-panel-border text-text-primary p-2 rounded-md outline-none focus:border-primary w-24"
+                    />
+                </div>
+
+                {!isAddonsOnly && (
+                    <div className="flex flex-col gap-1.5">
+                        <label className="text-xs font-semibold text-text-secondary uppercase">Summa</label>
+                        <div className="font-bold text-lg text-text-primary flex items-center h-10">{itemBaseTotal.toLocaleString('sv-SE')} SEK</div>
+                    </div>
+                )}
+            </div>
+
+            {addonCategories.length > 0 && (
+                <details open={isAddonsOnly || undefined} className="mt-6 pt-6 border-t border-panel-border group">
+                    <summary className="cursor-pointer list-none select-none flex items-center justify-between rounded-md border border-panel-border bg-black/10 px-4 py-3 hover:bg-black/20 transition-colors">
+                        <span className="text-sm font-semibold uppercase tracking-wide text-text-primary">Tillägg</span>
+                        <span className="flex items-center gap-3 text-xs text-text-secondary">
+                            {selectedAddonCount > 0 ? `${selectedAddonCount} valda` : 'Inga valda'}
+                            <span className="transition-transform group-open:rotate-180">▼</span>
+                        </span>
+                    </summary>
+
+                    <div className="mt-4 space-y-4">
+                        {addonCategories.map((cat) => {
+                            const selectedCategoryCount = getSelectedCategoryCount(cat);
+                            const customAddons = item.addons.filter((addon) => addon.isCustom === true && addon.categoryId === cat.id);
+
+                            return (
+                            <details key={cat.id} className="bg-black/10 border border-panel-border rounded-md overflow-hidden group">
+                                <summary className="p-3 text-sm font-semibold text-primary uppercase cursor-pointer list-none flex justify-between items-center group-open:border-b group-open:border-panel-border">
+                                    <span>{cat.name}</span>
+                                    <span className="flex items-center gap-3">
+                                        {selectedCategoryCount > 0 && (
+                                            <span className="inline-flex items-center rounded-full bg-primary/20 px-2.5 py-1 text-[11px] font-semibold normal-case tracking-normal text-primary">
+                                                {getSelectedCategoryLabel(selectedCategoryCount)}
+                                            </span>
+                                        )}
+                                        <span className="text-xs transition-transform group-open:rotate-180">▼</span>
+                                    </span>
+                                </summary>
+                                <div className="p-4 space-y-3">
+                                        {cat.items.map((addon) => {
+                                        const existing = item.addons.find((a) => a.isCustom !== true && a.id === addon.id);
+                                        const isChecked = !!existing;
+                                        const priceSEK = getPriceSEK(addon.price, item.line);
+                                        return (
+                                            <div key={addon.id} className="grid grid-cols-[1fr_auto_auto_auto] items-center gap-4">
+                                                <label className="flex items-center gap-2 cursor-pointer text-sm">
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={isChecked}
+                                                        onChange={(e) => toggleAddon(addon.id, e.target.checked)}
+                                                        className="w-4 h-4 accent-primary"
+                                                    />
+                                                    {addon.name}
+                                                </label>
+                                                <span className="text-sm text-text-secondary whitespace-nowrap">{priceSEK.toLocaleString('sv-SE')} SEK</span>
+                                                <input
+                                                    type="number"
+                                                    min="1"
+                                                    value={isChecked ? existing.qty : item.qty}
+                                                    disabled={!isChecked}
+                                                    onChange={(e) => updateAddonQty(addon.id, e.target.value)}
+                                                    className="bg-input-bg border border-panel-border text-text-primary p-1.5 rounded-md outline-none focus:border-primary w-16 text-sm disabled:opacity-50"
+                                                />
+                                                <span className="text-sm font-semibold min-w-[100px] text-right">
+                                                    {isChecked ? `= ${(priceSEK * (parseInt(existing.qty, 10) || 1)).toLocaleString('sv-SE')} SEK` : ''}
+                                                </span>
+                                            </div>
+                                        );
+                                    })}
+                                    {customAddons.map((addon) => {
+                                        const addonQty = parseInt(addon.qty, 10) || 1;
+                                        const addonPrice = parseFloat(addon.price) || 0;
+                                        return (
+                                            <div key={addon.id} className="grid grid-cols-[1fr_auto_auto_auto_auto] items-center gap-4">
+                                                <input
+                                                    type="text"
+                                                    value={addon.name || ''}
+                                                    onChange={(e) => updateCustomAddon(addon.id, { name: e.target.value })}
+                                                    placeholder="Egen rad"
+                                                    className="bg-input-bg border border-panel-border text-text-primary p-1.5 rounded-md outline-none focus:border-primary text-sm"
+                                                />
+                                                <input
+                                                    type="number"
+                                                    min="0"
+                                                    value={addonPrice}
+                                                    onChange={(e) => updateCustomAddon(addon.id, { price: parseFloat(e.target.value) || 0 })}
+                                                    className="bg-input-bg border border-panel-border text-text-primary p-1.5 rounded-md outline-none focus:border-primary w-24 text-sm text-right"
+                                                />
+                                                <input
+                                                    type="number"
+                                                    min="1"
+                                                    value={addonQty}
+                                                    onChange={(e) => updateCustomAddon(addon.id, { qty: parseInt(e.target.value, 10) || 1 })}
+                                                    className="bg-input-bg border border-panel-border text-text-primary p-1.5 rounded-md outline-none focus:border-primary w-16 text-sm"
+                                                />
+                                                <span className="text-sm font-semibold min-w-[100px] text-right">
+                                                    = {(addonPrice * addonQty).toLocaleString('sv-SE')} SEK
+                                                </span>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => removeCustomAddon(addon.id)}
+                                                    className="text-danger bg-transparent border-none text-sm font-medium cursor-pointer hover:underline justify-self-end"
+                                                >
+                                                    Ta bort
+                                                </button>
+                                            </div>
+                                        );
+                                    })}
+                                    <button
+                                        type="button"
+                                        onClick={() => addCustomAddon(cat.id)}
+                                        className="w-full rounded-md border border-dashed border-panel-border bg-white/[0.02] px-3 py-2 text-left text-sm font-medium text-primary hover:bg-white/[0.05] transition-colors"
+                                    >
+                                        + Lägg till egen rad
+                                    </button>
+                                </div>
+                            </details>
+                            );
+                        })}
+                    </div>
+                </details>
+            )}
+
+            <div className="mt-6 pt-4 border-t border-panel-border flex justify-end items-center gap-4">
+                <span className="text-sm text-text-secondary italic">Total för denna produkt:</span>
+                <span className="text-xl font-bold text-text-primary">{itemGrandTotal.toLocaleString('sv-SE')} SEK</span>
+            </div>
+        </div>
+    );
+}

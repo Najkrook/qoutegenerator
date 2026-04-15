@@ -1,10 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { createInitialQuoteState } from '../src/store/quoteStateSchema.js';
+import { createInitialQuoteState } from '../src/store/quoteStateSchema';
 import {
     clearPersistedQuoteState,
     loadPersistedQuoteState,
     persistQuoteState
-} from '../src/store/quoteStatePersistence.js';
+} from '../src/store/quoteStatePersistence';
 
 function createStorage() {
     const store = new Map();

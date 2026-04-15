@@ -4,8 +4,8 @@ import {
     createQuoteRepository,
     normalizeQuoteMetadata,
     normalizeScriveStatus
-} from '../src/services/quoteRepository.js';
-import { createFirestoreMock } from './fixtures/firestoreMock.js';
+} from '../src/services/quoteRepository';
+import { createFirestoreMock } from './fixtures/firestoreMock';
 
 function buildRepo(initialDocs = {}) {
     const mock = createFirestoreMock(initialDocs);

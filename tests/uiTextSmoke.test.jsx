@@ -43,12 +43,15 @@ const quoteState = vi.hoisted(() => ({
 
 vi.mock('../src/services/firebase', () => ({
     db: {},
+    doc: vi.fn(() => ({})),
+    getDoc: vi.fn(async () => ({ exists: () => false, data: () => ({}) })),
     collection: vi.fn(() => ({})),
     query: vi.fn(() => ({})),
     orderBy: vi.fn(() => ({})),
     limit: vi.fn(() => ({})),
     startAfter: vi.fn(() => ({})),
-    getDocs: vi.fn(async () => ({ docs: [] }))
+    getDocs: vi.fn(async () => ({ docs: [], empty: true })),
+    writeBatch: vi.fn(() => ({ set: vi.fn(), commit: vi.fn(async () => {}) }))
 }));
 
 vi.mock('../src/components/features/SketchCanvas', () => ({
@@ -73,6 +76,14 @@ vi.mock('../src/components/features/FinalSummaryTable', () => ({
 
 vi.mock('../src/components/features/TermsAndPaymentPanel', () => ({
     TermsAndPaymentPanel: () => React.createElement('div', null, 'TermsAndPaymentPanelMock')
+}));
+
+vi.mock('../src/components/features/PricingTable', () => ({
+    PricingTable: () => React.createElement('div', null, 'PricingTableMock')
+}));
+
+vi.mock('../src/components/features/CustomCosts', () => ({
+    CustomCosts: () => React.createElement('div', null, 'CustomCostsMock')
 }));
 
 vi.mock('../src/services/calculationEngine', () => ({
@@ -103,7 +114,7 @@ vi.mock('../src/services/activityLogService', () => ({
     },
     formatActivityMetadata: vi.fn(() => ''),
     getActivityEventDefinition: vi.fn(() => ({ label: 'Offert skapad' })),
-    getActivityLogVisual: vi.fn(() => ({ icon: '📄', color: 'var(--color-primary)', label: 'Offert skapad' })),
+    getActivityLogVisual: vi.fn(() => ({ icon: '??', color: 'var(--color-primary)', label: 'Offert skapad' })),
     getActivitySystemLabel: vi.fn(() => 'Offert'),
     normalizeActivityLog: vi.fn((value) => value),
     safeLogActivity: vi.fn()
@@ -118,14 +129,19 @@ vi.mock('react-hot-toast', () => ({
     }
 }));
 
-import { Dashboard } from '../src/views/Dashboard.jsx';
-import { ActivityLogs, getActivityLogsEmptyStateMessage } from '../src/views/ActivityLogs.jsx';
-import { Header } from '../src/components/layout/Header.jsx';
-import { SketchBom } from '../src/components/features/SketchBom.jsx';
-import { SketchTool } from '../src/views/SketchTool.jsx';
-import { SummaryExport } from '../src/views/SummaryExport.jsx';
-import { AuthContext } from '../src/store/AuthContext.jsx';
-import { QuoteContext } from '../src/store/QuoteContext.jsx';
+import { Dashboard } from '../src/views/Dashboard';
+import { ActivityLogs, getActivityLogsEmptyStateMessage } from '../src/views/ActivityLogs';
+import { InventoryLogs } from '../src/views/InventoryLogs';
+import { InventoryManager } from '../src/views/InventoryManager';
+import { Pricing } from '../src/views/Pricing';
+import { RetailerManager } from '../src/views/RetailerManager';
+import { History } from '../src/views/History';
+import { Header } from '../src/components/layout/Header';
+import { SketchBom } from '../src/components/features/SketchBom';
+import { SketchTool } from '../src/views/SketchTool';
+import { SummaryExport } from '../src/views/SummaryExport';
+import { AuthContext } from '../src/store/AuthContext';
+import { QuoteContext } from '../src/store/QuoteContext';
 
 function renderWithProviders(node, overrides = {}) {
     const authValue = {
@@ -139,6 +155,8 @@ function renderWithProviders(node, overrides = {}) {
         canExportSketchToQuote: false,
         login: vi.fn(),
         logout: vi.fn(),
+        retailer: null,
+        isRetailer: false,
         ...authState.value,
         ...(overrides.auth || {})
     };
@@ -262,6 +280,54 @@ describe('UI text smoke', () => {
         expect(html).toContain('Inga loggade händelser ännu.');
     });
 
+    it('renders inventory logs filters and empty state for admin users', () => {
+        authState.value = {
+            canViewEverything: true,
+            canStartQuote: true,
+            canAccessSketch: true,
+            canAccessQuoteHistory: true,
+            canExportSketchToQuote: true,
+            user: { uid: 'admin-1', email: 'admin@example.com' }
+        };
+
+        const html = renderWithProviders(<InventoryLogs onBack={() => {}} />);
+
+        expect(html).toContain('Från datum');
+        expect(html).toContain('Kategori');
+        expect(html).toContain('Inga loggar matchar filtret.');
+    });
+
+    it('renders inventory manager loading state copy', () => {
+        authState.value = {
+            canViewEverything: true,
+            canStartQuote: true,
+            canAccessSketch: true,
+            canAccessQuoteHistory: true,
+            canExportSketchToQuote: true,
+            user: { uid: 'admin-1', email: 'admin@example.com' }
+        };
+
+        const html = renderWithProviders(<InventoryManager onBack={() => {}} />);
+
+        expect(html).toContain('Laddar lagersaldo...');
+    });
+
+    it('renders retailer manager loading state copy', () => {
+        authState.value = {
+            canViewEverything: true,
+            canStartQuote: true,
+            canAccessSketch: true,
+            canAccessQuoteHistory: true,
+            canExportSketchToQuote: true,
+            user: { uid: 'admin-1', email: 'admin@example.com' }
+        };
+
+        const html = renderWithProviders(<RetailerManager onBack={() => {}} />);
+
+        expect(html).toContain('Återförsäljare');
+        expect(html).toContain('Laddar återförsäljare...');
+    });
+
     it('returns a filter-specific empty state message for filtered activity views', () => {
         expect(getActivityLogsEmptyStateMessage({
             loading: false,
@@ -366,5 +432,47 @@ describe('UI text smoke', () => {
         expect(html).toContain('PDF förhandsvisning');
         expect(html).toContain('Exportera som PDF');
         expect(html).toContain('Exportera som Excel');
+    });
+
+    it('renders Pricing labels for discounts and quote review', () => {
+        authState.value = {
+            canViewEverything: true,
+            canStartQuote: true,
+            canAccessSketch: false,
+            canAccessQuoteHistory: true,
+            canExportSketchToQuote: false
+        };
+        quoteState.value = {
+            state: {
+                ...quoteState.value.state,
+                step: 3,
+                globalDiscountPct: 10
+            },
+            dispatch: vi.fn()
+        };
+
+        const html = renderWithProviders(<Pricing onNext={() => {}} onPrev={() => {}} />);
+
+        expect(html).toContain('Priser &amp; Rabatter');
+        expect(html).toContain('Övergripande offertrabatt (%)');
+        expect(html).toContain('Växelkurs (EUR → SEK)');
+        expect(html).toContain('Granska Offert');
+    });
+
+    it('renders History labels for filters and loading state', () => {
+        authState.value = {
+            canViewEverything: true,
+            canStartQuote: true,
+            canAccessSketch: false,
+            canAccessQuoteHistory: true,
+            canExportSketchToQuote: false,
+            user: { uid: 'admin-1', email: 'admin@example.com' }
+        };
+
+        const html = renderWithProviders(<History onBack={() => {}} onOpenQuote={() => {}} />);
+
+        expect(html).toContain('Alla statusar');
+        expect(html).toContain('Sök företag eller referens');
+        expect(html).toContain('Laddar offerter...');
     });
 });

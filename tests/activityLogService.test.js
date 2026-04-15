@@ -10,7 +10,7 @@ import {
     getActivitySystemLabel,
     isActivityLogFailure,
     normalizeActivityLog
-} from '../src/services/activityLogService.js';
+} from '../src/services/activityLogService';
 
 describe('activityLogService', () => {
     it('builds a normalized activity log entry for the authenticated user', () => {
@@ -71,7 +71,7 @@ describe('activityLogService', () => {
         const result = buildActivityLogSuccessResult(
             { id: 'log-123' },
             {
-            eventType: 'quote_created',
+                eventType: 'quote_created',
                 system: 'quote'
             }
         );

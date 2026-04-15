@@ -134,4 +134,3 @@ describe('normalizeRetailerData', () => {
         expect(() => normalizeRetailerData({ name: 'Test', email: '   ' }, mockCatalog)).toThrow('Användare (E-post) är obligatoriskt.');
     });
 });
-

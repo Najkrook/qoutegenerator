@@ -1,7 +1,7 @@
 import React from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { SketchConfig } from '../src/components/features/SketchConfig.jsx';
+import { SketchConfig } from '../src/components/features/SketchConfig';
 
 describe('SketchConfig zero-depth controls', () => {
     it('disables unavailable side controls for a straight 0 mm layout', () => {

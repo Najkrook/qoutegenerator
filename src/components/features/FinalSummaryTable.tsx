@@ -1,0 +1,97 @@
+import React, { type ChangeEvent } from 'react';
+import { useQuote } from '../../store/QuoteContext';
+import { catalogData } from '../../data/catalog';
+import { computeQuoteTotals } from '../../services/calculationEngine';
+import type { QuoteTotalsResult } from '../../types/contracts';
+
+export function FinalSummaryTable() {
+    const { state, dispatch } = useQuote();
+    const { totals, grossTotalSek, totalDiscountSek, finalTotalSek, globalDiscountAmt } = computeQuoteTotals({
+        state,
+        catalogData
+    }) as QuoteTotalsResult;
+
+    const formatSek = (value: number): string => Math.round(value).toLocaleString('sv-SE');
+
+    const vatAmount = state.includesVat ? finalTotalSek * 0.25 : 0;
+    const totalWithVat = finalTotalSek + vatAmount;
+
+    return (
+        <div className="space-y-6">
+            <div className="flex justify-end items-center gap-3">
+                <label className="flex items-center gap-2 cursor-pointer select-none">
+                    <input
+                        type="checkbox"
+                        checked={state.includesVat}
+                        onChange={(event: ChangeEvent<HTMLInputElement>) => dispatch({
+                            type: 'SET_INCLUDES_VAT',
+                            payload: event.target.checked
+                        })}
+                        className="w-5 h-5 accent-primary cursor-pointer border-panel-border bg-black/20 rounded"
+                    />
+                    <span className="text-sm font-medium text-text-primary">Visa priser inklusive 25% moms</span>
+                </label>
+            </div>
+
+            <div className="overflow-x-auto bg-panel-bg border border-panel-border rounded-lg shadow-inner w-full">
+                <table className="w-full text-left border-collapse min-w-0">
+                    <thead>
+                        <tr className="bg-black/20 text-[10px] uppercase font-bold text-text-secondary tracking-wider">
+                            <th className="p-4 border-b border-panel-border">Modell</th>
+                            <th className="p-4 border-b border-panel-border">Storlek</th>
+                            <th className="p-4 border-b border-panel-border text-right whitespace-nowrap">Ert pris</th>
+                            <th className="p-4 border-b border-panel-border text-center whitespace-nowrap">Antal</th>
+                            <th className="p-4 border-b border-panel-border text-right whitespace-nowrap">Rek utpris</th>
+                            <th className="p-4 border-b border-panel-border text-right whitespace-nowrap">Rabatt %</th>
+                        </tr>
+                    </thead>
+                    <tbody className="divide-y divide-panel-border/50">
+                        {totals.map((row, index) => (
+                            <tr
+                                key={`${row.model}-${index}`}
+                                className={`${row.isAddon ? 'text-text-secondary italic bg-black/5' : 'font-medium'} ${row.isCustom ? 'italic text-secondary/80' : ''}`}
+                            >
+                                <td className={`p-3 text-sm ${row.isAddon ? 'pl-8' : ''}`}>{row.model}</td>
+                                <td className="p-3 text-sm text-text-secondary">{row.size}</td>
+                                <td className="p-3 text-sm text-right text-primary font-bold whitespace-nowrap">{formatSek(row.net)} SEK</td>
+                                <td className="p-3 text-sm text-center whitespace-nowrap">{row.qty}</td>
+                                <td className="p-3 text-sm text-right text-text-secondary whitespace-nowrap">{formatSek(row.gross)} SEK</td>
+                                <td className="p-3 text-sm text-right text-danger whitespace-nowrap">-{row.discountPct}%</td>
+                            </tr>
+                        ))}
+
+                        {globalDiscountAmt > 0 && (
+                            <tr className="bg-black/10 italic text-text-secondary">
+                                <td colSpan={2} className="p-3 text-sm">Övergripande offertrabatt ({state.globalDiscountPct}%)</td>
+                                <td className="p-3 text-sm text-right text-danger font-bold whitespace-nowrap">-{formatSek(globalDiscountAmt)} SEK</td>
+                                <td colSpan={3}></td>
+                            </tr>
+                        )}
+                    </tbody>
+                    <tfoot className="bg-black/30 border-t-2 border-panel-border">
+                        <tr>
+                            <td colSpan={2} className="p-4 text-right text-xs uppercase font-bold text-text-secondary">Totalt exkl. moms</td>
+                            <td className="p-4 text-right font-bold text-primary text-3xl whitespace-nowrap">{formatSek(finalTotalSek)} SEK</td>
+                            <td colSpan={2} className="p-4 text-right text-xs uppercase font-bold text-text-secondary whitespace-nowrap">Brutto: {formatSek(grossTotalSek)} SEK</td>
+                            <td className="p-4 text-right text-danger font-bold text-xs">Total rabatt:<br />-{formatSek(totalDiscountSek)} SEK</td>
+                        </tr>
+                        {state.includesVat && (
+                            <>
+                                <tr className="border-t border-panel-border/30">
+                                    <td colSpan={2} className="p-2 text-right text-xs uppercase font-bold text-text-secondary">Moms 25%</td>
+                                    <td className="p-2 text-right font-bold text-text-secondary whitespace-nowrap">{formatSek(vatAmount)} SEK</td>
+                                    <td colSpan={3}></td>
+                                </tr>
+                                <tr className="bg-primary/5">
+                                    <td colSpan={2} className="p-4 text-right text-lg uppercase font-black text-white">Totalt att betala (inkl. moms)</td>
+                                    <td className="p-4 text-right font-black text-2xl text-primary whitespace-nowrap">{formatSek(totalWithVat)} SEK</td>
+                                    <td colSpan={3}></td>
+                                </tr>
+                            </>
+                        )}
+                    </tfoot>
+                </table>
+            </div>
+        </div>
+    );
+}

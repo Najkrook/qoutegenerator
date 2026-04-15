@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { computeQuoteTotals } from '../src/services/calculationEngine.js';
-import { createCatalogFixture, createStateFixture } from './fixtures/calculationFixtures.js';
+import { computeQuoteTotals } from '../src/services/calculationEngine';
+import { createCatalogFixture, createStateFixture } from './fixtures/calculationFixtures';
 
 describe('computeQuoteTotals', () => {
     function addClickitUpAutoScaleAddons(catalogData) {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { computeLayout } from '../src/utils/sectionCalculator.js';
+import { computeLayout } from '../src/utils/sectionCalculator';
 
 function baseConfig(overrides = {}) {
     return {

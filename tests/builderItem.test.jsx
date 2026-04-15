@@ -1,10 +1,10 @@
 import React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { QuoteProvider } from '../src/store/QuoteContext.jsx';
-import { QUOTE_STATE_STORAGE_KEY } from '../src/store/quoteStateSchema.js';
-import { BuilderItem } from '../src/components/features/BuilderItem.jsx';
-import { catalogData } from '../src/data/catalog.js';
+import { QuoteProvider } from '../src/store/QuoteContext';
+import { QUOTE_STATE_STORAGE_KEY } from '../src/store/quoteStateSchema';
+import { BuilderItem } from '../src/components/features/BuilderItem';
+import { catalogData } from '../src/data/catalog';
 
 const baseItem = {
     id: 'item-1',

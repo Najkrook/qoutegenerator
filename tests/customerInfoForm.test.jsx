@@ -1,8 +1,8 @@
 import React from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { CustomerInfoForm } from '../src/components/features/CustomerInfoForm.jsx';
-import { QuoteContext } from '../src/store/QuoteContext.jsx';
+import { CustomerInfoForm } from '../src/components/features/CustomerInfoForm';
+import { QuoteContext } from '../src/store/QuoteContext';
 
 function renderForm(stateOverrides = {}) {
     const value = {

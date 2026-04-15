@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { buildSavedQuoteStatePatch, saveQuoteToRepository } from '../src/services/quoteSaveService.js';
+import { buildSavedQuoteStatePatch, saveQuoteToRepository } from '../src/services/quoteSaveService';
 
 describe('quoteSaveService', () => {
     it('creates a new quote when activeQuoteId is missing', async () => {

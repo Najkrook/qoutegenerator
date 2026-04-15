@@ -3,8 +3,8 @@ import {
     applyGlobalDiscountToGridCustomAddons,
     applyGlobalDiscountToLineSelection,
     buildEffectiveGridSelections
-} from '../src/utils/gridAutoScale.js';
-import { createCatalogFixture } from './fixtures/calculationFixtures.js';
+} from '../src/utils/gridAutoScale';
+import { createCatalogFixture } from './fixtures/calculationFixtures';
 
     function createLineData() {
         const catalog = createCatalogFixture();

@@ -3,7 +3,7 @@ import {
     ACCESS_LEVELS,
     getAccessCapabilities,
     getAuthorizedStepForAccess
-} from '../src/config/accessControl.shared.js';
+} from '../src/config/accessControl.shared';
 
 describe('accessControl.shared', () => {
     it('exposes quote history for quote-only users without full admin access', () => {

@@ -1,10 +1,10 @@
 import { describe, expect, it, vi } from 'vitest';
-import { quoteReducer } from '../src/store/QuoteContext.jsx';
+import { quoteReducer } from '../src/store/QuoteContext';
 import {
     CURRENT_STATE_VERSION,
     createInitialQuoteState,
     hydrateQuoteState
-} from '../src/store/quoteStateSchema.js';
+} from '../src/store/quoteStateSchema';
 
 describe('quoteStateSchema', () => {
     it('returns current defaults for empty input', () => {

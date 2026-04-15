@@ -76,14 +76,14 @@ vi.mock('jspdf-autotable', () => ({
     }
 }));
 
-import { computeQuoteTotals } from '../src/services/calculationEngine.js';
+import { computeQuoteTotals } from '../src/services/calculationEngine';
 import {
     computeValidUntilDateString,
     createPdfTableLayout,
     generatePDF,
     groupSummaryTotalsByLine
-} from '../src/features/pdfExport.js';
-import { createCatalogFixture, createStateFixture } from './fixtures/calculationFixtures.js';
+} from '../src/features/pdfExport';
+import { createCatalogFixture, createStateFixture } from './fixtures/calculationFixtures';
 
 function createZeroDiscountState(overrides = {}) {
     return createStateFixture({

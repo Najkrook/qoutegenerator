@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { catalogData } from '../src/data/catalog.js';
+import { catalogData } from '../src/data/catalog';
 import {
     DEFAULT_PARASOL_PRESET_ID,
     FIESTA_DIAMETER_MM,
@@ -16,7 +16,7 @@ import {
     isParasolRotatable,
     normalizeFiestaItem,
     parseJumbrellaSize
-} from '../src/utils/parasolGeometry.js';
+} from '../src/utils/parasolGeometry';
 
 describe('parasolGeometry', () => {
     it('parses Jumbrella kvadrat and rektangel sizes to millimeters', () => {

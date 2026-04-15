@@ -41,6 +41,10 @@ jobs:
         shell: bash
         run: npm run test:confidence
 
+      - name: Run typecheck
+        shell: bash
+        run: npm run typecheck
+
       - name: Build production bundle
         shell: bash
         run: npm run build

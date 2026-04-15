@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildSketchExportState } from '../src/features/sketchExportState.js';
+import { buildSketchExportState } from '../src/features/sketchExportState';
 
 function createIdFactory() {
     let index = 0;

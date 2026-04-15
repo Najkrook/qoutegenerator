@@ -1,13 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { computeQuoteTotals } from '../src/services/calculationEngine.js';
+import { computeQuoteTotals } from '../src/services/calculationEngine';
 import {
     buildExcelSheetData,
     buildExportSummary,
     buildPdfTableData,
     hasZeroDiscountSummary,
     shouldHideDiscountReferencesInPdf
-} from '../src/services/exportDataBuilders.js';
-import { createCatalogFixture, createStateFixture } from './fixtures/calculationFixtures.js';
+} from '../src/services/exportDataBuilders';
+import { createCatalogFixture, createStateFixture } from './fixtures/calculationFixtures';
 
 function formatSek(value) {
     return Math.round(value).toString();

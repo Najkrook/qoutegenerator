@@ -1,9 +1,9 @@
 import React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { QuoteProvider } from '../src/store/QuoteContext.jsx';
-import { QUOTE_STATE_STORAGE_KEY } from '../src/store/quoteStateSchema.js';
-import { GridConfig } from '../src/components/features/GridConfig.jsx';
+import { QuoteProvider } from '../src/store/QuoteContext';
+import { QUOTE_STATE_STORAGE_KEY } from '../src/store/quoteStateSchema';
+import { GridConfig } from '../src/components/features/GridConfig';
 
 function stubLocalStorage(serializedState) {
     const storage = new Map();
