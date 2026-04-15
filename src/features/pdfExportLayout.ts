@@ -1,7 +1,7 @@
-// @ts-nocheck
-import autoTable from 'jspdf-autotable';
+import autoTable, { type Color, type FontStyle, type Styles } from 'jspdf-autotable';
 import { BRIXX_LOGO_BASE64 } from '../../assets/logoData';
 import { buildPdfTableData } from '../services/exportDataBuilders';
+import type { CustomerInfo, QuoteState, QuoteTotalsResult } from '../types/contracts';
 
 export const PDF_LAYOUT = Object.freeze({
     pageMarginX: 10,
@@ -40,25 +40,27 @@ export function createPdfTableLayout(hideDiscountReferences, pageWidth, layout =
     const tableHead = hideDiscountReferences
         ? [['Modell', 'Storlek', 'Pris/enhet\nExkl. moms', 'Antal', 'Ert Pris\nExkl. moms']]
         : [['Modell', 'Storlek', 'Pris/enhet\nExkl. moms', 'Antal', 'Ert Pris\nExkl. moms', 'Rek Utpris\nExkl. moms', 'Rabatt\ni SEK', 'Rabatt\ni %']];
-    const tableColumnStyles = hideDiscountReferences
+    const tableColumnStyles = (hideDiscountReferences
         ? {
-            0: { halign: 'left', fontStyle: 'bold', cellWidth: 54 },
+            0: { halign: 'left', fontStyle: 'bold' as FontStyle, cellWidth: 54 },
             1: { halign: 'center', cellWidth: 20 },
             2: { halign: 'right', cellWidth: 33 },
-            3: { halign: 'center', fontStyle: 'bold', cellWidth: 18 },
-            4: { halign: 'right', fontStyle: 'bold', cellWidth: 33 }
+            3: { halign: 'center', fontStyle: 'bold' as FontStyle, cellWidth: 18 },
+            4: { halign: 'right', fontStyle: 'bold' as FontStyle, cellWidth: 33 }
         }
         : {
-            0: { halign: 'left', fontStyle: 'bold', cellWidth: 44 },
+            0: { halign: 'left', fontStyle: 'bold' as FontStyle, cellWidth: 44 },
             1: { halign: 'center', cellWidth: 16 },
             2: { halign: 'right', cellWidth: 27 },
-            3: { halign: 'center', fontStyle: 'bold', cellWidth: 14 },
-            4: { halign: 'right', fontStyle: 'bold', cellWidth: 27 },
+            3: { halign: 'center', fontStyle: 'bold' as FontStyle, cellWidth: 14 },
+            4: { halign: 'right', fontStyle: 'bold' as FontStyle, cellWidth: 27 },
             5: { halign: 'right', cellWidth: 27 },
             6: { halign: 'right', cellWidth: 23 },
             7: { halign: 'center', cellWidth: 14 }
-        };
-    const reducedTableWidth = Object.values(tableColumnStyles).reduce((sum, style) => sum + (style.cellWidth || 0), 0);
+        }) as Record<string, Partial<Styles>>;
+    const reducedTableWidth = Object.values(tableColumnStyles).reduce((sum, style) => (
+        sum + (typeof style.cellWidth === 'number' ? style.cellWidth : 0)
+    ), 0);
     const tableLeftMargin = hideDiscountReferences
         ? Math.max(layout.pageMarginX, (pageWidth - reducedTableWidth) / 2)
         : layout.pageMarginX;
@@ -76,7 +78,8 @@ export function createPdfTableLayout(hideDiscountReferences, pageWidth, layout =
 }
 
 export function groupSummaryTotalsByLine(summaryData = {}) {
-    const totals = Array.isArray(summaryData?.totals) ? summaryData.totals : [];
+    const safeSummaryData = summaryData as Partial<QuoteTotalsResult>;
+    const totals = Array.isArray(safeSummaryData.totals) ? safeSummaryData.totals : [];
     const groupedTotals = totals.reduce((acc, item) => {
         const line = item.line || 'Övrigt';
         if (!acc[line]) {
@@ -136,6 +139,7 @@ function drawGroupSubtitle(doc, title, y, layout, pageMarginX) {
 
 export function drawHeader(doc, { pageWidth, quoteDate, customerInfo = {}, layout = PDF_LAYOUT }) {
     const { pageMarginX, headerTopY, headerLineY } = layout;
+    const safeCustomerInfo = customerInfo as Partial<CustomerInfo>;
 
     drawBrandLogo(doc, pageMarginX, 8, 50, 16, 22, layout);
 
@@ -148,11 +152,11 @@ export function drawHeader(doc, { pageWidth, quoteDate, customerInfo = {}, layou
     doc.setFontSize(9);
     doc.setTextColor(...layout.colors.grayText);
     doc.text(`Datum: ${quoteDate}`, pageWidth - pageMarginX, 22, { align: 'right' });
-    if (customerInfo.reference) {
-        doc.text(`Projektreferens: ${customerInfo.reference}`, pageWidth - pageMarginX, 26, { align: 'right' });
+    if (safeCustomerInfo.reference) {
+        doc.text(`Projektreferens: ${safeCustomerInfo.reference}`, pageWidth - pageMarginX, 26, { align: 'right' });
     }
-    if (customerInfo.customerReference) {
-        doc.text(`Er referens: ${customerInfo.customerReference}`, pageWidth - pageMarginX, 30, { align: 'right' });
+    if (safeCustomerInfo.customerReference) {
+        doc.text(`Er referens: ${safeCustomerInfo.customerReference}`, pageWidth - pageMarginX, 30, { align: 'right' });
     }
 
     doc.setDrawColor(...layout.colors.brandOrange);
@@ -161,13 +165,14 @@ export function drawHeader(doc, { pageWidth, quoteDate, customerInfo = {}, layou
 }
 
 export function renderCustomerInfoBlock(doc, { customerInfo = {}, pageWidth, layout = PDF_LAYOUT }) {
+    const safeCustomerInfo = customerInfo as Partial<CustomerInfo>;
     const customerLines = [];
-    const recipient = customerInfo.company || customerInfo.name || '';
+    const recipient = safeCustomerInfo.company || safeCustomerInfo.name || '';
     if (recipient) {
         customerLines.push({ type: 'recipient', value: recipient });
     }
-    if (customerInfo.validity) {
-        customerLines.push({ type: 'muted', value: `Giltighetstid: ${customerInfo.validity}` });
+    if (safeCustomerInfo.validity) {
+        customerLines.push({ type: 'muted', value: `Giltighetstid: ${safeCustomerInfo.validity}` });
     }
 
     if (customerLines.length === 0) {
@@ -202,12 +207,14 @@ export function renderCustomerInfoBlock(doc, { customerInfo = {}, pageWidth, lay
 }
 
 export function renderExtraNotesBlock(doc, { customerInfo = {}, pageWidth, pageHeight, drawMainHeader, currentY, layout = PDF_LAYOUT }) {
-    if (!customerInfo.extraNotes || !customerInfo.extraNotes.trim()) {
+    const safeCustomerInfo = customerInfo as Partial<CustomerInfo>;
+
+    if (!safeCustomerInfo.extraNotes || !safeCustomerInfo.extraNotes.trim()) {
         return currentY;
     }
 
     const marginX = layout.pageMarginX;
-    const notesText = customerInfo.extraNotes.trim();
+    const notesText = safeCustomerInfo.extraNotes.trim();
 
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(9);
@@ -244,9 +251,10 @@ export function renderGroupedTables(doc, {
     drawMainHeader,
     layout = PDF_LAYOUT
 }) {
+    const safeSummaryData = summaryData as Partial<QuoteTotalsResult>;
     const { groupedTotals, groupKeys } = groupSummaryTotalsByLine(summaryData);
 
-    if (groupKeys.length === 0 || !Array.isArray(summaryData?.totals) || summaryData.totals.length === 0) {
+    if (groupKeys.length === 0 || !Array.isArray(safeSummaryData.totals) || safeSummaryData.totals.length === 0) {
         doc.setFont('helvetica', 'bold');
         doc.setFontSize(10);
         doc.text('Offertdetaljer', layout.pageMarginX, currentY);
@@ -254,7 +262,7 @@ export function renderGroupedTables(doc, {
         doc.setFontSize(8);
         let y = currentY + 6;
 
-        (summaryData?.totals || []).forEach((row) => {
+        (safeSummaryData.totals || []).forEach((row) => {
             if (y > pageHeight - (layout.contentBottomSafe - 3)) {
                 y = startNewPage(doc, drawMainHeader, layout.contentStartY);
             }
@@ -300,28 +308,28 @@ export function renderGroupedTables(doc, {
                 fontSize: 8.5,
                 cellPadding: 2.5,
                 valign: 'middle',
-                textColor: layout.colors.darkText,
-                lineColor: [220, 220, 220],
+                textColor: layout.colors.darkText as Color,
+                lineColor: [220, 220, 220] as Color,
                 lineWidth: 0.1
             },
             headStyles: {
-                fillColor: [35, 35, 45],
-                textColor: [255, 255, 255],
-                fontStyle: 'bold',
+                fillColor: [35, 35, 45] as Color,
+                textColor: [255, 255, 255] as Color,
+                fontStyle: 'bold' as FontStyle,
                 halign: 'center',
                 fontSize: 8
             },
             alternateRowStyles: {
-                fillColor: [248, 249, 250]
+                fillColor: [248, 249, 250] as Color
             },
             columnStyles: tableColumnStyles,
             didParseCell(data) {
                 if (data.section === 'head' && data.column.index === 4) {
-                    data.cell.styles.fillColor = layout.colors.accentGreen;
-                    data.cell.styles.textColor = [255, 255, 255];
+                    data.cell.styles.fillColor = layout.colors.accentGreen as Color;
+                    data.cell.styles.textColor = [255, 255, 255] as Color;
                 }
                 if (data.section === 'body' && data.column.index === 4) {
-                    data.cell.styles.fillColor = [235, 250, 240];
+                    data.cell.styles.fillColor = [235, 250, 240] as Color;
                 }
             },
             margin: {
@@ -600,7 +608,13 @@ export function renderSignatureBlock(doc, {
 }
 
 export function renderFooters(doc, { pageWidth, pageHeight, layout = PDF_LAYOUT }) {
-    const pageCount = doc.internal.getNumberOfPages();
+    const internal = doc.internal as typeof doc.internal & {
+        getNumberOfPages?: () => number;
+        pages?: unknown[];
+    };
+    const pageCount = typeof internal.getNumberOfPages === 'function'
+        ? internal.getNumberOfPages()
+        : Math.max(1, Array.isArray(internal.pages) ? internal.pages.length - 1 : 1);
 
     for (let page = 1; page <= pageCount; page++) {
         doc.setPage(page);

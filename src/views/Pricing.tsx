@@ -9,7 +9,7 @@ import {
     applyGlobalDiscountToGridCustomItems,
     applyGlobalDiscountToLineSelection
 } from '../utils/gridAutoScale';
-import type { PricingProps } from '../types/contracts';
+import type { GridCatalogLineData, PricingProps } from '../types/contracts';
 
 function parseDiscount(value: string): number {
     const parsed = Number.parseFloat(value);
@@ -58,6 +58,7 @@ export function Pricing({ onNext, onPrev }: PricingProps) {
 
         const updatedGridSelections = Object.entries(state.gridSelections || {}).reduce((acc, [lineId, lineSelection]) => {
             const lineData = catalogData[lineId];
+            const gridLineData: GridCatalogLineData | null = lineData?.type === 'grid' ? lineData : null;
             const nextItems = Object.entries(lineSelection.items || {}).reduce<Record<string, any>>((itemsAcc, [key, item]) => {
                 const currentDiscount = Number.isFinite(item.discountPct) ? item.discountPct : 0;
                 itemsAcc[key] = shouldFollowGlobal(currentDiscount)
@@ -67,7 +68,7 @@ export function Pricing({ onNext, onPrev }: PricingProps) {
             }, {});
 
             const nextAddons = Object.entries(lineSelection.addons || {}).reduce<Record<string, any>>((addonsAcc, [addonId, addon]) => {
-                const addonDef = (lineData?.addonCategories || [])
+                const addonDef = (gridLineData?.addonCategories || [])
                     .flatMap((category: any) => category.items || [])
                     .find((item: any) => item.id === addonId);
                 if (addonDef?.autoScale) {
@@ -97,7 +98,7 @@ export function Pricing({ onNext, onPrev }: PricingProps) {
             );
 
             acc[lineId] = applyGlobalDiscountToLineSelection(
-                lineData,
+                gridLineData || undefined,
                 {
                     ...nextLineSelection,
                     items: nextItems,

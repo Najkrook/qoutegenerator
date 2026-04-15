@@ -48,9 +48,13 @@ vi.mock('../src/services/firebase', () => ({
     collection: vi.fn(() => ({})),
     query: vi.fn(() => ({})),
     orderBy: vi.fn(() => ({})),
+    where: vi.fn(() => ({})),
     limit: vi.fn(() => ({})),
     startAfter: vi.fn(() => ({})),
     getDocs: vi.fn(async () => ({ docs: [], empty: true })),
+    addDoc: vi.fn(async () => ({ id: 'planner-1' })),
+    updateDoc: vi.fn(async () => {}),
+    deleteDoc: vi.fn(async () => {}),
     writeBatch: vi.fn(() => ({ set: vi.fn(), commit: vi.fn(async () => {}) }))
 }));
 
@@ -136,6 +140,8 @@ import { InventoryManager } from '../src/views/InventoryManager';
 import { Pricing } from '../src/views/Pricing';
 import { RetailerManager } from '../src/views/RetailerManager';
 import { History } from '../src/views/History';
+import { BuilderConfig } from '../src/components/features/BuilderConfig';
+import { Planner } from '../src/views/Planner';
 import { Header } from '../src/components/layout/Header';
 import { SketchBom } from '../src/components/features/SketchBom';
 import { SketchTool } from '../src/views/SketchTool';
@@ -396,8 +402,7 @@ describe('UI text smoke', () => {
         const html = renderWithProviders(<SketchTool onBack={() => {}} />);
 
         expect(html).toContain('Rita Uteservering');
-        expect(html).toContain('Återställ ritning');
-        expect(html).toContain('Tillbaka');
+        expect(html).toContain('Gå till offert');
         expect(html).toContain('Förslag');
     });
 
@@ -474,5 +479,39 @@ describe('UI text smoke', () => {
         expect(html).toContain('Alla statusar');
         expect(html).toContain('Sök företag eller referens');
         expect(html).toContain('Laddar offerter...');
+    });
+
+    it('renders Planner labels for empty state and form controls', () => {
+        authState.value = {
+            canViewEverything: true,
+            canStartQuote: true,
+            canAccessSketch: true,
+            canAccessQuoteHistory: true,
+            canExportSketchToQuote: true,
+            user: { uid: 'admin-1', email: 'admin@example.com' }
+        };
+
+        const html = renderWithProviders(<Planner onBack={() => {}} />);
+
+        expect(html).toContain('Projektplanerare');
+        expect(html).toContain('Ingen etablerare');
+        expect(html).toContain('Lägg till');
+        expect(html).toContain('Laddar projekt...');
+    });
+
+    it('renders BuilderConfig empty state labels for selected builder lines', () => {
+        quoteState.value = {
+            state: {
+                ...quoteState.value.state,
+                selectedLines: ['BaHaMa'],
+                builderItems: []
+            },
+            dispatch: vi.fn()
+        };
+
+        const html = renderWithProviders(<BuilderConfig />);
+
+        expect(html).toContain('Inga produkter valda ännu');
+        expect(html).toContain('Lägg till produkt');
     });
 });

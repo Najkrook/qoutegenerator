@@ -1,5 +1,6 @@
-// @ts-nocheck
-function slugifyBuilderCategoryId(value, fallback) {
+import type { BuilderCatalogLineData, CatalogData } from '../types/contracts';
+
+function slugifyBuilderCategoryId(value: unknown, fallback: string): string {
     const normalized = String(value || '')
         .normalize('NFKD')
         .replace(/[^\w\s-]/g, '')
@@ -10,14 +11,14 @@ function slugifyBuilderCategoryId(value, fallback) {
     return normalized || fallback;
 }
 
-function withBuilderAddonCategoryIds(catalog) {
-    return Object.entries(catalog || {}).reduce((catalogAcc, [lineId, lineData]) => {
+function withBuilderAddonCategoryIds(catalog: CatalogData): CatalogData {
+    return Object.entries(catalog).reduce<CatalogData>((catalogAcc, [lineId, lineData]) => {
         if (lineData?.type !== 'builder' || !lineData?.models) {
             catalogAcc[lineId] = lineData;
             return catalogAcc;
         }
 
-        const models = Object.entries(lineData.models).reduce((modelsAcc, [modelId, modelData]) => {
+        const models = Object.entries(lineData.models).reduce<BuilderCatalogLineData['models']>((modelsAcc, [modelId, modelData]) => {
             if (!Array.isArray(modelData?.addonCategories)) {
                 modelsAcc[modelId] = modelData;
                 return modelsAcc;
@@ -41,7 +42,7 @@ function withBuilderAddonCategoryIds(catalog) {
     }, {});
 }
 
-export const catalogData = withBuilderAddonCategoryIds({
+const rawCatalogData: CatalogData = {
     BaHaMa: {
         name: "BaHaMa",
         type: "builder",
@@ -689,4 +690,6 @@ export const catalogData = withBuilderAddonCategoryIds({
             }
         }
     }
-});
+};
+
+export const catalogData: CatalogData = withBuilderAddonCategoryIds(rawCatalogData);

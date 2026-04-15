@@ -1,4 +1,5 @@
 import { buildEffectiveGridSelections } from '../utils/gridAutoScale';
+import type { GridAddonState } from '../types/contracts';
 
 const ADDONS_ONLY_SIZE = '__addons_only__';
 
@@ -332,7 +333,7 @@ export function computeQuoteTotals({ state, catalogData }) {
         }
 
         for (const addonId of Object.keys(effectiveGridSelections.addons || {})) {
-            const addonState = effectiveGridSelections.addons[addonId] || {};
+            const addonState = (effectiveGridSelections.addons[addonId] || {}) as Partial<GridAddonState>;
             const addonDef = findGridAddon(lineData, addonId);
             const basePrice = toFloat(addonDef?.price || 0);
             const unitPrice = getUnitSekPrice(basePrice, line, safeCatalog, exchangeRate);

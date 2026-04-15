@@ -109,12 +109,45 @@ export interface GridCustomAddonRow {
     discountPct: number;
 }
 
+export interface GridCustomItemRow {
+    id: string;
+    name: string;
+    size: string;
+    price: number;
+    qty: number;
+    discountPct: number;
+}
+
+export type GridAddonSyncMode = 'auto' | 'manual';
+
+export type GridAddonDiscountSyncMode = 'global' | 'manual';
+
+export interface GridItemSelectionState {
+    qty: number;
+    discountPct: number;
+}
+
+export interface GridAddonState {
+    qty: number;
+    discountPct: number;
+    syncMode?: GridAddonSyncMode;
+    discountSyncMode?: GridAddonDiscountSyncMode;
+}
+
+export interface EffectiveGridAddonState extends GridAddonState {
+    qty: number;
+    discountPct: number;
+    syncMode: GridAddonSyncMode;
+    discountSyncMode: GridAddonDiscountSyncMode;
+    isAutoScaled: boolean;
+}
+
 export interface GridLineSelection {
-    items: Record<string, any>;
-    addons: Record<string, any>;
+    items: Record<string, GridItemSelectionState>;
+    addons: Record<string, GridAddonState>;
     customAddonsByCategory: Record<string, GridCustomAddonRow[]>;
-    customItems?: any[];
-    [key: string]: any;
+    customItems?: GridCustomItemRow[];
+    [key: string]: unknown;
 }
 
 export type GridSelections = Record<string, GridLineSelection>;
@@ -134,6 +167,69 @@ export interface CustomBuilderAddon extends CatalogBuilderAddon {
 
 export type BuilderAddon = CatalogBuilderAddon | CustomBuilderAddon;
 
+export interface BuilderCatalogSizeOption {
+    price: number;
+}
+
+export interface BuilderCatalogAddonOption {
+    id: string;
+    name: string;
+    price: number;
+}
+
+export interface BuilderCatalogAddonCategory {
+    id?: string;
+    name: string;
+    items: BuilderCatalogAddonOption[];
+}
+
+export interface BuilderCatalogModelData {
+    name: string;
+    sizes: Record<string, BuilderCatalogSizeOption>;
+    addons?: BuilderCatalogAddonOption[];
+    addonCategories?: BuilderCatalogAddonCategory[];
+}
+
+export interface BuilderCatalogLineData {
+    name: string;
+    type: 'builder';
+    currency: string;
+    models: Record<string, BuilderCatalogModelData>;
+}
+
+export interface GridCatalogSizeOption {
+    size: string;
+    price: number;
+}
+
+export interface GridCatalogItemGroup {
+    model: string;
+    sizes: GridCatalogSizeOption[];
+}
+
+export interface GridCatalogAddonOption extends BuilderCatalogAddonOption {
+    autoScale?: boolean;
+}
+
+export interface GridCatalogAddonCategory {
+    id?: string;
+    categoryId?: string;
+    name: string;
+    items: GridCatalogAddonOption[];
+}
+
+export interface GridCatalogLineData {
+    name: string;
+    type: 'grid';
+    currency: string;
+    gridItems: GridCatalogItemGroup[];
+    addonCategories: GridCatalogAddonCategory[];
+}
+
+export type CatalogLineData = BuilderCatalogLineData | GridCatalogLineData;
+
+export type CatalogData = Record<string, CatalogLineData>;
+
 export interface BuilderItem {
     id: string;
     line: string;
@@ -144,7 +240,13 @@ export interface BuilderItem {
     addons: BuilderAddon[];
     source?: string;
     sourceType?: string;
-    [key: string]: any;
+    [key: string]: unknown;
+}
+
+export interface EffectiveGridLineSelection {
+    items: GridLineSelection['items'];
+    addons: Record<string, EffectiveGridAddonState>;
+    itemsQtyTotal: number;
 }
 
 export interface SketchMeta {
@@ -474,6 +576,18 @@ export interface ProductLineSelectionProps {
     onNext: () => void;
 }
 
+export interface BuilderConfigProps {}
+
+export interface BuilderItemProps {
+    item: BuilderItem;
+    index: number;
+    onRemove: (id: string) => void;
+}
+
+export interface GridConfigProps {
+    lineId: string;
+}
+
 export interface ConfigurationProps {
     onNext: () => void;
     onPrev: () => void;
@@ -495,6 +609,10 @@ export type HydratedQuoteStatePayload = Partial<QuoteState> | Record<string, any
 export interface HistoryProps {
     onBack?: () => void;
     onOpenQuote?: (payload: HydratedQuoteStatePayload) => void;
+}
+
+export interface PlannerProps {
+    onBack?: () => void;
 }
 
 export interface TermsAndPaymentPanelProps {
@@ -661,6 +779,24 @@ export interface PaginatedLogPageState<Row> {
     hasNext: boolean;
     rows: Row[];
     error?: boolean;
+}
+
+export type PlannerContractor = '' | 'Stabil' | 'Tavi';
+
+export type PlannerPriority = 'Låg' | 'Normal' | 'Hög';
+
+export interface PlannerProject {
+    id: string;
+    title: string;
+    done: boolean;
+    contractor: PlannerContractor;
+    priority: PlannerPriority;
+    createdAt: number;
+    createdBy: string;
+    week: string;
+    address?: string;
+    phone?: string;
+    notes?: string;
 }
 
 export interface AuthContextValue {

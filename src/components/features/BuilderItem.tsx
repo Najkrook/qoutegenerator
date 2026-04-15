@@ -1,14 +1,43 @@
-// @ts-nocheck
-import React from 'react';
+import type { ChangeEvent, ReactNode } from 'react';
 import { useQuote } from '../../store/QuoteContext';
 import { catalogData } from '../../data/catalog';
+import type {
+    BuilderAddon,
+    BuilderCatalogAddonCategory,
+    BuilderCatalogAddonOption,
+    BuilderCatalogLineData,
+    BuilderCatalogModelData,
+    BuilderItem as QuoteBuilderItem,
+    BuilderItemProps,
+    CatalogBuilderAddon,
+    CustomBuilderAddon
+} from '../../types/contracts';
 
 const BUILDER_UNCATEGORIZED_CATEGORY_ID = '__uncategorized__';
 export const ADDONS_ONLY_SIZE = '__addons_only__';
 
-function createCustomAddon(itemQty, globalDiscountPct, categoryId) {
+const typedCatalogData = catalogData as Record<string, BuilderCatalogLineData | undefined>;
+
+interface NormalizedBuilderAddonCategory extends BuilderCatalogAddonCategory {
+    id: string;
+}
+
+function createBuilderItemId(prefix: string): string {
+    return `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+}
+
+function isCustomBuilderAddon(addon: BuilderAddon): addon is CustomBuilderAddon {
+    return 'isCustom' in addon && addon.isCustom === true;
+}
+
+function getBuilderLine(lineId: string): BuilderCatalogLineData | null {
+    const lineData = typedCatalogData[lineId];
+    return lineData?.type === 'builder' ? lineData : null;
+}
+
+function createCustomAddon(itemQty: number, globalDiscountPct: number, categoryId: string): CustomBuilderAddon {
     return {
-        id: `builder_custom_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+        id: createBuilderItemId('builder_custom'),
         qty: itemQty,
         discountPct: globalDiscountPct,
         isCustom: true,
@@ -18,11 +47,11 @@ function createCustomAddon(itemQty, globalDiscountPct, categoryId) {
     };
 }
 
-function getBuilderCategoryId(category, index) {
-    return String(category?.id || `category_${index}`);
+function getBuilderCategoryId(category: BuilderCatalogAddonCategory, index: number): string {
+    return String(category.id || `category_${index}`);
 }
 
-function getBuilderAddonCategories(modelData) {
+function getBuilderAddonCategories(modelData: BuilderCatalogModelData | null): NormalizedBuilderAddonCategory[] {
     const categories = Array.isArray(modelData?.addonCategories)
         ? modelData.addonCategories.map((category, index) => ({
             ...category,
@@ -42,135 +71,153 @@ function getBuilderAddonCategories(modelData) {
     return categories;
 }
 
-export function BuilderItem({ item, index, onRemove }) {
+function getPriceSek(price: number, lineData: BuilderCatalogLineData | null, exchangeRate: number): number {
+    return lineData?.currency === 'EUR' ? Math.round(price * exchangeRate) : price;
+}
+
+function buildSizeOptionGroups(sizes: Record<string, unknown>): Record<string, string[]> {
+    const groups: Record<string, string[]> = {};
+    const noGroup: string[] = [];
+
+    Object.keys(sizes).forEach((sizeLabel) => {
+        let matchedGroup: string | null = null;
+        const lower = sizeLabel.toLowerCase();
+
+        if (lower.includes('kvadrat')) {
+            matchedGroup = 'Kvadrat';
+        } else if (lower.includes('runda') || sizeLabel.includes('*') || sizeLabel.includes('Ø')) {
+            matchedGroup = 'Runda';
+        } else if (lower.includes('rektangel')) {
+            matchedGroup = 'Rektangel';
+        } else if (sizeLabel.includes('x')) {
+            const parts = sizeLabel.split('x').map((part) => part.trim());
+            if (parts.length === 2) {
+                matchedGroup = parts[0] === parts[1] ? 'Kvadrat' : 'Rektangel';
+            }
+        }
+
+        if (matchedGroup) {
+            groups[matchedGroup] = groups[matchedGroup] || [];
+            groups[matchedGroup].push(sizeLabel);
+        } else {
+            noGroup.push(sizeLabel);
+        }
+    });
+
+    return {
+        __ungrouped__: noGroup,
+        ...groups
+    };
+}
+
+export function BuilderItem({ item, index, onRemove }: BuilderItemProps) {
     const { state, dispatch } = useQuote();
     const { exchangeRate, globalDiscountPct } = state;
 
-    const lineData = catalogData[item.line];
-    const modelData = lineData?.models?.[item.model];
+    const lineData = getBuilderLine(item.line);
+    const modelData = lineData?.models?.[item.model] || null;
     const addonCategories = getBuilderAddonCategories(modelData);
+    const isAddonsOnly = item.size === ADDONS_ONLY_SIZE;
+    const supportsAddonsOnly = item.line === 'BaHaMa';
 
-    const updateItem = (updates) => {
-        const newItems = state.builderItems.map((i) => (i.id === item.id ? { ...i, ...updates } : i));
+    const updateItem = (updates: Partial<QuoteBuilderItem>) => {
+        const newItems = state.builderItems.map((existingItem) => (
+            existingItem.id === item.id ? { ...existingItem, ...updates } : existingItem
+        ));
         dispatch({ type: 'SET_BUILDER_ITEMS', payload: newItems });
     };
 
-    const isAddonsOnly = item.size === ADDONS_ONLY_SIZE;
+    const handleLineChange = (event: ChangeEvent<HTMLSelectElement>) => {
+        const newLine = event.target.value;
+        const nextLineData = getBuilderLine(newLine);
+        if (!nextLineData) return;
 
-    const handleLineChange = (e) => {
-        const newLine = e.target.value;
-        const newModels = Object.keys(catalogData[newLine].models);
+        const newModels = Object.keys(nextLineData.models);
         const newModel = newModels[0];
-        const newSize = isAddonsOnly ? ADDONS_ONLY_SIZE : Object.keys(catalogData[newLine].models[newModel].sizes)[0];
+        const newSize = isAddonsOnly
+            ? ADDONS_ONLY_SIZE
+            : Object.keys(nextLineData.models[newModel]?.sizes || {})[0] || '';
+
         updateItem({ line: newLine, model: newModel, size: newSize, addons: [] });
     };
 
-    const handleModelChange = (e) => {
-        const newModel = e.target.value;
-        const newSize = isAddonsOnly ? ADDONS_ONLY_SIZE : Object.keys(lineData.models[newModel].sizes)[0];
+    const handleModelChange = (event: ChangeEvent<HTMLSelectElement>) => {
+        const newModel = event.target.value;
+        if (!lineData?.models[newModel]) return;
+
+        const newSize = isAddonsOnly
+            ? ADDONS_ONLY_SIZE
+            : Object.keys(lineData.models[newModel].sizes || {})[0] || '';
+
         updateItem({ model: newModel, size: newSize, addons: [] });
     };
 
-    const handleSizeChange = (e) => {
-        updateItem({ size: e.target.value });
+    const handleSizeChange = (event: ChangeEvent<HTMLSelectElement>) => {
+        updateItem({ size: event.target.value });
     };
 
-    const handleQtyChange = (e) => {
-        const newQty = parseInt(e.target.value, 10) || 1;
+    const handleQtyChange = (event: ChangeEvent<HTMLInputElement>) => {
+        const newQty = Number.parseInt(event.target.value, 10) || 1;
         const oldQty = item.qty;
-        
-        const newAddons = item.addons.map((a) => {
-            if (a.isCustom !== true && a.qty === oldQty) {
-                return { ...a, qty: newQty };
+
+        const newAddons = item.addons.map((addon) => {
+            if (!isCustomBuilderAddon(addon) && addon.qty === oldQty) {
+                return { ...addon, qty: newQty };
             }
-            return a;
+            return addon;
         });
 
         updateItem({ qty: newQty, addons: newAddons });
     };
 
-    const toggleAddon = (addonId, isChecked) => {
+    const toggleAddon = (addonId: string, isChecked: boolean) => {
         let newAddons = [...item.addons];
         if (isChecked) {
-            newAddons.push({ id: addonId, qty: item.qty, discountPct: globalDiscountPct });
+            const nextAddon: CatalogBuilderAddon = {
+                id: addonId,
+                qty: item.qty,
+                discountPct: globalDiscountPct
+            };
+            newAddons.push(nextAddon);
         } else {
-            newAddons = newAddons.filter((a) => a.isCustom === true || a.id !== addonId);
+            newAddons = newAddons.filter((addon) => isCustomBuilderAddon(addon) || addon.id !== addonId);
         }
         updateItem({ addons: newAddons });
     };
 
-    const updateAddonQty = (addonId, qty) => {
-        const newAddons = item.addons.map((a) => (
-            a.isCustom !== true && a.id === addonId ? { ...a, qty: parseInt(qty, 10) || 1 } : a
+    const updateAddonQty = (addonId: string, qtyValue: string) => {
+        const newQty = Number.parseInt(qtyValue, 10) || 1;
+        const newAddons = item.addons.map((addon) => (
+            !isCustomBuilderAddon(addon) && addon.id === addonId ? { ...addon, qty: newQty } : addon
         ));
         updateItem({ addons: newAddons });
     };
 
-    const addCustomAddon = (categoryId) => {
+    const addCustomAddon = (categoryId: string) => {
         updateItem({
             addons: [...item.addons, createCustomAddon(item.qty, globalDiscountPct, categoryId)]
         });
     };
 
-    const updateCustomAddon = (customAddonId, updates) => {
+    const updateCustomAddon = (customAddonId: string, updates: Partial<CustomBuilderAddon>) => {
         updateItem({
             addons: item.addons.map((addon) => (
-                addon.isCustom === true && addon.id === customAddonId
+                isCustomBuilderAddon(addon) && addon.id === customAddonId
                     ? { ...addon, ...updates }
                     : addon
             ))
         });
     };
 
-    const removeCustomAddon = (customAddonId) => {
+    const removeCustomAddon = (customAddonId: string) => {
         updateItem({
-            addons: item.addons.filter((addon) => !(addon.isCustom === true && addon.id === customAddonId))
+            addons: item.addons.filter((addon) => !(isCustomBuilderAddon(addon) && addon.id === customAddonId))
         });
     };
 
-    const getPriceSEK = (price, line) => {
-        const currency = catalogData[line]?.currency;
-        return currency === 'EUR' ? Math.round(price * exchangeRate) : price;
-    };
-
-    const supportsAddonsOnly = item.line === 'BaHaMa';
-
-    const renderSizeOptions = (sizesObj) => {
-        const groups = {};
-        const noGroup = [];
-
-        Object.keys(sizesObj).forEach((s) => {
-            let matchedGroup = null;
-
-            // Explicit shape in name
-            if (s.toLowerCase().includes('kvadrat') || s.includes('Kvadrat')) {
-                matchedGroup = 'Kvadrat';
-            } else if (s.toLowerCase().includes('runda') || s.includes('Runda') || s.includes('*') || s.includes('Ø')) {
-                matchedGroup = 'Runda';
-            } else if (s.toLowerCase().includes('rektangel') || s.includes('Rektangel')) {
-                matchedGroup = 'Rektangel';
-            }
-            // Implicit shape from dimensions (like 2x2 or 2,5x2)
-            else if (s.includes('x')) {
-                const parts = s.split('x').map(p => p.trim());
-                if (parts.length === 2) {
-                    if (parts[0] === parts[1]) {
-                        matchedGroup = 'Kvadrat';
-                    } else {
-                        matchedGroup = 'Rektangel';
-                    }
-                }
-            }
-
-            if (matchedGroup) {
-                if (!groups[matchedGroup]) groups[matchedGroup] = [];
-                groups[matchedGroup].push(s);
-            } else {
-                noGroup.push(s);
-            }
-        });
-
-        const elements = [];
+    const renderSizeOptions = (sizes: Record<string, unknown>): ReactNode[] => {
+        const groupedSizes = buildSizeOptionGroups(sizes);
+        const elements: ReactNode[] = [];
 
         if (supportsAddonsOnly) {
             elements.push(
@@ -182,68 +229,87 @@ export function BuilderItem({ item, index, onRemove }) {
             );
         }
 
-        noGroup.forEach((s) => {
+        groupedSizes.__ungrouped__.forEach((sizeLabel) => {
             elements.push(
-                <option key={s} value={s} className="bg-panel-bg text-text-primary">
-                    {s}
+                <option key={sizeLabel} value={sizeLabel} className="bg-panel-bg text-text-primary">
+                    {sizeLabel}
                 </option>
             );
         });
 
-        Object.keys(groups).forEach((gName) => {
-            elements.push(
-                <optgroup key={gName} label={`--- ${gName.toUpperCase()} ---`} className="bg-panel-bg text-primary font-bold italic">
-                    {groups[gName].map((s) => (
-                        <option key={s} value={s} className="bg-panel-bg text-text-primary font-normal not-italic">
-                            {s}
-                        </option>
-                    ))}
-                </optgroup>
-            );
-        });
+        Object.entries(groupedSizes)
+            .filter(([groupName]) => groupName !== '__ungrouped__')
+            .forEach(([groupName, sizeLabels]) => {
+                elements.push(
+                    <optgroup
+                        key={groupName}
+                        label={`--- ${groupName.toUpperCase()} ---`}
+                        className="bg-panel-bg text-primary font-bold italic"
+                    >
+                        {sizeLabels.map((sizeLabel) => (
+                            <option key={sizeLabel} value={sizeLabel} className="bg-panel-bg text-text-primary font-normal not-italic">
+                                {sizeLabel}
+                            </option>
+                        ))}
+                    </optgroup>
+                );
+            });
 
         return elements;
     };
 
     const itemBasePrice = modelData?.sizes?.[item.size]?.price || 0;
-    const itemUnitPrice = getPriceSEK(itemBasePrice, item.line);
+    const itemUnitPrice = getPriceSek(itemBasePrice, lineData, exchangeRate);
     const itemBaseTotal = itemUnitPrice * item.qty;
 
     let addonsTotal = 0;
     item.addons.forEach((addon) => {
-        if (addon.isCustom === true) {
-            addonsTotal += (parseFloat(addon.price) || 0) * (parseInt(addon.qty, 10) || 1);
+        if (isCustomBuilderAddon(addon)) {
+            addonsTotal += (Number(addon.price) || 0) * (Number(addon.qty) || 1);
             return;
         }
 
         let addonPrice = 0;
-        addonCategories.forEach((cat) => {
-            const found = cat.items.find((i) => i.id === addon.id);
-            if (found) addonPrice = found.price;
+        addonCategories.forEach((category) => {
+            const found = category.items.find((catalogAddon) => catalogAddon.id === addon.id);
+            if (found) {
+                addonPrice = found.price;
+            }
         });
-        addonsTotal += getPriceSEK(addonPrice, item.line) * (parseInt(addon.qty, 10) || 1);
+        addonsTotal += getPriceSek(addonPrice, lineData, exchangeRate) * (Number(addon.qty) || 1);
     });
 
     const itemGrandTotal = itemBaseTotal + addonsTotal;
     const selectedAddonCount = item.addons.length;
     const selectedAddonBadgeText = selectedAddonCount === 1 ? '1 tillägg' : `${selectedAddonCount} tillägg`;
-    const getSelectedCategoryCount = (category) => {
-        const selectedCatalogCount = category.items.filter((addon) => (
-            item.addons.some((selected) => selected.isCustom !== true && selected.id === addon.id)
+
+    const getSelectedCategoryCount = (category: NormalizedBuilderAddonCategory): number => {
+        const selectedCatalogCount = category.items.filter((addonOption) => (
+            item.addons.some((selectedAddon) => !isCustomBuilderAddon(selectedAddon) && selectedAddon.id === addonOption.id)
         )).length;
-        const selectedCustomCount = item.addons.filter((selected) => (
-            selected.isCustom === true && selected.categoryId === category.id
+        const selectedCustomCount = item.addons.filter((selectedAddon) => (
+            isCustomBuilderAddon(selectedAddon) && selectedAddon.categoryId === category.id
         )).length;
         return selectedCatalogCount + selectedCustomCount;
     };
-    const getSelectedCategoryLabel = (count) => (count === 1 ? '1 vald' : `${count} valda`);
+
+    const getSelectedCategoryLabel = (count: number): string => (count === 1 ? '1 vald' : `${count} valda`);
+
+    const availableBuilderLines = Array.from(new Set([
+        ...state.selectedLines.filter((lineId) => getBuilderLine(lineId) !== null),
+        item.line
+    ]));
+
+    if (!lineData || !modelData) {
+        return null;
+    }
 
     return (
         <div className={`bg-panel-bg border rounded-lg p-6 mb-6 relative animate-slide-in ${isAddonsOnly ? 'border-primary/40' : 'border-panel-border'}`}>
             <div className="flex justify-between items-center mb-4 pb-4 border-bottom border-panel-border">
                 <h3 className="text-lg font-semibold m-0 flex items-center gap-2">
                     <span className="text-text-secondary cursor-grab">=</span>
-                    {isAddonsOnly ? `Enbart Tillägg (${item.model})` : `Produkt ${index + 1} (${item.line})`}
+                    {isAddonsOnly ? `Enbart tillägg (${item.model})` : `Produkt ${index + 1} (${item.line})`}
                     {isAddonsOnly && (
                         <span className="inline-flex items-center rounded-full bg-secondary/20 px-2.5 py-1 text-xs font-semibold text-secondary">
                             Utan parasoll
@@ -271,9 +337,9 @@ export function BuilderItem({ item, index, onRemove }) {
                         onChange={handleLineChange}
                         className="bg-input-bg border border-panel-border text-text-primary p-2 rounded-md outline-none focus:border-primary"
                     >
-                        {Array.from(new Set([...state.selectedLines.filter((l) => catalogData[l].type === 'builder'), item.line])).map((l) => (
-                            <option key={l} value={l} className="bg-panel-bg text-text-primary">
-                                {catalogData[l] ? catalogData[l].name : l}
+                        {availableBuilderLines.map((lineId) => (
+                            <option key={lineId} value={lineId} className="bg-panel-bg text-text-primary">
+                                {getBuilderLine(lineId)?.name || lineId}
                             </option>
                         ))}
                     </select>
@@ -286,9 +352,9 @@ export function BuilderItem({ item, index, onRemove }) {
                         onChange={handleModelChange}
                         className="bg-input-bg border border-panel-border text-text-primary p-2 rounded-md outline-none focus:border-primary"
                     >
-                        {Object.keys(lineData.models).map((m) => (
-                            <option key={m} value={m} className="bg-panel-bg text-text-primary">
-                                {lineData.models[m].name}
+                        {Object.entries(lineData.models).map(([modelId, catalogModel]) => (
+                            <option key={modelId} value={modelId} className="bg-panel-bg text-text-primary">
+                                {catalogModel.name}
                             </option>
                         ))}
                     </select>
@@ -319,7 +385,9 @@ export function BuilderItem({ item, index, onRemove }) {
                 {!isAddonsOnly && (
                     <div className="flex flex-col gap-1.5">
                         <label className="text-xs font-semibold text-text-secondary uppercase">Summa</label>
-                        <div className="font-bold text-lg text-text-primary flex items-center h-10">{itemBaseTotal.toLocaleString('sv-SE')} SEK</div>
+                        <div className="font-bold text-lg text-text-primary flex items-center h-10">
+                            {itemBaseTotal.toLocaleString('sv-SE')} SEK
+                        </div>
                     </div>
                 )}
             </div>
@@ -330,107 +398,118 @@ export function BuilderItem({ item, index, onRemove }) {
                         <span className="text-sm font-semibold uppercase tracking-wide text-text-primary">Tillägg</span>
                         <span className="flex items-center gap-3 text-xs text-text-secondary">
                             {selectedAddonCount > 0 ? `${selectedAddonCount} valda` : 'Inga valda'}
-                            <span className="transition-transform group-open:rotate-180">▼</span>
+                            <span className="transition-transform group-open:rotate-180">v</span>
                         </span>
                     </summary>
 
                     <div className="mt-4 space-y-4">
-                        {addonCategories.map((cat) => {
-                            const selectedCategoryCount = getSelectedCategoryCount(cat);
-                            const customAddons = item.addons.filter((addon) => addon.isCustom === true && addon.categoryId === cat.id);
+                        {addonCategories.map((category) => {
+                            const selectedCategoryCount = getSelectedCategoryCount(category);
+                            const customAddons = item.addons.filter(
+                                (addon): addon is CustomBuilderAddon => isCustomBuilderAddon(addon) && addon.categoryId === category.id
+                            );
 
                             return (
-                            <details key={cat.id} className="bg-black/10 border border-panel-border rounded-md overflow-hidden group">
-                                <summary className="p-3 text-sm font-semibold text-primary uppercase cursor-pointer list-none flex justify-between items-center group-open:border-b group-open:border-panel-border">
-                                    <span>{cat.name}</span>
-                                    <span className="flex items-center gap-3">
-                                        {selectedCategoryCount > 0 && (
-                                            <span className="inline-flex items-center rounded-full bg-primary/20 px-2.5 py-1 text-[11px] font-semibold normal-case tracking-normal text-primary">
-                                                {getSelectedCategoryLabel(selectedCategoryCount)}
-                                            </span>
-                                        )}
-                                        <span className="text-xs transition-transform group-open:rotate-180">▼</span>
-                                    </span>
-                                </summary>
-                                <div className="p-4 space-y-3">
-                                        {cat.items.map((addon) => {
-                                        const existing = item.addons.find((a) => a.isCustom !== true && a.id === addon.id);
-                                        const isChecked = !!existing;
-                                        const priceSEK = getPriceSEK(addon.price, item.line);
-                                        return (
-                                            <div key={addon.id} className="grid grid-cols-[1fr_auto_auto_auto] items-center gap-4">
-                                                <label className="flex items-center gap-2 cursor-pointer text-sm">
+                                <details key={category.id} className="bg-black/10 border border-panel-border rounded-md overflow-hidden group">
+                                    <summary className="p-3 text-sm font-semibold text-primary uppercase cursor-pointer list-none flex justify-between items-center group-open:border-b group-open:border-panel-border">
+                                        <span>{category.name}</span>
+                                        <span className="flex items-center gap-3">
+                                            {selectedCategoryCount > 0 && (
+                                                <span className="inline-flex items-center rounded-full bg-primary/20 px-2.5 py-1 text-[11px] font-semibold normal-case tracking-normal text-primary">
+                                                    {getSelectedCategoryLabel(selectedCategoryCount)}
+                                                </span>
+                                            )}
+                                            <span className="text-xs transition-transform group-open:rotate-180">v</span>
+                                        </span>
+                                    </summary>
+                                    <div className="p-4 space-y-3">
+                                        {category.items.map((addonOption: BuilderCatalogAddonOption) => {
+                                            const existingAddon = item.addons.find((addon) => (
+                                                !isCustomBuilderAddon(addon) && addon.id === addonOption.id
+                                            ));
+                                            const isChecked = Boolean(existingAddon);
+                                            const priceSek = getPriceSek(addonOption.price, lineData, exchangeRate);
+
+                                            return (
+                                                <div key={addonOption.id} className="grid grid-cols-[1fr_auto_auto_auto] items-center gap-4">
+                                                    <label className="flex items-center gap-2 cursor-pointer text-sm">
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={isChecked}
+                                                            onChange={(event) => toggleAddon(addonOption.id, event.target.checked)}
+                                                            className="w-4 h-4 accent-primary"
+                                                        />
+                                                        {addonOption.name}
+                                                    </label>
+                                                    <span className="text-sm text-text-secondary whitespace-nowrap">
+                                                        {priceSek.toLocaleString('sv-SE')} SEK
+                                                    </span>
                                                     <input
-                                                        type="checkbox"
-                                                        checked={isChecked}
-                                                        onChange={(e) => toggleAddon(addon.id, e.target.checked)}
-                                                        className="w-4 h-4 accent-primary"
+                                                        type="number"
+                                                        min="1"
+                                                        value={isChecked ? existingAddon?.qty || item.qty : item.qty}
+                                                        disabled={!isChecked}
+                                                        onChange={(event) => updateAddonQty(addonOption.id, event.target.value)}
+                                                        className="bg-input-bg border border-panel-border text-text-primary p-1.5 rounded-md outline-none focus:border-primary w-16 text-sm disabled:opacity-50"
                                                     />
-                                                    {addon.name}
-                                                </label>
-                                                <span className="text-sm text-text-secondary whitespace-nowrap">{priceSEK.toLocaleString('sv-SE')} SEK</span>
-                                                <input
-                                                    type="number"
-                                                    min="1"
-                                                    value={isChecked ? existing.qty : item.qty}
-                                                    disabled={!isChecked}
-                                                    onChange={(e) => updateAddonQty(addon.id, e.target.value)}
-                                                    className="bg-input-bg border border-panel-border text-text-primary p-1.5 rounded-md outline-none focus:border-primary w-16 text-sm disabled:opacity-50"
-                                                />
-                                                <span className="text-sm font-semibold min-w-[100px] text-right">
-                                                    {isChecked ? `= ${(priceSEK * (parseInt(existing.qty, 10) || 1)).toLocaleString('sv-SE')} SEK` : ''}
-                                                </span>
-                                            </div>
-                                        );
-                                    })}
-                                    {customAddons.map((addon) => {
-                                        const addonQty = parseInt(addon.qty, 10) || 1;
-                                        const addonPrice = parseFloat(addon.price) || 0;
-                                        return (
-                                            <div key={addon.id} className="grid grid-cols-[1fr_auto_auto_auto_auto] items-center gap-4">
-                                                <input
-                                                    type="text"
-                                                    value={addon.name || ''}
-                                                    onChange={(e) => updateCustomAddon(addon.id, { name: e.target.value })}
-                                                    placeholder="Egen rad"
-                                                    className="bg-input-bg border border-panel-border text-text-primary p-1.5 rounded-md outline-none focus:border-primary text-sm"
-                                                />
-                                                <input
-                                                    type="number"
-                                                    min="0"
-                                                    value={addonPrice}
-                                                    onChange={(e) => updateCustomAddon(addon.id, { price: parseFloat(e.target.value) || 0 })}
-                                                    className="bg-input-bg border border-panel-border text-text-primary p-1.5 rounded-md outline-none focus:border-primary w-24 text-sm text-right"
-                                                />
-                                                <input
-                                                    type="number"
-                                                    min="1"
-                                                    value={addonQty}
-                                                    onChange={(e) => updateCustomAddon(addon.id, { qty: parseInt(e.target.value, 10) || 1 })}
-                                                    className="bg-input-bg border border-panel-border text-text-primary p-1.5 rounded-md outline-none focus:border-primary w-16 text-sm"
-                                                />
-                                                <span className="text-sm font-semibold min-w-[100px] text-right">
-                                                    = {(addonPrice * addonQty).toLocaleString('sv-SE')} SEK
-                                                </span>
-                                                <button
-                                                    type="button"
-                                                    onClick={() => removeCustomAddon(addon.id)}
-                                                    className="text-danger bg-transparent border-none text-sm font-medium cursor-pointer hover:underline justify-self-end"
-                                                >
-                                                    Ta bort
-                                                </button>
-                                            </div>
-                                        );
-                                    })}
-                                    <button
-                                        type="button"
-                                        onClick={() => addCustomAddon(cat.id)}
-                                        className="w-full rounded-md border border-dashed border-panel-border bg-white/[0.02] px-3 py-2 text-left text-sm font-medium text-primary hover:bg-white/[0.05] transition-colors"
-                                    >
-                                        + Lägg till egen rad
-                                    </button>
-                                </div>
-                            </details>
+                                                    <span className="text-sm font-semibold min-w-[100px] text-right">
+                                                        {isChecked
+                                                            ? `= ${(priceSek * (Number(existingAddon?.qty) || 1)).toLocaleString('sv-SE')} SEK`
+                                                            : ''}
+                                                    </span>
+                                                </div>
+                                            );
+                                        })}
+
+                                        {customAddons.map((addon) => {
+                                            const addonQty = Number(addon.qty) || 1;
+                                            const addonPrice = Number(addon.price) || 0;
+                                            return (
+                                                <div key={addon.id} className="grid grid-cols-[1fr_auto_auto_auto_auto] items-center gap-4">
+                                                    <input
+                                                        type="text"
+                                                        value={addon.name || ''}
+                                                        onChange={(event) => updateCustomAddon(addon.id, { name: event.target.value })}
+                                                        placeholder="Egen rad"
+                                                        className="bg-input-bg border border-panel-border text-text-primary p-1.5 rounded-md outline-none focus:border-primary text-sm"
+                                                    />
+                                                    <input
+                                                        type="number"
+                                                        min="0"
+                                                        value={addonPrice}
+                                                        onChange={(event) => updateCustomAddon(addon.id, { price: Number.parseFloat(event.target.value) || 0 })}
+                                                        className="bg-input-bg border border-panel-border text-text-primary p-1.5 rounded-md outline-none focus:border-primary w-24 text-sm text-right"
+                                                    />
+                                                    <input
+                                                        type="number"
+                                                        min="1"
+                                                        value={addonQty}
+                                                        onChange={(event) => updateCustomAddon(addon.id, { qty: Number.parseInt(event.target.value, 10) || 1 })}
+                                                        className="bg-input-bg border border-panel-border text-text-primary p-1.5 rounded-md outline-none focus:border-primary w-16 text-sm"
+                                                    />
+                                                    <span className="text-sm font-semibold min-w-[100px] text-right">
+                                                        = {(addonPrice * addonQty).toLocaleString('sv-SE')} SEK
+                                                    </span>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => removeCustomAddon(addon.id)}
+                                                        className="text-danger bg-transparent border-none text-sm font-medium cursor-pointer hover:underline justify-self-end"
+                                                    >
+                                                        Ta bort
+                                                    </button>
+                                                </div>
+                                            );
+                                        })}
+
+                                        <button
+                                            type="button"
+                                            onClick={() => addCustomAddon(category.id)}
+                                            className="w-full rounded-md border border-dashed border-panel-border bg-white/[0.02] px-3 py-2 text-left text-sm font-medium text-primary hover:bg-white/[0.05] transition-colors"
+                                        >
+                                            + Lägg till egen rad
+                                        </button>
+                                    </div>
+                                </details>
                             );
                         })}
                     </div>

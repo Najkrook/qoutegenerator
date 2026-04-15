@@ -1,10 +1,10 @@
-// @ts-nocheck
 import { jsPDF } from 'jspdf';
 import { notifyWarn, notifyError } from '../services/notificationService';
 import {
     buildExportSummary,
     shouldHideDiscountReferencesInPdf
 } from '../services/exportDataBuilders';
+import type { CustomerInfo, QuoteState, QuoteTotalsResult } from '../types/contracts';
 import {
     PDF_LAYOUT,
     drawHeader,
@@ -21,9 +21,46 @@ import {
 
 export { createPdfTableLayout, groupSummaryTotalsByLine } from './pdfExportLayout';
 
-export function computeValidUntilDateString(quoteDateValue, quoteValidityDays, nowDate = new Date()) {
+type PdfExportState = Partial<QuoteState> & {
+    customerInfo?: Partial<CustomerInfo>;
+};
+
+type PdfSummaryData = Partial<QuoteTotalsResult>;
+
+type JsPdfDocument = InstanceType<typeof jsPDF>;
+
+function getPdfPageCount(doc: JsPdfDocument): number {
+    const internal = doc.internal as typeof doc.internal & {
+        getNumberOfPages?: () => number;
+        pages?: unknown[];
+    };
+
+    if (typeof internal.getNumberOfPages === 'function') {
+        return internal.getNumberOfPages();
+    }
+
+    const pageArrayLength = Array.isArray(internal.pages) ? internal.pages.length - 1 : 1;
+    return Math.max(1, pageArrayLength);
+}
+
+function formatSek(value: number): string {
+    return new Intl.NumberFormat('sv-SE', {
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 0
+    }).format(value);
+}
+
+function createPdfDocument(): JsPdfDocument {
+    return new jsPDF();
+}
+
+export function computeValidUntilDateString(
+    quoteDateValue: string | null | undefined,
+    quoteValidityDays: unknown,
+    nowDate = new Date()
+): string {
     const validityDays = normalizePositiveInt(quoteValidityDays, 14);
-    let baseDate = null;
+    let baseDate: Date | null = null;
 
     if (typeof quoteDateValue === 'string' && quoteDateValue.trim()) {
         const rawDate = quoteDateValue.trim();
@@ -44,17 +81,17 @@ export function computeValidUntilDateString(quoteDateValue, quoteValidityDays, n
     return validUntil.toLocaleDateString('sv-SE');
 }
 
-export function generatePDF(state, summaryData, returnBlob = false) {
-    const doc = new jsPDF();
+export function generatePDF(
+    state: PdfExportState,
+    summaryData: PdfSummaryData,
+    returnBlob = false
+): Blob | null {
+    const doc = createPdfDocument();
 
     try {
-        const formatSEK = (value) => new Intl.NumberFormat('sv-SE', {
-            minimumFractionDigits: 0,
-            maximumFractionDigits: 0
-        }).format(value);
         const pageWidth = doc.internal.pageSize.width;
         const pageHeight = doc.internal.pageSize.height;
-        const customerInfo = state.customerInfo || {};
+        const customerInfo: Partial<CustomerInfo> = state.customerInfo || {};
         const quoteDate = customerInfo.date || new Date().toLocaleDateString('sv-SE');
         const pdfLegalTemplatesEnabled = typeof window === 'undefined'
             ? true
@@ -80,7 +117,7 @@ export function generatePDF(state, summaryData, returnBlob = false) {
 
         finalY = renderGroupedTables(doc, {
             summaryData,
-            formatSEK,
+            formatSEK: formatSek,
             currentY: finalY,
             pageWidth,
             pageHeight,
@@ -89,7 +126,7 @@ export function generatePDF(state, summaryData, returnBlob = false) {
             layout: PDF_LAYOUT
         });
 
-        if ((summaryData?.totals || []).length === 0 && !returnBlob) {
+        if ((summaryData.totals || []).length === 0 && !returnBlob) {
             notifyWarn('Avancerad PDF-tabell saknas. Exporterar med enkel layout.');
         }
 
@@ -105,7 +142,7 @@ export function generatePDF(state, summaryData, returnBlob = false) {
             finalY,
             pageWidth,
             pageHeight,
-            formatSEK,
+            formatSEK: formatSek,
             shouldRenderPaymentBox,
             drawMainHeader,
             layout: PDF_LAYOUT
@@ -129,7 +166,7 @@ export function generatePDF(state, summaryData, returnBlob = false) {
 
         if (shouldRenderSignatureBlock) {
             if (termsPageEndY !== null) {
-                doc.setPage(doc.internal.getNumberOfPages());
+                doc.setPage(getPdfPageCount(doc));
                 renderSignatureBlock(doc, {
                     preferredY: termsPageEndY,
                     pageWidth,
@@ -151,9 +188,6 @@ export function generatePDF(state, summaryData, returnBlob = false) {
         renderFooters(doc, { pageWidth, pageHeight, layout: PDF_LAYOUT });
 
         const pdfBlob = doc.output('blob');
-        if (returnBlob) {
-            return pdfBlob;
-        }
         return pdfBlob;
     } catch (error) {
         console.error('PDF export failed:', error);

@@ -18,7 +18,7 @@ This is a living tracker for the QuoteGenerator TypeScript migration. Update it 
   - `npm run build`
 - `index.html` loads `/src/main.tsx`.
 - Only one declaration file remains in `src/`: `src/types/global.d.ts`.
-- Remaining temporary escape hatches: `8` files still use `// @ts-nocheck`.
+- Remaining temporary escape hatches: `0` files still use `// @ts-nocheck`.
 
 ## Implemented
 
@@ -168,65 +168,95 @@ This is a living tracker for the QuoteGenerator TypeScript migration. Update it 
 - [x] Preserved persisted `sketchDraft` structure while tightening its TypeScript shape in shared contracts.
 - [x] Fixed visible mojibake in the touched sketch files only.
 
-### 9. Validation already passing
+### 9. Planner slice
+
+- [x] Removed `// @ts-nocheck` from:
+  - `src/views/Planner.tsx`
+- [x] Kept planner project CRUD, weekly filtering, modal editing, and undo-delete behavior unchanged.
+- [x] Tightened the Firestore update boundary used by the project details modal so planner saves typecheck cleanly.
+- [x] Extended smoke coverage for the planner empty/loading state and form labels.
+
+### 10. PDF export slice
+
+- [x] Removed `// @ts-nocheck` from:
+  - `src/features/pdfExport.ts`
+  - `src/features/pdfExportLayout.ts`
+- [x] Added concrete TypeScript boundaries around PDF export inputs:
+  - quote-state/customer-info payloads
+  - grouped summary totals
+  - PDF layout column styles and color tuples
+- [x] Preserved runtime PDF behavior for:
+  - valid-until date handling
+  - grouped quote-table rendering
+  - totals/payment/terms/signature rendering
+  - multi-page footer rendering
+- [x] Normalized touched PDF-export copy to clean Swedish text where the slice already touched visible strings.
+- [x] Kept existing PDF tests green while removing the export-layer escape hatches.
+
+### 11. Builder/grid slice
+
+- [x] Removed `// @ts-nocheck` from:
+  - `src/components/features/BuilderConfig.tsx`
+  - `src/components/features/BuilderItem.tsx`
+  - `src/components/features/GridConfig.tsx`
+  - `src/utils/gridAutoScale.ts`
+- [x] Added builder/grid-domain contracts for:
+  - `BuilderConfigProps`
+  - `BuilderItemProps`
+  - `GridConfigProps`
+  - `GridAddonSyncMode`
+  - `GridAddonDiscountSyncMode`
+  - `GridAddonState`
+  - `GridCustomItemRow`
+  - `EffectiveGridAddonState`
+  - `EffectiveGridLineSelection`
+  - narrow catalog-facing builder/grid line, model, item, and add-on shapes used by this slice
+- [x] Tightened shared builder/grid state typing without changing reducer actions or runtime data flow:
+  - `GridLineSelection`
+  - `BuilderAddon`
+  - `BuilderItem`
+- [x] Preserved current runtime behavior for:
+  - builder default item creation
+  - builder add-on toggling and custom add-on rows
+  - grid section qty editing, custom rows, and auto-scaled add-ons
+  - global-discount propagation in `gridAutoScale.ts`
+- [x] Fixed visible mojibake only in the touched builder/grid files and tests.
+
+### 12. Validation already passing
 
 - [x] `npm run typecheck`
 - [x] `npm run test:confidence`
 - [x] `npm run build`
 - [x] `vitest run tests/sectionCalculator.test.js tests/parasolGeometry.test.js tests/sketchExportState.test.js tests/sketchConfig.test.jsx`
+- [x] `vitest run tests/builderItem.test.jsx tests/gridConfig.test.jsx tests/gridAutoScale.test.js`
+
+### 13. Catalog slice
+
+- [x] Removed `// @ts-nocheck` from:
+  - `src/data/catalog.ts`
+- [x] Added the final shared catalog contracts needed to type the catalog boundary:
+  - `CatalogLineData`
+  - `CatalogData`
+- [x] Typed the catalog helper utilities that annotate builder add-on categories.
+- [x] Preserved all runtime catalog keys, labels, prices, and nested data without schema changes.
+- [x] Finished the app-source migration milestone: no `// @ts-nocheck` files remain under `src/`.
 
 ## Remaining Work
 
-### 1. Remove remaining `// @ts-nocheck` files
-
-Current backlog by area:
-
-- `components`: 3
-- `views`: 1
-- `features`: 2
-- `utils`: 1
-- `data`: 1
-
-Remaining files:
-
-#### Views
-
-- [ ] `src/views/Planner.tsx`
-
-#### Components
-
-- [ ] `src/components/features/BuilderConfig.tsx`
-- [ ] `src/components/features/BuilderItem.tsx`
-- [ ] `src/components/features/GridConfig.tsx`
-
-#### Features
-
-- [ ] `src/features/pdfExportLayout.ts`
-- [ ] `src/features/pdfExport.ts`
-
-#### Utils
-
-- [ ] `src/utils/gridAutoScale.ts`
-
-#### Data
-
-- [ ] `src/data/catalog.ts`
-
-### 2. Improve type quality inside already-migrated files
+### 1. Improve type quality inside already-migrated files
 
 - [ ] Reduce broad `any` and `Record<string, any>` usage in shared contracts.
 - [ ] Tighten repository and Firestore payload typing where current shapes are still permissive.
 - [ ] Replace loose shell-to-feature payloads with exported domain-specific interfaces where practical.
 - [ ] Add stronger typing around catalog-derived data so components do not rely on untyped object indexing.
 
-### 3. Continue mojibake cleanup outside the finished slices
+### 2. Continue mojibake cleanup outside the finished slices
 
 - [ ] Fix visible mojibake in untouched admin, sketch, catalog, and helper-heavy files.
 - [ ] Keep text cleanup scoped to files actively being migrated so behavior changes stay reviewable.
 
-### 4. Longer-term hardening
+### 3. Longer-term hardening
 
-- [ ] Remove all remaining `// @ts-nocheck` markers from `src/`.
 - [ ] Re-evaluate compiler strictness after the escape-hatch backlog is gone.
 - [ ] Consider tightening options like `noImplicitAny` and related strict flags in a dedicated follow-up.
 - [ ] Decide separately whether tests and scripts should also migrate to TypeScript. This is intentionally out of scope for the main app-source migration.
@@ -235,30 +265,14 @@ Remaining files:
 
 Recommended order from here:
 
-1. `Planner` follow-up slice
+1. `Type hardening` follow-up
    - Target:
-     - `Planner`
+     - shared contracts
+     - Firestore/repository boundaries
+     - catalog-consumer indexing
    - Why:
-     - It is now the only remaining view still using `// @ts-nocheck`.
-     - Keeping it separate keeps the next slice reviewable before the lower-level catalog/PDF work.
-
-2. `Catalog + PDF/export internals` slice
-   - Target:
-     - `catalog.ts`
-     - `pdfExport.ts`
-     - `pdfExportLayout.ts`
-   - Why:
-     - These files will benefit from stronger domain models already established by the previous slices.
-
-3. `Builder/Grid` follow-up slice
-   - Target:
-     - `BuilderConfig`
-     - `BuilderItem`
-     - `GridConfig`
-     - `gridAutoScale.ts`
-   - Why:
-     - This is the last cluster of builder-specific escape hatches.
-     - Leaving it until after planner/catalog keeps layout math and export internals from mixing with builder UI concerns.
+     - the migration itself is now complete for `src/`
+     - the highest-value remaining work is tightening permissive types rather than converting more files
 
 ## Definition of Done for the Migration
 
@@ -267,7 +281,7 @@ The app-source migration is complete when all of the following are true:
 - [x] No `.js` or `.jsx` files remain under `src/`.
 - [x] `typecheck` validates actual source files.
 - [x] CI runs `npm run typecheck`.
-- [ ] No `// @ts-nocheck` files remain under `src/`.
+- [x] No `// @ts-nocheck` files remain under `src/`.
 - [ ] Remaining `any` usage is deliberate and minimal rather than structural.
 - [ ] Main quote, admin, and sketch flows are all typechecked without escape hatches.
 - [ ] Backward compatibility for persisted quote/revision data is still intact after cleanup.

@@ -1,22 +1,47 @@
-// @ts-nocheck
-function normalizeNonNegativeInt(value) {
-    const parsed = Number.parseInt(value, 10);
+import type {
+    EffectiveGridAddonState,
+    EffectiveGridLineSelection,
+    GridAddonDiscountSyncMode,
+    GridAddonState,
+    GridAddonSyncMode,
+    GridCatalogAddonOption,
+    GridCatalogLineData,
+    GridCustomAddonRow,
+    GridCustomItemRow,
+    GridLineSelection
+} from '../types/contracts';
+
+interface GridAddonResolutionInput {
+    addonDef?: GridCatalogAddonOption | null;
+    addonState?: Partial<GridAddonState> | null;
+}
+
+interface GridAddonQtyInput extends GridAddonResolutionInput {
+    itemsQtyTotal: number;
+}
+
+interface GridSelectionOptions {
+    globalDiscountPct?: number;
+}
+
+function normalizeNonNegativeInt(value: unknown): number {
+    const parsed = Number.parseInt(String(value), 10);
     return Number.isFinite(parsed) && parsed >= 0 ? parsed : 0;
 }
 
-function normalizeDiscountPct(value) {
-    const parsed = Number.parseFloat(value);
+function normalizeDiscountPct(value: unknown): number {
+    const parsed = Number.parseFloat(String(value));
     if (!Number.isFinite(parsed)) return 0;
     return Math.max(0, Math.min(100, parsed));
 }
 
-function nearlyEqual(a, b) {
+function nearlyEqual(a: number, b: number): boolean {
     return Math.abs(a - b) < 0.0001;
 }
 
-function getCatalogAddonMap(lineData = {}) {
-    const addonMap = {};
-    (lineData.addonCategories || []).forEach((category) => {
+function getCatalogAddonMap(lineData?: Partial<GridCatalogLineData> | null): Record<string, GridCatalogAddonOption> {
+    const addonMap: Record<string, GridCatalogAddonOption> = {};
+    (lineData?.addonCategories || []).forEach((category) => {
         (category.items || []).forEach((addon) => {
             addonMap[addon.id] = addon;
         });
@@ -24,13 +49,22 @@ function getCatalogAddonMap(lineData = {}) {
     return addonMap;
 }
 
-export function getGridItemsQtyTotal(selections = {}) {
-    const itemsTotal = Object.values(selections.items || {}).reduce((sum, entry) => sum + normalizeNonNegativeInt(entry?.qty), 0);
-    const customItemsTotal = (selections.customItems || []).reduce((sum, entry) => sum + normalizeNonNegativeInt(entry?.qty), 0);
+export function getGridItemsQtyTotal(selections: Partial<GridLineSelection> = {}): number {
+    const itemsTotal = Object.values(selections.items || {}).reduce(
+        (sum, entry) => sum + normalizeNonNegativeInt(entry?.qty),
+        0
+    );
+    const customItemsTotal = (selections.customItems || []).reduce(
+        (sum, entry) => sum + normalizeNonNegativeInt(entry?.qty),
+        0
+    );
     return itemsTotal + customItemsTotal;
 }
 
-export function getGridAddonSyncMode({ addonDef, addonState }) {
+export function getGridAddonSyncMode({
+    addonDef,
+    addonState
+}: GridAddonResolutionInput): GridAddonSyncMode {
     if (!addonDef?.autoScale) {
         return 'manual';
     }
@@ -43,7 +77,10 @@ export function getGridAddonSyncMode({ addonDef, addonState }) {
     return 'auto';
 }
 
-export function getGridAddonDiscountSyncMode({ addonDef, addonState }) {
+export function getGridAddonDiscountSyncMode({
+    addonDef,
+    addonState
+}: GridAddonResolutionInput): GridAddonDiscountSyncMode {
     if (!addonDef?.autoScale) {
         return 'manual';
     }
@@ -56,7 +93,11 @@ export function getGridAddonDiscountSyncMode({ addonDef, addonState }) {
     return 'global';
 }
 
-export function getEffectiveGridAddonQty({ addonDef, addonState, itemsQtyTotal }) {
+export function getEffectiveGridAddonQty({
+    addonDef,
+    addonState,
+    itemsQtyTotal
+}: GridAddonQtyInput): number {
     const syncMode = getGridAddonSyncMode({ addonDef, addonState });
     if (addonDef?.autoScale && syncMode === 'auto') {
         return normalizeNonNegativeInt(itemsQtyTotal);
@@ -64,7 +105,11 @@ export function getEffectiveGridAddonQty({ addonDef, addonState, itemsQtyTotal }
     return normalizeNonNegativeInt(addonState?.qty);
 }
 
-export function getEffectiveGridAddonDiscountPct({ addonDef, addonState, globalDiscountPct = 0 }) {
+export function getEffectiveGridAddonDiscountPct({
+    addonDef,
+    addonState,
+    globalDiscountPct = 0
+}: GridAddonResolutionInput & { globalDiscountPct?: number }): number {
     const discountSyncMode = getGridAddonDiscountSyncMode({ addonDef, addonState });
     if (addonDef?.autoScale && discountSyncMode === 'global') {
         return normalizeDiscountPct(globalDiscountPct);
@@ -72,12 +117,16 @@ export function getEffectiveGridAddonDiscountPct({ addonDef, addonState, globalD
     return normalizeDiscountPct(addonState?.discountPct);
 }
 
-export function buildEffectiveGridSelections(lineData = {}, selections = {}, options = {}) {
+export function buildEffectiveGridSelections(
+    lineData: Partial<GridCatalogLineData> = {},
+    selections: Partial<GridLineSelection> = {},
+    options: GridSelectionOptions = {}
+): EffectiveGridLineSelection {
     const items = selections.items || {};
     const persistedAddons = selections.addons || {};
     const itemsQtyTotal = getGridItemsQtyTotal(selections);
     const catalogAddonMap = getCatalogAddonMap(lineData);
-    const addons = {};
+    const addons: Record<string, EffectiveGridAddonState> = {};
     const globalDiscountPct = normalizeDiscountPct(options.globalDiscountPct);
 
     Object.entries(catalogAddonMap).forEach(([addonId, addonDef]) => {
@@ -85,7 +134,7 @@ export function buildEffectiveGridSelections(lineData = {}, selections = {}, opt
         const syncMode = getGridAddonSyncMode({ addonDef, addonState });
         const discountSyncMode = getGridAddonDiscountSyncMode({ addonDef, addonState });
         addons[addonId] = {
-            ...(addonState || {}),
+            ...(addonState || { qty: 0, discountPct: 0 }),
             qty: getEffectiveGridAddonQty({ addonDef, addonState, itemsQtyTotal }),
             discountPct: getEffectiveGridAddonDiscountPct({ addonDef, addonState, globalDiscountPct }),
             syncMode,
@@ -115,9 +164,13 @@ export function buildEffectiveGridSelections(lineData = {}, selections = {}, opt
     };
 }
 
-export function applyGlobalDiscountToLineSelection(lineData = {}, lineSelection = {}, nextGlobalDiscount = 0) {
+export function applyGlobalDiscountToLineSelection(
+    lineData: Partial<GridCatalogLineData> = {},
+    lineSelection: Partial<GridLineSelection> = {},
+    nextGlobalDiscount = 0
+): Partial<GridLineSelection> {
     const nextDiscount = normalizeDiscountPct(nextGlobalDiscount);
-    const nextAddons = { ...(lineSelection.addons || {}) };
+    const nextAddons: Record<string, GridAddonState> = { ...(lineSelection.addons || {}) };
     const effectiveSelections = buildEffectiveGridSelections(lineData, lineSelection, {
         globalDiscountPct: nextDiscount
     });
@@ -133,12 +186,12 @@ export function applyGlobalDiscountToLineSelection(lineData = {}, lineSelection 
             if (discountSyncMode !== 'global') {
                 return;
             }
-            const effectiveAddon = effectiveSelections.addons[addonId] || {};
+            const effectiveAddon = effectiveSelections.addons[addonId];
             nextAddons[addonId] = {
-                ...(addonState || {}),
-                qty: addonState?.qty ?? effectiveAddon.qty ?? 0,
+                ...(addonState || { qty: 0, discountPct: 0 }),
+                qty: addonState?.qty ?? effectiveAddon?.qty ?? 0,
                 discountPct: nextDiscount,
-                syncMode: addonState?.syncMode ?? effectiveAddon.syncMode ?? 'auto',
+                syncMode: addonState?.syncMode ?? effectiveAddon?.syncMode ?? 'auto',
                 discountSyncMode: 'global'
             };
         });
@@ -150,22 +203,29 @@ export function applyGlobalDiscountToLineSelection(lineData = {}, lineSelection 
     };
 }
 
-export function applyGlobalDiscountToGridCustomAddons(lineSelection = {}, previousGlobalDiscount = 0, nextGlobalDiscount = 0) {
+export function applyGlobalDiscountToGridCustomAddons(
+    lineSelection: Partial<GridLineSelection> = {},
+    previousGlobalDiscount = 0,
+    nextGlobalDiscount = 0
+): Partial<GridLineSelection> {
     const previousDiscount = normalizeDiscountPct(previousGlobalDiscount);
     const nextDiscount = normalizeDiscountPct(nextGlobalDiscount);
     const customAddonsByCategory = lineSelection.customAddonsByCategory || {};
 
-    const nextCustomAddonsByCategory = Object.entries(customAddonsByCategory).reduce((acc, [categoryId, rows]) => {
-        acc[categoryId] = Array.isArray(rows)
-            ? rows.map((row) => {
-                const currentDiscount = normalizeDiscountPct(row?.discountPct);
-                return nearlyEqual(currentDiscount, previousDiscount)
-                    ? { ...row, discountPct: nextDiscount }
-                    : row;
-            })
-            : [];
-        return acc;
-    }, {});
+    const nextCustomAddonsByCategory = Object.entries(customAddonsByCategory).reduce<Record<string, GridCustomAddonRow[]>>(
+        (acc, [categoryId, rows]) => {
+            acc[categoryId] = Array.isArray(rows)
+                ? rows.map((row) => {
+                    const currentDiscount = normalizeDiscountPct(row?.discountPct);
+                    return nearlyEqual(currentDiscount, previousDiscount)
+                        ? { ...row, discountPct: nextDiscount }
+                        : row;
+                })
+                : [];
+            return acc;
+        },
+        {}
+    );
 
     return {
         ...lineSelection,
@@ -173,12 +233,16 @@ export function applyGlobalDiscountToGridCustomAddons(lineSelection = {}, previo
     };
 }
 
-export function applyGlobalDiscountToGridCustomItems(lineSelection = {}, previousGlobalDiscount = 0, nextGlobalDiscount = 0) {
+export function applyGlobalDiscountToGridCustomItems(
+    lineSelection: Partial<GridLineSelection> = {},
+    previousGlobalDiscount = 0,
+    nextGlobalDiscount = 0
+): Partial<GridLineSelection> {
     const previousDiscount = normalizeDiscountPct(previousGlobalDiscount);
     const nextDiscount = normalizeDiscountPct(nextGlobalDiscount);
     const customItems = Array.isArray(lineSelection.customItems) ? lineSelection.customItems : [];
 
-    const nextCustomItems = customItems.map((row) => {
+    const nextCustomItems: GridCustomItemRow[] = customItems.map((row) => {
         const currentDiscount = normalizeDiscountPct(row?.discountPct);
         return nearlyEqual(currentDiscount, previousDiscount)
             ? { ...row, discountPct: nextDiscount }

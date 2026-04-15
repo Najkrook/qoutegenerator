@@ -1,12 +1,32 @@
-// @ts-nocheck
-import React from 'react';
+import type { ChangeEvent } from 'react';
 import { useQuote } from '../../store/QuoteContext';
 import { catalogData } from '../../data/catalog';
 import { buildEffectiveGridSelections } from '../../utils/gridAutoScale';
+import type {
+    EffectiveGridLineSelection,
+    GridAddonDiscountSyncMode,
+    GridAddonState,
+    GridAddonSyncMode,
+    GridCatalogAddonCategory,
+    GridCatalogAddonOption,
+    GridCatalogItemGroup,
+    GridCatalogLineData,
+    GridConfigProps,
+    GridCustomAddonRow,
+    GridCustomItemRow,
+    GridItemSelectionState,
+    GridLineSelection
+} from '../../types/contracts';
 
-function createCustomAddonRow(globalDiscountPct) {
+const typedCatalogData = catalogData as Record<string, GridCatalogLineData | undefined>;
+
+function createGridRowId(prefix: string): string {
+    return `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+}
+
+function createCustomAddonRow(globalDiscountPct: number): GridCustomAddonRow {
     return {
-        id: `custom_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+        id: createGridRowId('custom'),
         name: '',
         price: 0,
         qty: 1,
@@ -14,9 +34,9 @@ function createCustomAddonRow(globalDiscountPct) {
     };
 }
 
-function createCustomItemRow(globalDiscountPct) {
+function createCustomItemRow(globalDiscountPct: number): GridCustomItemRow {
     return {
-        id: `custom_item_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+        id: createGridRowId('custom_item'),
         name: '',
         size: '',
         price: 0,
@@ -25,22 +45,236 @@ function createCustomItemRow(globalDiscountPct) {
     };
 }
 
-function getCategoryId(category, index) {
-    return String(category?.id || category?.categoryId || `category_${index}`);
+function getCategoryId(category: GridCatalogAddonCategory, index: number): string {
+    return String(category.id || category.categoryId || `category_${index}`);
 }
 
-export function GridConfig({ lineId }) {
+function getGridLine(lineId: string): GridCatalogLineData | null {
+    const lineData = typedCatalogData[lineId];
+    return lineData?.type === 'grid' ? lineData : null;
+}
+
+function createEmptyGridSelection(): GridLineSelection {
+    return {
+        items: {},
+        addons: {},
+        customAddonsByCategory: {},
+        customItems: []
+    };
+}
+
+function getGridPrice(group: GridCatalogItemGroup, size: string): number {
+    return group.sizes.find((sizeOption) => sizeOption.size === size)?.price || 0;
+}
+
+interface FragmentRowsProps {
+    group: GridCatalogItemGroup;
+    selections: GridLineSelection;
+    setItemQty: (model: string, size: string, qty: number) => void;
+}
+
+function FragmentRows({ group, selections, setItemQty }: FragmentRowsProps) {
+    return (
+        <>
+            {group.sizes.map((sizeOption) => {
+                const key = `${group.model}|${sizeOption.size}`;
+                const qty = selections.items[key]?.qty || 0;
+                const total = sizeOption.price * qty;
+
+                return (
+                    <tr key={key} className="hover:bg-white/5 transition-colors">
+                        <td className="p-3 text-sm">{group.model}</td>
+                        <td className="p-3 text-sm">{sizeOption.size}</td>
+                        <td className="p-3 text-sm text-right">{sizeOption.price.toLocaleString('sv-SE')} SEK</td>
+                        <td className="p-3">
+                            <div className="flex items-center justify-center gap-2">
+                                <button onClick={() => setItemQty(group.model, sizeOption.size, qty - 6)} className="bg-panel-bg border border-panel-border text-text-primary px-1.5 py-1 rounded text-[10px] hover:bg-panel-border cursor-pointer">-6</button>
+                                <button onClick={() => setItemQty(group.model, sizeOption.size, qty - 1)} className="bg-panel-bg border border-panel-border text-text-primary px-2 py-1 rounded text-xs hover:bg-panel-border cursor-pointer">-</button>
+                                <input
+                                    type="number"
+                                    min="0"
+                                    value={qty}
+                                    onChange={(event: ChangeEvent<HTMLInputElement>) => setItemQty(group.model, sizeOption.size, Number.parseInt(event.target.value, 10) || 0)}
+                                    className={`w-12 text-center font-bold bg-black/20 border border-panel-border rounded p-1 text-sm outline-none focus:border-primary ${qty > 0 ? 'text-primary' : ''}`}
+                                />
+                                <button onClick={() => setItemQty(group.model, sizeOption.size, qty + 1)} className="bg-panel-bg border border-panel-border text-text-primary px-2 py-1 rounded text-xs hover:bg-panel-border cursor-pointer">+</button>
+                                <button onClick={() => setItemQty(group.model, sizeOption.size, qty + 6)} className="bg-panel-bg border border-panel-border text-text-primary px-1.5 py-1 rounded text-[10px] hover:bg-panel-border cursor-pointer">+6</button>
+                            </div>
+                        </td>
+                        <td className="p-3 text-sm text-right font-semibold">
+                            {total > 0 ? `${total.toLocaleString('sv-SE')} SEK` : ''}
+                        </td>
+                    </tr>
+                );
+            })}
+        </>
+    );
+}
+
+interface GridAddonCategoryRowsProps {
+    category: GridCatalogAddonCategory;
+    categoryId: string;
+    customRows: GridCustomAddonRow[];
+    effectiveSelections: EffectiveGridLineSelection;
+    setAddonQtyManual: (addonId: string, qty: number, addon?: GridCatalogAddonOption) => void;
+    setAddonSyncMode: (addonId: string, syncMode: GridAddonSyncMode) => void;
+    updateCustomAddon: (categoryId: string, rowId: string, updates: Partial<GridCustomAddonRow>) => void;
+    removeCustomAddon: (categoryId: string, rowId: string) => void;
+    setCustomAddonQty: (categoryId: string, rowId: string, qty: number) => void;
+    addCustomAddon: (categoryId: string) => void;
+}
+
+function GridAddonCategoryRows({
+    category,
+    categoryId,
+    customRows,
+    effectiveSelections,
+    setAddonQtyManual,
+    setAddonSyncMode,
+    updateCustomAddon,
+    removeCustomAddon,
+    setCustomAddonQty,
+    addCustomAddon
+}: GridAddonCategoryRowsProps) {
+    return (
+        <>
+            <tr className="bg-black/10">
+                <td colSpan={5} className="p-2 pl-4 text-xs font-bold uppercase text-text-secondary border-y border-panel-border">
+                    {category.name}
+                </td>
+            </tr>
+            {category.items.map((addon) => {
+                const effectiveAddon = effectiveSelections.addons[addon.id];
+                const qty = effectiveAddon?.qty || 0;
+                const syncMode = effectiveAddon?.syncMode || 'manual';
+                const total = addon.price * qty;
+
+                return (
+                    <tr key={addon.id} className="hover:bg-white/5 transition-colors">
+                        <td colSpan={2} className="p-3 pl-6 text-sm italic">{addon.name}</td>
+                        <td className="p-3 text-sm text-right">{addon.price.toLocaleString('sv-SE')} SEK</td>
+                        <td className="p-3">
+                            <div className="flex items-center justify-center gap-2">
+                                {addon.autoScale && (
+                                    <button
+                                        type="button"
+                                        aria-pressed={syncMode === 'auto'}
+                                        onClick={() => setAddonSyncMode(addon.id, 'auto')}
+                                        className={`px-2 py-1 rounded-full text-[10px] font-semibold border transition-colors ${syncMode === 'auto'
+                                            ? 'bg-primary/20 text-primary border-primary/60'
+                                            : 'bg-panel-bg border-panel-border text-text-secondary hover:text-text-primary'
+                                            }`}
+                                    >
+                                        Auto
+                                    </button>
+                                )}
+                                <button onClick={() => setAddonQtyManual(addon.id, qty - 6, addon)} className="bg-panel-bg border border-panel-border text-text-primary px-1.5 py-1 rounded text-[10px] hover:bg-panel-border cursor-pointer">-6</button>
+                                <button onClick={() => setAddonQtyManual(addon.id, qty - 1, addon)} className="bg-panel-bg border border-panel-border text-text-primary px-2 py-1 rounded text-xs hover:bg-panel-border cursor-pointer">-</button>
+                                <input
+                                    type="number"
+                                    min="0"
+                                    value={qty}
+                                    onChange={(event: ChangeEvent<HTMLInputElement>) => setAddonQtyManual(addon.id, Number.parseInt(event.target.value, 10) || 0, addon)}
+                                    className={`w-12 text-center font-bold bg-black/20 border border-panel-border rounded p-1 text-sm outline-none focus:border-primary ${qty > 0 ? 'text-primary' : ''}`}
+                                />
+                                <button onClick={() => setAddonQtyManual(addon.id, qty + 1, addon)} className="bg-panel-bg border border-panel-border text-text-primary px-2 py-1 rounded text-xs hover:bg-panel-border cursor-pointer">+</button>
+                                <button onClick={() => setAddonQtyManual(addon.id, qty + 6, addon)} className="bg-panel-bg border border-panel-border text-text-primary px-1.5 py-1 rounded text-[10px] hover:bg-panel-border cursor-pointer">+6</button>
+                            </div>
+                        </td>
+                        <td className="p-3 text-sm text-right font-semibold">
+                            {total > 0 ? `${total.toLocaleString('sv-SE')} SEK` : ''}
+                        </td>
+                    </tr>
+                );
+            })}
+
+            {customRows.map((row) => {
+                const qty = Number(row.qty) || 0;
+                const price = Number(row.price) || 0;
+                const total = price * qty;
+
+                return (
+                    <tr key={row.id} className="bg-white/[0.025] hover:bg-white/[0.04] transition-colors">
+                        <td colSpan={2} className="p-3 pl-6">
+                            <div className="flex items-center gap-2">
+                                <input
+                                    type="text"
+                                    value={row.name}
+                                    onChange={(event) => updateCustomAddon(categoryId, row.id, { name: event.target.value })}
+                                    placeholder="Egen rad"
+                                    className="w-full bg-black/20 border border-panel-border text-text-primary rounded p-2 text-sm outline-none focus:border-primary"
+                                />
+                                <button
+                                    type="button"
+                                    onClick={() => removeCustomAddon(categoryId, row.id)}
+                                    className="h-9 w-9 shrink-0 rounded border border-danger/30 bg-danger/10 text-danger hover:bg-danger/20 transition-colors"
+                                    aria-label="Ta bort egen rad"
+                                >
+                                    x
+                                </button>
+                            </div>
+                        </td>
+                        <td className="p-3">
+                            <input
+                                type="number"
+                                min="0"
+                                value={price}
+                                onChange={(event) => updateCustomAddon(categoryId, row.id, { price: Number.parseFloat(event.target.value) || 0 })}
+                                className="w-full bg-black/20 border border-panel-border text-text-primary rounded p-2 text-sm text-right outline-none focus:border-primary"
+                            />
+                        </td>
+                        <td className="p-3">
+                            <div className="flex items-center justify-center gap-2">
+                                <button onClick={() => setCustomAddonQty(categoryId, row.id, qty - 6)} className="bg-panel-bg border border-panel-border text-text-primary px-1.5 py-1 rounded text-[10px] hover:bg-panel-border cursor-pointer">-6</button>
+                                <button onClick={() => setCustomAddonQty(categoryId, row.id, qty - 1)} className="bg-panel-bg border border-panel-border text-text-primary px-2 py-1 rounded text-xs hover:bg-panel-border cursor-pointer">-</button>
+                                <input
+                                    type="number"
+                                    min="0"
+                                    value={qty}
+                                    onChange={(event: ChangeEvent<HTMLInputElement>) => setCustomAddonQty(categoryId, row.id, Number.parseInt(event.target.value, 10) || 0)}
+                                    className={`w-12 text-center font-bold bg-black/20 border border-panel-border rounded p-1 text-sm outline-none focus:border-primary ${qty > 0 ? 'text-primary' : ''}`}
+                                />
+                                <button onClick={() => setCustomAddonQty(categoryId, row.id, qty + 1)} className="bg-panel-bg border border-panel-border text-text-primary px-2 py-1 rounded text-xs hover:bg-panel-border cursor-pointer">+</button>
+                                <button onClick={() => setCustomAddonQty(categoryId, row.id, qty + 6)} className="bg-panel-bg border border-panel-border text-text-primary px-1.5 py-1 rounded text-[10px] hover:bg-panel-border cursor-pointer">+6</button>
+                            </div>
+                        </td>
+                        <td className="p-3 text-sm text-right font-semibold">
+                            {total > 0 ? `${total.toLocaleString('sv-SE')} SEK` : ''}
+                        </td>
+                    </tr>
+                );
+            })}
+
+            <tr className="bg-white/[0.02]">
+                <td colSpan={5} className="p-0">
+                    <button
+                        type="button"
+                        onClick={() => addCustomAddon(categoryId)}
+                        className="w-full px-6 py-3 text-left text-sm font-medium text-primary hover:bg-white/[0.04] transition-colors"
+                    >
+                        + Lägg till egen rad
+                    </button>
+                </td>
+            </tr>
+        </>
+    );
+}
+
+export function GridConfig({ lineId }: GridConfigProps) {
     const { state, dispatch } = useQuote();
     const { gridSelections, globalDiscountPct } = state;
 
-    const lineData = catalogData[lineId];
-    const selections = gridSelections[lineId] || { items: {}, addons: {}, customAddonsByCategory: {} };
-    const effectiveSelections = buildEffectiveGridSelections(lineData, selections, {
+    const lineData = getGridLine(lineId);
+    const selections = gridSelections[lineId] || createEmptyGridSelection();
+    const effectiveSelections: EffectiveGridLineSelection = buildEffectiveGridSelections(lineData || {}, selections, {
         globalDiscountPct
     });
 
-    const updateGrid = (updates) => {
-        const newSelections = { ...gridSelections, [lineId]: { ...selections, ...updates } };
+    const updateGrid = (updates: Partial<GridLineSelection>) => {
+        const newSelections = {
+            ...gridSelections,
+            [lineId]: { ...selections, ...updates }
+        };
         dispatch({ type: 'SET_GRID_SELECTIONS', payload: newSelections });
     };
 
@@ -51,7 +285,7 @@ export function GridConfig({ lineId }) {
         });
     };
 
-    const updateCustomItem = (rowId, updates) => {
+    const updateCustomItem = (rowId: string, updates: Partial<GridCustomItemRow>) => {
         const existingRows = selections.customItems || [];
         updateGrid({
             customItems: existingRows.map((row) => (
@@ -60,18 +294,18 @@ export function GridConfig({ lineId }) {
         });
     };
 
-    const removeCustomItem = (rowId) => {
+    const removeCustomItem = (rowId: string) => {
         const existingRows = selections.customItems || [];
         updateGrid({
             customItems: existingRows.filter((row) => row.id !== rowId)
         });
     };
 
-    const setCustomItemQty = (rowId, qty) => {
+    const setCustomItemQty = (rowId: string, qty: number) => {
         updateCustomItem(rowId, { qty: Math.max(0, qty) });
     };
 
-    const addCustomAddon = (categoryId) => {
+    const addCustomAddon = (categoryId: string) => {
         const existingRows = selections.customAddonsByCategory?.[categoryId] || [];
         updateGrid({
             customAddonsByCategory: {
@@ -81,7 +315,7 @@ export function GridConfig({ lineId }) {
         });
     };
 
-    const updateCustomAddon = (categoryId, rowId, updates) => {
+    const updateCustomAddon = (categoryId: string, rowId: string, updates: Partial<GridCustomAddonRow>) => {
         const categoryRows = selections.customAddonsByCategory?.[categoryId] || [];
         updateGrid({
             customAddonsByCategory: {
@@ -93,24 +327,26 @@ export function GridConfig({ lineId }) {
         });
     };
 
-    const removeCustomAddon = (categoryId, rowId) => {
+    const removeCustomAddon = (categoryId: string, rowId: string) => {
         const nextCustomAddonsByCategory = { ...(selections.customAddonsByCategory || {}) };
         const nextRows = (nextCustomAddonsByCategory[categoryId] || []).filter((row) => row.id !== rowId);
+
         if (nextRows.length > 0) {
             nextCustomAddonsByCategory[categoryId] = nextRows;
         } else {
             delete nextCustomAddonsByCategory[categoryId];
         }
+
         updateGrid({ customAddonsByCategory: nextCustomAddonsByCategory });
     };
 
-    const setCustomAddonQty = (categoryId, rowId, qty) => {
+    const setCustomAddonQty = (categoryId: string, rowId: string, qty: number) => {
         updateCustomAddon(categoryId, rowId, { qty: Math.max(0, qty) });
     };
 
-    const setItemQty = (model, size, qty) => {
+    const setItemQty = (model: string, size: string, qty: number) => {
         const key = `${model}|${size}`;
-        const newItems = { ...selections.items };
+        const newItems: Record<string, GridItemSelectionState> = { ...selections.items };
         if (qty > 0) {
             const existing = newItems[key];
             newItems[key] = existing
@@ -122,8 +358,8 @@ export function GridConfig({ lineId }) {
         updateGrid({ items: newItems });
     };
 
-    const setAddonQtyManual = (addonId, qty, addon) => {
-        const newAddons = { ...selections.addons };
+    const setAddonQtyManual = (addonId: string, qty: number, addon?: GridCatalogAddonOption) => {
+        const newAddons: Record<string, GridAddonState> = { ...selections.addons };
         const normalizedQty = Math.max(0, qty);
         if (normalizedQty > 0 || addon?.autoScale) {
             const existing = newAddons[addonId];
@@ -146,63 +382,71 @@ export function GridConfig({ lineId }) {
         updateGrid({ addons: newAddons });
     };
 
-    const setAddonSyncMode = (addonId, syncMode) => {
-        const newAddons = { ...selections.addons };
+    const setAddonSyncMode = (addonId: string, syncMode: GridAddonSyncMode) => {
+        const newAddons: Record<string, GridAddonState> = { ...selections.addons };
         const existing = newAddons[addonId];
         const effectiveQty = effectiveSelections.addons[addonId]?.qty || 0;
+        const effectiveDiscountSyncMode = existing?.discountSyncMode ?? (existing ? 'manual' : 'global');
+
         newAddons[addonId] = {
-            ...(existing || {}),
+            ...(existing || { qty: 0, discountPct: globalDiscountPct }),
             qty: existing?.qty ?? effectiveQty,
             discountPct: existing?.discountPct ?? globalDiscountPct,
             syncMode,
-            discountSyncMode: existing?.discountSyncMode ?? (existing ? 'manual' : 'global')
+            discountSyncMode: effectiveDiscountSyncMode as GridAddonDiscountSyncMode
         };
         updateGrid({ addons: newAddons });
     };
 
-    const getSubtotal = () => {
+    const getItemsSubtotal = (): number => {
+        if (!lineData) return 0;
+
         let total = 0;
-        Object.entries(selections.items).forEach(([key, val]) => {
+        Object.entries(selections.items).forEach(([key, value]) => {
             const [model, size] = key.split('|');
-            const group = lineData.gridItems.find(g => g.model === model);
-            const price = group?.sizes.find(s => s.size === size)?.price || 0;
-            total += price * val.qty;
+            const group = lineData.gridItems.find((gridGroup) => gridGroup.model === model);
+            const price = group ? getGridPrice(group, size) : 0;
+            total += price * value.qty;
         });
+
         (selections.customItems || []).forEach((row) => {
-            total += (Number(row?.price) || 0) * (Number(row?.qty) || 0);
+            total += (Number(row.price) || 0) * (Number(row.qty) || 0);
         });
-        Object.entries(effectiveSelections.addons).forEach(([id, val]) => {
-            let price = 0;
-            lineData.addonCategories.forEach(cat => {
-                const found = cat.items.find(a => a.id === id);
-                if (found) price = found.price;
-            });
-            total += price * val.qty;
-        });
-        Object.values(selections.customAddonsByCategory || {}).forEach((rows) => {
-            (rows || []).forEach((row) => {
-                total += (Number(row?.price) || 0) * (Number(row?.qty) || 0);
-            });
-        });
+
         return total;
     };
 
-    const getItemsSubtotal = () => {
-        let total = 0;
-        Object.entries(selections.items).forEach(([key, val]) => {
-            const [model, size] = key.split('|');
-            const group = lineData.gridItems.find(g => g.model === model);
-            const price = group?.sizes.find(s => s.size === size)?.price || 0;
-            total += price * val.qty;
+    const getSubtotal = (): number => {
+        if (!lineData) return 0;
+
+        let total = getItemsSubtotal();
+
+        Object.entries(effectiveSelections.addons).forEach(([addonId, value]) => {
+            let price = 0;
+            lineData.addonCategories.forEach((category) => {
+                const found = category.items.find((addon) => addon.id === addonId);
+                if (found) {
+                    price = found.price;
+                }
+            });
+            total += price * value.qty;
         });
-        (selections.customItems || []).forEach((row) => {
-            total += (Number(row?.price) || 0) * (Number(row?.qty) || 0);
+
+        Object.values(selections.customAddonsByCategory || {}).forEach((rows) => {
+            (rows || []).forEach((row) => {
+                total += (Number(row.price) || 0) * (Number(row.qty) || 0);
+            });
         });
+
         return total;
     };
 
     const itemsSubtotal = getItemsSubtotal();
     const itemsQtyTotal = effectiveSelections.itemsQtyTotal;
+
+    if (!lineData) {
+        return null;
+    }
 
     return (
         <div className="bg-panel-bg border border-panel-border rounded-lg p-6 mb-8 bg-black/5 animate-fade-in">
@@ -221,58 +465,20 @@ export function GridConfig({ lineId }) {
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-panel-border">
-                        {lineData.gridItems.map(group => (
-                            <React.Fragment key={group.model}>
-                                {group.sizes.map(sz => {
-                                    const key = `${group.model}|${sz.size}`;
-                                    const qty = selections.items[key]?.qty || 0;
-                                    const total = sz.price * qty;
-                                    return (
-                                        <tr key={key} className="hover:bg-white/5 transition-colors">
-                                            <td className="p-3 text-sm">{group.model}</td>
-                                            <td className="p-3 text-sm">{sz.size}</td>
-                                            <td className="p-3 text-sm text-right">{sz.price.toLocaleString('sv-SE')} SEK</td>
-                                            <td className="p-3">
-                                                <div className="flex items-center justify-center gap-2">
-                                                    <button
-                                                        onClick={() => setItemQty(group.model, sz.size, qty - 6)}
-                                                        className="bg-panel-bg border border-panel-border text-text-primary px-1.5 py-1 rounded text-[10px] hover:bg-panel-border cursor-pointer"
-                                                    >-6</button>
-                                                    <button
-                                                        onClick={() => setItemQty(group.model, sz.size, qty - 1)}
-                                                        className="bg-panel-bg border border-panel-border text-text-primary px-2 py-1 rounded text-xs hover:bg-panel-border cursor-pointer"
-                                                    >-</button>
-                                                    <input
-                                                        type="number"
-                                                        min="0"
-                                                        value={qty}
-                                                        onChange={(e) => setItemQty(group.model, sz.size, parseInt(e.target.value) || 0)}
-                                                        className={`w-12 text-center font-bold bg-black/20 border border-panel-border rounded p-1 text-sm outline-none focus:border-primary ${qty > 0 ? 'text-primary' : ''}`}
-                                                    />
-                                                    <button
-                                                        onClick={() => setItemQty(group.model, sz.size, qty + 1)}
-                                                        className="bg-panel-bg border border-panel-border text-text-primary px-2 py-1 rounded text-xs hover:bg-panel-border cursor-pointer"
-                                                    >+</button>
-                                                    <button
-                                                        onClick={() => setItemQty(group.model, sz.size, qty + 6)}
-                                                        className="bg-panel-bg border border-panel-border text-text-primary px-1.5 py-1 rounded text-[10px] hover:bg-panel-border cursor-pointer"
-                                                    >+6</button>
-                                                </div>
-                                            </td>
-                                            <td className="p-3 text-sm text-right font-semibold">
-                                                {total > 0 ? `${total.toLocaleString('sv-SE')} SEK` : ''}
-                                            </td>
-                                        </tr>
-                                    );
-                                })}
-                            </React.Fragment>
+                        {lineData.gridItems.map((group) => (
+                            <FragmentRows
+                                key={group.model}
+                                group={group}
+                                selections={selections}
+                                setItemQty={setItemQty}
+                            />
                         ))}
 
-                        {/* Custom Items */}
                         {(selections.customItems || []).map((row) => {
                             const qty = Number(row.qty) || 0;
                             const price = Number(row.price) || 0;
                             const total = price * qty;
+
                             return (
                                 <tr key={row.id} className="bg-white/[0.025] hover:bg-white/[0.04] transition-colors">
                                     <td className="p-3">
@@ -280,7 +486,7 @@ export function GridConfig({ lineId }) {
                                             <input
                                                 type="text"
                                                 value={row.name}
-                                                onChange={(e) => updateCustomItem(row.id, { name: e.target.value })}
+                                                onChange={(event) => updateCustomItem(row.id, { name: event.target.value })}
                                                 placeholder="Egen modell"
                                                 className="w-full bg-black/20 border border-panel-border text-text-primary rounded p-2 text-sm outline-none focus:border-primary"
                                             />
@@ -290,7 +496,7 @@ export function GridConfig({ lineId }) {
                                                 className="h-9 w-9 shrink-0 rounded border border-danger/30 bg-danger/10 text-danger hover:bg-danger/20 transition-colors"
                                                 aria-label="Ta bort egen rad"
                                             >
-                                                ×
+                                                x
                                             </button>
                                         </div>
                                     </td>
@@ -298,7 +504,7 @@ export function GridConfig({ lineId }) {
                                         <input
                                             type="text"
                                             value={row.size}
-                                            onChange={(e) => updateCustomItem(row.id, { size: e.target.value })}
+                                            onChange={(event) => updateCustomItem(row.id, { size: event.target.value })}
                                             placeholder="Storlek"
                                             className="w-full bg-black/20 border border-panel-border text-text-primary rounded p-2 text-sm outline-none focus:border-primary"
                                         />
@@ -308,35 +514,23 @@ export function GridConfig({ lineId }) {
                                             type="number"
                                             min="0"
                                             value={price}
-                                            onChange={(e) => updateCustomItem(row.id, { price: parseFloat(e.target.value) || 0 })}
+                                            onChange={(event) => updateCustomItem(row.id, { price: Number.parseFloat(event.target.value) || 0 })}
                                             className="w-full bg-black/20 border border-panel-border text-text-primary rounded p-2 text-sm text-right outline-none focus:border-primary"
                                         />
                                     </td>
                                     <td className="p-3">
                                         <div className="flex items-center justify-center gap-2">
-                                            <button
-                                                onClick={() => setCustomItemQty(row.id, qty - 6)}
-                                                className="bg-panel-bg border border-panel-border text-text-primary px-1.5 py-1 rounded text-[10px] hover:bg-panel-border cursor-pointer"
-                                            >-6</button>
-                                            <button
-                                                onClick={() => setCustomItemQty(row.id, qty - 1)}
-                                                className="bg-panel-bg border border-panel-border text-text-primary px-2 py-1 rounded text-xs hover:bg-panel-border cursor-pointer"
-                                            >-</button>
+                                            <button onClick={() => setCustomItemQty(row.id, qty - 6)} className="bg-panel-bg border border-panel-border text-text-primary px-1.5 py-1 rounded text-[10px] hover:bg-panel-border cursor-pointer">-6</button>
+                                            <button onClick={() => setCustomItemQty(row.id, qty - 1)} className="bg-panel-bg border border-panel-border text-text-primary px-2 py-1 rounded text-xs hover:bg-panel-border cursor-pointer">-</button>
                                             <input
                                                 type="number"
                                                 min="0"
                                                 value={qty}
-                                                onChange={(e) => setCustomItemQty(row.id, parseInt(e.target.value, 10) || 0)}
+                                                onChange={(event: ChangeEvent<HTMLInputElement>) => setCustomItemQty(row.id, Number.parseInt(event.target.value, 10) || 0)}
                                                 className={`w-12 text-center font-bold bg-black/20 border border-panel-border rounded p-1 text-sm outline-none focus:border-primary ${qty > 0 ? 'text-primary' : ''}`}
                                             />
-                                            <button
-                                                onClick={() => setCustomItemQty(row.id, qty + 1)}
-                                                className="bg-panel-bg border border-panel-border text-text-primary px-2 py-1 rounded text-xs hover:bg-panel-border cursor-pointer"
-                                            >+</button>
-                                            <button
-                                                onClick={() => setCustomItemQty(row.id, qty + 6)}
-                                                className="bg-panel-bg border border-panel-border text-text-primary px-1.5 py-1 rounded text-[10px] hover:bg-panel-border cursor-pointer"
-                                            >+6</button>
+                                            <button onClick={() => setCustomItemQty(row.id, qty + 1)} className="bg-panel-bg border border-panel-border text-text-primary px-2 py-1 rounded text-xs hover:bg-panel-border cursor-pointer">+</button>
+                                            <button onClick={() => setCustomItemQty(row.id, qty + 6)} className="bg-panel-bg border border-panel-border text-text-primary px-1.5 py-1 rounded text-[10px] hover:bg-panel-border cursor-pointer">+6</button>
                                         </div>
                                     </td>
                                     <td className="p-3 text-sm text-right font-semibold">
@@ -346,10 +540,10 @@ export function GridConfig({ lineId }) {
                             );
                         })}
                         <tr className="bg-white/[0.02]">
-                            <td colSpan="5" className="p-0 border-b border-panel-border">
+                            <td colSpan={5} className="p-0 border-b border-panel-border">
                                 <button
                                     type="button"
-                                    onClick={() => addCustomItem()}
+                                    onClick={addCustomItem}
                                     className="w-full px-6 py-3 text-left text-sm font-medium text-primary hover:bg-white/[0.04] transition-colors"
                                 >
                                     + Lägg till egen sektion
@@ -358,7 +552,7 @@ export function GridConfig({ lineId }) {
                         </tr>
 
                         <tr className="bg-white/[0.035] border-y border-panel-border">
-                            <td colSpan="3" className="px-4 py-4 pl-5 text-sm font-semibold uppercase tracking-[0.08em] text-text-secondary">
+                            <td colSpan={3} className="px-4 py-4 pl-5 text-sm font-semibold uppercase tracking-[0.08em] text-text-secondary">
                                 Delsumma sektioner
                             </td>
                             <td className="px-4 py-4 text-sm text-center font-semibold text-text-primary">
@@ -369,161 +563,38 @@ export function GridConfig({ lineId }) {
                             </td>
                         </tr>
                         <tr aria-hidden="true">
-                            <td colSpan="5" className="h-4 p-0 border-0 bg-transparent" />
+                            <td colSpan={5} className="h-4 p-0 border-0 bg-transparent" />
                         </tr>
 
-                        {/* Addons for Grid */}
-                        {lineData.addonCategories.map((cat, categoryIndex) => {
-                            const categoryId = getCategoryId(cat, categoryIndex);
+                        {lineData.addonCategories.map((category, categoryIndex) => {
+                            const categoryId = getCategoryId(category, categoryIndex);
                             const customRows = selections.customAddonsByCategory?.[categoryId] || [];
+
                             return (
-                            <React.Fragment key={categoryId}>
-                                <tr className="bg-black/10">
-                                    <td colSpan="5" className="p-2 pl-4 text-xs font-bold uppercase text-text-secondary border-y border-panel-border">
-                                        {cat.name}
-                                    </td>
-                                </tr>
-                                {cat.items.map(addon => {
-                                    const effectiveAddon = effectiveSelections.addons[addon.id] || {};
-                                    const qty = effectiveAddon.qty || 0;
-                                    const syncMode = effectiveAddon.syncMode || 'manual';
-                                    const total = addon.price * qty;
-                                    return (
-                                        <tr key={addon.id} className="hover:bg-white/5 transition-colors">
-                                            <td colSpan="2" className="p-3 pl-6 text-sm italic">{addon.name}</td>
-                                            <td className="p-3 text-sm text-right">{addon.price.toLocaleString('sv-SE')} SEK</td>
-                                            <td className="p-3">
-                                                <div className="flex items-center justify-center gap-2">
-                                                    {addon.autoScale && (
-                                                        <button
-                                                            type="button"
-                                                            aria-pressed={syncMode === 'auto'}
-                                                            onClick={() => setAddonSyncMode(addon.id, 'auto')}
-                                                            className={`px-2 py-1 rounded-full text-[10px] font-semibold border transition-colors ${syncMode === 'auto'
-                                                                ? 'bg-primary/20 text-primary border-primary/60'
-                                                                : 'bg-panel-bg border-panel-border text-text-secondary hover:text-text-primary'
-                                                                }`}
-                                                        >
-                                                            Auto
-                                                        </button>
-                                                    )}
-                                                    <button
-                                                        onClick={() => setAddonQtyManual(addon.id, qty - 6, addon)}
-                                                        className="bg-panel-bg border border-panel-border text-text-primary px-1.5 py-1 rounded text-[10px] hover:bg-panel-border cursor-pointer"
-                                                    >-6</button>
-                                                    <button
-                                                        onClick={() => setAddonQtyManual(addon.id, qty - 1, addon)}
-                                                        className="bg-panel-bg border border-panel-border text-text-primary px-2 py-1 rounded text-xs hover:bg-panel-border cursor-pointer"
-                                                    >-</button>
-                                                    <input
-                                                        type="number"
-                                                        min="0"
-                                                        value={qty}
-                                                        onChange={(e) => setAddonQtyManual(addon.id, parseInt(e.target.value, 10) || 0, addon)}
-                                                        className={`w-12 text-center font-bold bg-black/20 border border-panel-border rounded p-1 text-sm outline-none focus:border-primary ${qty > 0 ? 'text-primary' : ''}`}
-                                                    />
-                                                    <button
-                                                        onClick={() => setAddonQtyManual(addon.id, qty + 1, addon)}
-                                                        className="bg-panel-bg border border-panel-border text-text-primary px-2 py-1 rounded text-xs hover:bg-panel-border cursor-pointer"
-                                                    >+</button>
-                                                    <button
-                                                        onClick={() => setAddonQtyManual(addon.id, qty + 6, addon)}
-                                                        className="bg-panel-bg border border-panel-border text-text-primary px-1.5 py-1 rounded text-[10px] hover:bg-panel-border cursor-pointer"
-                                                    >+6</button>
-                                                </div>
-                                            </td>
-                                            <td className="p-3 text-sm text-right font-semibold">
-                                                {total > 0 ? `${total.toLocaleString('sv-SE')} SEK` : ''}
-                                            </td>
-                                        </tr>
-                                    );
-                                })}
-                                {customRows.map((row) => {
-                                    const qty = Number(row.qty) || 0;
-                                    const price = Number(row.price) || 0;
-                                    const total = price * qty;
-                                    return (
-                                        <tr key={row.id} className="bg-white/[0.025] hover:bg-white/[0.04] transition-colors">
-                                            <td colSpan="2" className="p-3 pl-6">
-                                                <div className="flex items-center gap-2">
-                                                    <input
-                                                        type="text"
-                                                        value={row.name}
-                                                        onChange={(e) => updateCustomAddon(categoryId, row.id, { name: e.target.value })}
-                                                        placeholder="Egen rad"
-                                                        className="w-full bg-black/20 border border-panel-border text-text-primary rounded p-2 text-sm outline-none focus:border-primary"
-                                                    />
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => removeCustomAddon(categoryId, row.id)}
-                                                        className="h-9 w-9 shrink-0 rounded border border-danger/30 bg-danger/10 text-danger hover:bg-danger/20 transition-colors"
-                                                        aria-label="Ta bort egen rad"
-                                                    >
-                                                        ×
-                                                    </button>
-                                                </div>
-                                            </td>
-                                            <td className="p-3">
-                                                <input
-                                                    type="number"
-                                                    min="0"
-                                                    value={price}
-                                                    onChange={(e) => updateCustomAddon(categoryId, row.id, { price: parseFloat(e.target.value) || 0 })}
-                                                    className="w-full bg-black/20 border border-panel-border text-text-primary rounded p-2 text-sm text-right outline-none focus:border-primary"
-                                                />
-                                            </td>
-                                            <td className="p-3">
-                                                <div className="flex items-center justify-center gap-2">
-                                                    <button
-                                                        onClick={() => setCustomAddonQty(categoryId, row.id, qty - 6)}
-                                                        className="bg-panel-bg border border-panel-border text-text-primary px-1.5 py-1 rounded text-[10px] hover:bg-panel-border cursor-pointer"
-                                                    >-6</button>
-                                                    <button
-                                                        onClick={() => setCustomAddonQty(categoryId, row.id, qty - 1)}
-                                                        className="bg-panel-bg border border-panel-border text-text-primary px-2 py-1 rounded text-xs hover:bg-panel-border cursor-pointer"
-                                                    >-</button>
-                                                    <input
-                                                        type="number"
-                                                        min="0"
-                                                        value={qty}
-                                                        onChange={(e) => setCustomAddonQty(categoryId, row.id, parseInt(e.target.value, 10) || 0)}
-                                                        className={`w-12 text-center font-bold bg-black/20 border border-panel-border rounded p-1 text-sm outline-none focus:border-primary ${qty > 0 ? 'text-primary' : ''}`}
-                                                    />
-                                                    <button
-                                                        onClick={() => setCustomAddonQty(categoryId, row.id, qty + 1)}
-                                                        className="bg-panel-bg border border-panel-border text-text-primary px-2 py-1 rounded text-xs hover:bg-panel-border cursor-pointer"
-                                                    >+</button>
-                                                    <button
-                                                        onClick={() => setCustomAddonQty(categoryId, row.id, qty + 6)}
-                                                        className="bg-panel-bg border border-panel-border text-text-primary px-1.5 py-1 rounded text-[10px] hover:bg-panel-border cursor-pointer"
-                                                    >+6</button>
-                                                </div>
-                                            </td>
-                                            <td className="p-3 text-sm text-right font-semibold">
-                                                {total > 0 ? `${total.toLocaleString('sv-SE')} SEK` : ''}
-                                            </td>
-                                        </tr>
-                                    );
-                                })}
-                                <tr className="bg-white/[0.02]">
-                                    <td colSpan="5" className="p-0">
-                                        <button
-                                            type="button"
-                                            onClick={() => addCustomAddon(categoryId)}
-                                            className="w-full px-6 py-3 text-left text-sm font-medium text-primary hover:bg-white/[0.04] transition-colors"
-                                        >
-                                            + Lägg till egen rad
-                                        </button>
-                                    </td>
-                                </tr>
-                            </React.Fragment>
+                                <GridAddonCategoryRows
+                                    key={categoryId}
+                                    category={category}
+                                    categoryId={categoryId}
+                                    customRows={customRows}
+                                    effectiveSelections={effectiveSelections}
+                                    setAddonQtyManual={setAddonQtyManual}
+                                    setAddonSyncMode={setAddonSyncMode}
+                                    updateCustomAddon={updateCustomAddon}
+                                    removeCustomAddon={removeCustomAddon}
+                                    setCustomAddonQty={setCustomAddonQty}
+                                    addCustomAddon={addCustomAddon}
+                                />
                             );
                         })}
                     </tbody>
                     <tfoot>
                         <tr className="bg-black/30 border-t-2 border-primary">
-                            <td colSpan="4" className="p-4 text-right font-bold text-lg uppercase tracking-wider">Totalt {lineData.name}</td>
-                            <td className="p-4 text-right font-bold text-lg text-primary">{getSubtotal().toLocaleString('sv-SE')} SEK</td>
+                            <td colSpan={4} className="p-4 text-right font-bold text-lg uppercase tracking-wider">
+                                Totalt {lineData.name}
+                            </td>
+                            <td className="p-4 text-right font-bold text-lg text-primary">
+                                {getSubtotal().toLocaleString('sv-SE')} SEK
+                            </td>
                         </tr>
                     </tfoot>
                 </table>

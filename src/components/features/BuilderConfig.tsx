@@ -1,73 +1,77 @@
-// @ts-nocheck
-import React, { useEffect, useCallback } from 'react';
+import { useCallback, useEffect } from 'react';
 import { useQuote } from '../../store/QuoteContext';
 import { catalogData } from '../../data/catalog';
+import type { BuilderCatalogLineData, BuilderConfigProps, BuilderItem as QuoteBuilderItem } from '../../types/contracts';
 import { BuilderItem } from './BuilderItem';
 
-export function BuilderConfig() {
+const typedCatalogData = catalogData as Record<string, BuilderCatalogLineData | undefined>;
+
+function createBuilderItemId(): string {
+    return Math.random().toString(36).slice(2, 11);
+}
+
+function getBuilderLine(lineId: string): BuilderCatalogLineData | null {
+    const lineData = typedCatalogData[lineId];
+    return lineData?.type === 'builder' ? lineData : null;
+}
+
+function createDefaultBuilderItem(
+    lineData: BuilderCatalogLineData,
+    lineId: string,
+    globalDiscountPct: number
+): QuoteBuilderItem {
+    const modelIds = Object.keys(lineData.models);
+    const defaultModel = modelIds[0];
+    const sizeIds = Object.keys(lineData.models[defaultModel]?.sizes || {});
+    const defaultSize = sizeIds[0] || '';
+
+    return {
+        id: createBuilderItemId(),
+        line: lineId,
+        model: defaultModel,
+        size: defaultSize,
+        qty: 1,
+        addons: [],
+        discountPct: globalDiscountPct
+    };
+}
+
+export function BuilderConfig(_props: BuilderConfigProps) {
     const { state, dispatch } = useQuote();
     const { builderItems, selectedLines, globalDiscountPct } = state;
 
-    const builderLines = selectedLines.filter((l) => catalogData[l]?.type === 'builder');
+    const builderLines = selectedLines.filter((lineId) => getBuilderLine(lineId) !== null);
 
     const addNewItem = useCallback(() => {
         if (builderLines.length === 0) return;
         const defaultLine = builderLines[0];
-        const models = Object.keys(catalogData[defaultLine].models);
-        const defaultModel = models[0];
-        const sizes = Object.keys(catalogData[defaultLine].models[defaultModel].sizes);
-        const defaultSize = sizes[0];
+        const lineData = getBuilderLine(defaultLine);
+        if (!lineData) return;
 
-        const newItem = {
-            id: Math.random().toString(36).substr(2, 9),
-            line: defaultLine,
-            model: defaultModel,
-            size: defaultSize,
-            qty: 1,
-            addons: [],
-            discountPct: globalDiscountPct
-        };
-
+        const newItem = createDefaultBuilderItem(lineData, defaultLine, globalDiscountPct);
         dispatch({ type: 'SET_BUILDER_ITEMS', payload: [...builderItems, newItem] });
     }, [builderLines, builderItems, globalDiscountPct, dispatch]);
 
-    // Auto-fill an item if there are none when the configuration loads
     useEffect(() => {
-        if (builderItems.length === 0 && builderLines.length > 0) {
-            const defaultLine = builderLines[0];
-            const models = Object.keys(catalogData[defaultLine].models);
-
-            // To fulfill the user request "like Jumbrella 4x4", let's be smart about default selection
-            let defaultModel = models[0];
-            let defaultSize = Object.keys(catalogData[defaultLine].models[defaultModel].sizes)[0];
-
-            // If Bahama is chosen, explicitly prefer Jumbrella 4x4 as requested
-            if (defaultLine === 'bahama') {
-                if (models.includes('Jumbrella')) {
-                    defaultModel = 'Jumbrella';
-                    const jumbrellaSizes = Object.keys(catalogData['bahama'].models['Jumbrella'].sizes);
-                    if (jumbrellaSizes.includes('4X4')) {
-                        defaultSize = '4X4';
-                    }
-                }
-            }
-
-            const newItem = {
-                id: Math.random().toString(36).substr(2, 9),
-                line: defaultLine,
-                model: defaultModel,
-                size: defaultSize,
-                qty: 1,
-                addons: [],
-                discountPct: globalDiscountPct
-            };
-
-            dispatch({ type: 'SET_BUILDER_ITEMS', payload: [newItem] });
+        if (builderItems.length > 0 || builderLines.length === 0) {
+            return;
         }
-    }, []); // Run only once on mount
 
-    const removeItem = (id) => {
-        dispatch({ type: 'SET_BUILDER_ITEMS', payload: builderItems.filter((i) => i.id !== id) });
+        const defaultLine = builderLines[0];
+        const lineData = getBuilderLine(defaultLine);
+        if (!lineData) {
+            return;
+        }
+
+        const newItem = createDefaultBuilderItem(lineData, defaultLine, globalDiscountPct);
+        dispatch({ type: 'SET_BUILDER_ITEMS', payload: [newItem] });
+    }, [builderItems.length, builderLines, globalDiscountPct, dispatch]);
+
+    const removeItem = (id: string) => {
+        dispatch({
+            type: 'SET_BUILDER_ITEMS',
+            payload: builderItems.filter((item) => item.id !== id)
+        });
     };
 
     if (builderLines.length === 0) return null;
@@ -77,7 +81,7 @@ export function BuilderConfig() {
             {builderItems.length === 0 ? (
                 <div className="bg-panel-bg border-2 border-dashed border-panel-border rounded-xl p-12 text-center flex flex-col items-center justify-center animate-fade-in">
                     <div className="w-16 h-16 bg-primary/20 text-primary rounded-full flex items-center justify-center mb-4">
-                        <span className="text-2xl">📦</span>
+                        <span className="text-2xl">P</span>
                     </div>
                     <h4 className="text-xl font-bold text-white mb-2">Inga produkter valda ännu</h4>
                     <p className="text-text-secondary mb-6 max-w-sm">
@@ -116,4 +120,3 @@ export function BuilderConfig() {
         </div>
     );
 }
-
