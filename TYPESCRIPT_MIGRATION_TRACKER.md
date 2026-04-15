@@ -18,7 +18,7 @@ This is a living tracker for the QuoteGenerator TypeScript migration. Update it 
   - `npm run build`
 - `index.html` loads `/src/main.tsx`.
 - Only one declaration file remains in `src/`: `src/types/global.d.ts`.
-- Remaining temporary escape hatches: `16` files still use `// @ts-nocheck`.
+- Remaining temporary escape hatches: `8` files still use `// @ts-nocheck`.
 
 ## Implemented
 
@@ -124,11 +124,56 @@ This is a living tracker for the QuoteGenerator TypeScript migration. Update it 
 - [x] Fixed visible mojibake in the touched admin views, components, and service strings.
 - [x] Extended smoke coverage for `RetailerManager`, `InventoryManager`, and `InventoryLogs`, and updated touched service tests for cleaned text/output.
 
-### 8. Validation already passing
+### 8. Sketch domain slice
+
+- [x] Removed `// @ts-nocheck` from:
+  - `src/views/SketchTool.tsx`
+  - `src/components/features/SketchCanvas.tsx`
+  - `src/components/features/SketchConfig.tsx`
+  - `src/components/features/SketchBom.tsx`
+  - `src/components/features/StockComparisonModal.tsx`
+  - `src/features/sketchExportState.ts`
+  - `src/utils/sectionCalculator.ts`
+  - `src/utils/parasolGeometry.ts`
+- [x] Added shared sketch-domain contracts for:
+  - `SketchToolProps`
+  - `SketchWorkspace`
+  - `SketchCamera`
+  - `SketchSelection`
+  - `SketchConfigState`
+  - `SketchEdgeKey`
+  - `SketchDensity`
+  - `SketchMode`
+  - `DoorSegment`
+  - `ManualSectionPin`
+  - `DoorSegmentsByEdge`
+  - `ManualSectionsByEdge`
+  - `SectionCountByEdge`
+  - `LayoutWarning`
+  - `LayoutSuggestion`
+  - `EdgeSummary`
+  - `EdgeDiagnostic`
+  - `ComputedLayoutResult`
+  - `ParasolPreset`
+  - `PlacedParasol`
+  - `PlacedFiesta`
+  - `StockComparisonRow`
+  - sketch component prop types for `SketchCanvas`, `SketchConfig`, `SketchBom`, and `StockComparisonModal`
+- [x] Typed the sketch pure-helper boundary end to end without changing runtime behavior:
+  - `computeLayout`
+  - section-sizing helpers
+  - parasol preset parsing/grouping helpers
+  - parasol overlap warnings
+  - `buildSketchExportState`
+- [x] Preserved persisted `sketchDraft` structure while tightening its TypeScript shape in shared contracts.
+- [x] Fixed visible mojibake in the touched sketch files only.
+
+### 9. Validation already passing
 
 - [x] `npm run typecheck`
 - [x] `npm run test:confidence`
 - [x] `npm run build`
+- [x] `vitest run tests/sectionCalculator.test.js tests/parasolGeometry.test.js tests/sketchExportState.test.js tests/sketchConfig.test.jsx`
 
 ## Remaining Work
 
@@ -136,17 +181,16 @@ This is a living tracker for the QuoteGenerator TypeScript migration. Update it 
 
 Current backlog by area:
 
-- `components`: 7
-- `views`: 2
-- `features`: 3
-- `utils`: 3
+- `components`: 3
+- `views`: 1
+- `features`: 2
+- `utils`: 1
 - `data`: 1
 
 Remaining files:
 
 #### Views
 
-- [ ] `src/views/SketchTool.tsx`
 - [ ] `src/views/Planner.tsx`
 
 #### Components
@@ -154,21 +198,14 @@ Remaining files:
 - [ ] `src/components/features/BuilderConfig.tsx`
 - [ ] `src/components/features/BuilderItem.tsx`
 - [ ] `src/components/features/GridConfig.tsx`
-- [ ] `src/components/features/SketchCanvas.tsx`
-- [ ] `src/components/features/SketchBom.tsx`
-- [ ] `src/components/features/StockComparisonModal.tsx`
-- [ ] `src/components/features/SketchConfig.tsx`
 
 #### Features
 
-- [ ] `src/features/sketchExportState.ts`
 - [ ] `src/features/pdfExportLayout.ts`
 - [ ] `src/features/pdfExport.ts`
 
 #### Utils
 
-- [ ] `src/utils/sectionCalculator.ts`
-- [ ] `src/utils/parasolGeometry.ts`
 - [ ] `src/utils/gridAutoScale.ts`
 
 #### Data
@@ -198,32 +235,30 @@ Remaining files:
 
 Recommended order from here:
 
-1. `Sketch domain` slice
-   - Target:
-     - `SketchTool`
-     - `SketchCanvas`
-     - `SketchConfig`
-     - `SketchBom`
-     - `sketchExportState`
-     - geometry/math helpers
-   - Why:
-     - This is now the largest remaining product surface.
-     - These files share state, geometry, and export-shape pressure and should move as one coordinated slice.
-
-2. `Planner` follow-up slice
+1. `Planner` follow-up slice
    - Target:
      - `Planner`
    - Why:
-     - It is now the only remaining admin-facing view outside the sketch domain.
-     - Keeping it separate avoids mixing planning CRUD with the heavier geometry work.
+     - It is now the only remaining view still using `// @ts-nocheck`.
+     - Keeping it separate keeps the next slice reviewable before the lower-level catalog/PDF work.
 
-3. `Catalog + PDF/export internals` slice
+2. `Catalog + PDF/export internals` slice
    - Target:
      - `catalog.ts`
      - `pdfExport.ts`
      - `pdfExportLayout.ts`
    - Why:
      - These files will benefit from stronger domain models already established by the previous slices.
+
+3. `Builder/Grid` follow-up slice
+   - Target:
+     - `BuilderConfig`
+     - `BuilderItem`
+     - `GridConfig`
+     - `gridAutoScale.ts`
+   - Why:
+     - This is the last cluster of builder-specific escape hatches.
+     - Leaving it until after planner/catalog keeps layout math and export internals from mixing with builder UI concerns.
 
 ## Definition of Done for the Migration
 

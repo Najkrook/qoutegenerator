@@ -1,25 +1,40 @@
-// @ts-nocheck
 import { catalogData } from '../data/catalog';
+import type {
+    ParasolPreset,
+    PlacedFiesta,
+    PlacedParasol,
+    SketchConfigState,
+    SketchPolygon
+} from '../types/contracts';
 
-/**
- * @typedef {Object} Polygon
- * @property {Array<{x: number, y: number}>} points
- */
+interface CatalogWithJumbrella {
+    BaHaMa?: {
+        models?: {
+            Jumbrella?: {
+                sizes?: Record<string, unknown>;
+            };
+        };
+    };
+}
+
+interface ParsedJumbrellaSize {
+    widthMm: number;
+    depthMm: number;
+    shapeCategory: string;
+}
+
+type ParasolWarning = { id: string; text: string };
 
 /**
  * Creates a polygon representing the drawn area based on the current Sketch config.
  * Handles equal depth (rectangle) and split depth (trapezoid).
- * @param {Object} config The valid Sketch configuration
- * @returns {Polygon}
  */
-export function getAreaPolygon(config) {
+export function getAreaPolygon(config: Partial<SketchConfigState> | null | undefined): SketchPolygon {
     const w = Number(config?.width) || 0;
     const dl = Number(config?.depthLeft ?? config?.depth) || 0;
     const dr = Number(config?.depthRight ?? config?.depth) || 0;
     const maxDepth = Math.max(dl, dr);
 
-    // Must match SketchCanvas world coordinates:
-    // y=0 at back/wall, increasing downward toward front edge.
     return {
         points: [
             { x: 0, y: maxDepth },
@@ -33,15 +48,11 @@ export function getAreaPolygon(config) {
 /**
  * Checks if a given point is inside or on the boundary of a polygon.
  * Uses ray-casting algorithm.
- * @param {number} x X coordinate in mm
- * @param {number} y Y coordinate in mm
- * @param {Polygon} polygon The area polygon
- * @returns {boolean}
  */
-export function pointInPolygon(x, y, polygon) {
+export function pointInPolygon(x: number, y: number, polygon: SketchPolygon | null | undefined): boolean {
     if (!polygon?.points || polygon.points.length < 3) return false;
 
-    const isPointOnSegment = (px, py, ax, ay, bx, by) => {
+    const isPointOnSegment = (px: number, py: number, ax: number, ay: number, bx: number, by: number) => {
         const eps = 1e-6;
         const cross = (px - ax) * (by - ay) - (py - ay) * (bx - ax);
         if (Math.abs(cross) > eps) return false;
@@ -67,14 +78,14 @@ export function pointInPolygon(x, y, polygon) {
         const yj = pts[j].y;
 
         const intersect = ((yi > y) !== (yj > y)) &&
-            (x < (xj - xi) * (y - yi) / (yj - yi) + xi);
+            (x < ((xj - xi) * (y - yi)) / (yj - yi) + xi);
         if (intersect) inside = !inside;
     }
 
     return inside;
 }
 
-export function getParasolRotationDeg(parasol) {
+export function getParasolRotationDeg(parasol: Partial<PlacedParasol> | null | undefined): 0 | 90 {
     return parasol?.rotationDeg === 90 ? 90 : 0;
 }
 
@@ -82,19 +93,19 @@ export const FIESTA_DIAMETER_MM = 700;
 export const FIESTA_EXPORT_LINE = 'Fiesta';
 export const FIESTA_EXPORT_MODEL = 'FIESTA Biogasstolpe 12 kW';
 export const FIESTA_EXPORT_SIZE = 'Standard';
-export const FIESTA_DEFAULT_LAYER = 'below';
+export const FIESTA_DEFAULT_LAYER = 'below' as const;
 
-export function normalizeFiestaLayer(layer) {
+export function normalizeFiestaLayer(layer: unknown): 'above' | 'below' {
     if (layer === 'above' || layer === 'below') return layer;
     return FIESTA_DEFAULT_LAYER;
 }
 
-export function getFiestaRadiusMm(fiesta) {
+export function getFiestaRadiusMm(fiesta: Partial<PlacedFiesta> | null | undefined): number {
     const diameterMm = Number(fiesta?.diameterMm) || FIESTA_DIAMETER_MM;
     return diameterMm / 2;
 }
 
-export function normalizeFiestaItem(fiesta) {
+export function normalizeFiestaItem(fiesta: Partial<PlacedFiesta> | null | undefined): PlacedFiesta | null {
     if (!fiesta) return null;
 
     const xMm = Number(fiesta.xMm);
@@ -105,6 +116,7 @@ export function normalizeFiestaItem(fiesta) {
 
     return {
         ...fiesta,
+        id: String(fiesta.id || ''),
         diameterMm: FIESTA_DIAMETER_MM,
         xMm,
         yMm,
@@ -115,14 +127,14 @@ export function normalizeFiestaItem(fiesta) {
     };
 }
 
-export function isParasolRotatable(parasol) {
+export function isParasolRotatable(parasol: Partial<PlacedParasol> | null | undefined): boolean {
     if (!parasol) return false;
-    return Number(parasol.widthMm) > 0
-        && Number(parasol.depthMm) > 0
-        && Number(parasol.widthMm) !== Number(parasol.depthMm);
+    return Number(parasol.widthMm) > 0 &&
+        Number(parasol.depthMm) > 0 &&
+        Number(parasol.widthMm) !== Number(parasol.depthMm);
 }
 
-export function getEffectiveParasolDimensions(parasol) {
+export function getEffectiveParasolDimensions(parasol: Partial<PlacedParasol> | null | undefined) {
     const widthMm = Number(parasol?.widthMm) || 0;
     const depthMm = Number(parasol?.depthMm) || 0;
     const rotationDeg = getParasolRotationDeg(parasol);
@@ -137,12 +149,7 @@ export function getEffectiveParasolDimensions(parasol) {
     return { widthMm, depthMm };
 }
 
-/**
- * Warns if parasols AABB overlap.
- * @param {Array<Object>} parasols Array of placed parasol objects
- * @returns {Array<{id: string, text: string}>} Array of warning messages
- */
-export function computeParasolOverlapWarnings(parasols) {
+export function computeParasolOverlapWarnings(parasols: Array<Partial<PlacedParasol>>): ParasolWarning[] {
     for (let i = 0; i < parasols.length; i++) {
         for (let j = i + 1; j < parasols.length; j++) {
             const p1 = parasols[i];
@@ -150,19 +157,17 @@ export function computeParasolOverlapWarnings(parasols) {
             const p1Dims = getEffectiveParasolDimensions(p1);
             const p2Dims = getEffectiveParasolDimensions(p2);
 
-            const p1Left = p1.xMm - p1Dims.widthMm / 2;
-            const p1Right = p1.xMm + p1Dims.widthMm / 2;
-            const p1Top = p1.yMm + p1Dims.depthMm / 2;
-            const p1Bottom = p1.yMm - p1Dims.depthMm / 2;
+            const p1Left = (Number(p1.xMm) || 0) - p1Dims.widthMm / 2;
+            const p1Right = (Number(p1.xMm) || 0) + p1Dims.widthMm / 2;
+            const p1Top = (Number(p1.yMm) || 0) + p1Dims.depthMm / 2;
+            const p1Bottom = (Number(p1.yMm) || 0) - p1Dims.depthMm / 2;
 
-            const p2Left = p2.xMm - p2Dims.widthMm / 2;
-            const p2Right = p2.xMm + p2Dims.widthMm / 2;
-            const p2Top = p2.yMm + p2Dims.depthMm / 2;
-            const p2Bottom = p2.yMm - p2Dims.depthMm / 2;
+            const p2Left = (Number(p2.xMm) || 0) - p2Dims.widthMm / 2;
+            const p2Right = (Number(p2.xMm) || 0) + p2Dims.widthMm / 2;
+            const p2Top = (Number(p2.yMm) || 0) + p2Dims.depthMm / 2;
+            const p2Bottom = (Number(p2.yMm) || 0) - p2Dims.depthMm / 2;
 
-            // Check AABB overlap
-            if (p1Left < p2Right && p1Right > p2Left &&
-                p1Bottom < p2Top && p1Top > p2Bottom) {
+            if (p1Left < p2Right && p1Right > p2Left && p1Bottom < p2Top && p1Top > p2Bottom) {
                 return [{ id: 'parasol-overlap', text: 'Flera parasoller overlappar varandra.' }];
             }
         }
@@ -173,7 +178,7 @@ export function computeParasolOverlapWarnings(parasols) {
 
 export const DEFAULT_PARASOL_PRESET_ID = 'parasol_3x3';
 
-const LEGACY_PRESET_IDS = {
+const LEGACY_PRESET_IDS: Record<string, string> = {
     '3x3 Kvadrat': 'parasol_3x3',
     '4x4 Kvadrat': 'parasol_4x4',
     '5x5 Kvadrat': 'parasol_5x5',
@@ -182,25 +187,24 @@ const LEGACY_PRESET_IDS = {
 
 const CATEGORY_ORDER = ['Kvadrat', 'Rektangel', 'Övrigt'];
 
-function slugifyPresetLabel(label) {
+function slugifyPresetLabel(label: string): string {
     return label
         .toLowerCase()
         .normalize('NFKD')
         .replace(/[^\w\s,.*-]/g, '')
         .replace(/\*/g, 'runda')
         .replace(/,/g, '')
-        .replace(/\s+/g, '_')
-        .replace(/x/g, 'x');
+        .replace(/\s+/g, '_');
 }
 
-export function parseMetricToken(token) {
+export function parseMetricToken(token: unknown): number | null {
     const normalized = String(token || '').trim().replace(',', '.');
     const parsed = Number.parseFloat(normalized);
     if (!Number.isFinite(parsed)) return null;
     return Math.round(parsed * 1000);
 }
 
-export function parseJumbrellaSize(sizeLabel) {
+export function parseJumbrellaSize(sizeLabel: unknown): ParsedJumbrellaSize | null {
     const label = String(sizeLabel || '').trim();
     if (!label) return null;
 
@@ -229,14 +233,15 @@ export function parseJumbrellaSize(sizeLabel) {
     };
 }
 
-function buildPresetId(label) {
+function buildPresetId(label: string): string {
     return LEGACY_PRESET_IDS[label] || `jumbrella_${slugifyPresetLabel(label)}`;
 }
 
-export function buildJumbrellaParasolPresets() {
-    const jumbrellaSizes = catalogData?.BaHaMa?.models?.Jumbrella?.sizes || {};
+export function buildJumbrellaParasolPresets(): ParasolPreset[] {
+    const catalog = catalogData as CatalogWithJumbrella;
+    const jumbrellaSizes = catalog?.BaHaMa?.models?.Jumbrella?.sizes || {};
 
-    return Object.keys(jumbrellaSizes).reduce((presets, sizeLabel) => {
+    return Object.keys(jumbrellaSizes).reduce<ParasolPreset[]>((presets, sizeLabel) => {
         const parsed = parseJumbrellaSize(sizeLabel);
 
         if (!parsed) {
@@ -263,8 +268,8 @@ export function buildJumbrellaParasolPresets() {
     }, []);
 }
 
-export function groupParasolPresetsByCategory(presets) {
-    const grouped = presets.reduce((acc, preset) => {
+export function groupParasolPresetsByCategory(presets: ParasolPreset[]): Array<{ category: string; presets: ParasolPreset[] }> {
+    const grouped = presets.reduce<Record<string, ParasolPreset[]>>((acc, preset) => {
         const category = CATEGORY_ORDER.includes(preset.shapeCategory) ? preset.shapeCategory : 'Övrigt';
         if (!acc[category]) {
             acc[category] = [];
@@ -281,15 +286,12 @@ export function groupParasolPresetsByCategory(presets) {
         }));
 }
 
-/**
- * Core configuration for available parasol presets
- */
 export const PARASOL_PRESETS = buildJumbrellaParasolPresets();
 
-export function getParasolPresetById(presetId) {
+export function getParasolPresetById(presetId: string | null | undefined): ParasolPreset | null {
     return PARASOL_PRESETS.find((preset) => preset.id === presetId) || null;
 }
 
-export function snapToStep100(value) {
+export function snapToStep100(value: number): number {
     return Math.round(value / 100) * 100;
 }

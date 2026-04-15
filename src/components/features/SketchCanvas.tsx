@@ -1,5 +1,4 @@
-// @ts-nocheck
-import React, { useMemo, useRef, useState, useEffect, useCallback } from 'react';
+import { useMemo, useRef, useState, useEffect, useCallback } from 'react';
 import { DOOR_LABEL, MIN_DIMENSION_MM, STEP_MM } from '../../utils/sectionCalculator';
 import {
     getFiestaRadiusMm,
@@ -7,27 +6,94 @@ import {
     getParasolRotationDeg,
     isParasolRotatable
 } from '../../utils/parasolGeometry';
+import type {
+    EdgeSummary,
+    PlacedFiesta,
+    PlacedParasol,
+    SketchCamera,
+    SketchCanvasProps,
+    SketchEdgeKey,
+    SketchConfigState,
+    SketchRenderedSegment,
+    SketchSectionEntry
+} from '../../types/contracts';
 
-const DEFAULT_CAMERA = { zoom: 1, panX: 0, panY: 0 };
+type ActiveDrag = 'front' | 'right' | 'left' | 'depthLeft' | 'depthRight';
+type EdgeDirection = 'E' | 'S';
 
-function clamp(value, min, max) {
+interface ResizeDragState {
+    startX: number;
+    startY: number;
+    initialW: number;
+    initialD: number;
+    initialDLeft: number;
+    initialDRight: number;
+}
+
+interface DraggedItemState {
+    id: string;
+    startX: number;
+    startY: number;
+    initialX: number;
+    initialY: number;
+}
+
+interface PanState {
+    startX: number;
+    startY: number;
+    panX: number;
+    panY: number;
+}
+
+interface TouchPinchState {
+    distance: number;
+    camera: SketchCamera;
+    centerX: number;
+    centerY: number;
+}
+
+interface TouchSinglePanState {
+    startX: number;
+    startY: number;
+    camera: SketchCamera;
+}
+
+interface SegmentGeometry {
+    x: number;
+    y: number;
+    w: number;
+    h: number;
+    tx: number;
+    ty: number;
+}
+
+interface DragHandleProps {
+    x: number;
+    y: number;
+    edgeId: ActiveDrag;
+    cursor: string;
+}
+
+const DEFAULT_CAMERA: SketchCamera = { zoom: 1, panX: 0, panY: 0 };
+
+function clamp(value: number, min: number, max: number): number {
     if (value < min) return min;
     if (value > max) return max;
     return value;
 }
 
-function parseDoorSize(item) {
+function parseDoorSize(item: SketchSectionEntry): number | null {
     const match = new RegExp(`${DOOR_LABEL}\\s+(\\d+)`, 'i').exec(String(item));
     if (!match) return null;
     const parsed = Number.parseInt(match[1], 10);
     return Number.isFinite(parsed) ? parsed : null;
 }
 
-function snapToGrid(value) {
+function snapToGrid(value: number): number {
     return Math.round(value / STEP_MM) * STEP_MM;
 }
 
-function normalizeCamera(camera, width, depth, padding) {
+function normalizeCamera(camera: Partial<SketchCamera> | undefined, width: number, depth: number, padding: number): SketchCamera {
     const zoom = clamp(Number(camera?.zoom) || 1, 0.55, 3.5);
     const totalWidth = width + padding * 2;
     const totalHeight = depth + padding * 2;
@@ -46,7 +112,7 @@ function normalizeCamera(camera, width, depth, padding) {
     return { zoom, panX, panY };
 }
 
-function sectionSegmentsFromArray(sections, edgeKey) {
+function sectionSegmentsFromArray(sections: SketchSectionEntry[], edgeKey: SketchEdgeKey): SketchRenderedSegment[] {
     return sections.map((item, index) => {
         const doorSize = parseDoorSize(item);
         const isDoor = doorSize !== null;
@@ -100,20 +166,23 @@ export function SketchCanvas({
     onPlaceFiesta,
     onSelectFiesta,
     onMoveFiesta
-}) {
-    const svgRef = useRef(null);
-    const [activeDrag, setActiveDrag] = useState(null);
-    const dragRef = useRef({ startX: 0, startY: 0, initialW: 0, initialD: 0, initialDLeft: 0, initialDRight: 0 });
-    const [dragWidth, setDragWidth] = useState(null);
-    const [dragDepth, setDragDepth] = useState(null);
-    const [dragDepthLeft, setDragDepthLeft] = useState(null);
-    const [dragDepthRight, setDragDepthRight] = useState(null);
-    const dragWidthRef = useRef(null);
-    const dragDepthRef = useRef(null);
-    const dragDepthLeftRef = useRef(null);
-    const dragDepthRightRef = useRef(null);
-    const panRef = useRef(null);
-    const touchRef = useRef({ pinch: null, singlePan: null });
+}: SketchCanvasProps) {
+    const svgRef = useRef<SVGSVGElement | null>(null);
+    const [activeDrag, setActiveDrag] = useState<ActiveDrag | null>(null);
+    const dragRef = useRef<ResizeDragState>({ startX: 0, startY: 0, initialW: 0, initialD: 0, initialDLeft: 0, initialDRight: 0 });
+    const [dragWidth, setDragWidth] = useState<number | null>(null);
+    const [dragDepth, setDragDepth] = useState<number | null>(null);
+    const [dragDepthLeft, setDragDepthLeft] = useState<number | null>(null);
+    const [dragDepthRight, setDragDepthRight] = useState<number | null>(null);
+    const dragWidthRef = useRef<number | null>(null);
+    const dragDepthRef = useRef<number | null>(null);
+    const dragDepthLeftRef = useRef<number | null>(null);
+    const dragDepthRightRef = useRef<number | null>(null);
+    const panRef = useRef<PanState | null>(null);
+    const touchRef = useRef<{
+        pinch: TouchPinchState | null;
+        singlePan: TouchSinglePanState | null;
+    }>({ pinch: null, singlePan: null });
 
     const currentWidth = dragWidth ?? width;
     const currentDepthLeft = dragDepthLeft ?? (equalDepth ? (dragDepth ?? propDepthLeft ?? depth) : (propDepthLeft ?? depth));
@@ -137,14 +206,30 @@ export function SketchCanvas({
     const sectionThickness = uiDensity === 'touch' ? 130 : 100;
     const labelFont = uiDensity === 'touch' ? 220 : 190;
 
-    const summaryByEdge = useMemo(
+    const summaryByEdge = useMemo<Record<SketchEdgeKey, Partial<EdgeSummary> & { segments: SketchRenderedSegment[] }>>(
         () => ({
-            front: edgeSummaries.front || { segments: sectionSegmentsFromArray(frontEdge, 'front') },
-            left: edgeSummaries.left || { segments: sectionSegmentsFromArray(leftEdge, 'left') },
-            right: edgeSummaries.right || { segments: sectionSegmentsFromArray(rightEdge, 'right') },
-            back: edgeSummaries.back || { segments: sectionSegmentsFromArray(backEdge, 'back') }
+            front: edgeSummaries.front || {
+                segments: sectionSegmentsFromArray(frontEdge, 'front'),
+                enabled: true,
+                effectiveLength: currentWidth
+            },
+            left: edgeSummaries.left || {
+                segments: sectionSegmentsFromArray(leftEdge, 'left'),
+                enabled: true,
+                effectiveLength: currentDepthLeft
+            },
+            right: edgeSummaries.right || {
+                segments: sectionSegmentsFromArray(rightEdge, 'right'),
+                enabled: true,
+                effectiveLength: currentDepthRight
+            },
+            back: edgeSummaries.back || {
+                segments: sectionSegmentsFromArray(backEdge, 'back'),
+                enabled: includeBack,
+                effectiveLength: currentWidth
+            }
         }),
-        [edgeSummaries, frontEdge, leftEdge, rightEdge, backEdge]
+        [backEdge, currentDepthLeft, currentDepthRight, currentWidth, edgeSummaries, frontEdge, includeBack, leftEdge, rightEdge]
     );
 
     const selectedEdge = selection?.edgeKey || null;
@@ -272,7 +357,7 @@ export function SketchCanvas({
 
         const handleUp = () => {
             setActiveDrag(null);
-            const finalUpdate = {};
+            const finalUpdate: Partial<Pick<SketchConfigState, 'width' | 'depth' | 'depthLeft' | 'depthRight'>> = {};
             const resizeCommit = onResizeCommit || onResize;
 
             if (dragWidthRef.current !== null && dragWidthRef.current !== dragRef.current.initialW) {
@@ -313,8 +398,8 @@ export function SketchCanvas({
         };
     }, [activeDrag, onResize, onResizePreview, onResizeCommit, viewHeight, viewWidth, equalDepth]);
 
-    const [activeParasolDrag, setActiveParasolDrag] = useState(null);
-    const parasolDragRef = useRef(null);
+    const [activeParasolDrag, setActiveParasolDrag] = useState<string | null>(null);
+    const parasolDragRef = useRef<DraggedItemState | null>(null);
 
     const handlePolygonClick = useCallback((event) => {
         if (activeMode !== 'parasol' && activeMode !== 'fiesta') return;
@@ -394,8 +479,8 @@ export function SketchCanvas({
         };
     }, [activeParasolDrag, viewWidth, viewHeight, onMoveParasol]);
 
-    const [activeFiestaDrag, setActiveFiestaDrag] = useState(null);
-    const fiestaDragRef = useRef(null);
+    const [activeFiestaDrag, setActiveFiestaDrag] = useState<string | null>(null);
+    const fiestaDragRef = useRef<DraggedItemState | null>(null);
 
     const beginFiestaDrag = useCallback((id, event) => {
         if (activeMode !== 'fiesta') return;

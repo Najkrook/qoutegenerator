@@ -1,5 +1,4 @@
-// @ts-nocheck
-import React, { useState, useMemo, useCallback, useRef } from 'react';
+import { useState, useMemo, useCallback, useRef } from 'react';
 import { useQuote } from '../store/QuoteContext';
 import { useAuth } from '../store/AuthContext';
 import {
@@ -33,28 +32,54 @@ import { SketchBom } from '../components/features/SketchBom';
 import { StockComparisonModal } from '../components/features/StockComparisonModal';
 import toast from 'react-hot-toast';
 import { safeLogActivity } from '../services/activityLogService';
+import type {
+    ComputedLayoutResult,
+    DoorSegment,
+    DoorSegmentsByEdge,
+    EdgeDiagnostic,
+    GridCustomAddonRow,
+    GridLineSelection,
+    ManualSectionsByEdge,
+    PlacedFiesta,
+    PlacedParasol,
+    SectionCountByEdge,
+    SketchCamera,
+    SketchConfigState,
+    SketchDensity,
+    SketchEdgeKey,
+    SketchSectionEntry,
+    SketchToolProps,
+    SketchWorkspace
+} from '../types/contracts';
 
-const EDGE_LABELS = {
+type SketchConfigInput = Partial<SketchConfigState> & {
+    doorEdges?: SketchEdgeKey[] | Set<SketchEdgeKey>;
+    doorSizeByEdge?: Partial<Record<SketchEdgeKey, number>>;
+};
+
+type DragPreview = Partial<Pick<SketchConfigState, 'width' | 'depth' | 'depthLeft' | 'depthRight'>>;
+
+const EDGE_LABELS: Record<SketchEdgeKey, string> = {
     front: 'Fram',
     left: 'Vänster',
     right: 'Höger',
     back: 'Bak'
 };
 
-const EDGE_KEYS = ['front', 'left', 'right', 'back'];
-const DEFAULT_CAMERA = { zoom: 1, panX: 0, panY: 0 };
+const EDGE_KEYS: SketchEdgeKey[] = ['front', 'left', 'right', 'back'];
+const DEFAULT_CAMERA: SketchCamera = { zoom: 1, panX: 0, panY: 0 };
 
-function roundToStep(value) {
+function roundToStep(value: number): number {
     return Math.round(value / STEP_MM) * STEP_MM;
 }
 
-function clamp(value, min, max) {
+function clamp(value: number, min: number, max: number): number {
     if (value < min) return min;
     if (value > max) return max;
     return value;
 }
 
-function nearestFromList(value, list) {
+function nearestFromList(value: number, list: number[]): number {
     return list.reduce((best, current) => {
         const bestDiff = Math.abs(best - value);
         const currentDiff = Math.abs(current - value);
@@ -64,34 +89,34 @@ function nearestFromList(value, list) {
     }, list[0]);
 }
 
-function normalizeDimension(rawValue, fallback) {
+function normalizeDimension(rawValue: unknown, fallback: number): number {
     const parsed = Number(rawValue);
     const base = Number.isFinite(parsed) ? parsed : fallback;
     const rounded = roundToStep(base);
     return clamp(rounded, MIN_DIMENSION_MM, 50000);
 }
 
-function normalizeDepth(rawValue, fallback) {
+function normalizeDepth(rawValue: unknown, fallback: number): number {
     const parsed = Number(rawValue);
     const base = Number.isFinite(parsed) ? parsed : fallback;
     const rounded = roundToStep(base);
     return clamp(rounded, 0, 50000);
 }
 
-function normalizeTarget(rawValue, fallback) {
+function normalizeTarget(rawValue: unknown, fallback: number): number {
     const parsed = Number(rawValue);
     const base = Number.isFinite(parsed) ? parsed : fallback;
     const rounded = roundToStep(base);
     return nearestFromList(clamp(rounded, 700, 2000), SECTION_SIZES);
 }
 
-function normalizeDoorSize(rawValue) {
+function normalizeDoorSize(rawValue: unknown): number {
     const parsed = Number(rawValue);
     const base = Number.isFinite(parsed) ? parsed : 1000;
     return nearestFromList(base, DOOR_SIZES);
 }
 
-function normalizeDoorSegment(rawSegment, fallbackIndex = 0) {
+function normalizeDoorSegment(rawSegment: Partial<DoorSegment> | null | undefined, fallbackIndex = 0): DoorSegment {
     const parsedIndex = Number(rawSegment?.index);
     const normalizedIndex = Number.isInteger(parsedIndex) && parsedIndex >= 0 ? parsedIndex : fallbackIndex;
     return {
@@ -100,7 +125,7 @@ function normalizeDoorSegment(rawSegment, fallbackIndex = 0) {
     };
 }
 
-function normalizeDoorSegments(rawSegments = []) {
+function normalizeDoorSegments(rawSegments: unknown = []): DoorSegment[] {
     if (!Array.isArray(rawSegments)) return [];
 
     const byIndex = new Map();
@@ -112,10 +137,15 @@ function normalizeDoorSegments(rawSegments = []) {
     return Array.from(byIndex.values()).sort((a, b) => a.index - b.index);
 }
 
-function normalizeDoorSegmentsByEdge(config, includeBack, hasLeftDepth, hasRightDepth) {
+function normalizeDoorSegmentsByEdge(
+    config: SketchConfigInput,
+    includeBack: boolean,
+    hasLeftDepth: boolean,
+    hasRightDepth: boolean
+): DoorSegmentsByEdge {
     const rawDoorSegmentsByEdge = config.doorSegmentsByEdge;
     const hasNewModel = rawDoorSegmentsByEdge && typeof rawDoorSegmentsByEdge === 'object' && !Array.isArray(rawDoorSegmentsByEdge);
-    const normalized = {};
+    const normalized: DoorSegmentsByEdge = {};
 
     if (hasNewModel) {
         EDGE_KEYS.forEach((edge) => {
@@ -152,8 +182,8 @@ function normalizeDoorSegmentsByEdge(config, includeBack, hasLeftDepth, hasRight
     return normalized;
 }
 
-function normalizeManualSectionsByEdge(rawManualSectionsByEdge, doorSegmentsByEdge) {
-    const normalized = {};
+function normalizeManualSectionsByEdge(rawManualSectionsByEdge: unknown, doorSegmentsByEdge: DoorSegmentsByEdge): ManualSectionsByEdge {
+    const normalized: ManualSectionsByEdge = {};
 
     EDGE_KEYS.forEach((edge) => {
         const rawPins = Array.isArray(rawManualSectionsByEdge?.[edge]) ? rawManualSectionsByEdge[edge] : [];
@@ -180,8 +210,8 @@ function normalizeManualSectionsByEdge(rawManualSectionsByEdge, doorSegmentsByEd
     return normalized;
 }
 
-function normalizeSectionCountByEdge(rawCounts) {
-    const normalized = {};
+function normalizeSectionCountByEdge(rawCounts: unknown): SectionCountByEdge {
+    const normalized: SectionCountByEdge = {};
     if (!rawCounts || typeof rawCounts !== 'object') return normalized;
 
     EDGE_KEYS.forEach((edge) => {
@@ -194,21 +224,22 @@ function normalizeSectionCountByEdge(rawCounts) {
     return normalized;
 }
 
-function normalizeParasol(parasol) {
-    if (!parasol) return parasol;
+function normalizeParasol(parasol: Partial<PlacedParasol> | null | undefined): PlacedParasol | null {
+    if (!parasol) return null;
 
     return {
         ...parasol,
+        id: String(parasol.id),
         rotationDeg: parasol.rotationDeg === 90 ? 90 : 0
-    };
+    } as PlacedParasol;
 }
 
-function normalizeFiesta(fiesta) {
+function normalizeFiesta(fiesta: Partial<PlacedFiesta> | null | undefined): PlacedFiesta | null {
     return normalizeFiestaItem(fiesta);
 }
 
-function sanitizeConfig(config) {
-    const next = { ...config };
+function sanitizeConfig(config: SketchConfigInput): SketchConfigState {
+    const next: SketchConfigInput = { ...config };
     next.width = normalizeDimension(next.width, 8000);
     next.equalDepth = next.equalDepth !== false; // default true
 
@@ -256,17 +287,17 @@ function sanitizeConfig(config) {
     next.selectedFiestaId = (config.selectedFiestaId && next.fiestaItems.some((fiesta) => fiesta.id === config.selectedFiestaId))
         ? config.selectedFiestaId
         : null;
-    return next;
+    return next as SketchConfigState;
 }
 
-function parseDoorSize(section) {
+function parseDoorSize(section: SketchSectionEntry): number | null {
     const match = new RegExp(`${DOOR_LABEL}\\s+(\\d+)`, 'i').exec(String(section));
     if (!match) return null;
     const parsed = Number.parseInt(match[1], 10);
     return Number.isFinite(parsed) ? parsed : null;
 }
 
-function getInitialDensity() {
+function getInitialDensity(): SketchDensity {
     if (typeof window === 'undefined') {
         return 'desktop';
     }
@@ -274,14 +305,14 @@ function getInitialDensity() {
     return coarse ? 'touch' : 'desktop';
 }
 
-function serializeSketchConfig(config) {
+function serializeSketchConfig(config: SketchConfigState): SketchConfigState {
     const { doorEdges, doorSizeByEdge, ...rest } = config || {};
     return {
         ...rest
-    };
+    } as SketchConfigState;
 }
 
-function createDefaultSketchConfig() {
+function createDefaultSketchConfig(): SketchConfigState {
     return {
         width: 8000,
         depth: 4000,
@@ -303,11 +334,11 @@ function createDefaultSketchConfig() {
     };
 }
 
-function cloneSketchConfig(config) {
+function cloneSketchConfig(config?: SketchConfigInput | null): SketchConfigState {
     return sanitizeConfig(JSON.parse(JSON.stringify(config || createDefaultSketchConfig())));
 }
 
-function cloneWorkspace(saved = {}) {
+function cloneWorkspace(saved: Partial<SketchWorkspace> = {}): SketchWorkspace {
     return {
         camera: { ...DEFAULT_CAMERA, ...(saved.camera || {}) },
         selection: {
@@ -318,26 +349,26 @@ function cloneWorkspace(saved = {}) {
     };
 }
 
-function warnIfActivityLogFailed(result, message) {
+function warnIfActivityLogFailed(result: { ok?: boolean } | null | undefined, message: string): void {
     if (result?.ok === false) {
         toast(message, { icon: '!' });
     }
 }
 
-export function SketchTool({ onBack }) {
+export function SketchTool({ onBack }: SketchToolProps) {
     const { state, dispatch } = useQuote();
     const { user, canExportSketchToQuote } = useAuth();
 
-    const initialConfigRef = useRef(cloneSketchConfig(state.sketchDraft?.config || createDefaultSketchConfig()));
-    const initialWorkspaceRef = useRef(cloneWorkspace(state.sketchDraft?.workspace || {}));
+    const initialConfigRef = useRef<SketchConfigState>(cloneSketchConfig(state.sketchDraft?.config || createDefaultSketchConfig()));
+    const initialWorkspaceRef = useRef<SketchWorkspace>(cloneWorkspace(state.sketchDraft?.workspace || {}));
 
-    const [config, setConfig] = useState(() => cloneSketchConfig(initialConfigRef.current));
-    const [workspace, setWorkspace] = useState(() => cloneWorkspace(initialWorkspaceRef.current));
+    const [config, setConfig] = useState<SketchConfigState>(() => cloneSketchConfig(initialConfigRef.current));
+    const [workspace, setWorkspace] = useState<SketchWorkspace>(() => cloneWorkspace(initialWorkspaceRef.current));
 
     const [showStockModal, setShowStockModal] = useState(false);
-    const [dragPreview, setDragPreview] = useState(null);
+    const [dragPreview, setDragPreview] = useState<DragPreview | null>(null);
 
-    const updateConfig = useCallback((partial) => {
+    const updateConfig = useCallback((partial: Partial<SketchConfigState>) => {
         setConfig((prev) => {
             const merged = {
                 ...prev,
@@ -418,8 +449,8 @@ export function SketchTool({ onBack }) {
         updateConfig({ doorSegmentsByEdge: nextDoors });
     }, [config.doorSegmentsByEdge, updateConfig]);
 
-    const layout = useMemo(() => computeLayout(config), [config]);
-    const previewConfig = useMemo(() => {
+    const layout = useMemo<ComputedLayoutResult>(() => computeLayout(config), [config]);
+    const previewConfig = useMemo<SketchConfigState>(() => {
         if (!dragPreview) return config;
         return sanitizeConfig({
             ...config,
@@ -428,18 +459,18 @@ export function SketchTool({ onBack }) {
             manualSectionsByEdge: config.manualSectionsByEdge
         });
     }, [config, dragPreview]);
-    const previewLayout = useMemo(
+    const previewLayout = useMemo<ComputedLayoutResult>(
         () => (dragPreview ? computeLayout(previewConfig) : layout),
         [dragPreview, previewConfig, layout]
     );
 
-    const invalidEdges = useMemo(
-        () => Object.entries(layout.edgeDiagnostics || {}).filter(([, diag]) => !diag.valid),
+    const invalidEdges = useMemo<Array<[SketchEdgeKey, EdgeDiagnostic]>>(
+        () => Object.entries(layout.edgeDiagnostics || {}).filter(([, diag]) => !diag.valid) as Array<[SketchEdgeKey, EdgeDiagnostic]>,
         [layout.edgeDiagnostics]
     );
 
-    const autoAdjustedEdges = useMemo(
-        () => Object.entries(layout.edgeDiagnostics || {}).filter(([, diag]) => diag.valid && diag.autoAdjusted),
+    const autoAdjustedEdges = useMemo<Array<[SketchEdgeKey, EdgeDiagnostic]>>(
+        () => Object.entries(layout.edgeDiagnostics || {}).filter(([, diag]) => diag.valid && diag.autoAdjusted) as Array<[SketchEdgeKey, EdgeDiagnostic]>,
         [layout.edgeDiagnostics]
     );
 
@@ -589,7 +620,7 @@ export function SketchTool({ onBack }) {
             label: preset.label,
             widthMm: preset.widthMm,
             depthMm: preset.depthMm,
-            rotationDeg: 0,
+            rotationDeg: 0 as const,
             xMm: snappedX,
             yMm: snappedY,
             exportLine: preset.exportLine,
@@ -699,7 +730,7 @@ export function SketchTool({ onBack }) {
 
     const handleExportClick = () => {
         if (!canExportSketchToQuote) {
-            toast.error('Du har inte behorighet att exportera till offert.');
+            toast.error('Du har inte behörighet att exportera till offert.');
             return;
         }
 
@@ -740,11 +771,11 @@ export function SketchTool({ onBack }) {
 
         const gridSelections = { ...state.gridSelections };
         // Build from scratch so each export reflects only the current sketch.
-        const preservedCustomAddons = Object.entries(state.gridSelections?.ClickitUp?.customAddonsByCategory || {}).reduce((acc, [categoryId, rows]) => {
+        const preservedCustomAddons = Object.entries(state.gridSelections?.ClickitUp?.customAddonsByCategory || {}).reduce<Record<string, GridCustomAddonRow[]>>((acc, [categoryId, rows]) => {
             acc[categoryId] = Array.isArray(rows) ? rows.map((row) => ({ ...row })) : [];
             return acc;
         }, {});
-        const cuGrid = { items: {}, addons: {}, customAddonsByCategory: preservedCustomAddons };
+        const cuGrid: GridLineSelection = { items: {}, addons: {}, customAddonsByCategory: preservedCustomAddons };
 
         layout.allSections.forEach((section) => {
             const doorSize = parseDoorSize(section);
@@ -833,8 +864,10 @@ export function SketchTool({ onBack }) {
         }
 
         // Temporarily hide drag handles
-        const handles = element.querySelectorAll('.sketch-drag-handle');
-        handles.forEach(h => h.style.display = 'none');
+        const handles = Array.from(element.querySelectorAll<HTMLElement>('.sketch-drag-handle'));
+        handles.forEach((handle) => {
+            handle.style.display = 'none';
+        });
 
         const originalBg = element.style.backgroundColor;
         element.style.backgroundColor = '#0b1220';
@@ -851,8 +884,15 @@ export function SketchTool({ onBack }) {
             });
 
             canvas.toBlob(async (blob) => {
-                handles.forEach(h => h.style.display = '');
+                handles.forEach((handle) => {
+                    handle.style.display = '';
+                });
                 element.style.backgroundColor = originalBg;
+
+                if (!blob) {
+                    toast.error('Kunde inte skapa bildfil.', { id: toastId });
+                    return;
+                }
 
                 const pickerResult = await saveBlobWithPicker(blob, fileName);
 
@@ -906,9 +946,12 @@ export function SketchTool({ onBack }) {
                 }
             }, 'image/png');
         } catch (err) {
-            handles.forEach(h => h.style.display = '');
+            handles.forEach((handle) => {
+                handle.style.display = '';
+            });
             element.style.backgroundColor = originalBg;
-            toast.error('Kunde inte skapa bild: ' + (err?.message || 'okänt fel'), { id: toastId });
+            const errorMessage = err instanceof Error ? err.message : 'okänt fel';
+            toast.error(`Kunde inte skapa bild: ${errorMessage}`, { id: toastId });
         }
     };
 
@@ -946,7 +989,7 @@ export function SketchTool({ onBack }) {
                             {['desktop', 'touch'].map((density) => (
                                 <button
                                     key={density}
-                                    onClick={() => setWorkspace((prev) => ({ ...prev, uiDensity: density }))}
+                                    onClick={() => setWorkspace((prev) => ({ ...prev, uiDensity: density as SketchDensity }))}
                                     className={`px-3 py-2 text-sm transition-colors ${workspace.uiDensity === density
                                         ? 'bg-white/10 text-text-primary'
                                         : 'text-text-secondary hover:text-text-primary hover:bg-white/5'

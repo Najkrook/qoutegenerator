@@ -1,23 +1,43 @@
-// @ts-nocheck
 import { FIESTA_EXPORT_LINE } from '../utils/parasolGeometry';
+import type {
+    BuilderItem,
+    PlacedFiesta,
+    PlacedParasol,
+    SketchExportBuilderItem,
+    SketchExportStateResult,
+    SketchMeta
+} from '../types/contracts';
 
 const CLICKITUP_LINE = 'ClickitUp';
 const BAHAMA_LINE = 'BaHaMa';
 const SKETCH_SOURCE = 'sketch';
 
-function addLineIfMissing(selectedLines, line) {
+type SketchSourceType = 'parasol' | 'fiesta';
+type SketchExportItem = PlacedParasol | PlacedFiesta;
+
+interface BuildSketchExportStateInput {
+    selectedLines?: string[];
+    builderItems?: BuilderItem[];
+    globalDiscountPct?: number;
+    sketchMeta?: Partial<SketchMeta>;
+    parasols?: PlacedParasol[];
+    fiestaItems?: PlacedFiesta[];
+    createId?: () => string;
+}
+
+function addLineIfMissing(selectedLines: string[], line: string): string[] {
     if (selectedLines.includes(line)) return selectedLines;
     return [...selectedLines, line];
 }
 
-function hasNonSketchBuilder(builderItems, line, sourceType) {
+function hasNonSketchBuilder(builderItems: BuilderItem[], line: string, sourceType: SketchSourceType): boolean {
     return builderItems.some(
         (item) => item.line === line && !(item.source === SKETCH_SOURCE && item.sourceType === sourceType)
     );
 }
 
-function groupSketchItems(items) {
-    return items.reduce((acc, item) => {
+function groupSketchItems(items: SketchExportItem[]): Record<string, { line: string; model: string; size: string; qty: number }> {
+    return items.reduce<Record<string, { line: string; model: string; size: string; qty: number }>>((acc, item) => {
         const key = `${item.exportLine}|${item.exportModel}|${item.exportSize}`;
         if (!acc[key]) {
             acc[key] = {
@@ -32,7 +52,12 @@ function groupSketchItems(items) {
     }, {});
 }
 
-function buildSketchBuilderItems(items, sourceType, discountPct, createId) {
+function buildSketchBuilderItems(
+    items: SketchExportItem[],
+    sourceType: SketchSourceType,
+    discountPct: number,
+    createId: () => string
+): SketchExportBuilderItem[] {
     return Object.values(groupSketchItems(items)).map((grouped) => ({
         id: createId(),
         line: grouped.line,
@@ -54,15 +79,14 @@ export function buildSketchExportState({
     parasols = [],
     fiestaItems = [],
     createId = () => Math.random().toString(36).slice(2, 11)
-}) {
+}: BuildSketchExportStateInput): SketchExportStateResult {
     const hasParasols = parasols.length > 0;
     const hasFiestaItems = fiestaItems.length > 0;
     const hadSketchBahamaLine = Boolean(sketchMeta?.addedBahamaLine);
     const hadSketchFiestaLine = Boolean(sketchMeta?.addedFiestaLine);
 
     let nextSelectedLines = addLineIfMissing(selectedLines, CLICKITUP_LINE);
-    let nextSketchMeta = {
-        ...sketchMeta,
+    const nextSketchMeta: SketchMeta = {
         addedBahamaLine: hadSketchBahamaLine,
         addedFiestaLine: hadSketchFiestaLine
     };
@@ -91,7 +115,7 @@ export function buildSketchExportState({
         (item) => !(item.source === SKETCH_SOURCE && (item.sourceType === 'parasol' || item.sourceType === 'fiesta'))
     );
 
-    const nextBuilderItems = [
+    const nextBuilderItems: BuilderItem[] = [
         ...baseBuilderItems,
         ...buildSketchBuilderItems(parasols, 'parasol', globalDiscountPct, createId),
         ...buildSketchBuilderItems(fiestaItems, 'fiesta', globalDiscountPct, createId)

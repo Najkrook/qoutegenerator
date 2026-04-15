@@ -1,33 +1,39 @@
-// @ts-nocheck
-import React from 'react';
+import type { StockComparisonModalProps, StockComparisonRow } from '../../types/contracts';
 
-function extractDoorSize(item) {
+function extractDoorSize(item: string | number): number | null {
     const match = /Dörr\s+(\d+)/i.exec(String(item));
     if (!match) return null;
     const parsed = Number.parseInt(match[1], 10);
     return Number.isFinite(parsed) ? parsed : null;
 }
 
-export function StockComparisonModal({ allSections, slimlineCount, stodbenCount, clickitupStock, onConfirm, onCancel }) {
-    const requirements = {};
-    allSections.forEach((item) => {
+export function StockComparisonModal({
+    allSections,
+    slimlineCount,
+    stodbenCount,
+    clickitupStock,
+    onConfirm,
+    onCancel
+}: StockComparisonModalProps) {
+    const requirements = allSections.reduce<Record<string, number>>((acc, item) => {
         const doorSize = extractDoorSize(item);
-        if (doorSize) {
-            const key = `Dörr|${doorSize}`;
-            requirements[key] = (requirements[key] || 0) + 1;
-        } else {
-            const key = `Sektion|${item}`;
-            requirements[key] = (requirements[key] || 0) + 1;
-        }
-    });
+        const key = doorSize ? `Dörr|${doorSize}` : `Sektion|${item}`;
+        acc[key] = (acc[key] || 0) + 1;
+        return acc;
+    }, {});
 
-    const stock = clickitupStock || {};
     let hasShortfall = false;
 
     const rows = Object.entries(requirements)
-        .map(([key, needed]) => {
+        .map<StockComparisonRow>(([key, needed]) => {
             const [type, size] = key.split('|');
-            const sizeData = stock[size] || {};
+            const sizeData = clickitupStock[size] || {
+                sektion: 0,
+                dorr_h: 0,
+                dorr_v: 0,
+                hane_h: 0,
+                hane_v: 0
+            };
 
             const inStock =
                 type === 'Sektion'
@@ -50,7 +56,7 @@ export function StockComparisonModal({ allSections, slimlineCount, stodbenCount,
 
     return (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50" onClick={onCancel}>
-            <div className="bg-panel-bg border border-panel-border rounded-xl p-8 w-full max-w-3xl animate-slide-in" onClick={(e) => e.stopPropagation()}>
+            <div className="bg-panel-bg border border-panel-border rounded-xl p-8 w-full max-w-3xl animate-slide-in" onClick={(event) => event.stopPropagation()}>
                 <h3 className="text-xl font-semibold text-text-primary mb-6 m-0">Lagerjämförelse</h3>
 
                 <div className="overflow-x-auto">
@@ -86,7 +92,7 @@ export function StockComparisonModal({ allSections, slimlineCount, stodbenCount,
                                         {row.isShort ? `${row.shortfall} st` : '0 st'}
                                     </td>
                                     <td className="p-2.5 text-center font-semibold" style={{ color: row.isShort ? '#ff6b6b' : '#4ade80' }}>
-                                        {row.isShort ? '⚠️ Kritisk' : '✅ OK'}
+                                        {row.isShort ? 'Kritisk' : 'OK'}
                                     </td>
                                 </tr>
                             ))}
@@ -130,7 +136,7 @@ export function StockComparisonModal({ allSections, slimlineCount, stodbenCount,
 
                 {hasShortfall && (
                     <p className="mt-4 p-3 bg-danger/15 rounded-lg text-sm text-danger m-0">
-                        ⚠️ Det finns lagerbrist för en eller flera storlekar. Du kan fortfarande exportera till offerten.
+                        Det finns lagerbrist för en eller flera storlekar. Du kan fortfarande exportera till offerten.
                     </p>
                 )}
 

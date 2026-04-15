@@ -141,6 +141,8 @@ export interface BuilderItem {
     qty: number;
     discountPct: number;
     addons: BuilderAddon[];
+    source?: string;
+    sourceType?: string;
     [key: string]: any;
 }
 
@@ -163,7 +165,7 @@ export interface QuoteState {
     customerInfo: CustomerInfo;
     inventoryData: InventoryData;
     cloudInventoryData: InventoryData;
-    sketchDraft: any | null;
+    sketchDraft: SketchDraft | null;
     sketchMeta: SketchMeta;
     inventoryBasket: InventoryBasketItem[];
     activeQuoteId: string | null;
@@ -672,4 +674,362 @@ export interface AuthContextValue {
     logout: () => Promise<any>;
     retailer: RetailerRecord | null;
     isRetailer: boolean;
+}
+
+export type SketchEdgeKey = 'front' | 'left' | 'right' | 'back';
+
+export type SketchDensity = 'desktop' | 'touch';
+
+export type SketchMode = 'clickitup' | 'parasol' | 'fiesta';
+
+export type SketchPriorityMode = 'symmetrical' | 'convenient' | 'target';
+
+export type SketchSectionEntry = number | string;
+
+export interface DoorSegment {
+    index: number;
+    size: number;
+}
+
+export interface ManualSectionPin {
+    index: number;
+    size: number;
+}
+
+export type DoorSegmentsByEdge = Partial<Record<SketchEdgeKey, DoorSegment[]>>;
+
+export type ManualSectionsByEdge = Partial<Record<SketchEdgeKey, ManualSectionPin[]>>;
+
+export type SectionCountByEdge = Partial<Record<SketchEdgeKey, number>>;
+
+export interface SketchAreaPoint {
+    x: number;
+    y: number;
+}
+
+export interface SketchPolygon {
+    points: SketchAreaPoint[];
+}
+
+export interface SketchCamera {
+    zoom: number;
+    panX: number;
+    panY: number;
+}
+
+export interface SketchSelection {
+    edgeKey: SketchEdgeKey;
+    segmentIndex: number | null;
+}
+
+export interface SketchWorkspace {
+    camera: SketchCamera;
+    selection: SketchSelection;
+    uiDensity: SketchDensity;
+}
+
+export type FiestaLayer = 'above' | 'below';
+
+export interface SketchExportableItem {
+    id: string;
+    exportLine: string;
+    exportModel: string;
+    exportSize: string;
+}
+
+export interface ParasolPreset {
+    id: string;
+    label: string;
+    widthMm: number;
+    depthMm: number;
+    shapeCategory: string;
+    exportLine: string;
+    exportModel: string;
+    exportSize: string;
+}
+
+export interface PlacedParasol extends SketchExportableItem {
+    presetId: string;
+    label: string;
+    widthMm: number;
+    depthMm: number;
+    rotationDeg: 0 | 90;
+    xMm: number;
+    yMm: number;
+}
+
+export interface PlacedFiesta extends SketchExportableItem {
+    diameterMm: number;
+    xMm: number;
+    yMm: number;
+    zLayer: FiestaLayer;
+}
+
+export interface SketchConfigState {
+    width: number;
+    depth: number;
+    depthLeft: number;
+    depthRight: number;
+    equalDepth: boolean;
+    includeBack: boolean;
+    prioMode: SketchPriorityMode;
+    targetLength: number;
+    doorSegmentsByEdge: DoorSegmentsByEdge;
+    manualSectionsByEdge: ManualSectionsByEdge;
+    sectionCountByEdge: SectionCountByEdge;
+    activeMode: SketchMode;
+    parasols: PlacedParasol[];
+    selectedParasolId: string | null;
+    selectedParasolPresetId: string;
+    fiestaItems: PlacedFiesta[];
+    selectedFiestaId: string | null;
+    doorEdges?: SketchEdgeKey[] | Set<SketchEdgeKey>;
+    doorSizeByEdge?: Partial<Record<SketchEdgeKey, number>>;
+    [key: string]: unknown;
+}
+
+export interface SketchDraft {
+    config: SketchConfigState;
+    workspace: SketchWorkspace;
+}
+
+export type EdgeDiagnosticErrorCode = 'NO_DOOR_COMBINATION' | 'NO_SECTION_SOLUTION' | 'WRONG_COUNT' | null;
+
+export interface EdgeDiagnostic {
+    valid: boolean;
+    requestedDoorSize: number | null;
+    resolvedDoorSize: number | null;
+    autoAdjusted: boolean;
+    errorCode: EdgeDiagnosticErrorCode;
+}
+
+export type LayoutWarningLevel = 'none' | 'warning' | 'critical';
+
+export interface LayoutWarning {
+    id: string;
+    level: Exclude<LayoutWarningLevel, 'none'>;
+    code: string;
+    edge: SketchEdgeKey;
+    text: string;
+}
+
+export type LayoutSuggestionPriority = 'high' | 'medium' | 'low';
+
+export type LayoutSuggestion =
+    | {
+          id: string;
+          type: 'setDoorSegmentSize';
+          edge: SketchEdgeKey;
+          index: number;
+          value: number;
+          priority: LayoutSuggestionPriority;
+          text: string;
+      }
+    | {
+          id: string;
+          type: 'removeDoorSegment';
+          edge: SketchEdgeKey;
+          index: number;
+          priority: LayoutSuggestionPriority;
+          text: string;
+      }
+    | {
+          id: string;
+          type: 'setDimension';
+          edge: SketchEdgeKey;
+          dimension: 'width' | 'depth' | 'depthLeft' | 'depthRight';
+          value: number;
+          priority: LayoutSuggestionPriority;
+          text: string;
+      }
+    | {
+          id: string;
+          type: 'setSectionCount';
+          edge: SketchEdgeKey;
+          value: number;
+          priority: LayoutSuggestionPriority;
+          text: string;
+      }
+    | {
+          id: string;
+          type: 'clearSectionCount';
+          edge: SketchEdgeKey;
+          priority: LayoutSuggestionPriority;
+          text: string;
+      };
+
+export interface SketchRenderedSegment {
+    index: number;
+    key: string;
+    type: 'door' | 'section';
+    length: number;
+    label: string;
+    isDoor: boolean;
+}
+
+export interface EdgeGeometry {
+    setbackMm: number;
+    leadingPostMm: number;
+}
+
+export interface EdgeSummary {
+    edge: SketchEdgeKey;
+    enabled: boolean;
+    requestedLength: number;
+    effectiveLength: number;
+    solverLength: number;
+    setbackMm: number;
+    leadingPostMm: number;
+    valid: boolean;
+    warningLevel: LayoutWarningLevel;
+    requestedDoorSize: number | null;
+    resolvedDoorSize: number | null;
+    autoAdjusted: boolean;
+    errorCode: EdgeDiagnosticErrorCode;
+    segments: SketchRenderedSegment[];
+    sectionCount: number;
+    doorCount: number;
+}
+
+export interface StockComparisonRow {
+    type: string;
+    size: string;
+    needed: number;
+    inStock: number;
+    isShort: boolean;
+    diff: number;
+    shortfall: number;
+}
+
+export interface ComputedLayoutResult {
+    requestedDimensions: {
+        width: number;
+        depth: number;
+        depthLeft: number;
+        depthRight: number;
+    };
+    effectiveDimensions: Record<SketchEdgeKey, number>;
+    solverDimensions: Record<SketchEdgeKey, number>;
+    edgeGeometry: Record<SketchEdgeKey, EdgeGeometry>;
+    width: number;
+    depth: number;
+    depthLeft: number;
+    depthRight: number;
+    targetLength: number;
+    doorSegmentsByEdge: DoorSegmentsByEdge;
+    manualSectionsByEdge: ManualSectionsByEdge;
+    sectionCountByEdge: SectionCountByEdge;
+    leftEdge: SketchSectionEntry[];
+    rightEdge: SketchSectionEntry[];
+    frontEdge: SketchSectionEntry[];
+    backEdge: SketchSectionEntry[];
+    allSections: SketchSectionEntry[];
+    doorCount: number;
+    slimlineCount: number;
+    stodbenCount: number;
+    counts: Record<string, number>;
+    totalGlassLength: number;
+    edgeDiagnostics: Record<SketchEdgeKey, EdgeDiagnostic>;
+    edgeSummaries: Record<SketchEdgeKey, EdgeSummary>;
+    layoutWarnings: LayoutWarning[];
+    suggestions: LayoutSuggestion[];
+    hasInvalidEdges: boolean;
+}
+
+export interface SketchToolProps {
+    onBack?: () => void;
+}
+
+export interface SketchCanvasProps {
+    width: number;
+    depth: number;
+    depthLeft?: number;
+    depthRight?: number;
+    equalDepth?: boolean;
+    includeBack: boolean;
+    leftEdge: SketchSectionEntry[];
+    rightEdge: SketchSectionEntry[];
+    frontEdge: SketchSectionEntry[];
+    backEdge: SketchSectionEntry[];
+    edgeDiagnostics?: Partial<Record<SketchEdgeKey, EdgeDiagnostic>>;
+    edgeSummaries?: Partial<Record<SketchEdgeKey, EdgeSummary>>;
+    layoutWarnings?: LayoutWarning[];
+    suggestions?: LayoutSuggestion[];
+    camera?: SketchCamera;
+    selection?: SketchSelection;
+    uiDensity?: SketchDensity;
+    activeMode?: SketchMode;
+    parasols?: PlacedParasol[];
+    selectedParasolId?: string | null;
+    fiestaItems?: PlacedFiesta[];
+    selectedFiestaId?: string | null;
+    onResize?: (dims: Partial<Pick<SketchConfigState, 'width' | 'depth' | 'depthLeft' | 'depthRight'>>) => void;
+    onResizePreview?: (dims: Partial<Pick<SketchConfigState, 'width' | 'depth' | 'depthLeft' | 'depthRight'>> | null) => void;
+    onResizeCommit?: (dims: Partial<Pick<SketchConfigState, 'width' | 'depth' | 'depthLeft' | 'depthRight'>>) => void;
+    onSelectEdge?: (edgeKey: SketchEdgeKey) => void;
+    onSelectSection?: (edgeKey: SketchEdgeKey, segmentIndex: number | null) => void;
+    onApplySuggestion?: (suggestionId: string) => void;
+    onCameraChange?: (camera: SketchCamera) => void;
+    onChangeMode?: (mode: SketchMode) => void;
+    onPlaceParasol?: (xMm: number, yMm: number) => void;
+    onSelectParasol?: (id: string | null) => void;
+    onMoveParasol?: (id: string, xMm: number, yMm: number) => void;
+    onPlaceFiesta?: (xMm: number, yMm: number) => void;
+    onSelectFiesta?: (id: string | null) => void;
+    onMoveFiesta?: (id: string, xMm: number, yMm: number) => void;
+}
+
+export interface SketchConfigProps {
+    config: SketchConfigState;
+    onChange: (partial: Partial<SketchConfigState>) => void;
+    selectedEdge: SketchEdgeKey | null;
+    selectedSegmentIndex: number | null;
+    onSelectEdge?: (edgeKey: SketchEdgeKey) => void;
+    onSetManualPin?: (edgeKey: SketchEdgeKey, segmentIndex: number, size: number | null) => void;
+    onClearManualPins?: (edgeKey: SketchEdgeKey) => void;
+    onConvertSegmentToDoor?: (edgeKey: SketchEdgeKey, segmentIndex: number, size: number) => void;
+    onSetDoorSegmentSize?: (edgeKey: SketchEdgeKey, segmentIndex: number, size: number) => void;
+    onResetDoorSegment?: (edgeKey: SketchEdgeKey, segmentIndex: number) => void;
+    edgeSummaries?: Partial<Record<SketchEdgeKey, EdgeSummary>>;
+    onDeleteParasol?: (id: string) => void;
+    onRotateParasol?: (id: string, rotationDeg: 0 | 90) => void;
+    onDeleteFiesta?: (id: string) => void;
+    onSetSectionCount?: (edgeKey: SketchEdgeKey, count: number) => void;
+    onClearSectionCount?: (edgeKey: SketchEdgeKey) => void;
+}
+
+export interface SketchBomProps {
+    counts: Record<string, number>;
+    totalGlassLength: number;
+    slimlineCount: number;
+    stodbenCount: number;
+    hasInvalidEdges: boolean;
+    invalidEdges: Array<[SketchEdgeKey, EdgeDiagnostic]>;
+    autoAdjustedEdges: Array<[SketchEdgeKey, EdgeDiagnostic]>;
+    parasols?: PlacedParasol[];
+    fiestaItems?: PlacedFiesta[];
+    parasolWarnings?: Array<{ id: string; text: string }>;
+    canExportToQuote?: boolean;
+    onExport?: () => void;
+    onExportImage?: () => void;
+}
+
+export interface StockComparisonModalProps {
+    allSections: SketchSectionEntry[];
+    slimlineCount: number;
+    stodbenCount: number;
+    clickitupStock: ClickitupStockMap;
+    onConfirm: () => void;
+    onCancel: () => void;
+}
+
+export interface SketchExportBuilderItem extends BuilderItem {
+    source: 'sketch';
+    sourceType: 'parasol' | 'fiesta';
+}
+
+export interface SketchExportStateResult {
+    selectedLines: string[];
+    builderItems: BuilderItem[];
+    sketchMeta: SketchMeta;
 }

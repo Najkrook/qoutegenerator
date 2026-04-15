@@ -1,12 +1,11 @@
-// @ts-nocheck
-import React from 'react';
+import type { SketchBomProps } from '../../types/contracts';
 
 const EDGE_LABELS = {
     front: 'Fram',
     left: 'Vänster',
     right: 'Höger',
     back: 'Bak'
-};
+} as const;
 
 export function SketchBom({
     counts,
@@ -22,17 +21,19 @@ export function SketchBom({
     canExportToQuote = true,
     onExport,
     onExportImage
-}) {
+}: SketchBomProps) {
     const keys = Object.keys(counts);
-    const doorKeys = keys.filter((key) => String(key).includes('Dörr')).sort((a, b) => Number.parseInt(b, 10) - Number.parseInt(a, 10));
+    const doorKeys = keys
+        .filter((key) => String(key).includes('Dörr'))
+        .sort((a, b) => Number.parseInt(b, 10) - Number.parseInt(a, 10));
     const sectionKeys = keys
         .filter((key) => !String(key).includes('Dörr'))
         .sort((a, b) => Number.parseFloat(b) - Number.parseFloat(a));
 
     const sortedKeys = [...doorKeys, ...sectionKeys];
 
-    const parasolCounts = parasols.reduce((acc, p) => {
-        acc[p.label] = (acc[p.label] || 0) + 1;
+    const parasolCounts = parasols.reduce<Record<string, number>>((acc, parasol) => {
+        acc[parasol.label] = (acc[parasol.label] || 0) + 1;
         return acc;
     }, {});
     const parasolKeys = Object.keys(parasolCounts).sort();
@@ -47,7 +48,7 @@ export function SketchBom({
     return (
         <div className="bg-panel-bg border border-panel-border rounded-xl p-5">
             <div className="flex items-center justify-between gap-2 mb-4">
-                <h3 className="text-lg font-semibold text-text-primary m-0">📋 Materialförteckning</h3>
+                <h3 className="text-lg font-semibold text-text-primary m-0">Materialförteckning</h3>
                 <span
                     className={`text-xs px-2 py-1 rounded-full border ${hasInvalidEdges
                         ? 'border-danger/50 text-danger bg-danger/10'
@@ -149,7 +150,7 @@ export function SketchBom({
                     disabled={sortedKeys.length === 0 && parasols.length === 0 && fiestaCount === 0}
                     className="w-full py-2.5 border border-panel-border bg-panel-bg text-text-primary rounded-lg cursor-pointer text-sm hover:bg-white/5 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
                 >
-                    🖼️ Ladda ner Bild
+                    Ladda ner Bild
                 </button>
             </div>
         </div>

@@ -1,5 +1,4 @@
-// @ts-nocheck
-import React, { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
 import { DOOR_SIZES, MIN_DIMENSION_MM, SECTION_SIZES, STEP_MM } from '../../utils/sectionCalculator';
 import {
     DEFAULT_PARASOL_PRESET_ID,
@@ -9,31 +8,40 @@ import {
     groupParasolPresetsByCategory,
     isParasolRotatable
 } from '../../utils/parasolGeometry';
+import type { SketchConfigProps, SketchPriorityMode } from '../../types/contracts';
 
-const PRIO_DESCRIPTIONS = {
+const PRIO_DESCRIPTIONS: Record<SketchPriorityMode, string> = {
     target: 'Fördelar sektioner så nära målstorleken som möjligt med standardstorlekar.',
     convenient: 'Använder större sektioner för färre totala delar.',
     symmetrical: 'Prioriterar jämn sektionstorlek för symmetri.'
 };
 
 const EDGE_META = [
-    { key: 'front', label: 'Fram', dimension: 'width' },
-    { key: 'left', label: 'Vänster', dimension: 'depth' },
-    { key: 'right', label: 'Höger', dimension: 'depth' },
-    { key: 'back', label: 'Bak', dimension: 'width' }
-];
+    { key: 'front', label: 'Fram' },
+    { key: 'left', label: 'Vänster' },
+    { key: 'right', label: 'Höger' },
+    { key: 'back', label: 'Bak' }
+] as const;
 
-function roundToStep(value) {
+interface DelayedInputProps {
+    value: string | number;
+    min: number;
+    step: number;
+    onValueCommit: (value: string | number) => void;
+    className: string;
+}
+
+function roundToStep(value: number): number {
     return Math.round(value / STEP_MM) * STEP_MM;
 }
 
-function clamp(value, min, max) {
+function clamp(value: number, min: number, max: number): number {
     if (value < min) return min;
     if (value > max) return max;
     return value;
 }
 
-function nearestFromList(value, list) {
+function nearestFromList(value: number, list: number[]): number {
     return list.reduce((best, current) => {
         const bestDiff = Math.abs(best - value);
         const currentDiff = Math.abs(current - value);
@@ -43,22 +51,21 @@ function nearestFromList(value, list) {
     }, list[0]);
 }
 
-function normalizeDimension(rawValue, fallback) {
+function normalizeDimension(rawValue: string | number, fallback: number): number {
     const parsed = Number(rawValue);
     const base = Number.isFinite(parsed) ? parsed : fallback;
     const rounded = roundToStep(base);
     return clamp(rounded, MIN_DIMENSION_MM, 50000);
 }
 
-function normalizeDepth(rawValue, fallback) {
+function normalizeDepth(rawValue: string | number, fallback: number): number {
     const parsed = Number(rawValue);
     const base = Number.isFinite(parsed) ? parsed : fallback;
     const rounded = roundToStep(base);
-    // Allow 0mm for depth only
     return clamp(rounded, 0, 50000);
 }
 
-function normalizeTarget(rawValue, fallback) {
+function normalizeTarget(rawValue: string | number, fallback: number): number {
     const parsed = Number(rawValue);
     const base = Number.isFinite(parsed) ? parsed : fallback;
     const rounded = roundToStep(base);
@@ -66,14 +73,14 @@ function normalizeTarget(rawValue, fallback) {
     return nearestFromList(clamped, SECTION_SIZES);
 }
 
-function normalizeDoorSize(rawValue) {
+function normalizeDoorSize(rawValue: string | number): number {
     const parsed = Number(rawValue);
     const base = Number.isFinite(parsed) ? parsed : 1000;
     return nearestFromList(base, DOOR_SIZES);
 }
 
-function DelayedInput({ value, min, step, onValueCommit, className }) {
-    const [localValue, setLocalValue] = useState(value);
+function DelayedInput({ value, min, step, onValueCommit, className }: DelayedInputProps) {
+    const [localValue, setLocalValue] = useState<string | number>(value);
 
     useEffect(() => {
         setLocalValue(value);
@@ -85,9 +92,9 @@ function DelayedInput({ value, min, step, onValueCommit, className }) {
         }
     };
 
-    const handleKeyDown = (e) => {
-        if (e.key === 'Enter') {
-            e.target.blur();
+    const handleKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
+        if (event.key === 'Enter') {
+            event.currentTarget.blur();
         }
     };
 
@@ -97,7 +104,7 @@ function DelayedInput({ value, min, step, onValueCommit, className }) {
             value={localValue}
             step={step}
             min={min}
-            onChange={(e) => setLocalValue(e.target.value)}
+            onChange={(event) => setLocalValue(event.target.value)}
             onBlur={handleBlur}
             onKeyDown={handleKeyDown}
             className={className}
@@ -110,7 +117,6 @@ export function SketchConfig({
     onChange,
     selectedEdge,
     selectedSegmentIndex,
-    onSelectEdge,
     onSetManualPin,
     onClearManualPins,
     onConvertSegmentToDoor,
@@ -122,7 +128,7 @@ export function SketchConfig({
     onDeleteFiesta,
     onSetSectionCount,
     onClearSectionCount
-}) {
+}: SketchConfigProps) {
     const {
         activeMode = 'clickitup',
         parasols = [],
@@ -177,18 +183,18 @@ export function SketchConfig({
         });
     };
 
-    // Determine selected segment if any
-    const selectedEdgeSummary = edgeSummaries?.[selectedEdge];
-    const selectedSegment = (selectedSegmentIndex !== null && selectedSegmentIndex !== undefined)
-        ? selectedEdgeSummary?.segments?.find((s) => s.index === selectedSegmentIndex)
-        : null;
+    const selectedEdgeSummary = selectedEdge ? edgeSummaries?.[selectedEdge] : undefined;
+    const selectedSegment =
+        selectedSegmentIndex !== null && selectedSegmentIndex !== undefined
+            ? selectedEdgeSummary?.segments?.find((segment) => segment.index === selectedSegmentIndex) ?? null
+            : null;
 
-    // Current manual pin for the selected segment (null = auto)
-    const existingPin = (manualSectionsByEdge[selectedEdge] || []).find((p) => p.index === selectedSegmentIndex);
-    const currentPinSize = existingPin?.size ?? null;
-    const hasAnyPins = (manualSectionsByEdge[selectedEdge] || []).length > 0;
-    const currentDoorSegments = doorSegmentsByEdge[selectedEdge] || [];
-    const existingDoorSegment = currentDoorSegments.find((segment) => segment.index === selectedSegmentIndex) || null;
+    const selectedPins = selectedEdge ? manualSectionsByEdge[selectedEdge] || [] : [];
+    const currentPinSize = selectedPins.find((pin) => pin.index === selectedSegmentIndex)?.size ?? null;
+    const hasAnyPins = selectedPins.length > 0;
+    const currentDoorSegments = selectedEdge ? doorSegmentsByEdge[selectedEdge] || [] : [];
+    const existingDoorSegment =
+        currentDoorSegments.find((segment) => segment.index === selectedSegmentIndex) || null;
     const selectedDoorSize = existingDoorSegment?.size ?? normalizeDoorSize(selectedSegment?.length ?? 1000);
     const selectedParasol = selectedParasolId
         ? parasols.find((parasol) => parasol.id === selectedParasolId) || null
@@ -198,19 +204,18 @@ export function SketchConfig({
         : null;
     const canRotateSelectedParasol = isParasolRotatable(selectedParasol);
     const selectedParasolRotation = getParasolRotationDeg(selectedParasol);
-
     const groupedParasolPresets = groupParasolPresetsByCategory(PARASOL_PRESETS);
 
     if (activeMode === 'parasol') {
         return (
             <div className="bg-panel-bg border border-panel-border rounded-xl p-5 space-y-5">
-                <h3 className="text-lg font-semibold text-text-primary m-0">⛱️ Parasollkonfiguration</h3>
+                <h3 className="text-lg font-semibold text-text-primary m-0">Parasollkonfiguration</h3>
 
                 <div className="flex flex-col gap-1.5">
                     <label className="text-xs font-semibold text-text-secondary uppercase">Lägg till parasoll</label>
                     <select
                         value={selectedParasolPresetId}
-                        onChange={(e) => onChange({ selectedParasolPresetId: e.target.value })}
+                        onChange={(event) => onChange({ selectedParasolPresetId: event.target.value })}
                         className="bg-input-bg border border-panel-border text-text-primary p-2.5 rounded-lg outline-none focus:border-primary text-sm"
                     >
                         {groupedParasolPresets.map((group) => (
@@ -226,21 +231,21 @@ export function SketchConfig({
                     <p className="text-xs text-text-secondary mt-1">Klicka i den ritade ytan för att placera ett parasoll med denna storlek.</p>
                 </div>
 
-                {selectedParasolId && (
+                {selectedParasolId && selectedParasol && (
                     <div className="border border-amber-500/40 bg-amber-500/10 rounded-xl p-4 space-y-3">
                         <div className="flex justify-between items-center">
                             <span className="text-xs font-semibold text-amber-400 uppercase">Valt Parasoll</span>
                         </div>
                         <p className="text-xs text-text-secondary m-0">
-                            Storlek: <b className="text-text-primary">{selectedParasol?.label || 'Okänd'}</b>
+                            Storlek: <b className="text-text-primary">{selectedParasol.label || 'Okänd'}</b>
                         </p>
                         {canRotateSelectedParasol && (
                             <div className="space-y-2">
                                 <span className="block text-xs font-semibold text-text-secondary uppercase">Riktning</span>
                                 <div className="grid grid-cols-2 gap-2">
                                     {[
-                                        { label: 'Standard', rotationDeg: 0 },
-                                        { label: 'Roterad 90°', rotationDeg: 90 }
+                                        { label: 'Standard', rotationDeg: 0 as const },
+                                        { label: 'Roterad 90°', rotationDeg: 90 as const }
                                     ].map((option) => {
                                         const isActive = selectedParasolRotation === option.rotationDeg;
                                         return (
@@ -276,7 +281,7 @@ export function SketchConfig({
     if (activeMode === 'fiesta') {
         return (
             <div className="bg-panel-bg border border-panel-border rounded-xl p-5 space-y-5">
-                <h3 className="text-lg font-semibold text-text-primary m-0">● Fiesta</h3>
+                <h3 className="text-lg font-semibold text-text-primary m-0">Fiesta</h3>
 
                 <div className="flex flex-col gap-1.5">
                     <label className="text-xs font-semibold text-text-secondary uppercase">Lägg till Fiesta</label>
@@ -286,7 +291,7 @@ export function SketchConfig({
                     <p className="text-xs text-text-secondary mt-1">Klicka i den ritade ytan för att placera en Fiesta med 700 mm diameter.</p>
                 </div>
 
-                {selectedFiestaId && (
+                {selectedFiestaId && selectedFiesta && (
                     <div className="border border-amber-500/40 bg-amber-500/10 rounded-xl p-4 space-y-3">
                         <div className="flex justify-between items-center">
                             <span className="text-xs font-semibold text-amber-400 uppercase">Vald Fiesta</span>
@@ -308,7 +313,7 @@ export function SketchConfig({
 
     return (
         <div className="bg-panel-bg border border-panel-border rounded-xl p-5 space-y-5">
-            <h3 className="text-lg font-semibold text-text-primary m-0">⚙️ Konfiguration</h3>
+            <h3 className="text-lg font-semibold text-text-primary m-0">Konfiguration</h3>
 
             <div className="grid grid-cols-2 gap-4">
                 <div className="flex flex-col gap-1.5">
@@ -317,7 +322,7 @@ export function SketchConfig({
                         value={width}
                         step={STEP_MM}
                         min={MIN_DIMENSION_MM}
-                        onValueCommit={(val) => onChange({ width: normalizeDimension(val, width) })}
+                        onValueCommit={(value) => onChange({ width: normalizeDimension(value, width) })}
                         className="bg-input-bg border border-panel-border text-text-primary p-2.5 rounded-lg outline-none focus:border-primary text-sm"
                     />
                 </div>
@@ -328,7 +333,10 @@ export function SketchConfig({
                             value={depth}
                             step={STEP_MM}
                             min={0}
-                            onValueCommit={(val) => onChange({ depth: normalizeDepth(val, depth), depthLeft: normalizeDepth(val, depth), depthRight: normalizeDepth(val, depth) })}
+                            onValueCommit={(value) => {
+                                const normalizedDepth = normalizeDepth(value, depth);
+                                onChange({ depth: normalizedDepth, depthLeft: normalizedDepth, depthRight: normalizedDepth });
+                            }}
                             className="bg-input-bg border border-panel-border text-text-primary p-2.5 rounded-lg outline-none focus:border-primary text-sm"
                         />
                     </div>
@@ -371,7 +379,7 @@ export function SketchConfig({
                             value={depthLeft}
                             step={STEP_MM}
                             min={0}
-                            onValueCommit={(val) => onChange({ depthLeft: normalizeDepth(val, depthLeft) })}
+                            onValueCommit={(value) => onChange({ depthLeft: normalizeDepth(value, depthLeft) })}
                             className="bg-input-bg border border-panel-border text-text-primary p-2.5 rounded-lg outline-none focus:border-primary text-sm"
                         />
                     </div>
@@ -381,7 +389,7 @@ export function SketchConfig({
                             value={depthRight}
                             step={STEP_MM}
                             min={0}
-                            onValueCommit={(val) => onChange({ depthRight: normalizeDepth(val, depthRight) })}
+                            onValueCommit={(value) => onChange({ depthRight: normalizeDepth(value, depthRight) })}
                             className="bg-input-bg border border-panel-border text-text-primary p-2.5 rounded-lg outline-none focus:border-primary text-sm"
                         />
                     </div>
@@ -393,8 +401,8 @@ export function SketchConfig({
                     type="checkbox"
                     checked={includeBack}
                     disabled={!hasAnySideDepth}
-                    onChange={(e) => {
-                        const newBack = e.target.checked;
+                    onChange={(event) => {
+                        const newBack = event.target.checked;
                         if (!newBack) {
                             const nextDoorSegmentsByEdge = { ...doorSegmentsByEdge };
                             delete nextDoorSegmentsByEdge.back;
@@ -409,14 +417,14 @@ export function SketchConfig({
             </label>
 
             {!hasAnySideDepth && (
-                <p className="text-xs text-text-secondary m-0">Rak layout (0 mm djup) kan inte ha bakvagg.</p>
+                <p className="text-xs text-text-secondary m-0">Rak layout (0 mm djup) kan inte ha bakvägg.</p>
             )}
 
             <div className="flex flex-col gap-1.5">
                 <label className="text-xs font-semibold text-text-secondary uppercase">Prioritering</label>
                 <select
                     value={prioMode}
-                    onChange={(e) => onChange({ prioMode: e.target.value })}
+                    onChange={(event) => onChange({ prioMode: event.target.value as SketchPriorityMode })}
                     className="bg-input-bg border border-panel-border text-text-primary p-2.5 rounded-lg outline-none focus:border-primary text-sm"
                 >
                     <option value="symmetrical">Symmetrisk</option>
@@ -431,7 +439,7 @@ export function SketchConfig({
                     <label className="text-xs font-semibold text-text-secondary uppercase">Målstorlek (mm)</label>
                     <select
                         value={targetLength}
-                        onChange={(e) => onChange({ targetLength: normalizeTarget(e.target.value, targetLength) })}
+                        onChange={(event) => onChange({ targetLength: normalizeTarget(event.target.value, targetLength) })}
                         className="bg-input-bg border border-panel-border text-text-primary p-2.5 rounded-lg outline-none focus:border-primary text-sm"
                     >
                         {SECTION_SIZES.map((size) => (
@@ -443,7 +451,6 @@ export function SketchConfig({
                 </div>
             )}
 
-            {/* ── Per-edge section count override ── */}
             <div className="flex flex-col gap-1.5">
                 <label className="text-xs font-semibold text-text-secondary uppercase">Antal sektioner per kant</label>
                 <p className="text-xs text-text-secondary m-0">Lämna tomt för automatisk beräkning.</p>
@@ -452,7 +459,7 @@ export function SketchConfig({
                         const summary = edgeSummaries?.[key];
                         if (!summary?.enabled) return null;
                         const currentCount = sectionCountByEdge[key];
-                        const autoCount = summary?.segments?.length ?? null;
+                        const autoCount = summary.segments?.length ?? null;
                         const hasOverride = currentCount !== undefined && currentCount !== null;
                         return (
                             <div key={key} className="flex flex-col gap-1">
@@ -462,17 +469,18 @@ export function SketchConfig({
                                         value={hasOverride ? currentCount : ''}
                                         step={1}
                                         min={1}
-                                        onValueCommit={(val) => {
-                                            const parsed = Number.parseInt(val, 10);
+                                        onValueCommit={(value) => {
+                                            const parsed = Number.parseInt(String(value), 10);
                                             if (Number.isFinite(parsed) && parsed > 0) {
                                                 onSetSectionCount?.(key, parsed);
                                             } else {
                                                 onClearSectionCount?.(key);
                                             }
                                         }}
-                                        className={`bg-input-bg border text-text-primary p-2 rounded-lg outline-none text-sm w-full ${
-                                            hasOverride ? 'border-amber-500/60 focus:border-amber-400' : 'border-panel-border focus:border-primary'
-                                        }`}
+                                        className={`bg-input-bg border text-text-primary p-2 rounded-lg outline-none text-sm w-full ${hasOverride
+                                            ? 'border-amber-500/60 focus:border-amber-400'
+                                            : 'border-panel-border focus:border-primary'
+                                            }`}
                                     />
                                     {hasOverride && (
                                         <button
@@ -496,7 +504,7 @@ export function SketchConfig({
                 </div>
             </div>
 
-            {selectedSegment && (
+            {selectedSegment && selectedEdge && selectedSegmentIndex !== null && (
                 <div className="border border-amber-500/40 bg-amber-500/10 rounded-xl p-4 space-y-3">
                     <div className="flex justify-between items-center">
                         <span className="text-xs font-semibold text-amber-400 uppercase">
@@ -518,7 +526,7 @@ export function SketchConfig({
                             </p>
                             <select
                                 value={selectedDoorSize}
-                                onChange={(e) => onSetDoorSegmentSize?.(selectedEdge, selectedSegmentIndex, normalizeDoorSize(e.target.value))}
+                                onChange={(event) => onSetDoorSegmentSize?.(selectedEdge, selectedSegmentIndex, normalizeDoorSize(event.target.value))}
                                 className="w-full bg-input-bg border border-amber-500/40 text-text-primary p-2.5 rounded-lg outline-none focus:border-amber-400 text-sm"
                             >
                                 {DOOR_SIZES.map((size) => (
@@ -540,7 +548,7 @@ export function SketchConfig({
                             </p>
                             <select
                                 value={currentPinSize ?? selectedSegment.length}
-                                onChange={(e) => onSetManualPin?.(selectedEdge, selectedSegmentIndex, Number(e.target.value))}
+                                onChange={(event) => onSetManualPin?.(selectedEdge, selectedSegmentIndex, Number(event.target.value))}
                                 className="w-full bg-input-bg border border-amber-500/40 text-text-primary p-2.5 rounded-lg outline-none focus:border-amber-400 text-sm"
                             >
                                 {SECTION_SIZES.map((size) => (
