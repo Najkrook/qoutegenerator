@@ -23,8 +23,9 @@ const EMPTY_ENTRY: ClickitupStockEntry = {
     hane_v: 0
 };
 
-export function ClickitupStockGrid({ inventoryData, onUpdateStock }: ClickitupStockGridProps) {
+export function ClickitupStockGrid({ inventoryData, cloudInventoryData, onUpdateStock }: ClickitupStockGridProps) {
     const clickitup = inventoryData.clickitup || {};
+    const cloudClickitup = cloudInventoryData.clickitup || {};
 
     return (
         <div className="overflow-x-auto">
@@ -42,41 +43,58 @@ export function ClickitupStockGrid({ inventoryData, onUpdateStock }: ClickitupSt
                 <tbody>
                     {SIZES.map((size) => {
                         const dataObj = clickitup[size] || EMPTY_ENTRY;
+                        const cloudDataObj = cloudClickitup[size] || EMPTY_ENTRY;
                         return (
                             <tr key={size} className="border-b border-panel-border">
                                 <td className="p-3 font-bold text-text-primary">{size}</td>
                                 {FIELDS.map((field) => {
                                     const value = dataObj[field.key] || 0;
+                                    const cloudValue = cloudDataObj[field.key] || 0;
+                                    const delta = value - cloudValue;
                                     return (
-                                        <td key={field.key} className="p-2 text-center" style={{ background: field.color }}>
-                                            <div className="flex items-center justify-center gap-1">
+                                        <td key={field.key} className="p-2 text-center relative" style={{ background: field.color }}>
+                                            <div className="flex items-center justify-center gap-2">
                                                 <button
                                                     onClick={() => onUpdateStock(size, field.key, -6)}
-                                                    className="px-1.5 py-0.5 rounded border border-panel-border bg-panel-bg text-text-primary cursor-pointer text-xs hover:bg-white/10"
+                                                    className="px-1.5 py-0.5 rounded border border-panel-border bg-panel-bg text-text-primary cursor-pointer text-xs hover:bg-white/10 transition-colors"
                                                     aria-label={`Minska ${field.label} ${size} med 6`}
                                                 >
                                                     -6
                                                 </button>
                                                 <button
                                                     onClick={() => onUpdateStock(size, field.key, -1)}
-                                                    className="px-2 py-0.5 rounded border border-panel-border bg-panel-bg text-text-primary cursor-pointer hover:bg-white/10"
+                                                    className="px-2 py-0.5 rounded border border-panel-border bg-panel-bg text-text-primary cursor-pointer hover:bg-white/10 transition-colors"
                                                     aria-label={`Minska ${field.label} ${size} med 1`}
                                                 >
                                                     -
                                                 </button>
-                                                <span className={`min-w-[24px] font-bold text-center ${value > 0 ? 'text-green-400' : 'text-text-primary'}`}>
-                                                    {value}
-                                                </span>
+                                                <div className="relative group">
+                                                    <span className={`min-w-[28px] font-bold text-center block ${value > 0 ? 'text-green-400' : 'text-text-primary'}`}>
+                                                        {value}
+                                                    </span>
+                                                    
+                                                    {delta !== 0 && (
+                                                        <div 
+                                                            className={`absolute -top-5 left-1/2 -translate-x-1/2 px-1 py-0.5 rounded-full text-[8px] font-black border shadow-sm animate-in fade-in zoom-in duration-200 whitespace-nowrap ${
+                                                                delta > 0 
+                                                                    ? 'bg-green-500/20 text-green-400 border-green-500/40' 
+                                                                    : 'bg-red-500/20 text-red-400 border-red-500/40'
+                                                            }`}
+                                                        >
+                                                            {delta > 0 ? `+${delta}` : delta}
+                                                        </div>
+                                                    )}
+                                                </div>
                                                 <button
                                                     onClick={() => onUpdateStock(size, field.key, 1)}
-                                                    className="px-2 py-0.5 rounded border border-panel-border bg-panel-bg text-text-primary cursor-pointer hover:bg-white/10"
+                                                    className="px-2 py-0.5 rounded border border-panel-border bg-panel-bg text-text-primary cursor-pointer hover:bg-white/10 transition-colors"
                                                     aria-label={`Öka ${field.label} ${size} med 1`}
                                                 >
                                                     +
                                                 </button>
                                                 <button
                                                     onClick={() => onUpdateStock(size, field.key, 6)}
-                                                    className="px-1.5 py-0.5 rounded border border-panel-border bg-panel-bg text-text-primary cursor-pointer text-xs hover:bg-white/10"
+                                                    className="px-1.5 py-0.5 rounded border border-panel-border bg-panel-bg text-text-primary cursor-pointer text-xs hover:bg-white/10 transition-colors"
                                                     aria-label={`Öka ${field.label} ${size} med 6`}
                                                 >
                                                     +6

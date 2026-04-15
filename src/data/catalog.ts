@@ -95,22 +95,28 @@ export const catalogData = withBuilderAddonCategoryIds({
                             { id: "base_8_flags", name: "Parasollfot ovan mark - 8 flagstones (100x100)", price: 670 },
                             { id: "base_12_flags", name: "Parasollfot ovan mark - 12 flagstones", price: 780 },
                             { id: "base_16_flags", name: "Parasollfot ovan mark - 16 flagstones", price: 1770 },
+                            { id: "justerbara_fotter", name: "4 st Justerbara hörnfötter till Parasollfot", price: 130 },
+                            { id: "jumb_steel_base_4_490", name: "Steel Plate Base with 4 Steel Plates (490x490)", price: 1590 },
+                            { id: "jumb_steel_base_8_490", name: "Steel Plate Base with 8 Steel Plates (490x490)", price: 2480 },
+                            { id: "jumb_steel_base_4_740", name: "Steel Plate Base with 4 Steel Plates (740x740)", price: 2670 },
+                            { id: "jumb_steel_base_8_740", name: "Steel Plate Base with 8 Steel Plates (740x740)", price: 4680 },
+                            { id: "jumb_powder_coat_steel_4_490", name: "Powder Coating of 4 Steel Plates (490x490)", price: 530 },
+                            { id: "jumb_powder_coat_steel_4_740", name: "Powder Coating of 4 Steel Plates (740x740)", price: 640 },
                             { id: "powder_coat", name: "Powder coating in RAL 9016/7016", price: 270 },
                             { id: "cementsten", name: "Cementsten (flagstone) (50x50)", price: 5 },
-                            { id: "justerbara_fotter", name: "4 st Justerbara hörnfötter", price: 130 },
                             { id: "fancy_frame", name: "Fancy Frame", price: 670 }
                         ]
                     },
                     {
                         name: "Classic Light",
                         items: [
-                            { id: "classic_light", name: "4 LED Lampor längs centrumstativet", price: 640 }
+                            { id: "classic_light", name: "Classic-Light - 4 LED Lampor längs centrumstativet", price: 640 }
                         ]
                     },
                     {
                         name: "Magic Light",
                         items: [
-                            { id: "magic_light", name: "8 RGBW LED-strips integrerade i armarna", price: 1400 }
+                            { id: "magic_light", name: "Magic-Light - 8 RGBW LED-strips integrerade i armarna", price: 1400 }
                         ]
                     },
                     {
@@ -230,6 +236,50 @@ export const catalogData = withBuilderAddonCategoryIds({
                             { id: "jumb_v4a_maritime", name: "V4A | Maritime Edition", price: 280 },
                             { id: "jumb_pole_extension", name: "Umbrella Center Pole Extension", price: 180 },
                             { id: "jumb_pole_reduction", name: "Umbrella Center Pole Reduction", price: 180 }
+                        ]
+                    },
+                    {
+                        name: "Valance Runda",
+                        items: [
+                            { id: "jumb_valance_o3", name: "Valance Ø3", price: 200 },
+                            { id: "jumb_valance_o35", name: "Valance Ø3,5", price: 230 },
+                            { id: "jumb_valance_o4", name: "Valance Ø4", price: 270 },
+                            { id: "jumb_valance_o45", name: "Valance Ø4,5", price: 310 },
+                            { id: "jumb_valance_o5", name: "Valance Ø5", price: 330 },
+                            { id: "jumb_valance_o56", name: "Valance Ø5,6", price: 370 },
+                            { id: "jumb_valance_o63", name: "Valance Ø6,3", price: 390 },
+                            { id: "jumb_valance_o7", name: "Valance Ø7", price: 470 }
+                        ]
+                    },
+                    {
+                        name: "Valance Kvadrat",
+                        items: [
+                            { id: "jumb_valance_3x3", name: "Valance 3x3", price: 250 },
+                            { id: "jumb_valance_35x35", name: "Valance 3,5x3,5", price: 310 },
+                            { id: "jumb_valance_4x4", name: "Valance 4x4", price: 310 },
+                            { id: "jumb_valance_45x45", name: "Valance 4,5x4,5", price: 340 },
+                            { id: "jumb_valance_5x5", name: "Valance 5x5", price: 420 },
+                            { id: "jumb_valance_6x6", name: "Valance 6x6", price: 560 }
+                        ]
+                    },
+                    {
+                        name: "Valance Rektangel",
+                        items: [
+                            { id: "jumb_valance_3x15", name: "Valance 3x1,5", price: 200 },
+                            { id: "jumb_valance_3x35", name: "Valance 3x3,5", price: 300 },
+                            { id: "jumb_valance_4x2", name: "Valance 4x2", price: 250 },
+                            { id: "jumb_valance_4x3", name: "Valance 4x3", price: 300 },
+                            { id: "jumb_valance_4x35", name: "Valance 4x3,5", price: 300 },
+                            { id: "jumb_valance_4x45", name: "Valance 4x4,5", price: 310 },
+                            { id: "jumb_valance_45x3", name: "Valance 4,5x3", price: 300 },
+                            { id: "jumb_valance_45x35", name: "Valance 4,5x3,5", price: 310 },
+                            { id: "jumb_valance_5x25", name: "Valance 5x2,5", price: 300 },
+                            { id: "jumb_valance_5x3", name: "Valance 5x3", price: 310 },
+                            { id: "jumb_valance_5x375", name: "Valance 5x3,75", price: 350 },
+                            { id: "jumb_valance_5x4", name: "Valance 5x4", price: 350 },
+                            { id: "jumb_valance_6x3", name: "Valance 6x3", price: 350 },
+                            { id: "jumb_valance_6x4", name: "Valance 6x4", price: 400 },
+                            { id: "jumb_valance_6x45", name: "Valance 6x4,5", price: 460 }
                         ]
                     },
                     {
@@ -465,6 +515,41 @@ export const catalogData = withBuilderAddonCategoryIds({
                         items: [
                             { id: "pure_frame_custom", name: "Frame Color custom finish", price: 560 },
                             { id: "pure_v4a_maritime", name: "V4A | Maritime", price: 230 }
+                        ]
+                    },
+                    {
+                        name: "Valance Kvadrat",
+                        items: [
+                            { id: "pure_valance_2x2", name: "Valance 2x2", price: 170 },
+                            { id: "pure_valance_25x25", name: "Valance 2,5x2,5", price: 170 },
+                            { id: "pure_valance_3x3", name: "Valance 3x3", price: 200 },
+                            { id: "pure_valance_35x35", name: "Valance 3,5x3,5", price: 200 },
+                            { id: "pure_valance_4x4", name: "Valance 4x4", price: 220 }
+                        ]
+                    },
+                    {
+                        name: "Valance Runda",
+                        items: [
+                            { id: "pure_valance_o2", name: "Valance Ø2", price: 170 },
+                            { id: "pure_valance_o25", name: "Valance Ø2,5", price: 170 },
+                            { id: "pure_valance_o3", name: "Valance Ø3", price: 200 },
+                            { id: "pure_valance_o35", name: "Valance Ø3,5", price: 200 },
+                            { id: "pure_valance_o4", name: "Valance Ø4", price: 220 }
+                        ]
+                    },
+                    {
+                        name: "Valance Rektangel",
+                        items: [
+                            { id: "pure_valance_25x2", name: "Valance 2,5x2", price: 170 },
+                            { id: "pure_valance_3x2", name: "Valance 3x2", price: 170 },
+                            { id: "pure_valance_3x25", name: "Valance 3x2,5", price: 170 },
+                            { id: "pure_valance_35x2", name: "Valance 3,5x2", price: 170 },
+                            { id: "pure_valance_35x25", name: "Valance 3,5x2,5", price: 200 },
+                            { id: "pure_valance_35x3", name: "Valance 3,5x3", price: 200 },
+                            { id: "pure_valance_4x2", name: "Valance 4x2", price: 200 },
+                            { id: "pure_valance_4x25", name: "Valance 4x2,5", price: 200 },
+                            { id: "pure_valance_4x3", name: "Valance 4x3", price: 220 },
+                            { id: "pure_valance_4x35", name: "Valance 4x3,5", price: 230 }
                         ]
                     }
                 ]

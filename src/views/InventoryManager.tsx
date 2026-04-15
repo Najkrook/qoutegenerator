@@ -37,7 +37,8 @@ const DEFAULT_CLICKITUP_ENTRY: ClickitupStockEntry = {
 
 const DEFAULT_INVENTORY_DATA: InventoryData = {
     bahama: [],
-    clickitup: {}
+    clickitup: {},
+    notes: ''
 };
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -79,7 +80,8 @@ function toInventoryData(value: unknown): InventoryData {
         }, {})
         : {};
 
-    return { bahama, clickitup };
+    const notes = typeof value.notes === 'string' ? value.notes : '';
+    return { bahama, clickitup, notes };
 }
 
 function createEmptyModalState(): InventoryModalState {
@@ -498,6 +500,7 @@ export function InventoryManager({ onBack }: InventoryManagerProps) {
                             <div className="p-5 pt-0">
                                 <ClickitupStockGrid
                                     inventoryData={state.inventoryData}
+                                    cloudInventoryData={state.cloudInventoryData}
                                     onUpdateStock={handleUpdateStock}
                                 />
                             </div>
@@ -505,13 +508,34 @@ export function InventoryManager({ onBack }: InventoryManagerProps) {
                     </section>
                 </div>
 
-                <div className="lg:sticky lg:top-4 lg:self-start">
+                <div className="lg:sticky lg:top-4 lg:self-start space-y-4">
                     <PendingChangesPanel
                         inventoryData={state.inventoryData}
                         cloudInventoryData={state.cloudInventoryData}
                         onCommit={handleCommit}
                         isSaving={isSaving}
                     />
+
+                    <div className="bg-panel-bg border border-panel-border rounded-xl p-5">
+                        <div className="flex items-center gap-2 mb-3">
+                            <span className="text-lg">📝</span>
+                            <h4 className="text-sm font-semibold text-text-primary uppercase m-0">Noteringar</h4>
+                        </div>
+                        <textarea
+                            value={state.inventoryData.notes || ''}
+                            onChange={(e) => {
+                                dispatch({
+                                    type: 'SET_INVENTORY_DATA',
+                                    payload: { ...state.inventoryData, notes: e.target.value }
+                                });
+                            }}
+                            placeholder="Skriv interna noteringar om lagret här..."
+                            className="w-full h-40 bg-input-bg border border-panel-border text-text-primary p-3 rounded-lg outline-none focus:border-primary text-sm resize-none"
+                        />
+                        <p className="text-[10px] text-text-secondary mt-2 m-0 italic">
+                            Dessa noteringar sparas när du klickar på "Spara ändringar" ovan.
+                        </p>
+                    </div>
 
                     {state.inventoryBasket.length > 0 && (
                         <div className="mt-4 bg-panel-bg border border-panel-border rounded-xl p-4">

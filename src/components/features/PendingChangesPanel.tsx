@@ -126,6 +126,16 @@ export function PendingChangesPanel({ inventoryData, cloudInventoryData, onCommi
             }
         });
     });
+    
+    if (inventoryData.notes !== cloudInventoryData.notes) {
+        changes.push({
+            key: 'inventory-notes',
+            title: 'Huvudnoteringar',
+            desc: 'Noteringar har ändrats',
+            icon: '📝',
+            color: 'var(--primary)'
+        });
+    }
 
     const hasChanges = changes.length > 0;
 

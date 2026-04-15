@@ -98,6 +98,7 @@ export type ClickitupStockMap = Record<string, ClickitupStockEntry>;
 export interface InventoryData {
     bahama: BahamaInventoryItem[];
     clickitup: ClickitupStockMap;
+    notes?: string;
 }
 
 export interface GridCustomAddonRow {
@@ -576,6 +577,7 @@ export interface PendingChangesPanelProps {
 
 export interface ClickitupStockGridProps {
     inventoryData: InventoryData;
+    cloudInventoryData: InventoryData;
     onUpdateStock: (size: string, field: ClickitupFieldKey, delta: number) => void;
 }
 
@@ -977,6 +979,7 @@ export interface SketchCanvasProps {
     onPlaceFiesta?: (xMm: number, yMm: number) => void;
     onSelectFiesta?: (id: string | null) => void;
     onMoveFiesta?: (id: string, xMm: number, yMm: number) => void;
+    onReset?: () => void;
 }
 
 export interface SketchConfigProps {

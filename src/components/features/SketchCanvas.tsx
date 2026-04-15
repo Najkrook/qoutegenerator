@@ -165,7 +165,8 @@ export function SketchCanvas({
     onMoveParasol,
     onPlaceFiesta,
     onSelectFiesta,
-    onMoveFiesta
+    onMoveFiesta,
+    onReset
 }: SketchCanvasProps) {
     const svgRef = useRef<SVGSVGElement | null>(null);
     const [activeDrag, setActiveDrag] = useState<ActiveDrag | null>(null);
@@ -1100,7 +1101,7 @@ export function SketchCanvas({
                             onClick={() => onChangeMode && onChangeMode('clickitup')}
                             className={`h-8 px-3.5 rounded-md border text-xs font-semibold tracking-wide transition-all ${activeMode === 'clickitup'
                                 ? 'bg-primary/95 text-white border-blue-200/60 shadow-[0_0_0_1px_rgba(191,219,254,0.55),0_8px_18px_rgba(37,99,235,0.35)]'
-                                : 'bg-input-bg text-slate-300 border-panel-border hover:text-white hover:border-slate-400/60 hover:bg-slate-800/60'
+                                : 'bg-blue-900/20 text-blue-300 border-blue-800/50 hover:text-white hover:border-blue-500/60 hover:bg-blue-800/40'
                                 }`}
                         >
                             ClickitUp
@@ -1110,8 +1111,8 @@ export function SketchCanvas({
                             aria-pressed={activeMode === 'parasol'}
                             onClick={() => onChangeMode && onChangeMode('parasol')}
                             className={`h-8 px-3.5 rounded-md border text-xs font-semibold tracking-wide transition-all ${activeMode === 'parasol'
-                                ? 'bg-primary/95 text-white border-blue-200/60 shadow-[0_0_0_1px_rgba(191,219,254,0.55),0_8px_18px_rgba(37,99,235,0.35)]'
-                                : 'bg-input-bg text-slate-300 border-panel-border hover:text-white hover:border-slate-400/60 hover:bg-slate-800/60'
+                                ? 'bg-emerald-600/95 text-white border-emerald-300/60 shadow-[0_0_0_1px_rgba(110,231,183,0.55),0_8px_18px_rgba(5,150,105,0.35)]'
+                                : 'bg-emerald-900/20 text-emerald-300 border-emerald-800/50 hover:text-white hover:border-emerald-500/60 hover:bg-emerald-800/40'
                                 }`}
                         >
                             Parasoll
@@ -1121,8 +1122,8 @@ export function SketchCanvas({
                             aria-pressed={activeMode === 'fiesta'}
                             onClick={() => onChangeMode && onChangeMode('fiesta')}
                             className={`h-8 px-3.5 rounded-md border text-xs font-semibold tracking-wide transition-all ${activeMode === 'fiesta'
-                                ? 'bg-primary/95 text-white border-blue-200/60 shadow-[0_0_0_1px_rgba(191,219,254,0.55),0_8px_18px_rgba(37,99,235,0.35)]'
-                                : 'bg-input-bg text-slate-300 border-panel-border hover:text-white hover:border-slate-400/60 hover:bg-slate-800/60'
+                                ? 'bg-amber-500/95 text-white border-amber-200/60 shadow-[0_0_0_1px_rgba(253,230,138,0.55),0_8px_18px_rgba(217,119,6,0.35)]'
+                                : 'bg-amber-900/20 text-amber-300 border-amber-800/50 hover:text-white hover:border-amber-500/60 hover:bg-amber-800/40'
                                 }`}
                         >
                             Fiesta
@@ -1130,14 +1131,24 @@ export function SketchCanvas({
                     </div>
                 </div>
 
-                <div className="flex items-center gap-4">
-                    <div className="text-text-secondary">
-                        Aktiv kant: <b className="text-text-primary">{selectedEdge || 'Ingen'}</b>
+                <div className="flex items-center gap-6">
+                    <div className="flex items-center gap-4">
+                        <div className="text-text-secondary">
+                            Aktiv kant: <b className="text-text-primary">{selectedEdge || 'Ingen'}</b>
+                        </div>
+                        {onReset && (
+                            <button
+                                onClick={onReset}
+                                className="px-3 py-1.5 rounded-md text-xs font-semibold tracking-wide border border-red-900/50 bg-red-950/20 text-red-300 hover:text-white hover:border-red-500/60 hover:bg-red-800/40 transition-colors"
+                            >
+                                Återställ ritning
+                            </button>
+                        )}
                     </div>
-                </div>
 
-                <div className="text-text-secondary">
-                    Kritiska varningar: <b className="text-text-primary">{criticalWarnings.length}</b>
+                    <div className="text-text-secondary">
+                        Kritiska varningar: <b className="text-text-primary">{criticalWarnings.length}</b>
+                    </div>
                 </div>
             </div>
 

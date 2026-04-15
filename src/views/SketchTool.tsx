@@ -965,7 +965,7 @@ export function SketchTool({ onBack }: SketchToolProps) {
                 }
             }
         });
-        onBack?.();
+        dispatch({ type: 'SET_STEP', payload: 2 });
     }, [config, dispatch, onBack, workspace]);
 
     return (
@@ -978,34 +978,12 @@ export function SketchTool({ onBack }: SketchToolProps) {
                     </p>
                 </div>
                 <div className="flex items-center gap-3">
-                    <div className="flex gap-2">
-                        <button
-                            onClick={resetSketch}
-                            className="px-3 py-2 rounded-lg text-sm border border-panel-border bg-input-bg text-text-secondary hover:text-text-primary transition-colors"
-                        >
-                            Återställ ritning
-                        </button>
-                        <div className="flex rounded-lg border border-panel-border overflow-hidden bg-input-bg">
-                            {['desktop', 'touch'].map((density) => (
-                                <button
-                                    key={density}
-                                    onClick={() => setWorkspace((prev) => ({ ...prev, uiDensity: density as SketchDensity }))}
-                                    className={`px-3 py-2 text-sm transition-colors ${workspace.uiDensity === density
-                                        ? 'bg-white/10 text-text-primary'
-                                        : 'text-text-secondary hover:text-text-primary hover:bg-white/5'
-                                        }`}
-                                >
-                                    {density === 'desktop' ? 'Desktop' : 'Touch'}
-                                </button>
-                            ))}
-                        </div>
-                    </div>
 
                     <button
                         onClick={handleBackClick}
                         className="px-5 py-2 border border-panel-border bg-panel-bg text-text-primary rounded-lg cursor-pointer hover:bg-white/5 shadow-sm"
                     >
-                        ← Tillbaka
+                        Gå till offert
                     </button>
                 </div>
             </div>
@@ -1134,6 +1112,7 @@ export function SketchTool({ onBack }: SketchToolProps) {
                         onCameraChange={handleCameraChange}
                         onResizePreview={handleResizePreview}
                         onResizeCommit={handleResizeCommit}
+                        onReset={resetSketch}
                     />
 
                     <div className="flex flex-wrap justify-center gap-4 text-sm text-text-secondary">
