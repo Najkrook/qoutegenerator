@@ -13,9 +13,12 @@ import { saveQuoteToRepository } from '../services/quoteSaveService';
 import { safeLogActivity } from '../services/activityLogService';
 import { hasZeroDiscountSummary } from '../services/exportDataBuilders';
 import type {
+    ExcelExportModule,
+    PdfExportModule,
     QuoteState,
     QuoteTotalsResult,
     SaveQuoteToRepositoryResult,
+    SavedQuoteStatePatch,
     SummaryExportProps
 } from '../types/contracts';
 
@@ -59,10 +62,8 @@ function getErrorMessage(error: unknown, fallback: string): string {
 
 async function createPdfBlob(state: QuoteState, summaryData: QuoteTotalsResult): Promise<Blob | null> {
     try {
-        const pdfModule = await import('../features/pdfExport') as Record<string, unknown>;
-        const generatePDF = pdfModule.generatePDF as
-            | ((quoteState: QuoteState, quoteSummary: QuoteTotalsResult, preview?: boolean) => Blob | Promise<Blob | null> | null)
-            | undefined;
+        const pdfModule: PdfExportModule = await import('../features/pdfExport');
+        const { generatePDF } = pdfModule;
 
         if (typeof generatePDF !== 'function') {
             return null;
@@ -77,10 +78,8 @@ async function createPdfBlob(state: QuoteState, summaryData: QuoteTotalsResult):
 }
 
 async function exportExcelWorkbook(state: QuoteState, summaryData: QuoteTotalsResult): Promise<void> {
-    const excelModule = await import('../features/excelExport') as Record<string, unknown>;
-    const generateExcel = excelModule.generateExcel as
-        | ((quoteState: QuoteState, quoteSummary: QuoteTotalsResult) => Promise<void> | void)
-        | undefined;
+    const excelModule: ExcelExportModule = await import('../features/excelExport');
+    const { generateExcel } = excelModule;
 
     if (typeof generateExcel !== 'function') {
         throw new Error('Excel export is unavailable.');
@@ -263,10 +262,11 @@ export function SummaryExport({ onPrev, onBackToSketch }: SummaryExportProps) {
                 state,
                 summary: summaryData
             }) as SaveQuoteToRepositoryResult;
+            const saveStatePatch: SavedQuoteStatePatch = statePatch;
 
             dispatch({
                 type: 'UPDATE_STATE',
-                payload: statePatch
+                payload: saveStatePatch
             });
 
             void safeLogActivity({
@@ -274,12 +274,12 @@ export function SummaryExport({ onPrev, onBackToSketch }: SummaryExportProps) {
                 eventType: isNewQuote ? 'quote_created' : 'quote_revision_saved',
                 system: 'quote',
                 targetType: isNewQuote ? 'quote' : 'revision',
-                targetId: statePatch.activeQuoteId || saved?.quoteId || 'unknown_quote',
+                targetId: saveStatePatch.activeQuoteId || saved?.quoteId || 'unknown_quote',
                 details: isNewQuote
                     ? 'Offert skapad och sparad i Mina Offerter.'
-                    : `Offerten sparades som version ${statePatch.activeQuoteVersion}.`,
+                    : `Offerten sparades som version ${saveStatePatch.activeQuoteVersion}.`,
                 metadata: {
-                    version: statePatch.activeQuoteVersion || null,
+                    version: saveStatePatch.activeQuoteVersion || null,
                     customerName: getActivityCustomerLabel(state.customerInfo),
                     reference: state.customerInfo.reference || '',
                     totalSek: summaryData.finalTotalSek || 0
@@ -289,7 +289,7 @@ export function SummaryExport({ onPrev, onBackToSketch }: SummaryExportProps) {
             if (isNewQuote) {
                 toast.success('Offerten sparades i Mina Offerter.');
             } else {
-                toast.success(`Offerten sparades som version ${statePatch.activeQuoteVersion}.`);
+                toast.success(`Offerten sparades som version ${saveStatePatch.activeQuoteVersion}.`);
             }
         } catch (error) {
             console.error('Failed to save quote:', error);

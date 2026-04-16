@@ -1,4 +1,4 @@
-import type { AccessUser } from '../types/contracts';
+import type { AccessUser, AuthChangeUser } from '../types/contracts';
 import { auth, firebaseConfig } from './firebase';
 import { initializeApp, deleteApp } from 'firebase/app';
 import {
@@ -33,6 +33,19 @@ export function logout() {
     return signOut(auth);
 }
 
+function toAccessUser(user: AuthChangeUser | null): AccessUser | null {
+    if (!user) {
+        return null;
+    }
+
+    return {
+        uid: user.uid,
+        email: user.email
+    };
+}
+
 export function onAuthChange(callback: (user: AccessUser | null) => void) {
-    return onAuthStateChanged(auth, callback);
+    return onAuthStateChanged(auth, (user) => {
+        callback(toAccessUser(user));
+    });
 }

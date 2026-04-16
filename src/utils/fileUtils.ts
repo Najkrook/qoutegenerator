@@ -28,8 +28,8 @@ export async function saveBlobWithPicker(blob: Blob, fileName: string) {
         await writable.write(blob);
         await writable.close();
         return 'saved';
-    } catch (err: any) {
-        if (err.name === 'AbortError') {
+    } catch (err: unknown) {
+        if (err && typeof err === 'object' && 'name' in err && err.name === 'AbortError') {
             return 'canceled';
         }
         console.error('Save file picker failed:', err);

@@ -3,13 +3,14 @@ import type {
     QuoteState,
     SaveQuoteToRepositoryParams,
     SaveQuoteToRepositoryResult,
+    SavedQuoteStatePatch,
     SavedQuoteLike
 } from '../types/contracts';
 
 export function buildSavedQuoteStatePatch(
     saved: SavedQuoteLike,
     state: Partial<QuoteState> = {}
-): Partial<QuoteState> {
+): SavedQuoteStatePatch {
     const metadata = saved?.metadata || {};
 
     return {

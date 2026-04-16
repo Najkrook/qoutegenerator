@@ -11,7 +11,13 @@ import {
     doc,
     updateDoc
 } from '../services/firebase';
-import type { PlannerContractor, PlannerPriority, PlannerProject, PlannerProps } from '../types/contracts';
+import type {
+    PlannerContractor,
+    PlannerPriority,
+    PlannerProject,
+    PlannerProjectDetailsPatch,
+    PlannerProps
+} from '../types/contracts';
 
 interface PlannerProjectDocument extends Omit<PlannerProject, 'id'> {}
 
@@ -27,16 +33,10 @@ interface GroupedPlannerDay {
     projects: PlannerProject[];
 }
 
-interface ProjectDetailsUpdates {
-    address: string;
-    phone: string;
-    notes: string;
-}
-
 interface ProjectDetailsModalProps {
     project: PlannerProject;
     onClose: () => void;
-    onSave: (updates: ProjectDetailsUpdates) => Promise<void>;
+    onSave: (updates: PlannerProjectDetailsPatch) => Promise<void>;
 }
 
 const PLANNER_COLLECTION_PATH = 'planner_projects';
@@ -171,10 +171,10 @@ export function Planner({ onBack }: PlannerProps) {
         }
     };
 
-    const handleSaveDetails = async (projectId: string, updates: ProjectDetailsUpdates) => {
+    const handleSaveDetails = async (projectId: string, updates: PlannerProjectDetailsPatch) => {
         setProjects((prev) => prev.map((entry) => (entry.id === projectId ? { ...entry, ...updates } : entry)));
         try {
-            await updateDoc(doc(db, PLANNER_COLLECTION_PATH, projectId), updates as unknown as Record<string, string>);
+            await updateDoc(doc(db, PLANNER_COLLECTION_PATH, projectId), updates);
         } catch (error) {
             console.error('Failed to update project details:', error);
         }

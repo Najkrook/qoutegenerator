@@ -46,6 +46,7 @@ import type {
     SketchCamera,
     SketchConfigState,
     SketchDensity,
+    SketchDraftStatePatch,
     SketchEdgeKey,
     SketchSectionEntry,
     SketchToolProps,
@@ -805,15 +806,16 @@ export function SketchTool({ onBack }: SketchToolProps) {
         dispatch({ type: 'SET_SELECTED_LINES', payload: nextSketchExportState.selectedLines });
         dispatch({ type: 'SET_GRID_SELECTIONS', payload: gridSelections });
         dispatch({ type: 'SET_BUILDER_ITEMS', payload: nextSketchExportState.builderItems });
+        const sketchExportStatePatch: SketchDraftStatePatch = {
+            sketchDraft: {
+                config: serializeSketchConfig(config),
+                workspace
+            },
+            sketchMeta: nextSketchExportState.sketchMeta
+        };
         dispatch({
             type: 'UPDATE_STATE',
-            payload: {
-                sketchDraft: {
-                    config: serializeSketchConfig(config),
-                    workspace
-                },
-                sketchMeta: nextSketchExportState.sketchMeta
-            }
+            payload: sketchExportStatePatch
         });
         dispatch({ type: 'SET_STEP', payload: 2 });
         void safeLogActivity({
@@ -956,14 +958,15 @@ export function SketchTool({ onBack }: SketchToolProps) {
     };
 
     const handleBackClick = useCallback(() => {
+        const sketchDraftStatePatch: SketchDraftStatePatch = {
+            sketchDraft: {
+                config: serializeSketchConfig(config),
+                workspace
+            }
+        };
         dispatch({
             type: 'UPDATE_STATE',
-            payload: {
-                sketchDraft: {
-                    config: serializeSketchConfig(config),
-                    workspace
-                }
-            }
+            payload: sketchDraftStatePatch
         });
         dispatch({ type: 'SET_STEP', payload: 2 });
     }, [config, dispatch, onBack, workspace]);

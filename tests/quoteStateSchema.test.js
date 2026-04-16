@@ -234,6 +234,79 @@ describe('quoteStateSchema', () => {
         expect(nextState.customerInfo.customerReference).toBe('');
     });
 
+    it('hydrate action supports the history reopen payload shape used by the app shell', () => {
+        const initial = createInitialQuoteState();
+
+        const nextState = quoteReducer(initial, {
+            type: 'HYDRATE_STATE',
+            payload: {
+                step: 1,
+                activeQuoteId: 'quote_123',
+                activeQuoteVersion: 5,
+                quoteStatus: 'sent',
+                customerInfo: {
+                    name: 'Historik Kund',
+                    company: 'Brixx AB'
+                }
+            }
+        });
+
+        expect(nextState.step).toBe(1);
+        expect(nextState.activeQuoteId).toBe('quote_123');
+        expect(nextState.activeQuoteVersion).toBe(5);
+        expect(nextState.quoteStatus).toBe('sent');
+        expect(nextState.customerInfo.name).toBe('Historik Kund');
+        expect(nextState.customerInfo.company).toBe('Brixx AB');
+    });
+
+    it('update action persists sketch draft patches from the sketch flow without disturbing quote state', () => {
+        const initial = createInitialQuoteState();
+
+        const nextState = quoteReducer(initial, {
+            type: 'UPDATE_STATE',
+            payload: {
+                sketchDraft: {
+                    config: {
+                        width: 9000,
+                        depth: 4000,
+                        depthLeft: 4000,
+                        depthRight: 4000,
+                        equalDepth: true,
+                        includeBack: false,
+                        prioMode: 'symmetrical',
+                        targetLength: 1500,
+                        doorSegmentsByEdge: {},
+                        manualSectionsByEdge: {},
+                        sectionCountByEdge: {},
+                        activeMode: 'clickitup',
+                        parasols: [],
+                        selectedParasolId: null,
+                        selectedParasolPresetId: 'default',
+                        fiestaItems: [],
+                        selectedFiestaId: null
+                    },
+                    workspace: {
+                        camera: { zoom: 1.1, panX: 20, panY: 10 },
+                        selection: { edgeKey: 'front', segmentIndex: null },
+                        uiDensity: 'desktop'
+                    }
+                },
+                sketchMeta: {
+                    addedBahamaLine: true,
+                    addedFiestaLine: false
+                }
+            }
+        });
+
+        expect(nextState.sketchDraft?.config.width).toBe(9000);
+        expect(nextState.sketchDraft?.workspace.camera.zoom).toBe(1.1);
+        expect(nextState.sketchMeta).toEqual({
+            addedBahamaLine: true,
+            addedFiestaLine: false
+        });
+        expect(nextState.activeQuoteId).toBeNull();
+    });
+
     it('supports toggling the PDF zero-discount discount-reference flag through the reducer', () => {
         const initial = createInitialQuoteState();
 

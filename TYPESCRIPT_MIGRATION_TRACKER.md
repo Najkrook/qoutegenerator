@@ -332,14 +332,87 @@ This is a living tracker for the QuoteGenerator TypeScript migration. Update it 
   - `npm run build`
   - `vitest run tests/quoteRepository.test.js`
 
+### 19. Large hardening slice: shared contracts cleanup
+
+- [x] Removed the remaining structural `any` usage from shared app-facing contracts in `src/types/contracts.ts`.
+- [x] Added shared permissive payload aliases for:
+  - `QuoteStatePatch`
+  - `CustomerInfoPatch`
+- [x] Tightened reducer-facing action payloads to use shared aliases instead of inline `Record<string, any>` unions.
+- [x] Tightened auth context contracts so:
+  - `AccessUser` uses `unknown` for extra fields
+  - `login` returns the real Firebase `UserCredential` promise type
+  - `logout` returns `Promise<void>`
+- [x] Tightened the auth-service boundary to normalize Firebase auth callback values into the app-facing `AccessUser` shape.
+- [x] Replaced the `fileUtils` save-picker `catch (err: any)` path with `unknown` plus `AbortError` narrowing.
+- [x] Verified the shared-contract cleanup slice with:
+  - `npm run typecheck`
+  - `npm run test:confidence`
+  - `npm run build`
+
+### 20. Shell-to-feature payload cleanup
+
+- [x] Added domain-specific shell handoff and patch contracts for:
+  - `HistoryOpenQuotePayload`
+  - `SavedQuoteStatePatch`
+  - `SketchDraftStatePatch`
+  - `QuoteIdentityPatch`
+- [x] Replaced generic shell/view payload usage in:
+  - `src/App.tsx`
+  - `src/views/History.tsx`
+  - `src/views/SummaryExport.tsx`
+  - `src/views/SketchTool.tsx`
+- [x] Kept reducer compatibility intact by leaving `HydratedQuoteStatePayload` and `QuoteStatePatch` at the schema/reducer boundary while narrowing the view-to-view call sites.
+- [x] Tightened `buildSavedQuoteStatePatch` to return the dedicated save-state patch contract instead of a loose partial quote state.
+- [x] Added targeted regression coverage for:
+  - history reopen payload hydration through the reducer path
+  - sketch draft patch persistence through `UPDATE_STATE`
+  - save-state patch identity and Scrive fields
+- [x] Verified the shell payload cleanup slice with:
+  - `npm run typecheck`
+  - `npm run test:confidence`
+  - `npm run build`
+  - `vitest run tests/quoteSaveService.test.js tests/quoteStateSchema.test.js`
+
+### 21. Small hardening slice: runtime boundary tightening
+
+- [x] Added small runtime adapter contracts for:
+  - `PdfExportModule`
+  - `ExcelExportModule`
+  - `PlannerProjectDetailsPatch`
+  - `AuthChangeUser`
+- [x] Replaced broad dynamic-import object casts in `src/views/SummaryExport.tsx` with typed module boundaries for PDF and Excel export loading.
+- [x] Replaced the planner project-details Firestore update double-cast in `src/views/Planner.tsx` with the dedicated details patch contract.
+- [x] Replaced the Firebase auth user callback double-cast in `src/services/authService.ts` with an explicit mapper into the app-facing `AccessUser` shape.
+- [x] Kept runtime export, planner save, auth subscription, and export behavior unchanged.
+- [x] Verified the runtime-boundary cleanup slice with:
+  - `npm run typecheck`
+  - `npm run test:confidence`
+  - `npm run build`
+
+### 22. Small hardening slice: history reopen payload normalization
+
+- [x] Added a tiny pure history reopen helper in `src/views/historyPayload.ts`.
+- [x] Replaced the inline `revision.state.customerInfo` cast chain in `src/views/History.tsx` with a typed normalization boundary that returns `HistoryOpenQuotePayload`.
+- [x] Kept history reopen behavior unchanged for:
+  - latest revision open
+  - specific revision open
+  - missing revision-state guard
+  - metadata status normalization
+  - injected `activeQuoteId` and `activeQuoteVersion`
+- [x] Added focused regression coverage in `tests/historyPayload.test.js` for valid, missing, malformed, and non-object revision state inputs.
+- [x] Verified the history reopen normalization slice with:
+  - `npm run typecheck`
+  - `npm run test:confidence`
+  - `npm run build`
+  - `vitest run tests/historyPayload.test.js tests/quoteStateSchema.test.js`
+
 ## Remaining Work
 
 ### 1. Improve type quality inside already-migrated files
 
-- [ ] Reduce broad `any` and `Record<string, any>` usage in shared contracts.
-- [ ] Replace loose shell-to-feature payloads with exported domain-specific interfaces where practical.
 - [ ] Continue tightening catalog-derived data access so components do not rely on broad object indexing or local fallback casts.
-- [ ] Continue reducing broad `any` usage in repository helpers, file/export utilities, and shared runtime contracts.
+- [ ] Continue reducing permissive `unknown`-based payloads where stronger domain types are now safe and worthwhile.
 
 ### 2. Continue mojibake cleanup outside the finished slices
 
@@ -358,12 +431,12 @@ Recommended order from here:
 
 1. `Type hardening` follow-up
    - Target:
-     - shared contracts cleanup
-     - catalog-consumer indexing
-     - remaining utility/service `any` cleanup
+     - catalog-consumer indexing cleanup
+     - selective `unknown` reduction in shared runtime contracts
+     - remaining small utility/runtime boundary tightening beyond the current adapter cleanup
    - Why:
      - the migration itself is now complete for `src/`
-     - quote-state normalization and repository boundaries are now tightened, so the next highest-value work is reducing permissive shared contracts
+     - the shell, repository, runtime-boundary, and history reopen cleanup is now done, so the highest-value follow-up is shrinking the remaining broad catalog indexing and permissive `unknown` boundaries
 
 ## Definition of Done for the Migration
 
@@ -373,8 +446,8 @@ The app-source migration is complete when all of the following are true:
 - [x] `typecheck` validates actual source files.
 - [x] CI runs `npm run typecheck`.
 - [x] No `// @ts-nocheck` files remain under `src/`.
-- [ ] Remaining `any` usage is deliberate and minimal rather than structural.
-- [ ] Main quote, admin, and sketch flows are all typechecked without escape hatches.
+- [x] Remaining `any` usage is deliberate and minimal rather than structural.
+- [x] Main quote, admin, and sketch flows are all typechecked without escape hatches.
 - [x] Backward compatibility for persisted quote/revision data is still intact after cleanup.
 
 ## Update Checklist For Future Slices

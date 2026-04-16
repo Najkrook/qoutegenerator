@@ -1,3 +1,4 @@
+import type { UserCredential } from 'firebase/auth';
 import type { ReactNode } from 'react';
 
 export type QuoteStatus = 'draft' | 'sent' | 'won' | 'lost' | 'archived';
@@ -44,7 +45,7 @@ export type UnknownRecord = Record<string, unknown>;
 export interface AccessUser {
     uid?: string | null;
     email?: string | null;
-    [key: string]: any;
+    [key: string]: unknown;
 }
 
 export interface AccessCapabilities {
@@ -351,6 +352,38 @@ export interface RawPersistedGridLineSelection extends UnknownRecord {
 
 export type HydratedQuoteStatePayload = Partial<QuoteState> | UnknownRecord | null | undefined;
 
+export type QuoteStatePatch = Partial<QuoteState> | UnknownRecord;
+
+export type CustomerInfoPatch = Partial<CustomerInfo> | UnknownRecord;
+
+export interface QuoteIdentityPatch {
+    activeQuoteId: string | null;
+    activeQuoteVersion: number;
+    quoteStatus: QuoteStatus;
+}
+
+export interface SavedQuoteStatePatch extends QuoteIdentityPatch {
+    scriveEnabled?: boolean;
+    scriveStatus: ScriveStatus;
+    scriveDocumentId: string | null;
+    scriveSignerName: string;
+    scriveSignerEmail: string;
+    scriveLastError: string | null;
+    scriveSentAtMs: number | null;
+    scriveLastEventAtMs: number | null;
+    scriveCompletedAtMs: number | null;
+}
+
+export interface HistoryOpenQuotePayload extends QuoteIdentityPatch {
+    customerInfo: CustomerInfoPatch;
+    [key: string]: unknown;
+}
+
+export interface SketchDraftStatePatch {
+    sketchDraft: SketchDraft;
+    sketchMeta?: SketchMeta;
+}
+
 export interface QuoteSummary {
     finalTotalSek: number;
     grossTotalSek: number;
@@ -577,7 +610,7 @@ export interface SavedQuoteLike {
 export interface SaveQuoteToRepositoryResult {
     saved: SavedQuoteLike;
     isNewQuote: boolean;
-    statePatch: Partial<QuoteState>;
+    statePatch: SavedQuoteStatePatch;
 }
 
 export interface SaveQuoteToRepositoryParams {
@@ -609,6 +642,14 @@ export interface PdfTableOptions {
 }
 
 export type PdfTableRow = string[];
+
+export interface PdfExportModule {
+    generatePDF: (state: QuoteState, summaryData: QuoteTotalsResult, returnBlob?: boolean) => Blob | Promise<Blob | null> | null;
+}
+
+export interface ExcelExportModule {
+    generateExcel: (state: QuoteState, summaryData: QuoteTotalsResult) => Promise<void> | void;
+}
 
 export interface QuoteRepository {
     createQuote(input: CreateQuoteInput): Promise<{ quoteId: string; metadata: QuoteMetadata; revision: QuoteRevision }>;
@@ -700,10 +741,10 @@ export interface QuoteRepositoryDeps {
 
 export type QuoteReducerAction =
     | { type: 'SET_STEP'; payload: StepInput }
-    | { type: 'HYDRATE_STATE'; payload: Partial<QuoteState> | Record<string, any> | null | undefined }
-    | { type: 'UPDATE_STATE'; payload: Partial<QuoteState> | Record<string, any> }
-    | { type: 'SET_CUSTOMER_INFO'; payload: Partial<CustomerInfo> | Record<string, any> }
-    | { type: 'UPDATE_CUSTOMER_INFO'; payload: Partial<CustomerInfo> | Record<string, any> }
+    | { type: 'HYDRATE_STATE'; payload: HydratedQuoteStatePayload }
+    | { type: 'UPDATE_STATE'; payload: QuoteStatePatch }
+    | { type: 'SET_CUSTOMER_INFO'; payload: CustomerInfoPatch }
+    | { type: 'UPDATE_CUSTOMER_INFO'; payload: CustomerInfoPatch }
     | { type: 'SET_INCLUDES_VAT'; payload: boolean }
     | { type: 'SET_GLOBAL_DISCOUNT'; payload: number }
     | { type: 'SET_EXCHANGE_RATE'; payload: number }
@@ -777,11 +818,18 @@ export interface SummaryExportProps {
 
 export interface HistoryProps {
     onBack?: () => void;
-    onOpenQuote?: (payload: HydratedQuoteStatePayload) => void;
+    onOpenQuote?: (payload: HistoryOpenQuotePayload) => void;
 }
 
 export interface PlannerProps {
     onBack?: () => void;
+}
+
+export interface PlannerProjectDetailsPatch {
+    address: string;
+    phone: string;
+    notes: string;
+    [key: `${string}.${string}`]: string | undefined;
 }
 
 export interface TermsAndPaymentPanelProps {
@@ -977,10 +1025,15 @@ export interface AuthContextValue {
     canAccessSketch: boolean;
     canAccessQuoteHistory: boolean;
     canExportSketchToQuote: boolean;
-    login: (email: string, password: string) => Promise<any>;
-    logout: () => Promise<any>;
+    login: (email: string, password: string) => Promise<UserCredential>;
+    logout: () => Promise<void>;
     retailer: RetailerRecord | null;
     isRetailer: boolean;
+}
+
+export interface AuthChangeUser {
+    uid: string;
+    email: string | null;
 }
 
 export type SketchEdgeKey = 'front' | 'left' | 'right' | 'back';

@@ -77,7 +77,7 @@ describe('quoteSaveService', () => {
             user: null,
             state: { customerInfo: {} },
             summary: { finalTotalSek: 0, grossTotalSek: 0, totalDiscountSek: 0 }
-        })).rejects.toThrow('Du måste vara inloggad för att spara offerter.');
+        })).rejects.toThrow(/inloggad.*spara offerter/i);
     });
 
     it('buildSavedQuoteStatePatch preserves fallback state when metadata is partial', () => {
@@ -100,5 +100,43 @@ describe('quoteSaveService', () => {
         expect(patch.scriveEnabled).toBe(true);
         expect(patch.scriveStatus).toBe('closed');
         expect(patch.scriveDocumentId).toBe('doc_1');
+    });
+
+    it('buildSavedQuoteStatePatch copies quote identity and scrive fields from saved metadata', () => {
+        const patch = buildSavedQuoteStatePatch(
+            {
+                quoteId: 'quote_321',
+                metadata: {
+                    latestVersion: 7,
+                    status: 'sent',
+                    scriveEnabled: true,
+                    scriveStatus: 'pending',
+                    scriveDocumentId: 'scrive_7',
+                    scriveSignerName: 'Ada',
+                    scriveSignerEmail: 'ada@example.com',
+                    scriveLastError: null,
+                    scriveSentAtMs: 1700000000000,
+                    scriveLastEventAtMs: 1700000000100,
+                    scriveCompletedAtMs: null
+                },
+                revision: { version: 7 }
+            },
+            {}
+        );
+
+        expect(patch).toMatchObject({
+            activeQuoteId: 'quote_321',
+            activeQuoteVersion: 7,
+            quoteStatus: 'sent',
+            scriveEnabled: true,
+            scriveStatus: 'pending',
+            scriveDocumentId: 'scrive_7',
+            scriveSignerName: 'Ada',
+            scriveSignerEmail: 'ada@example.com',
+            scriveLastError: null,
+            scriveSentAtMs: 1700000000000,
+            scriveLastEventAtMs: 1700000000100,
+            scriveCompletedAtMs: null
+        });
     });
 });

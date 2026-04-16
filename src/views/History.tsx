@@ -4,6 +4,7 @@ import { quoteRepository } from '../services/quoteRepositoryClient';
 import { normalizeQuoteStatus } from '../services/quoteRepository';
 import { notifyError, notifyInfo, notifySuccess, confirmAction } from '../services/notificationService';
 import { db, collection, getDocs } from '../services/firebase';
+import { buildHistoryOpenQuotePayload } from './historyPayload';
 import type {
     HistoryOwnerOption,
     HistoryProps,
@@ -254,23 +255,8 @@ export function History({ onBack, onOpenQuote }: HistoryProps) {
             return;
         }
 
-        const revisionState = typeof revision.state === 'object' && revision.state != null
-            ? revision.state
-            : {};
-        const revisionCustomerInfo = typeof (revisionState as { customerInfo?: unknown }).customerInfo === 'object'
-            && (revisionState as { customerInfo?: unknown }).customerInfo != null
-            ? (revisionState as { customerInfo?: Record<string, unknown> }).customerInfo
-            : {};
         const metadata = quotes.find((quote) => quote.quoteId === quoteId);
-        const nextState = {
-            ...revisionState,
-            customerInfo: {
-                ...revisionCustomerInfo
-            },
-            activeQuoteId: quoteId,
-            activeQuoteVersion: Number(revision.version) || 1,
-            quoteStatus: normalizeQuoteStatus(metadata?.status || 'draft')
-        };
+        const nextState = buildHistoryOpenQuotePayload(revision.state, quoteId, revision.version, metadata?.status || 'draft');
 
         onOpenQuote?.(nextState);
     };
