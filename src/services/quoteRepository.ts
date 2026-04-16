@@ -1,44 +1,121 @@
 import type {
+    AccessUser,
+    CustomerInfo,
+    FirestoreDocRef,
+    GetAllUsersQuotesInput,
+    GetQuoteLatestRevisionInput,
+    GetQuoteRevisionsInput,
+    GetUserQuotesInput,
     QuoteFilters,
+    QuoteLatestRevisionResult,
     QuoteMetadata,
     QuoteRepository,
     QuoteRepositoryDeps,
+    QuoteRevision,
     QuoteRevisionSaveInput,
     QuoteStatus,
-    ScriveStatus
+    RawPersistedCustomerInfo,
+    RawQuoteMetadataDoc,
+    RawQuoteRevisionDoc,
+    RawQuoteSummary,
+    RepositoryQuoteStatePayload,
+    RepositoryQuoteSummaryPayload,
+    ScriveMetadata,
+    ScrivePatchInput,
+    ScriveStatus,
+    UnknownRecord,
+    UpdateQuoteScriveInput,
+    UpdateQuoteStatusInput
 } from '../types/contracts';
 
-export const QUOTE_STATUS_VALUES = ['draft', 'sent', 'won', 'lost', 'archived'];
-export const SCRIVE_STATUS_VALUES = ['not_sent', 'preparation', 'pending', 'closed', 'rejected', 'canceled', 'timedout', 'failed'];
+export const QUOTE_STATUS_VALUES: QuoteStatus[] = ['draft', 'sent', 'won', 'lost', 'archived'];
+export const SCRIVE_STATUS_VALUES: ScriveStatus[] = ['not_sent', 'preparation', 'pending', 'closed', 'rejected', 'canceled', 'timedout', 'failed'];
 
-type AnyRecord = Record<string, any>;
+const EMPTY_SUMMARY: RawQuoteSummary = {
+    finalTotalSek: 0,
+    grossTotalSek: 0,
+    totalDiscountSek: 0
+};
 
-function toNumber(value: any, fallback: any = 0) {
+interface QuoteSearchSource extends UnknownRecord {
+    customerName?: unknown;
+    company?: unknown;
+    reference?: unknown;
+    customerReference?: unknown;
+    status?: unknown;
+}
+
+interface BuildQuoteMetadataInput {
+    quoteId: string;
+    customerInfo?: Partial<CustomerInfo> | unknown;
+    summary?: Partial<RawQuoteSummary> | unknown;
+    status?: QuoteStatus | string;
+    scrive?: ScrivePatchInput | unknown;
+    nowMs: number;
+    user?: AccessUser | null;
+    latestVersion: number;
+    latestRevisionId: string;
+    existing?: Partial<QuoteMetadata> | unknown;
+    retailerName?: string | null;
+}
+
+type RevisionSaveContext = QuoteRevisionSaveInput & { retailerName?: string | null };
+type NormalizedRevisionRecord = Omit<QuoteRevision, 'revisionId'>;
+
+function clone<T>(value: T): T {
+    return JSON.parse(JSON.stringify(value)) as T;
+}
+
+function isObject(value: unknown): value is UnknownRecord {
+    return value != null && typeof value === 'object' && !Array.isArray(value);
+}
+
+function toRecord<T extends UnknownRecord = UnknownRecord>(value: unknown): T {
+    return (isObject(value) ? value : {}) as T;
+}
+
+function toStatePayload(value: unknown): RepositoryQuoteStatePayload {
+    return isObject(value) ? clone(value) as RepositoryQuoteStatePayload : {};
+}
+
+function toSummaryPayload(value: unknown): RepositoryQuoteSummaryPayload {
+    return isObject(value) ? clone(value) as RepositoryQuoteSummaryPayload : { ...EMPTY_SUMMARY };
+}
+
+function toNumber(value: unknown, fallback: number): number;
+function toNumber(value: unknown, fallback: null): number | null;
+function toNumber(value: unknown, fallback: number | null = 0): number | null {
     const parsed = Number(value);
     return Number.isFinite(parsed) ? parsed : fallback;
 }
 
-export function normalizeQuoteStatus(status: any): QuoteStatus {
+export function normalizeQuoteStatus(status: unknown): QuoteStatus {
     const normalized = String(status || '').toLowerCase();
-    return (QUOTE_STATUS_VALUES.includes(normalized) ? normalized : 'draft') as QuoteStatus;
+    return QUOTE_STATUS_VALUES.includes(normalized as QuoteStatus) ? (normalized as QuoteStatus) : 'draft';
 }
 
-export function normalizeScriveStatus(status: any): ScriveStatus {
+export function normalizeScriveStatus(status: unknown): ScriveStatus {
     const normalized = String(status || '').toLowerCase();
-    return (SCRIVE_STATUS_VALUES.includes(normalized) ? normalized : 'not_sent') as ScriveStatus;
+    return SCRIVE_STATUS_VALUES.includes(normalized as ScriveStatus) ? (normalized as ScriveStatus) : 'not_sent';
 }
 
-function normalizeScriveMetadata(raw: AnyRecord = {}, fallbackCustomer: AnyRecord = {}) {
+function normalizeScriveMetadata(
+    raw: RawQuoteMetadataDoc | unknown = {},
+    fallbackCustomer: Partial<CustomerInfo> | RawPersistedCustomerInfo | UnknownRecord = {}
+): ScriveMetadata {
+    const safeRaw = toRecord<RawQuoteMetadataDoc>(raw);
+    const safeFallbackCustomer = toRecord<RawPersistedCustomerInfo>(fallbackCustomer);
+
     return {
-        scriveEnabled: Boolean(raw.scriveEnabled),
-        scriveStatus: normalizeScriveStatus(raw.scriveStatus),
-        scriveDocumentId: raw.scriveDocumentId ? String(raw.scriveDocumentId) : null,
-        scriveSignerName: String(raw.scriveSignerName || fallbackCustomer.name || ''),
-        scriveSignerEmail: String(raw.scriveSignerEmail || fallbackCustomer.email || ''),
-        scriveLastError: raw.scriveLastError ? String(raw.scriveLastError) : null,
-        scriveSentAtMs: raw.scriveSentAtMs == null ? null : toNumber(raw.scriveSentAtMs, null),
-        scriveLastEventAtMs: raw.scriveLastEventAtMs == null ? null : toNumber(raw.scriveLastEventAtMs, null),
-        scriveCompletedAtMs: raw.scriveCompletedAtMs == null ? null : toNumber(raw.scriveCompletedAtMs, null)
+        scriveEnabled: Boolean(safeRaw.scriveEnabled),
+        scriveStatus: normalizeScriveStatus(safeRaw.scriveStatus),
+        scriveDocumentId: safeRaw.scriveDocumentId ? String(safeRaw.scriveDocumentId) : null,
+        scriveSignerName: String(safeRaw.scriveSignerName || safeFallbackCustomer.name || ''),
+        scriveSignerEmail: String(safeRaw.scriveSignerEmail || safeFallbackCustomer.email || ''),
+        scriveLastError: safeRaw.scriveLastError ? String(safeRaw.scriveLastError) : null,
+        scriveSentAtMs: safeRaw.scriveSentAtMs == null ? null : toNumber(safeRaw.scriveSentAtMs, null),
+        scriveLastEventAtMs: safeRaw.scriveLastEventAtMs == null ? null : toNumber(safeRaw.scriveLastEventAtMs, null),
+        scriveCompletedAtMs: safeRaw.scriveCompletedAtMs == null ? null : toNumber(safeRaw.scriveCompletedAtMs, null)
     };
 }
 
@@ -48,27 +125,29 @@ export function buildQuoteSearchText({
     reference = '',
     customerReference = '',
     status = 'draft'
-}: AnyRecord = {}) {
+}: QuoteSearchSource = {}): string {
     return [customerName, company, reference, customerReference, normalizeQuoteStatus(status)]
         .map((value) => String(value || '').trim().toLowerCase())
         .filter(Boolean)
         .join(' ');
 }
 
-export function normalizeQuoteMetadata(quoteId: string, raw: AnyRecord = {}): QuoteMetadata {
-    const fallbackCustomer = raw?.state?.customerInfo || {};
-    const customerName = String(raw.customerName || fallbackCustomer.company || fallbackCustomer.name || 'Okand kund');
-    const company = String(raw.company || fallbackCustomer.company || '');
-    const reference = String(raw.reference || fallbackCustomer.reference || '-');
-    const customerReference = String(raw.customerReference || fallbackCustomer.customerReference || '');
-    const totalSek = toNumber(raw.totalSek, toNumber(raw?.summary?.finalTotalSek, 0));
-    const timestampMs = toNumber(Date.parse(raw.timestamp || ''), 0);
-    const createdAtMs = toNumber(raw.createdAtMs, timestampMs || Date.now());
-    const updatedAtMs = toNumber(raw.updatedAtMs, timestampMs || createdAtMs);
-    const latestVersion = Math.max(1, toNumber(raw.latestVersion, raw.state ? 1 : 0));
-    const status = normalizeQuoteStatus(raw.status);
-    const latestRevisionId = String(raw.latestRevisionId || '');
-    const scrive = normalizeScriveMetadata(raw, fallbackCustomer);
+export function normalizeQuoteMetadata(quoteId: string, raw: RawQuoteMetadataDoc | unknown = {}): QuoteMetadata {
+    const safeRaw = toRecord<RawQuoteMetadataDoc>(raw);
+    const fallbackState = toRecord(safeRaw.state);
+    const fallbackCustomer = toRecord<RawPersistedCustomerInfo>(fallbackState.customerInfo);
+    const customerName = String(safeRaw.customerName || fallbackCustomer.company || fallbackCustomer.name || 'Okand kund');
+    const company = String(safeRaw.company || fallbackCustomer.company || '');
+    const reference = String(safeRaw.reference || fallbackCustomer.reference || '-');
+    const customerReference = String(safeRaw.customerReference || fallbackCustomer.customerReference || '');
+    const totalSek = toNumber(safeRaw.totalSek, toNumber(toRecord<RawQuoteSummary>(safeRaw.summary).finalTotalSek, 0)) || 0;
+    const timestampMs = toNumber(Date.parse(String(safeRaw.timestamp || '')), 0) || 0;
+    const createdAtMs = toNumber(safeRaw.createdAtMs, timestampMs || Date.now()) || 0;
+    const updatedAtMs = toNumber(safeRaw.updatedAtMs, timestampMs || createdAtMs) || createdAtMs;
+    const latestVersion = Math.max(1, toNumber(safeRaw.latestVersion, safeRaw.state ? 1 : 0) || 0);
+    const status = normalizeQuoteStatus(safeRaw.status);
+    const latestRevisionId = String(safeRaw.latestRevisionId || '');
+    const scrive = normalizeScriveMetadata(safeRaw, fallbackCustomer);
 
     return {
         quoteId,
@@ -79,23 +158,23 @@ export function normalizeQuoteMetadata(quoteId: string, raw: AnyRecord = {}): Qu
         status,
         createdAtMs,
         updatedAtMs,
-        savedBy: String(raw.savedBy || ''),
-        savedByUid: String(raw.savedByUid || ''),
+        savedBy: String(safeRaw.savedBy || ''),
+        savedByUid: String(safeRaw.savedByUid || ''),
         latestVersion,
         latestRevisionId,
         totalSek,
+        retailerName: safeRaw.retailerName != null ? String(safeRaw.retailerName) : null,
         ...scrive,
         searchText: String(
-            raw.searchText ||
+            safeRaw.searchText ||
             buildQuoteSearchText({ customerName, company, reference, customerReference, status })
         ),
-        // Keep legacy fields available for fallback reads.
-        state: raw.state || null,
-        summary: raw.summary || null
+        state: safeRaw.state ?? null,
+        summary: safeRaw.summary ?? null
     };
 }
 
-export function buildRevisionData({
+function buildRevisionData({
     quoteId,
     version,
     nowMs,
@@ -103,24 +182,26 @@ export function buildRevisionData({
     state,
     summary,
     changeNote = ''
-}: QuoteRevisionSaveInput & { version: number; nowMs: number }) {
+}: QuoteRevisionSaveInput & { version: number; nowMs: number }): NormalizedRevisionRecord {
+    const safeSummary = toRecord<RawQuoteSummary>(summary);
+
     return {
         quoteId,
         version,
         savedAtMs: nowMs,
         savedBy: String(user?.email || ''),
         savedByUid: String(user?.uid || ''),
-        state: JSON.parse(JSON.stringify(state || {})),
+        state: toStatePayload(state),
         summary: {
-            finalTotalSek: toNumber(summary?.finalTotalSek, 0),
-            grossTotalSek: toNumber(summary?.grossTotalSek, 0),
-            totalDiscountSek: toNumber(summary?.totalDiscountSek, 0)
+            finalTotalSek: toNumber(safeSummary.finalTotalSek, 0) || 0,
+            grossTotalSek: toNumber(safeSummary.grossTotalSek, 0) || 0,
+            totalDiscountSek: toNumber(safeSummary.totalDiscountSek, 0) || 0
         },
         changeNote: String(changeNote || '')
     };
 }
 
-export function buildQuoteMetadata({
+function buildQuoteMetadata({
     quoteId,
     customerInfo = {},
     summary = {},
@@ -132,41 +213,47 @@ export function buildQuoteMetadata({
     latestRevisionId,
     existing = {},
     retailerName = null
-}: AnyRecord): QuoteMetadata {
-    const normalizedStatus = normalizeQuoteStatus(status || existing.status);
-    const company = String(customerInfo.company || existing.company || '');
-    const customerName = String(company || customerInfo.name || existing.customerName || existing.company || 'Okand kund');
-    const reference = String(customerInfo.reference || existing.reference || '-');
-    const customerReference = String(customerInfo.customerReference || existing.customerReference || '');
-    const existingScrive = normalizeScriveMetadata(existing, customerInfo);
-    const normalizedScriveStatus = normalizeScriveStatus(scrive.status || existingScrive.scriveStatus || 'not_sent');
-    const scriveDocumentId = scrive.documentId || existingScrive.scriveDocumentId || null;
-    const scriveEnabled = typeof scrive.enabled === 'boolean'
-        ? scrive.enabled
+}: BuildQuoteMetadataInput): QuoteMetadata {
+    const safeCustomerInfo = toRecord<RawPersistedCustomerInfo>(customerInfo);
+    const safeSummary = toRecord<RawQuoteSummary>(summary);
+    const existingMetadata = toRecord<Partial<QuoteMetadata>>(existing);
+    const safeScrive = toRecord<ScrivePatchInput>(scrive);
+    const normalizedStatus = normalizeQuoteStatus(status || existingMetadata.status);
+    const company = String(safeCustomerInfo.company || existingMetadata.company || '');
+    const customerName = String(company || safeCustomerInfo.name || existingMetadata.customerName || existingMetadata.company || 'Okand kund');
+    const reference = String(safeCustomerInfo.reference || existingMetadata.reference || '-');
+    const customerReference = String(safeCustomerInfo.customerReference || existingMetadata.customerReference || '');
+    const existingScrive = normalizeScriveMetadata(existingMetadata, safeCustomerInfo);
+    const normalizedScriveStatus = normalizeScriveStatus(safeScrive.status || existingScrive.scriveStatus || 'not_sent');
+    const scriveDocumentId = safeScrive.documentId !== undefined
+        ? (safeScrive.documentId ? String(safeScrive.documentId) : null)
+        : existingScrive.scriveDocumentId;
+    const scriveEnabled = typeof safeScrive.enabled === 'boolean'
+        ? safeScrive.enabled
         : existingScrive.scriveEnabled;
     const scriveSignerName = String(
-        scrive.signerName ||
-        customerInfo.name ||
+        safeScrive.signerName ||
+        safeCustomerInfo.name ||
         existingScrive.scriveSignerName ||
         customerName
     );
     const scriveSignerEmail = String(
-        scrive.signerEmail ||
-        customerInfo.email ||
+        safeScrive.signerEmail ||
+        safeCustomerInfo.email ||
         existingScrive.scriveSignerEmail ||
         ''
     );
-    const scriveLastError = scrive.lastError != null
-        ? (scrive.lastError ? String(scrive.lastError) : null)
+    const scriveLastError = safeScrive.lastError !== undefined
+        ? (safeScrive.lastError ? String(safeScrive.lastError) : null)
         : (existingScrive.scriveLastError || null);
-    const scriveSentAtMs = scrive.sentAtMs != null
-        ? toNumber(scrive.sentAtMs, null)
+    const scriveSentAtMs = safeScrive.sentAtMs !== undefined
+        ? (safeScrive.sentAtMs == null ? null : toNumber(safeScrive.sentAtMs, existingScrive.scriveSentAtMs || null))
         : existingScrive.scriveSentAtMs;
-    const scriveLastEventAtMs = scrive.lastEventAtMs != null
-        ? toNumber(scrive.lastEventAtMs, null)
+    const scriveLastEventAtMs = safeScrive.lastEventAtMs !== undefined
+        ? (safeScrive.lastEventAtMs == null ? null : toNumber(safeScrive.lastEventAtMs, existingScrive.scriveLastEventAtMs || null))
         : existingScrive.scriveLastEventAtMs;
-    const scriveCompletedAtMs = scrive.completedAtMs != null
-        ? toNumber(scrive.completedAtMs, null)
+    const scriveCompletedAtMs = safeScrive.completedAtMs !== undefined
+        ? (safeScrive.completedAtMs == null ? null : toNumber(safeScrive.completedAtMs, existingScrive.scriveCompletedAtMs || null))
         : existingScrive.scriveCompletedAtMs;
 
     return {
@@ -176,14 +263,14 @@ export function buildQuoteMetadata({
         reference,
         customerReference,
         status: normalizedStatus,
-        createdAtMs: toNumber(existing.createdAtMs, nowMs),
+        createdAtMs: toNumber(existingMetadata.createdAtMs, nowMs) || nowMs,
         updatedAtMs: nowMs,
-        savedBy: String(user?.email || existing.savedBy || ''),
-        savedByUid: String(user?.uid || existing.savedByUid || ''),
-        latestVersion: Math.max(1, toNumber(latestVersion, 1)),
-        latestRevisionId: String(latestRevisionId || existing.latestRevisionId || ''),
-        totalSek: toNumber(summary?.finalTotalSek, existing.totalSek || 0),
-        retailerName: retailerName != null ? String(retailerName) : (existing.retailerName || null),
+        savedBy: String(user?.email || existingMetadata.savedBy || ''),
+        savedByUid: String(user?.uid || existingMetadata.savedByUid || ''),
+        latestVersion: Math.max(1, toNumber(latestVersion, 1) || 1),
+        latestRevisionId: String(latestRevisionId || existingMetadata.latestRevisionId || ''),
+        totalSek: toNumber(safeSummary.finalTotalSek, existingMetadata.totalSek || 0) || 0,
+        retailerName: retailerName != null ? String(retailerName) : (existingMetadata.retailerName || null),
         scriveEnabled,
         scriveStatus: normalizedScriveStatus,
         scriveDocumentId,
@@ -203,7 +290,35 @@ export function buildQuoteMetadata({
     };
 }
 
-export function applyQuoteFilters(quotes: any[] = [], { status = '', search = '' }: QuoteFilters = {}) {
+function normalizeQuoteRevision(
+    quoteId: string,
+    revisionId: string,
+    raw: RawQuoteRevisionDoc | unknown = {},
+    fallback: Partial<QuoteMetadata> = {}
+): QuoteRevision {
+    const safeRaw = toRecord<RawQuoteRevisionDoc>(raw);
+    const safeFallback = toRecord<Partial<QuoteMetadata>>(fallback);
+
+    return {
+        revisionId,
+        quoteId,
+        version: Math.max(1, toNumber(safeRaw.version, safeFallback.latestVersion || 1) || 1),
+        savedAtMs: toNumber(safeRaw.savedAtMs, toNumber(safeRaw.createdAt, safeFallback.updatedAtMs || Date.now())) || Date.now(),
+        savedBy: String(safeRaw.savedBy || safeFallback.savedBy || ''),
+        savedByUid: String(safeRaw.savedByUid || safeFallback.savedByUid || ''),
+        state: safeRaw.state ? toStatePayload(safeRaw.state) : toStatePayload(safeFallback.state),
+        summary: safeRaw.summary ? toSummaryPayload(safeRaw.summary) : toSummaryPayload(safeFallback.summary || {
+            finalTotalSek: safeFallback.totalSek || 0,
+            grossTotalSek: 0,
+            totalDiscountSek: 0
+        }),
+        changeNote: String(safeRaw.changeNote || '')
+    };
+}
+
+type QuoteFilterableRow = Pick<QuoteMetadata, 'status' | 'searchText' | 'customerName' | 'reference' | 'customerReference'>;
+
+export function applyQuoteFilters<T extends QuoteFilterableRow>(quotes: T[] = [], { status = '', search = '' }: QuoteFilters = {}): T[] {
     const normalizedStatus = String(status || '').trim().toLowerCase();
     const normalizedSearch = String(search || '').trim().toLowerCase();
 
@@ -215,7 +330,7 @@ export function applyQuoteFilters(quotes: any[] = [], { status = '', search = ''
     });
 }
 
-export function createQuoteRepository(deps: QuoteRepositoryDeps = {} as QuoteRepositoryDeps) {
+export function createQuoteRepository(deps: QuoteRepositoryDeps = {} as QuoteRepositoryDeps): QuoteRepository {
     const {
         db,
         doc,
@@ -237,8 +352,8 @@ export function createQuoteRepository(deps: QuoteRepositoryDeps = {} as QuoteRep
         throw new Error('quoteRepository requires Firestore dependencies.');
     }
 
-    const quoteDocRef = (userId, quoteId) => doc(db, 'users', userId, 'quotes', quoteId);
-    const revisionsCollectionRef = (userId, quoteId) =>
+    const quoteDocRef = (userId: string, quoteId: string): FirestoreDocRef => doc(db, 'users', userId, 'quotes', quoteId);
+    const revisionsCollectionRef = (userId: string, quoteId: string) =>
         collection(db, 'users', userId, 'quotes', quoteId, 'revisions');
 
     const saveRevisionFallback = async ({
@@ -246,22 +361,22 @@ export function createQuoteRepository(deps: QuoteRepositoryDeps = {} as QuoteRep
         quoteId,
         state,
         summary,
-        customerInfo,
-        status,
-        scrive,
+        customerInfo = {},
+        status = 'draft',
+        scrive = {},
         changeNote,
         retailerName = null
-    }: AnyRecord) => {
-        const quoteRef = quoteDocRef(user.uid, quoteId);
+    }: RevisionSaveContext): Promise<{ metadata: QuoteMetadata; revision: QuoteRevision }> => {
+        const quoteRef = quoteDocRef(String(user.uid), quoteId);
         const nowMs = Date.now();
         const quoteSnap = await getDoc(quoteRef);
-        const existing: AnyRecord = quoteSnap.exists()
+        const existing = quoteSnap.exists()
             ? normalizeQuoteMetadata(quoteId, quoteSnap.data())
-            : {};
+            : undefined;
 
-        const version = Math.max(1, toNumber(existing.latestVersion, 0) + 1);
+        const version = Math.max(1, (toNumber(existing?.latestVersion, 0) || 0) + 1);
         const revisionId = `v${String(version).padStart(4, '0')}_${nowMs}`;
-        const revisionRef = doc(db, 'users', user.uid, 'quotes', quoteId, 'revisions', revisionId);
+        const revisionRef = doc(db, 'users', String(user.uid), 'quotes', quoteId, 'revisions', revisionId);
         const revisionData = buildRevisionData({
             quoteId,
             version,
@@ -285,8 +400,8 @@ export function createQuoteRepository(deps: QuoteRepositoryDeps = {} as QuoteRep
             retailerName
         });
 
-        await setDoc(revisionRef, revisionData);
-        await setDoc(quoteRef, metadata, { merge: true });
+        await setDoc(revisionRef, revisionData as unknown as UnknownRecord);
+        await setDoc(quoteRef, metadata as unknown as UnknownRecord, { merge: true });
 
         return { metadata, revision: { revisionId, ...revisionData } };
     };
@@ -301,36 +416,38 @@ export function createQuoteRepository(deps: QuoteRepositoryDeps = {} as QuoteRep
         scrive = {},
         changeNote = '',
         retailerName = null
-    }: AnyRecord) {
+    }: QuoteRevisionSaveInput): Promise<{ metadata: QuoteMetadata; revision: QuoteRevision }> {
         if (!user?.uid) throw new Error('Missing authenticated user.');
         if (!quoteId) throw new Error('quoteId is required.');
 
+        const revisionInput: RevisionSaveContext = {
+            user,
+            quoteId,
+            state,
+            summary,
+            customerInfo,
+            status,
+            scrive,
+            changeNote,
+            retailerName
+        };
+
         if (typeof runTransaction !== 'function') {
-            return saveRevisionFallback({
-                user,
-                quoteId,
-                state,
-                summary,
-                customerInfo,
-                status,
-                scrive,
-                changeNote,
-                retailerName
-            });
+            return saveRevisionFallback(revisionInput);
         }
 
-        const quoteRef = quoteDocRef(user.uid, quoteId);
+        const quoteRef = quoteDocRef(String(user.uid), quoteId);
 
-        return runTransaction(db, async (transaction) => {
+        return runTransaction<{ metadata: QuoteMetadata; revision: QuoteRevision }>(db, async (transaction) => {
             const nowMs = Date.now();
             const snap = await transaction.get(quoteRef);
-            const existing: AnyRecord = snap.exists()
+            const existing = snap.exists()
                 ? normalizeQuoteMetadata(quoteId, snap.data())
-                : {};
+                : undefined;
 
-            const version = Math.max(1, toNumber(existing.latestVersion, 0) + 1);
+            const version = Math.max(1, (toNumber(existing?.latestVersion, 0) || 0) + 1);
             const revisionId = `v${String(version).padStart(4, '0')}_${nowMs}`;
-            const revisionRef = doc(db, 'users', user.uid, 'quotes', quoteId, 'revisions', revisionId);
+            const revisionRef = doc(db, 'users', String(user.uid), 'quotes', quoteId, 'revisions', revisionId);
 
             const revisionData = buildRevisionData({
                 quoteId,
@@ -355,8 +472,8 @@ export function createQuoteRepository(deps: QuoteRepositoryDeps = {} as QuoteRep
                 retailerName
             });
 
-            transaction.set(revisionRef, revisionData);
-            transaction.set(quoteRef, metadata, { merge: true });
+            transaction.set(revisionRef, revisionData as unknown as UnknownRecord);
+            transaction.set(quoteRef, metadata as unknown as UnknownRecord, { merge: true });
 
             return { metadata, revision: { revisionId, ...revisionData } };
         });
@@ -371,10 +488,10 @@ export function createQuoteRepository(deps: QuoteRepositoryDeps = {} as QuoteRep
         scrive = {},
         changeNote = 'Initial save',
         retailerName = null
-    }: AnyRecord) {
+    }: QuoteRevisionSaveInput): Promise<{ quoteId: string; metadata: QuoteMetadata; revision: QuoteRevision }> {
         if (!user?.uid) throw new Error('Missing authenticated user.');
         const quoteId = `quote_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-        const saved: any = await saveQuoteRevision({
+        const saved = await saveQuoteRevision({
             user,
             quoteId,
             state,
@@ -388,27 +505,26 @@ export function createQuoteRepository(deps: QuoteRepositoryDeps = {} as QuoteRep
         return { quoteId, ...saved };
     }
 
-    async function getUserQuotes({ userId, status = '', search = '' }: AnyRecord) {
+    async function getUserQuotes({ userId, status = '', search = '' }: GetUserQuotesInput): Promise<QuoteMetadata[]> {
         if (!userId) return [];
         const quotesRef = collection(db, 'users', userId, 'quotes');
         let snap;
         try {
             snap = await getDocs(query(quotesRef, orderBy('updatedAtMs', 'desc')));
-        } catch (err) {
+        } catch {
             snap = await getDocs(query(quotesRef, orderBy('timestamp', 'desc')));
         }
 
         const mapped = snap.docs.map((docSnap) =>
-            normalizeQuoteMetadata(docSnap.id, docSnap.data() || {})
+            normalizeQuoteMetadata(docSnap.id || '', docSnap.data() || {})
         );
 
-        const filtered = applyQuoteFilters(mapped, { status, search });
+        const filtered = applyQuoteFilters<QuoteMetadata>(mapped, { status, search });
         filtered.sort((a, b) => b.updatedAtMs - a.updatedAtMs);
         return filtered;
     }
 
-
-    async function getAllUsersQuotes({ status = '', search = '' }: AnyRecord = {}) {
+    async function getAllUsersQuotes({ status = '', search = '' }: GetAllUsersQuotesInput = {}): Promise<Array<QuoteMetadata & { ownerUid: string }>> {
         if (typeof collectionGroup !== 'function') {
             throw new Error('collectionGroup is required for cross-user quote queries.');
         }
@@ -417,51 +533,36 @@ export function createQuoteRepository(deps: QuoteRepositoryDeps = {} as QuoteRep
 
         const mapped = snap.docs.map((docSnap) => {
             const ownerUid = docSnap.ref?.parent?.parent?.id || 'unknown';
-            const meta = normalizeQuoteMetadata(docSnap.id, docSnap.data() || {});
+            const meta = normalizeQuoteMetadata(docSnap.id || '', docSnap.data() || {});
             return { ...meta, ownerUid };
         });
 
-        const filtered = applyQuoteFilters(mapped, { status, search });
+        const filtered = applyQuoteFilters<QuoteMetadata & { ownerUid: string }>(mapped, { status, search });
         filtered.sort((a, b) => b.updatedAtMs - a.updatedAtMs);
         return filtered;
     }
 
-    async function getQuoteRevisions({ userId, quoteId, limit: limitRows = 5 }: AnyRecord) {
+    async function getQuoteRevisions({ userId, quoteId, limit: limitRows = 5 }: GetQuoteRevisionsInput): Promise<QuoteRevision[]> {
         if (!userId || !quoteId) return [];
-        const maxRows = Math.max(1, Math.min(100, toNumber(limitRows, 5)));
+        const maxRows = Math.max(1, Math.min(100, toNumber(limitRows, 5) || 5));
         const revisionsRef = revisionsCollectionRef(userId, quoteId);
         let snap;
 
         try {
             snap = await getDocs(query(revisionsRef, orderBy('version', 'desc'), limit(maxRows)));
-        } catch (err) {
+        } catch {
             snap = await getDocs(query(revisionsRef, orderBy('savedAtMs', 'desc'), limit(maxRows)));
         }
 
-        const rows = snap.docs.map((docSnap) => {
-            const raw = docSnap.data() || {};
-            return {
-                revisionId: docSnap.id,
-                quoteId,
-                version: Math.max(1, toNumber(raw.version, 1)),
-                savedAtMs: toNumber(raw.savedAtMs, toNumber(raw.createdAt, Date.now())),
-                savedBy: String(raw.savedBy || ''),
-                savedByUid: String(raw.savedByUid || ''),
-                state: raw.state || {},
-                summary: raw.summary || {
-                    finalTotalSek: 0,
-                    grossTotalSek: 0,
-                    totalDiscountSek: 0
-                },
-                changeNote: String(raw.changeNote || '')
-            };
-        });
+        const rows = snap.docs.map((docSnap) =>
+            normalizeQuoteRevision(quoteId, docSnap.id || '', docSnap.data() || {})
+        );
 
         rows.sort((a, b) => b.version - a.version);
         return rows;
     }
 
-    async function getQuoteLatestRevision({ userId, quoteId }: AnyRecord) {
+    async function getQuoteLatestRevision({ userId, quoteId }: GetQuoteLatestRevisionInput): Promise<QuoteLatestRevisionResult | null> {
         if (!userId || !quoteId) return null;
         const quoteRef = quoteDocRef(userId, quoteId);
         const quoteSnap = await getDoc(quoteRef);
@@ -481,24 +582,14 @@ export function createQuoteRepository(deps: QuoteRepositoryDeps = {} as QuoteRep
             );
             const revisionSnap = await getDoc(revisionRef);
             if (revisionSnap.exists()) {
-                const revisionRaw = revisionSnap.data() || {};
                 return {
                     metadata,
-                    revision: {
-                        revisionId: revisionSnap.id,
+                    revision: normalizeQuoteRevision(
                         quoteId,
-                        version: Math.max(1, toNumber(revisionRaw.version, metadata.latestVersion || 1)),
-                        savedAtMs: toNumber(revisionRaw.savedAtMs, metadata.updatedAtMs),
-                        savedBy: String(revisionRaw.savedBy || metadata.savedBy || ''),
-                        savedByUid: String(revisionRaw.savedByUid || metadata.savedByUid || ''),
-                        state: revisionRaw.state || {},
-                        summary: revisionRaw.summary || metadata.summary || {
-                            finalTotalSek: metadata.totalSek || 0,
-                            grossTotalSek: 0,
-                            totalDiscountSek: 0
-                        },
-                        changeNote: String(revisionRaw.changeNote || '')
-                    }
+                        revisionSnap.id || metadata.latestRevisionId,
+                        revisionSnap.data() || {},
+                        metadata
+                    )
                 };
             }
         }
@@ -516,12 +607,12 @@ export function createQuoteRepository(deps: QuoteRepositoryDeps = {} as QuoteRep
                     savedAtMs: metadata.updatedAtMs || metadata.createdAtMs || Date.now(),
                     savedBy: metadata.savedBy || '',
                     savedByUid: metadata.savedByUid || '',
-                    state: metadata.state || {},
-                    summary: metadata.summary || {
+                    state: toStatePayload(metadata.state),
+                    summary: toSummaryPayload(metadata.summary || {
                         finalTotalSek: metadata.totalSek || 0,
                         grossTotalSek: 0,
                         totalDiscountSek: 0
-                    },
+                    }),
                     changeNote: 'Legacy snapshot'
                 }
             };
@@ -530,13 +621,13 @@ export function createQuoteRepository(deps: QuoteRepositoryDeps = {} as QuoteRep
         return { metadata, revision: null };
     }
 
-    async function updateQuoteStatus({ userId, quoteId, status }: AnyRecord) {
+    async function updateQuoteStatus({ userId, quoteId, status }: UpdateQuoteStatusInput): Promise<QuoteMetadata> {
         if (!userId || !quoteId) throw new Error('userId and quoteId are required.');
         const quoteRef = quoteDocRef(userId, quoteId);
         const snap = await getDoc(quoteRef);
         if (!snap.exists()) throw new Error('Quote not found.');
 
-        const existing: AnyRecord = normalizeQuoteMetadata(quoteId, snap.data() || {});
+        const existing = normalizeQuoteMetadata(quoteId, snap.data() || {});
         const normalizedStatus = normalizeQuoteStatus(status);
         const updatedAtMs = Date.now();
         const searchText = buildQuoteSearchText({
@@ -573,15 +664,15 @@ export function createQuoteRepository(deps: QuoteRepositoryDeps = {} as QuoteRep
         };
     }
 
-    async function updateQuoteScrive({ userId, quoteId, scrive = {} }: AnyRecord) {
+    async function updateQuoteScrive({ userId, quoteId, scrive = {} }: UpdateQuoteScriveInput): Promise<QuoteMetadata> {
         if (!userId || !quoteId) throw new Error('userId and quoteId are required.');
         const quoteRef = quoteDocRef(userId, quoteId);
         const snap = await getDoc(quoteRef);
         if (!snap.exists()) throw new Error('Quote not found.');
 
-        const existing: AnyRecord = normalizeQuoteMetadata(quoteId, snap.data() || {});
+        const existing = normalizeQuoteMetadata(quoteId, snap.data() || {});
         const updatedAtMs = Date.now();
-        const scriveInput: AnyRecord = scrive || {};
+        const scriveInput = toRecord<ScrivePatchInput>(scrive);
         const scrivePatch = {
             scriveEnabled: typeof scriveInput.enabled === 'boolean' ? scriveInput.enabled : existing.scriveEnabled,
             scriveStatus: normalizeScriveStatus(scriveInput.status || existing.scriveStatus),
@@ -617,7 +708,7 @@ export function createQuoteRepository(deps: QuoteRepositoryDeps = {} as QuoteRep
         };
     }
 
-    async function deleteQuote({ userId, quoteId }: AnyRecord) {
+    async function deleteQuote({ userId, quoteId }: { userId: string; quoteId: string }): Promise<void> {
         if (!userId || !quoteId) throw new Error('userId and quoteId are required.');
         const quoteRef = quoteDocRef(userId, quoteId);
         const revisionsRef = revisionsCollectionRef(userId, quoteId);
@@ -625,21 +716,26 @@ export function createQuoteRepository(deps: QuoteRepositoryDeps = {} as QuoteRep
 
         if (typeof writeBatch === 'function') {
             const batch = writeBatch(db);
-            revisionsSnap.forEach((docSnap) => {
-                batch.delete(docSnap.ref);
+            revisionsSnap.forEach?.((docSnap) => {
+                if (docSnap.ref) {
+                    batch.delete(docSnap.ref);
+                }
             });
             batch.delete(quoteRef);
             await batch.commit();
             return;
         }
 
-        for (const docSnap of revisionsSnap.docs) {
-            await deleteDoc(docSnap.ref);
-        }
         if (typeof deleteDoc === 'function') {
+            for (const docSnap of revisionsSnap.docs) {
+                if (docSnap.ref) {
+                    await deleteDoc(docSnap.ref);
+                }
+            }
             await deleteDoc(quoteRef);
             return;
         }
+
         await setDoc(quoteRef, { deletedAtMs: Date.now() }, { merge: true });
     }
 
@@ -653,5 +749,5 @@ export function createQuoteRepository(deps: QuoteRepositoryDeps = {} as QuoteRep
         updateQuoteStatus,
         updateQuoteScrive,
         getAllUsersQuotes
-    } as QuoteRepository;
+    };
 }

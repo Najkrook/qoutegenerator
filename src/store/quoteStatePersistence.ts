@@ -1,4 +1,4 @@
-import type { QuoteState } from '../types/contracts';
+import type { HydratedQuoteStatePayload, QuoteState } from '../types/contracts';
 import {
     QUOTE_STATE_STORAGE_KEY,
     createInitialQuoteState,
@@ -23,7 +23,10 @@ export function loadPersistedQuoteState(storage: Storage | undefined = globalThi
     }
 }
 
-export function persistQuoteState(state: QuoteState | Record<string, any>, storage: Storage | undefined = globalThis.localStorage) {
+export function persistQuoteState(
+    state: QuoteState | HydratedQuoteStatePayload,
+    storage: Storage | undefined = globalThis.localStorage
+) {
     if (!storage) return;
 
     try {

@@ -244,6 +244,109 @@ describe('quoteRepository', () => {
         expect(updated.scriveDocumentId).toBe('doc_123');
         expect(updated.scriveSignerEmail).toBe('customer@example.com');
     });
+
+    it('saveQuoteRevision falls back cleanly when runTransaction is unavailable', async () => {
+        const mock = createFirestoreMock();
+        delete mock.runTransaction;
+        const repo = createQuoteRepository(mock);
+
+        const created = await repo.createQuote({
+            user,
+            state: baseState,
+            summary: baseSummary,
+            customerInfo: baseState.customerInfo,
+            status: 'draft'
+        });
+
+        const updated = await repo.saveQuoteRevision({
+            user,
+            quoteId: created.quoteId,
+            state: baseState,
+            summary: { ...baseSummary, finalTotalSek: 20000 },
+            customerInfo: baseState.customerInfo,
+            status: 'sent'
+        });
+
+        expect(updated.metadata.latestVersion).toBe(2);
+        expect(updated.revision.version).toBe(2);
+        expect(updated.metadata.latestRevisionId).toBe(updated.revision.revisionId);
+    });
+
+    it('getQuoteLatestRevision falls back to the revision list when latestRevisionId is missing', async () => {
+        const { repo } = buildRepo({
+            'users/user-1/quotes/q_fallback': {
+                customerName: 'Fallback kund',
+                reference: 'FB-1',
+                customerReference: 'ER-FB-1',
+                latestVersion: 2,
+                updatedAtMs: 1710000000000,
+                totalSek: 18000,
+                status: 'sent'
+            },
+            'users/user-1/quotes/q_fallback/revisions/rev_2': {
+                version: 2,
+                savedAtMs: 1710000000000,
+                savedBy: 'sales@example.com',
+                savedByUid: 'user-1',
+                state: {
+                    customerInfo: { reference: 'FB-2' }
+                },
+                summary: {
+                    finalTotalSek: 18000,
+                    grossTotalSek: 19000,
+                    totalDiscountSek: 1000
+                },
+                changeNote: 'Fallback revision'
+            }
+        });
+
+        const latest = await repo.getQuoteLatestRevision({
+            userId: user.uid,
+            quoteId: 'q_fallback'
+        });
+
+        expect(latest?.revision?.revisionId).toBe('rev_2');
+        expect(latest?.revision?.version).toBe(2);
+        expect(latest?.revision?.state?.customerInfo?.reference).toBe('FB-2');
+    });
+
+    it('updateQuoteScrive preserves undefined fields and clears explicit nulls', async () => {
+        const { repo } = buildRepo();
+        const created = await repo.createQuote({
+            user,
+            state: baseState,
+            summary: baseSummary,
+            customerInfo: baseState.customerInfo,
+            status: 'draft'
+        });
+
+        await repo.updateQuoteScrive({
+            userId: user.uid,
+            quoteId: created.quoteId,
+            scrive: {
+                enabled: true,
+                status: 'pending',
+                documentId: 'doc_keep',
+                sentAtMs: 1700000000000,
+                lastEventAtMs: 1700000000100
+            }
+        });
+
+        const updated = await repo.updateQuoteScrive({
+            userId: user.uid,
+            quoteId: created.quoteId,
+            scrive: {
+                documentId: null,
+                sentAtMs: null,
+                lastEventAtMs: undefined
+            }
+        });
+
+        expect(updated.scriveDocumentId).toBe(null);
+        expect(updated.scriveSentAtMs).toBe(null);
+        expect(updated.scriveLastEventAtMs).toBe(1700000000100);
+        expect(updated.scriveEnabled).toBe(true);
+    });
 });
 
 describe('quoteRepository pure helpers', () => {

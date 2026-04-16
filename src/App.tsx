@@ -11,7 +11,7 @@ import { Login } from './views/Login';
 import { useQuote } from './store/QuoteContext';
 import { useAuth } from './store/AuthContext';
 import { getAuthorizedStepForAccess, isQuoteStep } from './config/accessControl.shared';
-import type { QuoteState, QuoteStep } from './types/contracts';
+import type { HydratedQuoteStatePayload, QuoteStep } from './types/contracts';
 
 const SummaryExport = lazy(() => import('./views/SummaryExport').then((module) => ({ default: module.SummaryExport })));
 const InventoryManager = lazy(() => import('./views/InventoryManager').then((module) => ({ default: module.InventoryManager })));
@@ -40,7 +40,7 @@ function App() {
         dispatch({ type: 'SET_STEP', payload: newStep });
     };
 
-    const handleOpenQuote = (payload: Partial<QuoteState> | Record<string, any>) => {
+    const handleOpenQuote = (payload: HydratedQuoteStatePayload) => {
         dispatch({ type: 'HYDRATE_STATE', payload: { ...payload, step: 1 } });
     };
 

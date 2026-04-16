@@ -39,6 +39,8 @@ export type AdminStep =
 
 export type StepInput = QuoteStep | number | string;
 
+export type UnknownRecord = Record<string, unknown>;
+
 export interface AccessUser {
     uid?: string | null;
     email?: string | null;
@@ -62,6 +64,17 @@ export interface CustomerInfo {
     date: string;
     validity: string;
     extraNotes: string;
+}
+
+export interface RawPersistedCustomerInfo extends UnknownRecord {
+    name?: unknown;
+    company?: unknown;
+    email?: unknown;
+    reference?: unknown;
+    customerReference?: unknown;
+    date?: unknown;
+    validity?: unknown;
+    extraNotes?: unknown;
 }
 
 export interface CustomCostRow {
@@ -99,6 +112,11 @@ export interface InventoryData {
     bahama: BahamaInventoryItem[];
     clickitup: ClickitupStockMap;
     notes?: string;
+}
+
+export interface RawPersistedInventoryData extends UnknownRecord {
+    bahama?: unknown;
+    clickitup?: unknown;
 }
 
 export interface GridCustomAddonRow {
@@ -166,6 +184,16 @@ export interface CustomBuilderAddon extends CatalogBuilderAddon {
 }
 
 export type BuilderAddon = CatalogBuilderAddon | CustomBuilderAddon;
+
+export interface RawPersistedBuilderAddon extends UnknownRecord {
+    id?: unknown;
+    qty?: unknown;
+    discountPct?: unknown;
+    isCustom?: unknown;
+    name?: unknown;
+    price?: unknown;
+    categoryId?: unknown;
+}
 
 export interface BuilderCatalogSizeOption {
     price: number;
@@ -243,15 +271,36 @@ export interface BuilderItem {
     [key: string]: unknown;
 }
 
+export interface RawPersistedBuilderItem extends UnknownRecord {
+    id?: unknown;
+    line?: unknown;
+    model?: unknown;
+    size?: unknown;
+    qty?: unknown;
+    discountPct?: unknown;
+    addons?: unknown;
+}
+
 export interface EffectiveGridLineSelection {
     items: GridLineSelection['items'];
     addons: Record<string, EffectiveGridAddonState>;
     itemsQtyTotal: number;
 }
 
+export type PricingGridItemsMap = GridLineSelection['items'];
+
+export type PricingGridAddonsMap = GridLineSelection['addons'];
+
+export type PricingEffectiveGridAddonsMap = EffectiveGridLineSelection['addons'];
+
 export interface SketchMeta {
     addedBahamaLine: boolean;
     addedFiestaLine: boolean;
+}
+
+export interface RawPersistedSketchMeta extends UnknownRecord {
+    addedBahamaLine?: unknown;
+    addedFiestaLine?: unknown;
 }
 
 export interface QuoteState {
@@ -293,6 +342,14 @@ export interface QuoteState {
     scriveLastEventAtMs: number | null;
     scriveCompletedAtMs: number | null;
 }
+
+export interface RawPersistedGridLineSelection extends UnknownRecord {
+    items?: unknown;
+    addons?: unknown;
+    customAddonsByCategory?: unknown;
+}
+
+export type HydratedQuoteStatePayload = Partial<QuoteState> | UnknownRecord | null | undefined;
 
 export interface QuoteSummary {
     finalTotalSek: number;
@@ -374,8 +431,8 @@ export interface QuoteMetadata extends ScriveMetadata {
     totalSek: number;
     retailerName?: string | null;
     searchText: string;
-    state?: QuoteState | Record<string, any> | null;
-    summary?: QuoteSummary | Record<string, any> | null;
+    state?: RepositoryQuoteStatePayload | null;
+    summary?: RepositoryQuoteSummaryPayload | null;
 }
 
 export interface QuoteRevision {
@@ -385,8 +442,8 @@ export interface QuoteRevision {
     savedAtMs: number;
     savedBy: string;
     savedByUid: string;
-    state: QuoteState | Record<string, any>;
-    summary: QuoteSummary | Record<string, any>;
+    state: RepositoryQuoteStatePayload;
+    summary: RepositoryQuoteSummaryPayload;
     changeNote: string;
 }
 
@@ -398,21 +455,11 @@ export interface QuoteFilters {
 export interface QuoteRevisionSaveInput {
     user: AccessUser;
     quoteId: string;
-    state: QuoteState | Record<string, any>;
-    summary: Partial<QuoteSummary> | Record<string, any>;
+    state: RepositoryQuoteStatePayload;
+    summary: Partial<QuoteSummary> | RawQuoteSummary;
     customerInfo?: Partial<CustomerInfo>;
     status?: QuoteStatus | string;
-    scrive?: Partial<{
-        enabled: boolean;
-        status: ScriveStatus | string;
-        documentId: string | null;
-        signerName: string;
-        signerEmail: string;
-        lastError: string | null;
-        sentAtMs: number | null;
-        lastEventAtMs: number | null;
-        completedAtMs: number | null;
-    }>;
+    scrive?: ScrivePatchInput;
     changeNote?: string;
     retailerName?: string | null;
 }
@@ -428,7 +475,7 @@ export interface UpdateQuoteStatusInput {
 export interface UpdateQuoteScriveInput {
     userId: string;
     quoteId: string;
-    scrive?: QuoteRevisionSaveInput['scrive'];
+    scrive?: ScrivePatchInput;
 }
 
 export interface GetUserQuotesInput extends QuoteFilters {
@@ -458,11 +505,110 @@ export interface QuoteLatestRevisionResult {
     revision: QuoteRevision | null;
 }
 
+export type RepositoryQuoteStatePayload = QuoteState | UnknownRecord;
+
+export interface RawQuoteSummary extends UnknownRecord {
+    finalTotalSek?: unknown;
+    grossTotalSek?: unknown;
+    totalDiscountSek?: unknown;
+}
+
+export type RepositoryQuoteSummaryPayload = QuoteSummary | RawQuoteSummary;
+
+export interface RawQuoteMetadataDoc extends UnknownRecord {
+    customerName?: unknown;
+    company?: unknown;
+    reference?: unknown;
+    customerReference?: unknown;
+    status?: unknown;
+    timestamp?: unknown;
+    createdAtMs?: unknown;
+    updatedAtMs?: unknown;
+    savedBy?: unknown;
+    savedByUid?: unknown;
+    latestVersion?: unknown;
+    latestRevisionId?: unknown;
+    totalSek?: unknown;
+    retailerName?: unknown;
+    searchText?: unknown;
+    state?: RepositoryQuoteStatePayload | null;
+    summary?: RepositoryQuoteSummaryPayload | null;
+    scriveEnabled?: unknown;
+    scriveStatus?: unknown;
+    scriveDocumentId?: unknown;
+    scriveSignerName?: unknown;
+    scriveSignerEmail?: unknown;
+    scriveLastError?: unknown;
+    scriveSentAtMs?: unknown;
+    scriveLastEventAtMs?: unknown;
+    scriveCompletedAtMs?: unknown;
+}
+
+export interface RawQuoteRevisionDoc extends UnknownRecord {
+    quoteId?: unknown;
+    version?: unknown;
+    savedAtMs?: unknown;
+    createdAt?: unknown;
+    savedBy?: unknown;
+    savedByUid?: unknown;
+    state?: RepositoryQuoteStatePayload;
+    summary?: RepositoryQuoteSummaryPayload;
+    changeNote?: unknown;
+}
+
+export interface ScrivePatchInput extends UnknownRecord {
+    enabled?: boolean;
+    status?: ScriveStatus | string;
+    documentId?: string | null;
+    signerName?: string;
+    signerEmail?: string;
+    lastError?: string | null;
+    sentAtMs?: number | null;
+    lastEventAtMs?: number | null;
+    completedAtMs?: number | null;
+}
+
+export interface SavedQuoteLike {
+    quoteId?: string | null;
+    metadata?: Partial<QuoteMetadata> | null;
+    revision?: Partial<Pick<QuoteRevision, 'version'>> | null;
+}
+
 export interface SaveQuoteToRepositoryResult {
-    saved: { quoteId?: string; metadata?: QuoteMetadata; revision?: QuoteRevision };
+    saved: SavedQuoteLike;
     isNewQuote: boolean;
     statePatch: Partial<QuoteState>;
 }
+
+export interface SaveQuoteToRepositoryParams {
+    quoteRepository: Pick<QuoteRepository, 'createQuote' | 'saveQuoteRevision'>;
+    user: AccessUser | null;
+    retailer?: RetailerRecord | null;
+    state: QuoteState;
+    summary: QuoteSummary | QuoteTotalsResult;
+}
+
+export type ExportSummaryState = Partial<Pick<
+    QuoteState,
+    'customerInfo' | 'includesVat' | 'globalDiscountPct' | 'hideZeroDiscountReferencesInPdf'
+>>;
+
+export type ExportSummaryInput = Partial<QuoteTotalsResult>;
+
+export interface ExportSummaryResult {
+    finalTotalSek: number;
+    grossTotalSek: number;
+    totalDiscountSek: number;
+    vatAmount: number;
+    totalWithVat: number;
+}
+
+export interface PdfTableOptions {
+    hideDiscountColumns?: boolean;
+    hideRecommendedPriceColumn?: boolean;
+}
+
+export type PdfTableRow = string[];
 
 export interface QuoteRepository {
     createQuote(input: CreateQuoteInput): Promise<{ quoteId: string; metadata: QuoteMetadata; revision: QuoteRevision }>;
@@ -476,55 +622,80 @@ export interface QuoteRepository {
     getAllUsersQuotes(input?: GetAllUsersQuotesInput): Promise<Array<QuoteMetadata & { ownerUid: string }>>;
 }
 
-export interface QuoteRepositoryDeps {
-    db?: any;
-    doc?: (...args: any[]) => any;
-    getDoc?: (...args: any[]) => Promise<{
-        exists(): boolean;
-        data(): Record<string, any> | undefined;
-        id?: string;
-        ref?: any;
-    }>;
-    setDoc?: (...args: any[]) => Promise<any>;
-    updateDoc?: (...args: any[]) => Promise<any>;
-    deleteDoc?: (...args: any[]) => Promise<any>;
-    collection?: (...args: any[]) => any;
-    collectionGroup?: (...args: any[]) => any;
-    getDocs?: (...args: any[]) => Promise<{
-        docs: Array<{
-            id: string;
-            data(): Record<string, any> | undefined;
-            ref?: {
-                parent?: {
-                    parent?: {
-                        id?: string;
-                    };
-                };
-            };
-        }>;
-        empty?: boolean;
-        forEach?: (callback: (docSnap: { ref: any }) => void) => void;
-    }>;
-    query?: (...args: any[]) => any;
-    orderBy?: (...args: any[]) => any;
-    limit?: (...args: any[]) => any;
-    where?: (...args: any[]) => any;
-    startAfter?: (...args: any[]) => any;
-    addDoc?: (...args: any[]) => Promise<any>;
-    writeBatch?: (...args: any[]) => {
-        delete: (ref: any) => void;
-        commit: () => Promise<any>;
+export interface FirestoreDocRef {
+    path?: string;
+    id?: string;
+    parent?: {
+        path?: string;
+        parent?: {
+            id?: string;
+        };
     };
-    runTransaction?: (
-        db: any,
-        updateFn: (transaction: {
-            get: (ref: any) => Promise<{
-                exists(): boolean;
-                data(): Record<string, any> | undefined;
-            }>;
-            set: (ref: any, data: any, options?: any) => void;
-        }) => Promise<unknown>
-    ) => Promise<unknown>;
+}
+
+export interface FirestoreCollectionRef {
+    path?: string;
+    kind?: string;
+    collectionId?: string;
+}
+
+export interface FirestoreQueryConstraint {
+    kind?: string;
+    field?: string;
+    direction?: 'asc' | 'desc';
+    size?: number;
+}
+
+export interface FirestoreQueryRef extends FirestoreCollectionRef {
+    constraints?: FirestoreQueryConstraint[];
+    isGroup?: boolean;
+}
+
+export interface FirestoreDocSnapshot<TDoc = UnknownRecord> {
+    exists(): boolean;
+    data(): TDoc | undefined;
+    id?: string;
+    ref?: FirestoreDocRef;
+}
+
+export interface FirestoreQuerySnapshot<TDoc = UnknownRecord> {
+    docs: Array<FirestoreDocSnapshot<TDoc>>;
+    empty?: boolean;
+    forEach?: (callback: (docSnap: FirestoreDocSnapshot<TDoc>) => void) => void;
+}
+
+export interface FirestoreWriteBatch {
+    set?: (ref: FirestoreDocRef, payload: UnknownRecord, options?: { merge?: boolean }) => void;
+    delete: (ref: FirestoreDocRef) => void;
+    commit: () => Promise<unknown>;
+}
+
+export interface FirestoreTransaction {
+    get: (ref: FirestoreDocRef) => Promise<FirestoreDocSnapshot>;
+    set: (ref: FirestoreDocRef, data: UnknownRecord, options?: { merge?: boolean }) => void;
+}
+
+export interface QuoteRepositoryDeps {
+    db?: unknown;
+    doc?: (db: unknown, ...segments: string[]) => FirestoreDocRef;
+    getDoc?: (ref: FirestoreDocRef) => Promise<FirestoreDocSnapshot>;
+    setDoc?: (ref: FirestoreDocRef, payload: UnknownRecord, options?: { merge?: boolean }) => Promise<unknown>;
+    updateDoc?: (ref: FirestoreDocRef, payload: UnknownRecord) => Promise<unknown>;
+    deleteDoc?: (ref: FirestoreDocRef) => Promise<unknown>;
+    collection?: (db: unknown, ...segments: string[]) => unknown;
+    collectionGroup?: (db: unknown, collectionId: string) => unknown;
+    getDocs?: (ref: unknown) => Promise<FirestoreQuerySnapshot>;
+    query?: (source: unknown, ...constraints: unknown[]) => unknown;
+    orderBy?: (field: string, direction?: 'asc' | 'desc') => unknown;
+    limit?: (size: number) => unknown;
+    where?: (...args: unknown[]) => unknown;
+    startAfter?: (...args: unknown[]) => unknown;
+    addDoc?: (collectionRef: unknown, payload: UnknownRecord) => Promise<unknown>;
+    writeBatch?: (db: unknown) => FirestoreWriteBatch;
+    runTransaction?: <T>(
+        db: unknown,
+        updateFn: (transaction: FirestoreTransaction) => Promise<T>
+    ) => Promise<T>;
 }
 
 export type QuoteReducerAction =
@@ -603,8 +774,6 @@ export interface SummaryExportProps {
     onPrev?: () => void;
     onBackToSketch?: () => void;
 }
-
-export type HydratedQuoteStatePayload = Partial<QuoteState> | Record<string, any>;
 
 export interface HistoryProps {
     onBack?: () => void;

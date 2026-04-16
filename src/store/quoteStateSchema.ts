@@ -1,85 +1,105 @@
-import type { QuoteState, QuoteStatus, ScriveStatus } from '../types/contracts';
-import { DEFAULT_TEMPLATE_ID, isBuiltinTemplateId, getTemplateById } from '../config/legalTemplates.shared';
+import type {
+    BuilderAddon,
+    HydratedQuoteStatePayload,
+    QuoteState,
+    QuoteStatus,
+    RawPersistedBuilderAddon,
+    RawPersistedBuilderItem,
+    RawPersistedCustomerInfo,
+    RawPersistedGridLineSelection,
+    RawPersistedInventoryData,
+    RawPersistedSketchMeta,
+    ScriveStatus,
+    StepInput,
+    UnknownRecord
+} from '../types/contracts';
+import { DEFAULT_TEMPLATE_ID, getTemplateById, isBuiltinTemplateId } from '../config/legalTemplates.shared';
 
 export const QUOTE_STATE_STORAGE_KEY = 'offertverktyg_state';
 export const CURRENT_STATE_VERSION = 1;
 
-type AnyRecord = Record<string, any>;
+const VALID_QUOTE_STATUSES: QuoteStatus[] = ['draft', 'sent', 'won', 'lost', 'archived'];
+const VALID_SCRIVE_STATUSES: ScriveStatus[] = ['not_sent', 'preparation', 'pending', 'closed', 'rejected', 'canceled', 'timedout', 'failed'];
 
-const VALID_QUOTE_STATUSES = ['draft', 'sent', 'won', 'lost', 'archived'];
-const VALID_SCRIVE_STATUSES = ['not_sent', 'preparation', 'pending', 'closed', 'rejected', 'canceled', 'timedout', 'failed'];
-
-function clone(value: any) {
-    if (value === undefined) return undefined;
-    return JSON.parse(JSON.stringify(value));
+function clone<T>(value: T): T {
+    if (value === undefined) {
+        return value;
+    }
+    return JSON.parse(JSON.stringify(value)) as T;
 }
 
-function isObject(value: any): value is AnyRecord {
+function isObject(value: unknown): value is UnknownRecord {
     return value != null && typeof value === 'object' && !Array.isArray(value);
 }
 
-function toNumber(value: any, fallback: any = 0) {
+function toRecord(value: unknown): UnknownRecord {
+    return isObject(value) ? value : {};
+}
+
+function toNumber(value: unknown, fallback: number): number;
+function toNumber(value: unknown, fallback: null): number | null;
+function toNumber(value: unknown, fallback: number | null = 0): number | null {
     const parsed = Number(value);
     return Number.isFinite(parsed) ? parsed : fallback;
 }
 
-function normalizePositiveInt(value: any, fallback: number) {
-    const parsed = Number.parseInt(value, 10);
+function normalizePositiveInt(value: unknown, fallback: number): number {
+    const parsed = Number.parseInt(String(value), 10);
     return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
 }
 
-function normalizeNonNegativeInt(value: any, fallback: number = 0) {
-    const parsed = Number.parseInt(value, 10);
+function normalizeNonNegativeInt(value: unknown, fallback = 0): number {
+    const parsed = Number.parseInt(String(value), 10);
     return Number.isFinite(parsed) && parsed >= 0 ? parsed : fallback;
 }
 
-function parseValidityDays(value: any) {
+function parseValidityDays(value: unknown): number | null {
     const match = String(value ?? '').match(/(\d+)/);
     if (!match) return null;
     const parsed = Number.parseInt(match[1], 10);
     return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
 }
 
-function formatValidityLabel(days: number) {
+function formatValidityLabel(days: number): string {
     return `${days} dagar`;
 }
 
-function normalizeQuoteStatus(status: any): QuoteStatus {
+function normalizeQuoteStatus(status: unknown): QuoteStatus {
     const normalized = String(status || '').toLowerCase();
-    return (VALID_QUOTE_STATUSES.includes(normalized) ? normalized : 'draft') as QuoteStatus;
+    return VALID_QUOTE_STATUSES.includes(normalized as QuoteStatus) ? (normalized as QuoteStatus) : 'draft';
 }
 
-function normalizeScriveStatus(status: any): ScriveStatus {
+function normalizeScriveStatus(status: unknown): ScriveStatus {
     const normalized = String(status || '').toLowerCase();
-    return (VALID_SCRIVE_STATUSES.includes(normalized) ? normalized : 'not_sent') as ScriveStatus;
+    return VALID_SCRIVE_STATUSES.includes(normalized as ScriveStatus) ? (normalized as ScriveStatus) : 'not_sent';
 }
 
-function normalizeStep(step: any, fallback: any = 0) {
+function normalizeStep(step: unknown, fallback: StepInput = 0): StepInput {
     if (typeof step === 'number' && Number.isFinite(step)) return step;
     if (typeof step === 'string' && step.trim()) return step;
     return fallback;
 }
 
-function normalizeInventoryData(value: any) {
-    if (!isObject(value)) {
-        return { bahama: [], clickitup: {} };
-    }
+function normalizeInventoryData(value: RawPersistedInventoryData | unknown): QuoteState['inventoryData'] {
+    const record = toRecord(value);
 
     return {
-        bahama: Array.isArray(value.bahama) ? clone(value.bahama) : [],
-        clickitup: isObject(value.clickitup) ? clone(value.clickitup) : {}
+        bahama: Array.isArray(record.bahama) ? clone(record.bahama) as QuoteState['inventoryData']['bahama'] : [],
+        clickitup: isObject(record.clickitup) ? clone(record.clickitup) as QuoteState['inventoryData']['clickitup'] : {}
     };
 }
 
-function normalizeGridCustomAddonsByCategory(value: any) {
+function normalizeGridCustomAddonsByCategory(
+    value: unknown
+): QuoteState['gridSelections'][string]['customAddonsByCategory'] {
     if (!isObject(value)) {
         return {};
     }
 
-    return Object.entries(value).reduce((acc, [categoryId, rows]) => {
+    return Object.entries(value).reduce<QuoteState['gridSelections'][string]['customAddonsByCategory']>((acc, [categoryId, rows]) => {
         acc[categoryId] = Array.isArray(rows)
             ? rows.map((row, index) => {
-                const safeRow = isObject(row) ? row : {};
+                const safeRow = toRecord(row);
                 return {
                     id: String(safeRow.id || `custom_addon_${index}`),
                     name: String(safeRow.name || ''),
@@ -93,30 +113,27 @@ function normalizeGridCustomAddonsByCategory(value: any) {
     }, {});
 }
 
-function normalizeGridSelections(value: any) {
+function normalizeGridSelections(value: unknown): QuoteState['gridSelections'] {
     if (!isObject(value)) {
         return {};
     }
 
-    return Object.entries(value).reduce((acc, [lineId, lineSelection]) => {
+    return Object.entries(value).reduce<QuoteState['gridSelections']>((acc, [lineId, lineSelection]) => {
         const key = lineId === 'ClickitUP' ? 'ClickitUp' : lineId;
-        if (!isObject(lineSelection)) {
-            acc[key] = { items: {}, addons: {}, customAddonsByCategory: {} };
-            return acc;
-        }
+        const safeLineSelection = toRecord(lineSelection) as RawPersistedGridLineSelection;
 
         acc[key] = {
-            ...clone(lineSelection),
-            items: isObject(lineSelection.items) ? clone(lineSelection.items) : {},
-            addons: isObject(lineSelection.addons) ? clone(lineSelection.addons) : {},
-            customAddonsByCategory: normalizeGridCustomAddonsByCategory(lineSelection.customAddonsByCategory)
+            ...clone(safeLineSelection),
+            items: isObject(safeLineSelection.items) ? clone(safeLineSelection.items) as QuoteState['gridSelections'][string]['items'] : {},
+            addons: isObject(safeLineSelection.addons) ? clone(safeLineSelection.addons) as QuoteState['gridSelections'][string]['addons'] : {},
+            customAddonsByCategory: normalizeGridCustomAddonsByCategory(safeLineSelection.customAddonsByCategory)
         };
         return acc;
     }, {});
 }
 
-function normalizeBuilderAddon(addon: any, index: number) {
-    const safeAddon = isObject(addon) ? addon : {};
+function normalizeBuilderAddon(addon: unknown, index: number): BuilderAddon {
+    const safeAddon = toRecord(addon) as RawPersistedBuilderAddon;
     const isCustom = safeAddon.isCustom === true;
 
     if (!isCustom) {
@@ -138,13 +155,13 @@ function normalizeBuilderAddon(addon: any, index: number) {
     };
 }
 
-function normalizeBuilderItems(value: any) {
+function normalizeBuilderItems(value: unknown): QuoteState['builderItems'] {
     if (!Array.isArray(value)) {
         return [];
     }
 
     return value.map((item, index) => {
-        const safeItem = isObject(item) ? item : {};
+        const safeItem = toRecord(item) as RawPersistedBuilderItem;
         return {
             ...clone(safeItem),
             id: String(safeItem.id || `builder_item_${index}`),
@@ -217,25 +234,26 @@ export function createInitialQuoteState(): QuoteState {
     return clone(createBaseInitialState());
 }
 
-function migrateV0ToV1(rawState: AnyRecord = {}): QuoteState {
-    const next = isObject(rawState) ? { ...rawState } : {};
-    const customerInfo = isObject(next.customerInfo) ? { ...next.customerInfo } : {};
+function migrateV0ToV1(rawState: UnknownRecord = {}): QuoteState {
+    const next = toRecord(rawState);
+    const customerInfo = toRecord(next.customerInfo) as RawPersistedCustomerInfo;
     const validityFromCustomer = parseValidityDays(customerInfo.validity);
     const inventoryData = normalizeInventoryData(next.inventoryData);
     const cloudInventoryData = Object.prototype.hasOwnProperty.call(next, 'cloudInventoryData')
         ? normalizeInventoryData(next.cloudInventoryData)
         : clone(inventoryData);
+    const sketchMeta = toRecord(next.sketchMeta) as RawPersistedSketchMeta;
 
     return {
         ...next,
         stateVersion: 1,
         step: normalizeStep(next.step, 0),
         selectedLines: Array.isArray(next.selectedLines)
-            ? clone(next.selectedLines).map(l => l === 'ClickitUP' ? 'ClickitUp' : l)
+            ? clone(next.selectedLines).map((line) => line === 'ClickitUP' ? 'ClickitUp' : String(line))
             : [],
         builderItems: normalizeBuilderItems(next.builderItems),
         gridSelections: normalizeGridSelections(next.gridSelections),
-        customCosts: Array.isArray(next.customCosts) ? clone(next.customCosts) : [],
+        customCosts: Array.isArray(next.customCosts) ? clone(next.customCosts) as QuoteState['customCosts'] : [],
         includesVat: Boolean(next.includesVat),
         globalDiscountPct: toNumber(next.globalDiscountPct, 0),
         prevGlobalDiscountPct: toNumber(next.prevGlobalDiscountPct, toNumber(next.globalDiscountPct, 0)),
@@ -253,9 +271,12 @@ function migrateV0ToV1(rawState: AnyRecord = {}): QuoteState {
         },
         inventoryData,
         cloudInventoryData,
-        sketchDraft: Object.prototype.hasOwnProperty.call(next, 'sketchDraft') ? clone(next.sketchDraft) : null,
-        sketchMeta: isObject(next.sketchMeta) ? clone(next.sketchMeta) : { addedBahamaLine: false, addedFiestaLine: false },
-        inventoryBasket: Array.isArray(next.inventoryBasket) ? clone(next.inventoryBasket) : [],
+        sketchDraft: Object.prototype.hasOwnProperty.call(next, 'sketchDraft') ? clone(next.sketchDraft) as QuoteState['sketchDraft'] : null,
+        sketchMeta: {
+            addedBahamaLine: Boolean(sketchMeta.addedBahamaLine),
+            addedFiestaLine: Boolean(sketchMeta.addedFiestaLine)
+        },
+        inventoryBasket: Array.isArray(next.inventoryBasket) ? clone(next.inventoryBasket) as QuoteState['inventoryBasket'] : [],
         activeQuoteId: next.activeQuoteId ? String(next.activeQuoteId) : null,
         activeQuoteVersion: toNumber(next.activeQuoteVersion, 0),
         quoteStatus: normalizeQuoteStatus(next.quoteStatus),
@@ -282,13 +303,13 @@ function migrateV0ToV1(rawState: AnyRecord = {}): QuoteState {
     };
 }
 
-export function migrateQuoteState(fromVersion: any, rawState: any): QuoteState {
+export function migrateQuoteState(fromVersion: unknown, rawState: unknown): QuoteState {
     let version = Number.isFinite(Number(fromVersion)) ? Number(fromVersion) : 0;
-    let nextState = isObject(rawState) ? clone(rawState) : {};
+    let nextState: UnknownRecord = isObject(rawState) ? clone(rawState) as UnknownRecord : {};
 
     while (version < CURRENT_STATE_VERSION) {
         if (version === 0) {
-            nextState = migrateV0ToV1(nextState);
+            nextState = migrateV0ToV1(nextState) as unknown as UnknownRecord;
             version = 1;
             continue;
         }
@@ -296,21 +317,21 @@ export function migrateQuoteState(fromVersion: any, rawState: any): QuoteState {
         break;
     }
 
-    return nextState;
+    return nextState as unknown as QuoteState;
 }
 
-export function hydrateQuoteState(input: any): QuoteState {
+export function hydrateQuoteState(input: HydratedQuoteStatePayload): QuoteState {
     const initialState = createInitialQuoteState();
     if (!isObject(input)) {
         return initialState;
     }
 
-    const rawState = clone(input);
+    const rawState = clone(input) as UnknownRecord;
     const rawVersion = Object.prototype.hasOwnProperty.call(rawState, 'stateVersion')
         ? Number(rawState.stateVersion)
         : 0;
 
-    let migratedState = rawState;
+    let migratedState: QuoteState | UnknownRecord = rawState;
     if (rawVersion > CURRENT_STATE_VERSION) {
         console.warn(
             `Quote state version ${rawVersion} is newer than supported version ${CURRENT_STATE_VERSION}. Conservatively hydrating known fields.`
@@ -319,8 +340,8 @@ export function hydrateQuoteState(input: any): QuoteState {
         migratedState = migrateQuoteState(rawVersion, rawState);
     }
 
-    const mergedState = { ...initialState, ...migratedState };
-    const customerInfoSource = isObject(mergedState.customerInfo) ? mergedState.customerInfo : {};
+    const mergedState = { ...initialState, ...migratedState } as QuoteState & UnknownRecord;
+    const customerInfoSource = toRecord(mergedState.customerInfo) as RawPersistedCustomerInfo;
     const validityFromCustomer = parseValidityDays(customerInfoSource.validity);
     const normalizedValidityDays = normalizePositiveInt(
         mergedState.quoteValidityDays,
@@ -335,17 +356,18 @@ export function hydrateQuoteState(input: any): QuoteState {
         ? normalizeInventoryData(mergedState.cloudInventoryData)
         : clone(inventoryData);
     const normalizedGlobalDiscount = toNumber(mergedState.globalDiscountPct, initialState.globalDiscountPct);
+    const sketchMeta = toRecord(mergedState.sketchMeta) as RawPersistedSketchMeta;
 
     return {
         ...mergedState,
         stateVersion: CURRENT_STATE_VERSION,
         step: normalizeStep(mergedState.step, initialState.step),
         selectedLines: Array.isArray(mergedState.selectedLines)
-            ? clone(mergedState.selectedLines).map(l => l === 'ClickitUP' ? 'ClickitUp' : l)
+            ? clone(mergedState.selectedLines).map((line) => line === 'ClickitUP' ? 'ClickitUp' : String(line))
             : [],
         builderItems: normalizeBuilderItems(mergedState.builderItems),
         gridSelections: normalizeGridSelections(mergedState.gridSelections),
-        customCosts: Array.isArray(mergedState.customCosts) ? clone(mergedState.customCosts) : [],
+        customCosts: Array.isArray(mergedState.customCosts) ? clone(mergedState.customCosts) as QuoteState['customCosts'] : [],
         includesVat: Boolean(mergedState.includesVat),
         globalDiscountPct: normalizedGlobalDiscount,
         prevGlobalDiscountPct: toNumber(mergedState.prevGlobalDiscountPct, normalizedGlobalDiscount),
@@ -365,15 +387,14 @@ export function hydrateQuoteState(input: any): QuoteState {
         inventoryData,
         cloudInventoryData,
         sketchDraft: Object.prototype.hasOwnProperty.call(mergedState, 'sketchDraft')
-            ? clone(mergedState.sketchDraft)
+            ? clone(mergedState.sketchDraft) as QuoteState['sketchDraft']
             : initialState.sketchDraft,
         sketchMeta: {
             ...initialState.sketchMeta,
-            ...(isObject(mergedState.sketchMeta) ? clone(mergedState.sketchMeta) : {}),
-            addedBahamaLine: Boolean(mergedState?.sketchMeta?.addedBahamaLine),
-            addedFiestaLine: Boolean(mergedState?.sketchMeta?.addedFiestaLine)
+            addedBahamaLine: Boolean(sketchMeta.addedBahamaLine),
+            addedFiestaLine: Boolean(sketchMeta.addedFiestaLine)
         },
-        inventoryBasket: Array.isArray(mergedState.inventoryBasket) ? clone(mergedState.inventoryBasket) : [],
+        inventoryBasket: Array.isArray(mergedState.inventoryBasket) ? clone(mergedState.inventoryBasket) as QuoteState['inventoryBasket'] : [],
         activeQuoteId: mergedState.activeQuoteId ? String(mergedState.activeQuoteId) : null,
         activeQuoteVersion: toNumber(mergedState.activeQuoteVersion, initialState.activeQuoteVersion),
         quoteStatus: normalizeQuoteStatus(mergedState.quoteStatus),

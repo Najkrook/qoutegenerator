@@ -1,4 +1,15 @@
-export function buildSavedQuoteStatePatch(saved: any, state: any = {}) {
+import type {
+    CreateQuoteInput,
+    QuoteState,
+    SaveQuoteToRepositoryParams,
+    SaveQuoteToRepositoryResult,
+    SavedQuoteLike
+} from '../types/contracts';
+
+export function buildSavedQuoteStatePatch(
+    saved: SavedQuoteLike,
+    state: Partial<QuoteState> = {}
+): Partial<QuoteState> {
     const metadata = saved?.metadata || {};
 
     return {
@@ -17,12 +28,18 @@ export function buildSavedQuoteStatePatch(saved: any, state: any = {}) {
     };
 }
 
-export async function saveQuoteToRepository({ quoteRepository, user, retailer, state, summary }: any) {
+export async function saveQuoteToRepository({
+    quoteRepository,
+    user,
+    retailer,
+    state,
+    summary
+}: SaveQuoteToRepositoryParams): Promise<SaveQuoteToRepositoryResult> {
     if (!user?.uid) {
-        throw new Error('Du måste vara inloggad för att spara offerter.');
+        throw new Error('Du mÃ¥ste vara inloggad fÃ¶r att spara offerter.');
     }
 
-    const basePayload = {
+    const basePayload: Omit<CreateQuoteInput, 'quoteId'> = {
         user,
         state,
         summary,

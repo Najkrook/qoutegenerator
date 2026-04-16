@@ -254,11 +254,18 @@ export function History({ onBack, onOpenQuote }: HistoryProps) {
             return;
         }
 
+        const revisionState = typeof revision.state === 'object' && revision.state != null
+            ? revision.state
+            : {};
+        const revisionCustomerInfo = typeof (revisionState as { customerInfo?: unknown }).customerInfo === 'object'
+            && (revisionState as { customerInfo?: unknown }).customerInfo != null
+            ? (revisionState as { customerInfo?: Record<string, unknown> }).customerInfo
+            : {};
         const metadata = quotes.find((quote) => quote.quoteId === quoteId);
         const nextState = {
-            ...revision.state,
+            ...revisionState,
             customerInfo: {
-                ...(revision.state?.customerInfo || {})
+                ...revisionCustomerInfo
             },
             activeQuoteId: quoteId,
             activeQuoteVersion: Number(revision.version) || 1,

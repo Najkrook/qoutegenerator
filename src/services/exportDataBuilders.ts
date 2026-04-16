@@ -1,16 +1,32 @@
-function roundSek(value: any) {
+import type {
+    CustomerInfo,
+    ExportSummaryInput,
+    ExportSummaryResult,
+    ExportSummaryState,
+    PdfTableOptions,
+    PdfTableRow,
+    QuoteTotalsRow
+} from '../types/contracts';
+
+type WorksheetCell = string | number;
+type WorksheetRow = WorksheetCell[];
+
+function roundSek(value: number | string | null | undefined): number {
     return Math.round(Number(value) || 0);
 }
 
-function safeCustomerInfo(state: any) {
-    return state?.customerInfo || {};
+function safeCustomerInfo(state: ExportSummaryState): Partial<CustomerInfo> {
+    return state.customerInfo || {};
 }
 
-function isZeroNumber(value: any) {
+function isZeroNumber(value: number | string | null | undefined): boolean {
     return Number(value) === 0;
 }
 
-export function buildExportSummary(state: any = {}, summaryData: any = {}) {
+export function buildExportSummary(
+    state: ExportSummaryState = {},
+    summaryData: ExportSummaryInput = {}
+): ExportSummaryResult {
     const finalTotalSek = Number(summaryData.finalTotalSek) || 0;
     const grossTotalSek = Number(summaryData.grossTotalSek) || 0;
     const totalDiscountSek = Number(summaryData.totalDiscountSek) || 0;
@@ -26,20 +42,26 @@ export function buildExportSummary(state: any = {}, summaryData: any = {}) {
     };
 }
 
-export function hasZeroDiscountSummary(summaryData: any = {}) {
+export function hasZeroDiscountSummary(summaryData: ExportSummaryInput = {}): boolean {
     const totals = Array.isArray(summaryData?.totals) ? summaryData.totals : [];
     return isZeroNumber(summaryData?.totalDiscountSek) && totals.every((row) => (
         isZeroNumber(row?.discountPct) && isZeroNumber(row?.discountSek)
     ));
 }
 
-export function shouldHideDiscountReferencesInPdf(state: any = {}, summaryData: any = {}) {
+export function shouldHideDiscountReferencesInPdf(
+    state: ExportSummaryState = {},
+    summaryData: ExportSummaryInput = {}
+): boolean {
     return state?.hideZeroDiscountReferencesInPdf === true && hasZeroDiscountSummary(summaryData);
 }
 
-export function buildExcelSheetData(state: any = {}, summaryData: any = {}) {
+export function buildExcelSheetData(
+    state: ExportSummaryState = {},
+    summaryData: ExportSummaryInput = {}
+): WorksheetRow[] {
     const customerInfo = safeCustomerInfo(state);
-    const wsData = [
+    const wsData: WorksheetRow[] = [
         ['Offert'],
         ['Foretag', customerInfo.company || customerInfo.name || ''],
         ['Projektreferens', customerInfo.reference || ''],
@@ -115,13 +137,17 @@ export function buildExcelSheetData(state: any = {}, summaryData: any = {}) {
     return wsData;
 }
 
-export function buildPdfTableData(totalsArray: any[] = [], formatSEK = (v: any) => String(v), options: any = {}) {
+export function buildPdfTableData(
+    totalsArray: QuoteTotalsRow[] = [],
+    formatSEK: (value: number) => string = (value) => String(value),
+    options: PdfTableOptions = {}
+): PdfTableRow[] {
     const hideDiscountColumns = options.hideDiscountColumns === true;
     const hideRecommendedPriceColumn = options.hideRecommendedPriceColumn === true;
-    const tableData = [];
+    const tableData: PdfTableRow[] = [];
 
     totalsArray.forEach((row) => {
-        const cells = [
+        const cells: PdfTableRow = [
             row.model,
             row.size || '-',
             `${formatSEK(row.unitPrice)} SEK`,

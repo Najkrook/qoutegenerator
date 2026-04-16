@@ -8,12 +8,12 @@ import { loadPersistedQuoteState, persistQuoteState } from './quoteStatePersiste
 
 export const QuoteContext = createContext<QuoteContextValue | undefined>(undefined);
 
-function normalizePositiveInt(value: any, fallback: number) {
-    const parsed = Number.parseInt(value, 10);
+function normalizePositiveInt(value: unknown, fallback: number) {
+    const parsed = Number.parseInt(String(value), 10);
     return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
 }
 
-function parseValidityDays(value: any) {
+function parseValidityDays(value: unknown): number | null {
     const match = String(value ?? '').match(/(\d+)/);
     if (!match) return null;
     const parsed = Number.parseInt(match[1], 10);

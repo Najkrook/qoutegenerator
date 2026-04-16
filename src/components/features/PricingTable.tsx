@@ -4,7 +4,12 @@ import { useAuth } from '../../store/AuthContext';
 import { catalogData } from '../../data/catalog';
 import { computeQuoteTotals } from '../../services/calculationEngine';
 import { buildEffectiveGridSelections } from '../../utils/gridAutoScale';
-import type { GridCatalogLineData, QuoteTotalsResult, QuoteTotalsRowSource } from '../../types/contracts';
+import type {
+    GridCatalogLineData,
+    PricingEffectiveGridAddonsMap,
+    QuoteTotalsResult,
+    QuoteTotalsRowSource
+} from '../../types/contracts';
 
 export function PricingTable() {
     const { state, dispatch } = useQuote();
@@ -81,9 +86,10 @@ export function PricingTable() {
             const gridLineData: GridCatalogLineData | null = lineData?.type === 'grid' ? lineData : null;
             const effectiveSelections = buildEffectiveGridSelections(gridLineData || undefined, lineSelections, {
                 globalDiscountPct: state.globalDiscountPct
-            }) as { addons?: Record<string, any> };
+            });
             const existingAddon = lineSelections.addons?.[source.addonId];
-            const effectiveAddon = effectiveSelections.addons?.[source.addonId] || {};
+            const effectiveAddons: PricingEffectiveGridAddonsMap = effectiveSelections.addons;
+            const effectiveAddon = effectiveAddons[source.addonId];
             const nextSelections = {
                 ...state.gridSelections,
                 [source.lineId]: {
@@ -92,8 +98,8 @@ export function PricingTable() {
                         ...lineSelections.addons,
                         [source.addonId]: {
                             ...(existingAddon || {}),
-                            qty: existingAddon?.qty ?? effectiveAddon.qty ?? 0,
-                            syncMode: existingAddon?.syncMode ?? effectiveAddon.syncMode ?? 'manual',
+                            qty: existingAddon?.qty ?? effectiveAddon?.qty ?? 0,
+                            syncMode: existingAddon?.syncMode ?? effectiveAddon?.syncMode ?? 'manual',
                             discountPct,
                             discountSyncMode: 'manual' as const
                         }

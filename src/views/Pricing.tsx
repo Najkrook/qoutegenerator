@@ -9,7 +9,14 @@ import {
     applyGlobalDiscountToGridCustomItems,
     applyGlobalDiscountToLineSelection
 } from '../utils/gridAutoScale';
-import type { GridCatalogLineData, PricingProps } from '../types/contracts';
+import type {
+    GridCatalogAddonOption,
+    GridCatalogLineData,
+    PricingEffectiveGridAddonsMap,
+    PricingGridAddonsMap,
+    PricingGridItemsMap,
+    PricingProps
+} from '../types/contracts';
 
 function parseDiscount(value: string): number {
     const parsed = Number.parseFloat(value);
@@ -19,6 +26,24 @@ function parseDiscount(value: string): number {
 
 function nearlyEqual(left: number, right: number): boolean {
     return Math.abs(left - right) < 0.0001;
+}
+
+function findGridAddonDefinition(
+    lineData: GridCatalogLineData | null,
+    addonId: string
+): GridCatalogAddonOption | null {
+    if (!lineData) {
+        return null;
+    }
+
+    for (const category of lineData.addonCategories || []) {
+        const match = (category.items || []).find((item) => item.id === addonId);
+        if (match) {
+            return match;
+        }
+    }
+
+    return null;
 }
 
 export function Pricing({ onNext, onPrev }: PricingProps) {
@@ -59,7 +84,7 @@ export function Pricing({ onNext, onPrev }: PricingProps) {
         const updatedGridSelections = Object.entries(state.gridSelections || {}).reduce((acc, [lineId, lineSelection]) => {
             const lineData = catalogData[lineId];
             const gridLineData: GridCatalogLineData | null = lineData?.type === 'grid' ? lineData : null;
-            const nextItems = Object.entries(lineSelection.items || {}).reduce<Record<string, any>>((itemsAcc, [key, item]) => {
+            const nextItems = Object.entries(lineSelection.items || {}).reduce<PricingGridItemsMap>((itemsAcc, [key, item]) => {
                 const currentDiscount = Number.isFinite(item.discountPct) ? item.discountPct : 0;
                 itemsAcc[key] = shouldFollowGlobal(currentDiscount)
                     ? { ...item, discountPct: nextGlobalDiscount }
@@ -67,10 +92,8 @@ export function Pricing({ onNext, onPrev }: PricingProps) {
                 return itemsAcc;
             }, {});
 
-            const nextAddons = Object.entries(lineSelection.addons || {}).reduce<Record<string, any>>((addonsAcc, [addonId, addon]) => {
-                const addonDef = (gridLineData?.addonCategories || [])
-                    .flatMap((category: any) => category.items || [])
-                    .find((item: any) => item.id === addonId);
+            const nextAddons = Object.entries(lineSelection.addons || {}).reduce<PricingGridAddonsMap>((addonsAcc, [addonId, addon]) => {
+                const addonDef = findGridAddonDefinition(gridLineData, addonId);
                 if (addonDef?.autoScale) {
                     addonsAcc[addonId] = addon;
                     return addonsAcc;

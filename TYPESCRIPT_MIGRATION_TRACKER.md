@@ -1,6 +1,6 @@
 # TypeScript Migration Tracker
 
-Last updated: 2026-04-15
+Last updated: 2026-04-16
 Working branch: `feat/typescript-migration`
 
 This is a living tracker for the QuoteGenerator TypeScript migration. Update it after each migration slice so we keep one source of truth for what is done, what is intentionally deferred, and what should happen next.
@@ -241,14 +241,105 @@ This is a living tracker for the QuoteGenerator TypeScript migration. Update it 
 - [x] Preserved all runtime catalog keys, labels, prices, and nested data without schema changes.
 - [x] Finished the app-source migration milestone: no `// @ts-nocheck` files remain under `src/`.
 
+### 14. Small hardening slice: catalog consumers and quote hydration
+
+- [x] Tightened the retailer catalog boundary to consume `CatalogData` directly instead of a loose `Record<string, unknown>`.
+- [x] Removed an extra local catalog-cast shim in `RetailerManager` and used the typed catalog boundary directly for product-line labels.
+- [x] Reused the shared `HydratedQuoteStatePayload` contract in `App` for history-to-editor quote reopening instead of an inline `Record<string, any>` payload type.
+- [x] Kept runtime retailer CRUD and quote hydration behavior unchanged.
+
+### 15. Small hardening slice: save/export helpers
+
+- [x] Added helper-facing contracts for:
+  - `SaveQuoteToRepositoryParams`
+  - `SavedQuoteLike`
+  - `ExportSummaryResult`
+  - `PdfTableRow`
+  - `PdfTableOptions`
+  - narrow save/export input types built from existing quote contracts
+- [x] Removed broad `any` usage from `src/services/quoteSaveService.ts`.
+- [x] Removed broad `any` usage from `src/services/exportDataBuilders.ts`.
+- [x] Kept quote saving, state-patch generation, VAT handling, zero-discount detection, and PDF/Excel export row output unchanged.
+
+### 16. Small hardening slice: pricing surface
+
+- [x] Added narrow pricing/grid helper contracts for:
+  - `PricingGridItemsMap`
+  - `PricingGridAddonsMap`
+  - `PricingEffectiveGridAddonsMap`
+- [x] Removed the remaining local `Record<string, any>` reducer accumulators from `src/views/Pricing.tsx`.
+- [x] Removed the remaining local effective-grid-addon cast from `src/components/features/PricingTable.tsx`.
+- [x] Replaced the pricing view’s inline untyped grid-addon lookup with a typed grid-category traversal.
+- [x] Kept global discount follow behavior unchanged for builder rows, grid rows, auto-scale add-ons, and custom grid rows.
+
+### 17. Large hardening slice: quote state schema
+
+- [x] Added schema-facing raw input contracts for:
+  - `UnknownRecord`
+  - `RawPersistedCustomerInfo`
+  - `RawPersistedInventoryData`
+  - `RawPersistedBuilderAddon`
+  - `RawPersistedBuilderItem`
+  - `RawPersistedSketchMeta`
+  - `RawPersistedGridLineSelection`
+  - shared `HydratedQuoteStatePayload`
+- [x] Replaced broad `any`-based migration and hydration helpers in `src/store/quoteStateSchema.ts` with typed narrowing helpers built around `unknown`.
+- [x] Tightened the schema-adjacent boundaries in:
+  - `src/store/QuoteContext.tsx`
+  - `src/store/quoteStatePersistence.ts`
+- [x] Preserved quote-state compatibility behavior for:
+  - legacy `ClickitUP` to `ClickitUp`
+  - validity-day parsing and normalized customer validity labels
+  - malformed nested-object fallbacks
+  - conservative forward-version hydration
+  - custom builder add-ons and custom grid add-ons
+  - sketch metadata and persisted draft preservation
+- [x] Verified the schema hardening slice with:
+  - `npm run typecheck`
+  - `npm run test:confidence`
+  - `npm run build`
+  - `vitest run tests/quoteStateSchema.test.js tests/quoteStatePersistence.test.js tests/accessControl.shared.test.js tests/sketchExportState.test.js tests/uiTextSmoke.test.jsx`
+
+### 18. Large hardening slice: repository + Firestore boundary
+
+- [x] Added repository-facing raw document and payload contracts for:
+  - `RawQuoteMetadataDoc`
+  - `RawQuoteRevisionDoc`
+  - `RawQuoteSummary`
+  - `RepositoryQuoteStatePayload`
+  - `RepositoryQuoteSummaryPayload`
+  - `ScrivePatchInput`
+- [x] Added explicit Firestore adapter contracts for:
+  - document snapshots
+  - query snapshots
+  - document refs
+  - write batches
+  - transactions
+- [x] Replaced broad `any` and `Record<string, any>` usage in `src/services/quoteRepository.ts` with `unknown`-based narrowing and typed normalization helpers.
+- [x] Preserved repository behavior for:
+  - create-vs-revision save flow
+  - no-transaction fallback saves
+  - latest-revision fallback to revision rows and legacy metadata snapshots
+  - quote status updates and Scrive patch merging
+  - cross-user history owner UID extraction
+- [x] Extended repository tests to cover:
+  - fallback save without `runTransaction`
+  - latest-revision fallback without `latestRevisionId`
+  - Scrive null/undefined merge behavior
+- [x] Verified the repository hardening slice with:
+  - `npm run typecheck`
+  - `npm run test:confidence`
+  - `npm run build`
+  - `vitest run tests/quoteRepository.test.js`
+
 ## Remaining Work
 
 ### 1. Improve type quality inside already-migrated files
 
 - [ ] Reduce broad `any` and `Record<string, any>` usage in shared contracts.
-- [ ] Tighten repository and Firestore payload typing where current shapes are still permissive.
 - [ ] Replace loose shell-to-feature payloads with exported domain-specific interfaces where practical.
-- [ ] Add stronger typing around catalog-derived data so components do not rely on untyped object indexing.
+- [ ] Continue tightening catalog-derived data access so components do not rely on broad object indexing or local fallback casts.
+- [ ] Continue reducing broad `any` usage in repository helpers, file/export utilities, and shared runtime contracts.
 
 ### 2. Continue mojibake cleanup outside the finished slices
 
@@ -267,12 +358,12 @@ Recommended order from here:
 
 1. `Type hardening` follow-up
    - Target:
-     - shared contracts
-     - Firestore/repository boundaries
+     - shared contracts cleanup
      - catalog-consumer indexing
+     - remaining utility/service `any` cleanup
    - Why:
      - the migration itself is now complete for `src/`
-     - the highest-value remaining work is tightening permissive types rather than converting more files
+     - quote-state normalization and repository boundaries are now tightened, so the next highest-value work is reducing permissive shared contracts
 
 ## Definition of Done for the Migration
 
@@ -284,7 +375,7 @@ The app-source migration is complete when all of the following are true:
 - [x] No `// @ts-nocheck` files remain under `src/`.
 - [ ] Remaining `any` usage is deliberate and minimal rather than structural.
 - [ ] Main quote, admin, and sketch flows are all typechecked without escape hatches.
-- [ ] Backward compatibility for persisted quote/revision data is still intact after cleanup.
+- [x] Backward compatibility for persisted quote/revision data is still intact after cleanup.
 
 ## Update Checklist For Future Slices
 

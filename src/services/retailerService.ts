@@ -1,5 +1,6 @@
 import type {
     AccessUser,
+    CatalogData,
     RetailerProductLineConfig,
     RetailerRecord,
     RetailerWriteInput
@@ -16,8 +17,6 @@ import {
     orderBy
 } from './firebase';
 import { safeLogActivity } from './activityLogService';
-
-type CatalogRecord = Record<string, unknown>;
 
 interface RetailerPersistedRecord extends RetailerRecord {
     productLines: Record<string, RetailerProductLineConfig>;
@@ -54,7 +53,7 @@ function toRetailerRecord(value: unknown, id?: string): RetailerRecord {
  */
 export function normalizeRetailerData(
     data: Partial<RetailerWriteInput> | Record<string, unknown>,
-    catalogData: CatalogRecord
+    catalogData: CatalogData
 ): RetailerPersistedRecord {
     const name = String(data?.name ?? '').trim();
     if (!name) {
@@ -104,7 +103,7 @@ export async function fetchRetailers(): Promise<RetailerRecord[]> {
 export async function createRetailer(
     data: Partial<RetailerWriteInput> | Record<string, unknown>,
     user: AccessUser | null,
-    catalogData: CatalogRecord
+    catalogData: CatalogData
 ): Promise<RetailerRecord> {
     const normalized = normalizeRetailerData(data, catalogData);
     const now = Date.now();
@@ -141,7 +140,7 @@ export async function updateRetailer(
     id: string,
     data: Partial<RetailerWriteInput> | Record<string, unknown>,
     user: AccessUser | null,
-    catalogData: CatalogRecord
+    catalogData: CatalogData
 ): Promise<RetailerRecord> {
     const normalized = normalizeRetailerData(data, catalogData);
     const now = Date.now();
