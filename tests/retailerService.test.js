@@ -1,5 +1,23 @@
-import { describe, expect, it } from 'vitest';
-import { normalizeRetailerData } from '../src/services/retailerService';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+const firebaseMocks = vi.hoisted(() => ({
+    db: {},
+    collection: vi.fn(() => 'retailers-ref'),
+    doc: vi.fn(() => 'retailer-doc-ref'),
+    getDocs: vi.fn(),
+    addDoc: vi.fn(),
+    updateDoc: vi.fn(),
+    deleteDoc: vi.fn(),
+    query: vi.fn((ref) => ref),
+    orderBy: vi.fn(() => ({ field: 'name', direction: 'asc' }))
+}));
+
+vi.mock('../src/services/firebase', () => firebaseMocks);
+vi.mock('../src/services/activityLogService', () => ({
+    safeLogActivity: vi.fn()
+}));
+
+import { fetchRetailers, normalizeRetailerData } from '../src/services/retailerService';
 
 const mockCatalog = {
     BaHaMa: { name: 'BaHaMa', type: 'builder' },
@@ -8,9 +26,14 @@ const mockCatalog = {
 };
 
 describe('normalizeRetailerData', () => {
+    beforeEach(() => {
+        vi.clearAllMocks();
+    });
+
     it('trims whitespace from name', () => {
         const result = normalizeRetailerData({
             name: '  Markishuset  ',
+            email: 'sales@example.com',
             productLines: {}
         }, mockCatalog);
         expect(result.name).toBe('Markishuset');
@@ -25,6 +48,7 @@ describe('normalizeRetailerData', () => {
     it('clamps discount to 0..100', () => {
         const result = normalizeRetailerData({
             name: 'Test',
+            email: 'sales@example.com',
             productLines: {
                 BaHaMa: { enabled: true, discountPct: 150 },
                 ClickitUp: { enabled: true, discountPct: -10 }
@@ -37,6 +61,7 @@ describe('normalizeRetailerData', () => {
     it('zeros discount on disabled lines', () => {
         const result = normalizeRetailerData({
             name: 'Test',
+            email: 'sales@example.com',
             productLines: {
                 BaHaMa: { enabled: false, discountPct: 30 }
             }
@@ -48,6 +73,7 @@ describe('normalizeRetailerData', () => {
     it('strips unknown product line keys', () => {
         const result = normalizeRetailerData({
             name: 'Test',
+            email: 'sales@example.com',
             productLines: {
                 BaHaMa: { enabled: true, discountPct: 20 },
                 UnknownLine: { enabled: true, discountPct: 50 }
@@ -60,6 +86,7 @@ describe('normalizeRetailerData', () => {
     it('fills missing product lines with disabled defaults', () => {
         const result = normalizeRetailerData({
             name: 'Test',
+            email: 'sales@example.com',
             productLines: {
                 BaHaMa: { enabled: true, discountPct: 30 }
             }
@@ -94,6 +121,7 @@ describe('normalizeRetailerData', () => {
     it('handles non-finite discount values', () => {
         const result = normalizeRetailerData({
             name: 'Test',
+            email: 'sales@example.com',
             productLines: {
                 BaHaMa: { enabled: true, discountPct: NaN },
                 ClickitUp: { enabled: true, discountPct: undefined }
@@ -106,6 +134,7 @@ describe('normalizeRetailerData', () => {
     it('trims notes', () => {
         const result = normalizeRetailerData({
             name: 'Test',
+            email: 'sales@example.com',
             notes: '  some notes  '
         }, mockCatalog);
         expect(result.notes).toBe('some notes');
@@ -132,5 +161,61 @@ describe('normalizeRetailerData', () => {
     it('rejects empty or missing email', () => {
         expect(() => normalizeRetailerData({ name: 'Test' }, mockCatalog)).toThrow('Användare (E-post) är obligatoriskt.');
         expect(() => normalizeRetailerData({ name: 'Test', email: '   ' }, mockCatalog)).toThrow('Användare (E-post) är obligatoriskt.');
+    });
+
+    it('ignores malformed product line payloads safely', () => {
+        const result = normalizeRetailerData({
+            name: 'Test',
+            email: 'test@example.com',
+            productLines: 'broken'
+        }, mockCatalog);
+
+        expect(result.productLines).toEqual({
+            BaHaMa: { enabled: false, discountPct: 0 },
+            ClickitUp: { enabled: false, discountPct: 0 },
+            Fiesta: { enabled: false, discountPct: 0 }
+        });
+    });
+});
+
+describe('fetchRetailers', () => {
+    beforeEach(() => {
+        vi.clearAllMocks();
+    });
+
+    it('normalizes malformed stored product lines safely', async () => {
+        firebaseMocks.getDocs.mockResolvedValue({
+            docs: [
+                {
+                    id: 'ret-1',
+                    data: () => ({
+                        name: 'Nordvind',
+                        email: 'sales@nordvind.se',
+                        notes: 'VIP',
+                        productLines: {
+                            BaHaMa: { enabled: true, discountPct: 15 },
+                            ClickitUp: 'broken',
+                            Fiesta: { enabled: false, discountPct: 25 }
+                        }
+                    })
+                }
+            ]
+        });
+
+        const rows = await fetchRetailers();
+
+        expect(rows).toEqual([
+            {
+                id: 'ret-1',
+                name: 'Nordvind',
+                email: 'sales@nordvind.se',
+                notes: 'VIP',
+                productLines: {
+                    BaHaMa: { enabled: true, discountPct: 15 },
+                    ClickitUp: { enabled: false, discountPct: 0 },
+                    Fiesta: { enabled: false, discountPct: 0 }
+                }
+            }
+        ]);
     });
 });

@@ -457,7 +457,9 @@ const rawCatalogData: CatalogData = {
                             { id: "pure_flagstone", name: "Cementsten (flagstone)", price: 7 },
                             { id: "pure_flagstones_8", name: "8 Standard Flagstones", price: 220 },
                             { id: "pure_leveling_feet", name: "4 Leveling Feet", price: 130 },
-                            { id: "pure_powder_coat_crossframe", name: "Powder Coating for Cross-Frame", price: 270 }
+                            { id: "pure_powder_coat_crossframe", name: "Powder Coating for Cross-Frame", price: 270 },
+                            { id: "pure_krinner_plate", name: "Adaptation Plate for Krinner Ground Screw", price: 240 },
+                            { id: "pure_tilt_conn_above", name: "Tiltable Connecting Components (Above-ground)", price: 260 }
                         ]
                     },
                     {
@@ -515,7 +517,8 @@ const rawCatalogData: CatalogData = {
                         name: "Cosmetic & Special",
                         items: [
                             { id: "pure_frame_custom", name: "Frame Color custom finish", price: 560 },
-                            { id: "pure_v4a_maritime", name: "V4A | Maritime", price: 230 }
+                            { id: "pure_v4a_maritime", name: "V4A | Maritime", price: 230 },
+                            { id: "custom_edge_binding", name: "Custom Edge Binding", price: 250 }
                         ]
                     },
                     {

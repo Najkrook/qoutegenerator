@@ -1,6 +1,6 @@
 import type { ChangeEvent, ReactNode } from 'react';
 import { useQuote } from '../../store/QuoteContext';
-import { catalogData } from '../../data/catalog';
+import { getBuilderCatalogLine } from '../../data/catalogLookup';
 import type {
     BuilderAddon,
     BuilderCatalogAddonCategory,
@@ -16,8 +16,6 @@ import type {
 const BUILDER_UNCATEGORIZED_CATEGORY_ID = '__uncategorized__';
 export const ADDONS_ONLY_SIZE = '__addons_only__';
 
-const typedCatalogData = catalogData as Record<string, BuilderCatalogLineData | undefined>;
-
 interface NormalizedBuilderAddonCategory extends BuilderCatalogAddonCategory {
     id: string;
 }
@@ -31,8 +29,7 @@ function isCustomBuilderAddon(addon: BuilderAddon): addon is CustomBuilderAddon 
 }
 
 function getBuilderLine(lineId: string): BuilderCatalogLineData | null {
-    const lineData = typedCatalogData[lineId];
-    return lineData?.type === 'builder' ? lineData : null;
+    return getBuilderCatalogLine(lineId);
 }
 
 function createCustomAddon(itemQty: number, globalDiscountPct: number, categoryId: string): CustomBuilderAddon {
@@ -75,7 +72,7 @@ function getPriceSek(price: number, lineData: BuilderCatalogLineData | null, exc
     return lineData?.currency === 'EUR' ? Math.round(price * exchangeRate) : price;
 }
 
-function buildSizeOptionGroups(sizes: Record<string, unknown>): Record<string, string[]> {
+function buildSizeOptionGroups(sizes: BuilderCatalogModelData['sizes']): Record<string, string[]> {
     const groups: Record<string, string[]> = {};
     const noGroup: string[] = [];
 
@@ -215,7 +212,7 @@ export function BuilderItem({ item, index, onRemove }: BuilderItemProps) {
         });
     };
 
-    const renderSizeOptions = (sizes: Record<string, unknown>): ReactNode[] => {
+    const renderSizeOptions = (sizes: BuilderCatalogModelData['sizes']): ReactNode[] => {
         const groupedSizes = buildSizeOptionGroups(sizes);
         const elements: ReactNode[] = [];
 

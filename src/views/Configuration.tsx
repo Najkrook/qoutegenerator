@@ -1,6 +1,6 @@
 import React from 'react';
 import { useQuote } from '../store/QuoteContext';
-import { catalogData } from '../data/catalog';
+import { getBuilderCatalogLine, getGridCatalogLine } from '../data/catalogLookup';
 import { BuilderConfig } from '../components/features/BuilderConfig';
 import { GridConfig } from '../components/features/GridConfig';
 import type { ConfigurationProps } from '../types/contracts';
@@ -9,8 +9,8 @@ export function Configuration({ onNext, onPrev, onBackToSketch }: ConfigurationP
     const { state } = useQuote();
     const { selectedLines, builderItems, gridSelections } = state;
 
-    const builderLines = selectedLines.filter((lineId) => catalogData[lineId].type === 'builder');
-    const gridLines = selectedLines.filter((lineId) => catalogData[lineId].type === 'grid');
+    const builderLines = selectedLines.filter((lineId) => getBuilderCatalogLine(lineId) !== null);
+    const gridLines = selectedLines.filter((lineId) => getGridCatalogLine(lineId) !== null);
 
     const hasSelections = builderItems.length > 0 || Object.values(gridSelections).some((selection) =>
         Object.keys(selection.items || {}).length > 0 || Object.keys(selection.addons || {}).length > 0

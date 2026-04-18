@@ -1,6 +1,6 @@
 # TypeScript Migration Tracker
 
-Last updated: 2026-04-16
+Last updated: 2026-04-17
 Working branch: `feat/typescript-migration`
 
 This is a living tracker for the QuoteGenerator TypeScript migration. Update it after each migration slice so we keep one source of truth for what is done, what is intentionally deferred, and what should happen next.
@@ -407,12 +407,80 @@ This is a living tracker for the QuoteGenerator TypeScript migration. Update it 
   - `npm run build`
   - `vitest run tests/historyPayload.test.js tests/quoteStateSchema.test.js`
 
+### 23. Small hardening slice: catalog-consumer indexing cleanup
+
+- [x] Added a tiny shared catalog lookup helper in `src/data/catalogLookup.ts` for:
+  - `getCatalogLine`
+  - `getBuilderCatalogLine`
+  - `getGridCatalogLine`
+  - `getCatalogLineName`
+  - `getCatalogLineIds`
+- [x] Added the minimal shared `CatalogLineId` alias in `src/types/contracts.ts`.
+- [x] Replaced the remaining local catalog casts in:
+  - `src/components/features/BuilderConfig.tsx`
+  - `src/components/features/BuilderItem.tsx`
+  - `src/components/features/GridConfig.tsx`
+- [x] Replaced direct catalog indexing in:
+  - `src/views/Configuration.tsx`
+  - `src/views/ProductLineSelection.tsx`
+  - `src/views/RetailerManager.tsx`
+- [x] Tightened builder size-option helpers to use concrete catalog size types instead of broad `Record<string, unknown>` inputs.
+- [x] Preserved current builder/grid behavior, selected-line routing, product-line ordering, and retailer label/rabatt rendering.
+- [x] Added focused regression coverage in `tests/catalogLookup.test.jsx` for:
+  - builder/grid lookup null behavior
+  - catalog name/id lookup
+  - selected-line partitioning in the configuration flow
+- [x] Verified the catalog-consumer indexing slice with:
+  - `npm run typecheck`
+  - `npm run test:confidence`
+  - `npm run build`
+  - `vitest run tests/catalogLookup.test.jsx tests/builderItem.test.jsx tests/gridConfig.test.jsx`
+
+### 24. Small hardening slice: activity log + retailer boundaries
+
+- [x] Added small shared service-boundary contracts for:
+  - `ActivityLogSource`
+  - `ActivityLogWriteRef`
+  - `RetailerWriteSource`
+- [x] Replaced the remaining inline activity-log snapshot/object assumptions in `src/services/activityLogService.ts` with a typed normalization boundary.
+- [x] Replaced the activity-log success result's loose ref shape with the dedicated write-ref contract.
+- [x] Replaced repeated retailer write-input unions in `src/services/retailerService.ts` with the shared retailer write-source alias.
+- [x] Added a small retailer product-line normalization helper so stored retailer rows and Firestore write payloads share one tolerant normalization path.
+- [x] Kept activity logging, retailer normalization, and Firestore write behavior unchanged.
+- [x] Added focused regression coverage for:
+  - malformed `data()` payloads in `normalizeActivityLog`
+  - preserved `ref`/`id` handling in `buildActivityLogSuccessResult`
+  - malformed retailer `productLines` payloads in `normalizeRetailerData`
+  - malformed stored retailer product-line rows through `fetchRetailers`
+- [x] Verified the activity-log/retailer hardening slice with:
+  - `npm run typecheck`
+  - `npm run test:confidence`
+  - `npm run build`
+  - `vitest run tests/activityLogService.test.js tests/retailerService.test.js`
+
+### 25. Small hardening slice: CSV inventory normalizer
+
+- [x] Tightened `src/utils/csvNormalizer.ts` so `normalizeInventoryText` preserves non-string inputs while returning a concrete string for string inputs.
+- [x] Reused the shared `UnknownRecord` helper in the CSV normalizer instead of a local loose record type.
+- [x] Removed the duplicated BaHaMa list normalization path in `src/views/InventoryManager.tsx` by reusing `normalizeInventoryList`.
+- [x] Kept CSV/import runtime behavior unchanged for mojibake repair, item normalization, and array-to-item mapping.
+- [x] Added focused regression coverage in `tests/csvNormalizer.test.js` for:
+  - non-string passthrough behavior
+  - empty-list fallback for malformed inputs
+  - existing mojibake repair and row normalization behavior
+- [x] Verified the CSV normalizer hardening slice with:
+  - `npm run typecheck`
+  - `npm run test:confidence`
+  - `npm run build`
+  - `vitest run tests/csvNormalizer.test.js`
+
 ## Remaining Work
 
 ### 1. Improve type quality inside already-migrated files
 
-- [ ] Continue tightening catalog-derived data access so components do not rely on broad object indexing or local fallback casts.
 - [ ] Continue reducing permissive `unknown`-based payloads where stronger domain types are now safe and worthwhile.
+- [ ] Continue shrinking remaining small service/helper boundary casts and snapshot-like adapters where concrete runtime shapes are already known.
+- [ ] Continue tightening pure normalization helpers that still rely on ad hoc `Record<string, unknown>` shapes in sketch and inventory utilities.
 
 ### 2. Continue mojibake cleanup outside the finished slices
 
@@ -431,12 +499,11 @@ Recommended order from here:
 
 1. `Type hardening` follow-up
    - Target:
-     - catalog-consumer indexing cleanup
-     - selective `unknown` reduction in shared runtime contracts
-     - remaining small utility/runtime boundary tightening beyond the current adapter cleanup
+     - selective `unknown` reduction in pure normalization helpers
+     - remaining small utility/runtime boundary tightening beyond the CSV/activity-log/retailer cleanup
    - Why:
      - the migration itself is now complete for `src/`
-     - the shell, repository, runtime-boundary, and history reopen cleanup is now done, so the highest-value follow-up is shrinking the remaining broad catalog indexing and permissive `unknown` boundaries
+     - the most concentrated remaining work is now in pure helper normalization code such as sketch/layout helpers and a few remaining inventory/runtime adapters, not in large app-surface migrations
 
 ## Definition of Done for the Migration
 

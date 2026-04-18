@@ -1,9 +1,11 @@
-import type { BahamaInventoryItem } from '../types/contracts';
+import type { BahamaInventoryItem, UnknownRecord } from '../types/contracts';
 
-function isRecord(value: unknown): value is Record<string, unknown> {
+function isRecord(value: unknown): value is UnknownRecord {
     return value != null && typeof value === 'object' && !Array.isArray(value);
 }
 
+export function normalizeInventoryText(text: string): string;
+export function normalizeInventoryText<T>(text: T): T;
 export function normalizeInventoryText(text: unknown): unknown {
     if (!text || typeof text !== 'string') return text;
 
@@ -30,7 +32,7 @@ export function normalizeInventoryItem(item: unknown): BahamaInventoryItem {
 
     const normalized: BahamaInventoryItem = {};
     for (const [key, value] of Object.entries(item)) {
-        const cleanKey = String(normalizeInventoryText(typeof key === 'string' ? key.trim() : key) ?? key);
+        const cleanKey = normalizeInventoryText(String(key).trim());
         normalized[cleanKey] = typeof value === 'string' ? normalizeInventoryText(value) : value;
     }
 

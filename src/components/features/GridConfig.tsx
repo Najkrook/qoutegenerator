@@ -1,6 +1,6 @@
 import type { ChangeEvent } from 'react';
 import { useQuote } from '../../store/QuoteContext';
-import { catalogData } from '../../data/catalog';
+import { getGridCatalogLine } from '../../data/catalogLookup';
 import { buildEffectiveGridSelections } from '../../utils/gridAutoScale';
 import type {
     EffectiveGridLineSelection,
@@ -17,8 +17,6 @@ import type {
     GridItemSelectionState,
     GridLineSelection
 } from '../../types/contracts';
-
-const typedCatalogData = catalogData as Record<string, GridCatalogLineData | undefined>;
 
 function createGridRowId(prefix: string): string {
     return `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
@@ -50,8 +48,7 @@ function getCategoryId(category: GridCatalogAddonCategory, index: number): strin
 }
 
 function getGridLine(lineId: string): GridCatalogLineData | null {
-    const lineData = typedCatalogData[lineId];
-    return lineData?.type === 'grid' ? lineData : null;
+    return getGridCatalogLine(lineId);
 }
 
 function createEmptyGridSelection(): GridLineSelection {

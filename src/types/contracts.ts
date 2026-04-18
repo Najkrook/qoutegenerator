@@ -259,6 +259,8 @@ export type CatalogLineData = BuilderCatalogLineData | GridCatalogLineData;
 
 export type CatalogData = Record<string, CatalogLineData>;
 
+export type CatalogLineId = string;
+
 export interface BuilderItem {
     id: string;
     line: string;
@@ -871,6 +873,8 @@ export interface RetailerWriteInput {
     productLines: Record<string, RetailerProductLineDraftConfig>;
 }
 
+export type RetailerWriteSource = Partial<RetailerWriteInput> | UnknownRecord;
+
 export interface RetailerFormState extends RetailerWriteInput {}
 
 export interface RetailerRecord {
@@ -958,6 +962,17 @@ export interface InventoryLogFilters {
 export interface ActivityLogMetadata {
     [key: string]: unknown;
 }
+
+export interface ActivityLogWriteRef {
+    id?: string;
+}
+
+export interface ActivityLogSnapshotLike {
+    id?: unknown;
+    data?: (() => unknown) | unknown;
+}
+
+export type ActivityLogSource = ActivityLogSnapshotLike | UnknownRecord;
 
 export interface ActivityLogRow {
     id: string;

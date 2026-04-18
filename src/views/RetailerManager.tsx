@@ -8,6 +8,7 @@ import React, {
 } from 'react';
 import { useAuth } from '../store/AuthContext';
 import { catalogData } from '../data/catalog';
+import { getCatalogLineIds, getCatalogLineName } from '../data/catalogLookup';
 import { createRetailerAuthUser } from '../services/authService';
 import {
     fetchRetailers,
@@ -17,7 +18,6 @@ import {
     normalizeRetailerData
 } from '../services/retailerService';
 import type {
-    CatalogData,
     RetailerFormState,
     RetailerManagerProps,
     RetailerProductLineDraftConfig,
@@ -38,7 +38,7 @@ interface DeleteConfirmationProps {
     deleting: boolean;
 }
 
-const PRODUCT_LINE_IDS = Object.keys(catalogData as CatalogData);
+const PRODUCT_LINE_IDS = getCatalogLineIds();
 
 function getErrorMessage(error: unknown, fallback: string): string {
     if (error instanceof Error && error.message) return error.message;
@@ -195,7 +195,7 @@ function RetailerForm({ initial, onSave, onCancel, saving }: RetailerFormProps) 
                                         className="w-4 h-4 accent-primary cursor-pointer"
                                     />
                                     <span className="font-semibold text-text-primary text-sm">
-                                        {catalogData[lineId]?.name || lineId}
+                                        {getCatalogLineName(lineId) || lineId}
                                     </span>
                                 </label>
                                 {lineEntry.enabled && (
@@ -461,7 +461,7 @@ export function RetailerManager({ onBack }: RetailerManagerProps) {
                                                     key={lineId}
                                                     className="inline-flex items-center gap-1.5 bg-primary/10 text-primary border border-primary/20 rounded-full px-2.5 py-0.5 text-xs font-medium"
                                                 >
-                                                    {catalogData[lineId]?.name || lineId}
+                                                    {getCatalogLineName(lineId) || lineId}
                                                     <span className="text-primary/70 font-normal">
                                                         {retailer.productLines?.[lineId]?.discountPct || 0}%
                                                     </span>

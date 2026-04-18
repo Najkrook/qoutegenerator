@@ -8,7 +8,7 @@ import { InventoryItemModal } from '../components/features/InventoryItemModal';
 import { PendingChangesPanel } from '../components/features/PendingChangesPanel';
 import * as XLSX from 'xlsx';
 import toast from 'react-hot-toast';
-import { normalizeInventoryItem, normalizeInventoryText } from '../utils/csvNormalizer';
+import { normalizeInventoryItem, normalizeInventoryList, normalizeInventoryText } from '../utils/csvNormalizer';
 import type {
     BahamaInventoryItem,
     ClickitupFieldKey,
@@ -70,9 +70,7 @@ function toInventoryData(value: unknown): InventoryData {
         return cloneInventoryData(DEFAULT_INVENTORY_DATA);
     }
 
-    const bahama = Array.isArray(value.bahama)
-        ? value.bahama.map((item) => normalizeInventoryItem(item))
-        : [];
+    const bahama = normalizeInventoryList(value.bahama);
     const clickitup = isRecord(value.clickitup)
         ? Object.entries(value.clickitup).reduce<ClickitupStockMap>((acc, [size, entry]) => {
             acc[size] = toClickitupEntry(entry);

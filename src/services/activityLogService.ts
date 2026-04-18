@@ -2,7 +2,10 @@ import type {
     AccessUser,
     ActivityEventDefinition,
     ActivityLogMetadata,
-    ActivityLogRow
+    ActivityLogRow,
+    ActivityLogSource,
+    ActivityLogWriteRef,
+    UnknownRecord
 } from '../types/contracts';
 import { addDoc, collection, db } from './firebase';
 
@@ -38,7 +41,7 @@ interface ActivityLogEntry {
 interface ActivityLogSuccessResult {
     ok: true;
     id: string | null;
-    ref: unknown | null;
+    ref: ActivityLogWriteRef | null;
     eventType: string;
     system: string;
 }
@@ -74,8 +77,17 @@ export const ACTIVITY_EVENT_DEFINITIONS: Record<string, ActivityEventDefinition>
     retailer_deleted: { label: 'Återförsäljare borttagen', icon: '🗑️', color: 'var(--color-error, #e74c3c)' }
 };
 
-function isRecord(value: unknown): value is Record<string, unknown> {
+function isRecord(value: unknown): value is UnknownRecord {
     return value != null && typeof value === 'object' && !Array.isArray(value);
+}
+
+function toActivityLogRaw(source: ActivityLogSource | null | undefined): UnknownRecord {
+    if (isRecord(source) && typeof source.data === 'function') {
+        const snapshotData = source.data();
+        return isRecord(snapshotData) ? snapshotData : {};
+    }
+
+    return isRecord(source) ? source : {};
 }
 
 function buildActivityLogError(error: unknown): ActivityLogError {
@@ -87,7 +99,7 @@ function buildActivityLogError(error: unknown): ActivityLogError {
     };
 }
 
-export function buildActivityLogSuccessResult(ref: { id?: string } | null, params: ActivityLogEntryInput = {}): ActivityLogSuccessResult {
+export function buildActivityLogSuccessResult(ref: ActivityLogWriteRef | null, params: ActivityLogEntryInput = {}): ActivityLogSuccessResult {
     return {
         ok: true,
         id: ref?.id || null,
@@ -191,10 +203,8 @@ export function buildActivityLogEntry({
     };
 }
 
-export function normalizeActivityLog(source: unknown): ActivityLogRow {
-    const raw = isRecord(source) && typeof source.data === 'function'
-        ? (source.data() as Record<string, unknown>) || {}
-        : (isRecord(source) ? source : {});
+export function normalizeActivityLog(source: ActivityLogSource | null | undefined): ActivityLogRow {
+    const raw = toActivityLogRaw(source);
     const createdAtMs = toEpochMs(raw.createdAt);
     const timestampMs = toEpochMs(raw.timestamp);
 
@@ -227,7 +237,7 @@ export function isActivityLogFailure(result: ActivityLogResult | null | undefine
     return Boolean(result) && result.ok === false;
 }
 
-export async function logActivity(params: ActivityLogEntryInput): Promise<{ id?: string }> {
+export async function logActivity(params: ActivityLogEntryInput): Promise<ActivityLogWriteRef> {
     const entry = buildActivityLogEntry(params);
     return addDoc(collection(db, 'activity_logs'), entry);
 }

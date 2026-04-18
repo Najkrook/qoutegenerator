@@ -68,8 +68,9 @@ describe('activityLogService', () => {
     });
 
     it('builds a structured success result when activity logging succeeds', () => {
+        const ref = { id: 'log-123' };
         const result = buildActivityLogSuccessResult(
-            { id: 'log-123' },
+            ref,
             {
                 eventType: 'quote_created',
                 system: 'quote'
@@ -82,7 +83,28 @@ describe('activityLogService', () => {
             eventType: 'quote_created',
             system: 'quote'
         });
+        expect(result.ref).toBe(ref);
         expect(isActivityLogFailure(result)).toBe(false);
+    });
+
+    it('normalizes snapshot rows with malformed data payloads safely', () => {
+        const row = normalizeActivityLog({
+            id: 'log-bad',
+            data: () => 'not-an-object'
+        });
+
+        expect(row).toMatchObject({
+            id: 'log-bad',
+            eventType: 'unknown',
+            system: 'unknown',
+            targetType: 'unknown',
+            targetId: '-',
+            user: '-',
+            userUid: '-',
+            details: '-',
+            metadata: {}
+        });
+        expect(row.resolvedMs).toBe(0);
     });
 
     it('builds a structured failure result when activity logging fails', () => {

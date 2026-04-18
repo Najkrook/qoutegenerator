@@ -1,7 +1,7 @@
 import React, { useEffect } from 'react';
 import { useQuote } from '../store/QuoteContext';
 import { useAuth } from '../store/AuthContext';
-import { catalogData } from '../data/catalog';
+import { getCatalogLineIds, getCatalogLineName } from '../data/catalogLookup';
 import type { ProductLineSelectionProps } from '../types/contracts';
 
 interface ProductLineOption {
@@ -44,14 +44,14 @@ export function ProductLineSelection({ onNext }: ProductLineSelectionProps) {
         onNext();
     };
 
-    const productLines: ProductLineOption[] = Object.keys(catalogData)
+    const productLines: ProductLineOption[] = getCatalogLineIds()
         .filter((key) => {
             if (!isRetailer) return true;
             return retailer?.productLines?.[key]?.enabled === true;
         })
         .map((key) => ({
             id: key,
-            name: catalogData[key].name,
+            name: getCatalogLineName(key) || key,
             description: key === 'BaHaMa'
                 ? 'Premiumparasoller'
                 : key === 'ClickitUp'

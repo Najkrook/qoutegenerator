@@ -3,7 +3,8 @@ import type {
     CatalogData,
     RetailerProductLineConfig,
     RetailerRecord,
-    RetailerWriteInput
+    RetailerWriteSource,
+    UnknownRecord
 } from '../types/contracts';
 import {
     db,
@@ -22,8 +23,28 @@ interface RetailerPersistedRecord extends RetailerRecord {
     productLines: Record<string, RetailerProductLineConfig>;
 }
 
-function isRecord(value: unknown): value is Record<string, unknown> {
+function isRecord(value: unknown): value is UnknownRecord {
     return value != null && typeof value === 'object' && !Array.isArray(value);
+}
+
+function normalizeRetailerProductLines(
+    value: unknown,
+    validLineIds?: Iterable<string>
+): Record<string, RetailerProductLineConfig> {
+    const rawLines = isRecord(value) ? value : {};
+    const lineIds = validLineIds ? [...validLineIds] : Object.keys(rawLines);
+
+    return lineIds.reduce<Record<string, RetailerProductLineConfig>>((acc, lineId) => {
+        const safeLine = isRecord(rawLines[lineId]) ? rawLines[lineId] : {};
+        const enabled = Boolean(safeLine.enabled);
+        let discountPct = Number(safeLine.discountPct);
+        if (!Number.isFinite(discountPct)) discountPct = 0;
+        discountPct = Math.max(0, Math.min(100, discountPct));
+        if (!enabled) discountPct = 0;
+
+        acc[lineId] = { enabled, discountPct };
+        return acc;
+    }, {});
 }
 
 function toRetailerRecord(value: unknown, id?: string): RetailerRecord {
@@ -34,16 +55,7 @@ function toRetailerRecord(value: unknown, id?: string): RetailerRecord {
         name: String(raw.name ?? ''),
         email: String(raw.email ?? ''),
         notes: String(raw.notes ?? ''),
-        productLines: isRecord(raw.productLines)
-            ? Object.entries(raw.productLines).reduce<Record<string, RetailerProductLineConfig>>((acc, [lineId, lineValue]) => {
-                const safeLine = isRecord(lineValue) ? lineValue : {};
-                acc[lineId] = {
-                    enabled: Boolean(safeLine.enabled),
-                    discountPct: Number.isFinite(Number(safeLine.discountPct)) ? Number(safeLine.discountPct) : 0
-                };
-                return acc;
-            }, {})
-            : {}
+        productLines: normalizeRetailerProductLines(raw.productLines)
     };
 }
 
@@ -52,7 +64,7 @@ function toRetailerRecord(value: unknown, id?: string): RetailerRecord {
  * Pure function and exported for unit testing.
  */
 export function normalizeRetailerData(
-    data: Partial<RetailerWriteInput> | Record<string, unknown>,
+    data: RetailerWriteSource,
     catalogData: CatalogData
 ): RetailerPersistedRecord {
     const name = String(data?.name ?? '').trim();
@@ -61,19 +73,7 @@ export function normalizeRetailerData(
     }
 
     const validLineIds = new Set(Object.keys(catalogData || {}));
-    const rawLines = isRecord(data?.productLines) ? data.productLines : {};
-    const productLines = {} as Record<string, RetailerProductLineConfig>;
-
-    for (const lineId of validLineIds) {
-        const lineEntry = isRecord(rawLines[lineId]) ? rawLines[lineId] : {};
-        const enabled = Boolean(lineEntry.enabled);
-        let discountPct = Number(lineEntry.discountPct);
-        if (!Number.isFinite(discountPct)) discountPct = 0;
-        discountPct = Math.max(0, Math.min(100, discountPct));
-        if (!enabled) discountPct = 0;
-
-        productLines[lineId] = { enabled, discountPct };
-    }
+    const productLines = normalizeRetailerProductLines(data?.productLines, validLineIds);
 
     const email = String(data?.email ?? '').trim().toLowerCase();
     if (!email) {
@@ -101,7 +101,7 @@ export async function fetchRetailers(): Promise<RetailerRecord[]> {
  * Create a new retailer document.
  */
 export async function createRetailer(
-    data: Partial<RetailerWriteInput> | Record<string, unknown>,
+    data: RetailerWriteSource,
     user: AccessUser | null,
     catalogData: CatalogData
 ): Promise<RetailerRecord> {
@@ -138,7 +138,7 @@ export async function createRetailer(
  */
 export async function updateRetailer(
     id: string,
-    data: Partial<RetailerWriteInput> | Record<string, unknown>,
+    data: RetailerWriteSource,
     user: AccessUser | null,
     catalogData: CatalogData
 ): Promise<RetailerRecord> {

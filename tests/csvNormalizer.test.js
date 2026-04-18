@@ -16,28 +16,39 @@ describe('CSV Normalizer', () => {
         expect(normalizeInventoryText('Äpple')).toBe('Äpple');
     });
 
+    it('returns non-string values unchanged', () => {
+        expect(normalizeInventoryText(42)).toBe(42);
+        expect(normalizeInventoryText(null)).toBe(null);
+        expect(normalizeInventoryText(undefined)).toBe(undefined);
+    });
+
     it('normalizes an entire inventory item object', () => {
         const rawItem = {
-            'STORLEK': 'Ok\u00e3\u00a4nd',
-            'BESKRIVNING': 'Ett tillbeh\u00c3\u00b6r',
-            'Antal': 5,
+            STORLEK: 'Ok\u00e3\u00a4nd',
+            BESKRIVNING: 'Ett tillbeh\u00c3\u00b6r',
+            Antal: 5
         };
 
         const cleaned = normalizeInventoryItem(rawItem);
-        expect(cleaned['STORLEK']).toBe('Okänd');
-        expect(cleaned['BESKRIVNING']).toBe('Ett tillbehör');
-        expect(cleaned['Antal']).toBe(5); // Maintains numbers
+        expect(cleaned.STORLEK).toBe('Okänd');
+        expect(cleaned.BESKRIVNING).toBe('Ett tillbehör');
+        expect(cleaned.Antal).toBe(5);
     });
 
     it('normalizes an entire inventory list', () => {
         const rawList = [
-            { 'BESKRIVNING': 'Test 1 \u00e3\u00a4' },
-            { 'BESKRIVNING': 'Test 2' }
+            { BESKRIVNING: 'Test 1 \u00e3\u00a4' },
+            { BESKRIVNING: 'Test 2' }
         ];
 
         const cleaned = normalizeInventoryList(rawList);
         expect(cleaned).toHaveLength(2);
-        expect(cleaned[0]['BESKRIVNING']).toBe('Test 1 ä');
-        expect(cleaned[1]['BESKRIVNING']).toBe('Test 2');
+        expect(cleaned[0].BESKRIVNING).toBe('Test 1 ä');
+        expect(cleaned[1].BESKRIVNING).toBe('Test 2');
+    });
+
+    it('returns an empty list for non-array inputs', () => {
+        expect(normalizeInventoryList('broken')).toEqual([]);
+        expect(normalizeInventoryList(null)).toEqual([]);
     });
 });

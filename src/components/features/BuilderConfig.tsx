@@ -1,18 +1,15 @@
 import { useCallback, useEffect } from 'react';
 import { useQuote } from '../../store/QuoteContext';
-import { catalogData } from '../../data/catalog';
+import { getBuilderCatalogLine } from '../../data/catalogLookup';
 import type { BuilderCatalogLineData, BuilderConfigProps, BuilderItem as QuoteBuilderItem } from '../../types/contracts';
 import { BuilderItem } from './BuilderItem';
-
-const typedCatalogData = catalogData as Record<string, BuilderCatalogLineData | undefined>;
 
 function createBuilderItemId(): string {
     return Math.random().toString(36).slice(2, 11);
 }
 
 function getBuilderLine(lineId: string): BuilderCatalogLineData | null {
-    const lineData = typedCatalogData[lineId];
-    return lineData?.type === 'builder' ? lineData : null;
+    return getBuilderCatalogLine(lineId);
 }
 
 function createDefaultBuilderItem(
