@@ -1,10 +1,6 @@
 import React, { useState, type ChangeEvent, type FormEvent } from 'react';
 import { useAuth } from '../store/AuthContext';
-
-interface AuthErrorLike {
-    code?: string;
-    message?: string;
-}
+import { getErrorCode, getErrorMessage } from '../utils/runtime';
 
 export function Login() {
     const { login } = useAuth();
@@ -22,18 +18,19 @@ export function Login() {
             await login(email, password);
             // onAuthChange in App will handle redirect to step 0
         } catch (error) {
-            const authError = error as AuthErrorLike;
             console.error('Firebase Auth Error:', error);
+            const authErrorCode = getErrorCode(error);
+            const authErrorMessage = getErrorMessage(error, 'okänt fel');
 
             let message = 'Inloggningen misslyckades.';
-            if (authError.code === 'auth/invalid-credential' || authError.code === 'auth/wrong-password') {
+            if (authErrorCode === 'auth/invalid-credential' || authErrorCode === 'auth/wrong-password') {
                 message = 'Fel e-post eller lösenord.';
-            } else if (authError.code === 'auth/user-not-found') {
+            } else if (authErrorCode === 'auth/user-not-found') {
                 message = 'Ingen användare hittades med den e-posten.';
-            } else if (authError.code === 'auth/too-many-requests') {
+            } else if (authErrorCode === 'auth/too-many-requests') {
                 message = 'För många försök. Vänta en stund och försök igen.';
             } else {
-                message = `Systemfel: ${authError.code || authError.message || 'okänt fel'}`;
+                message = `Systemfel: ${authErrorCode || authErrorMessage}`;
             }
 
             setErrorMsg(message);

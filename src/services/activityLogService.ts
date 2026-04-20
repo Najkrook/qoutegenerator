@@ -8,6 +8,7 @@ import type {
     UnknownRecord
 } from '../types/contracts';
 import { addDoc, collection, db } from './firebase';
+import { cloneSerializable, getErrorInfo, isUnknownRecord, readSnapshotData } from '../utils/runtime';
 
 interface ActivityLogError {
     name: string;
@@ -77,21 +78,12 @@ export const ACTIVITY_EVENT_DEFINITIONS: Record<string, ActivityEventDefinition>
     retailer_deleted: { label: 'Återförsäljare borttagen', icon: '🗑️', color: 'var(--color-error, #e74c3c)' }
 };
 
-function isRecord(value: unknown): value is UnknownRecord {
-    return value != null && typeof value === 'object' && !Array.isArray(value);
-}
-
 function toActivityLogRaw(source: ActivityLogSource | null | undefined): UnknownRecord {
-    if (isRecord(source) && typeof source.data === 'function') {
-        const snapshotData = source.data();
-        return isRecord(snapshotData) ? snapshotData : {};
-    }
-
-    return isRecord(source) ? source : {};
+    return readSnapshotData(source);
 }
 
 function buildActivityLogError(error: unknown): ActivityLogError {
-    const safeError = isRecord(error) ? error : {};
+    const safeError = getErrorInfo(error);
     return {
         name: String(safeError.name || 'Error'),
         code: String(safeError.code || 'unknown'),
@@ -121,8 +113,8 @@ export function buildActivityLogFailureResult(error: unknown, params: ActivityLo
 
 function sanitizeMetadata(metadata: unknown): ActivityLogMetadata {
     try {
-        const cloned = JSON.parse(JSON.stringify(metadata || {})) as unknown;
-        return isRecord(cloned) ? cloned : {};
+        const cloned = cloneSerializable(metadata || {});
+        return isUnknownRecord(cloned) ? cloned : {};
     } catch {
         return {};
     }
@@ -134,7 +126,7 @@ function toEpochMs(value: unknown): number {
         const parsed = Date.parse(value);
         return Number.isFinite(parsed) ? parsed : 0;
     }
-    if (isRecord(value) && typeof value.toMillis === 'function') {
+    if (isUnknownRecord(value) && typeof value.toMillis === 'function') {
         const ms = value.toMillis();
         return Number.isFinite(ms) ? ms : 0;
     }
@@ -209,7 +201,7 @@ export function normalizeActivityLog(source: ActivityLogSource | null | undefine
     const timestampMs = toEpochMs(raw.timestamp);
 
     return {
-        id: isRecord(source) ? String(source.id || raw.id || '') : String(raw.id || ''),
+        id: isUnknownRecord(source) ? String(source.id || raw.id || '') : String(raw.id || ''),
         createdAtMs,
         timestampMs,
         resolvedMs: createdAtMs || timestampMs || 0,

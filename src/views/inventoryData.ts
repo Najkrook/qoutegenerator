@@ -1,4 +1,5 @@
 import { normalizeInventoryItem, normalizeInventoryList, normalizeInventoryText } from '../utils/csvNormalizer';
+import { cloneSerializable, isUnknownRecord } from '../utils/runtime';
 import type {
     BahamaInventoryItem,
     ClickitupStockEntry,
@@ -19,10 +20,6 @@ export const DEFAULT_CLICKITUP_ENTRY: ClickitupStockEntry = {
     hane_h: 0,
     hane_v: 0
 };
-
-function isUnknownRecord(value: unknown): value is UnknownRecord {
-    return value != null && typeof value === 'object' && !Array.isArray(value);
-}
 
 export function createDefaultInventoryData(): InventoryData {
     return {
@@ -58,6 +55,10 @@ export function normalizeStoredInventoryData(value: unknown): InventoryData {
 
     const notes = typeof value.notes === 'string' ? value.notes : '';
     return { bahama, clickitup, notes };
+}
+
+export function cloneInventoryData(inventory: InventoryData): InventoryData {
+    return normalizeStoredInventoryData(cloneSerializable(inventory));
 }
 
 export function normalizeInventorySheetHeaders(row: InventorySheetRow): InventorySheetHeaders {

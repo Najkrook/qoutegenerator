@@ -10,6 +10,13 @@ type EditableCustomerField =
     | 'date'
     | 'extraNotes';
 
+function createCustomerInfoPatch<Field extends EditableCustomerField>(
+    field: Field,
+    value: CustomerInfo[Field]
+): Pick<CustomerInfo, Field> {
+    return { [field]: value } as Pick<CustomerInfo, Field>;
+}
+
 export function CustomerInfoForm() {
     const { state, dispatch } = useQuote();
     const { customerInfo, quoteValidityDays } = state;
@@ -17,7 +24,7 @@ export function CustomerInfoForm() {
     const handleChange = (field: EditableCustomerField, value: string): void => {
         dispatch({
             type: 'SET_CUSTOMER_INFO',
-            payload: { [field]: value } as Partial<CustomerInfo>
+            payload: createCustomerInfoPatch(field, value)
         });
     };
 

@@ -7,7 +7,6 @@ import { buildEffectiveGridSelections } from '../../utils/gridAutoScale';
 import type {
     GridCatalogLineData,
     PricingEffectiveGridAddonsMap,
-    QuoteTotalsResult,
     QuoteTotalsRowSource
 } from '../../types/contracts';
 
@@ -17,7 +16,7 @@ export function PricingTable() {
     const { totals, grossTotalSek, totalDiscountSek, finalTotalSek } = computeQuoteTotals({
         state,
         catalogData
-    }) as QuoteTotalsResult;
+    });
 
     const handleDiscountChange = (source: QuoteTotalsRowSource, value: string): void => {
         const discountPct = Number.parseFloat(value) || 0;

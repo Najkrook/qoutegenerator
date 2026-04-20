@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
     buildImportedInventoryItem,
+    cloneInventoryData,
     createDefaultInventoryData,
     DEFAULT_CLICKITUP_ENTRY,
     normalizeClickitupEntry,
@@ -31,6 +32,29 @@ describe('inventoryData helpers', () => {
 
     it('falls back to an empty inventory shape for non-object payloads', () => {
         expect(normalizeStoredInventoryData('broken')).toEqual(createDefaultInventoryData());
+    });
+
+    it('clones inventory data without sharing nested references', () => {
+        const original = normalizeStoredInventoryData({
+            bahama: [{ BESKRIVNING: 'Parasollfot' }],
+            clickitup: {
+                '4m': { sektion: 1, dorr_h: 2, dorr_v: 3, hane_h: 4, hane_v: 5 }
+            },
+            notes: 'Intern notering'
+        });
+
+        const cloned = cloneInventoryData(original);
+        cloned.bahama[0].BESKRIVNING = 'Ändrad';
+        cloned.clickitup['4m'].sektion = 99;
+        cloned.notes = 'Ny notering';
+
+        expect(original).toEqual({
+            bahama: [{ BESKRIVNING: 'Parasollfot' }],
+            clickitup: {
+                '4m': { sektion: 1, dorr_h: 2, dorr_v: 3, hane_h: 4, hane_v: 5 }
+            },
+            notes: 'Intern notering'
+        });
     });
 
     it('builds imported inventory rows from normalized headers and preserves hasData', () => {

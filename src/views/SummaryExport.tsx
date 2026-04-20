@@ -12,22 +12,18 @@ import { quoteRepository } from '../services/quoteRepositoryClient';
 import { saveQuoteToRepository } from '../services/quoteSaveService';
 import { safeLogActivity } from '../services/activityLogService';
 import { hasZeroDiscountSummary } from '../services/exportDataBuilders';
+import { getErrorMessage } from '../utils/runtime';
 import type {
     ExcelExportModule,
     PdfExportModule,
     QuoteState,
     QuoteTotalsResult,
-    SaveQuoteToRepositoryResult,
     SavedQuoteStatePatch,
     SummaryExportProps
 } from '../types/contracts';
 
 interface ActivityLogResultLike {
     ok?: boolean;
-}
-
-interface ErrorLike {
-    message?: string;
 }
 
 function sanitizeFileNamePart(value: string): string {
@@ -51,13 +47,6 @@ function buildPdfFileName(customerInfo: QuoteState['customerInfo']): string {
 
 function getActivityCustomerLabel(customerInfo: QuoteState['customerInfo']): string {
     return customerInfo.company || customerInfo.name || '';
-}
-
-function getErrorMessage(error: unknown, fallback: string): string {
-    if (error && typeof error === 'object' && 'message' in error) {
-        return String((error as ErrorLike).message || fallback);
-    }
-    return fallback;
 }
 
 async function createPdfBlob(state: QuoteState, summaryData: QuoteTotalsResult): Promise<Blob | null> {
@@ -98,7 +87,7 @@ export function SummaryExport({ onPrev, onBackToSketch }: SummaryExportProps) {
     const { state, dispatch } = useQuote();
     const { user, retailer } = useAuth();
     const summaryData = useMemo(
-        () => computeQuoteTotals({ state, catalogData }) as QuoteTotalsResult,
+        () => computeQuoteTotals({ state, catalogData }),
         [state]
     );
     const [previewUrl, setPreviewUrl] = useState('');
@@ -261,7 +250,7 @@ export function SummaryExport({ onPrev, onBackToSketch }: SummaryExportProps) {
                 retailer,
                 state,
                 summary: summaryData
-            }) as SaveQuoteToRepositoryResult;
+            });
             const saveStatePatch: SavedQuoteStatePatch = statePatch;
 
             dispatch({

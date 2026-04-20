@@ -1,7 +1,13 @@
 import autoTable, { type Color, type FontStyle, type Styles } from 'jspdf-autotable';
 import { BRIXX_LOGO_BASE64 } from '../../assets/logoData';
 import { buildPdfTableData } from '../services/exportDataBuilders';
-import type { CustomerInfo, QuoteState, QuoteTotalsResult } from '../types/contracts';
+import type {
+    CustomerInfo,
+    ExportSummaryInput,
+    QuoteState,
+    QuoteTotalsResult,
+    QuoteTotalsRow
+} from '../types/contracts';
 
 export const PDF_LAYOUT = Object.freeze({
     pageMarginX: 10,
@@ -23,6 +29,14 @@ export const PDF_LAYOUT = Object.freeze({
 });
 
 const GROUP_SORT_ORDER = ['clickitup', 'bahama', 'fiesta', 'ovrigt'];
+
+function normalizeCustomerInfo(customerInfo: Partial<CustomerInfo> | null | undefined): Partial<CustomerInfo> {
+    return customerInfo || {};
+}
+
+function normalizeSummaryTotals(summaryData: ExportSummaryInput = {}): QuoteTotalsRow[] {
+    return Array.isArray(summaryData.totals) ? summaryData.totals : [];
+}
 
 function normalizeGroupKey(line) {
     return String(line || '')
@@ -77,10 +91,9 @@ export function createPdfTableLayout(hideDiscountReferences, pageWidth, layout =
     };
 }
 
-export function groupSummaryTotalsByLine(summaryData = {}) {
-    const safeSummaryData = summaryData as Partial<QuoteTotalsResult>;
-    const totals = Array.isArray(safeSummaryData.totals) ? safeSummaryData.totals : [];
-    const groupedTotals = totals.reduce((acc, item) => {
+export function groupSummaryTotalsByLine(summaryData: ExportSummaryInput = {}) {
+    const totals = normalizeSummaryTotals(summaryData);
+    const groupedTotals = totals.reduce<Record<string, QuoteTotalsRow[]>>((acc, item) => {
         const line = item.line || 'Övrigt';
         if (!acc[line]) {
             acc[line] = [];
@@ -139,7 +152,7 @@ function drawGroupSubtitle(doc, title, y, layout, pageMarginX) {
 
 export function drawHeader(doc, { pageWidth, quoteDate, customerInfo = {}, layout = PDF_LAYOUT }) {
     const { pageMarginX, headerTopY, headerLineY } = layout;
-    const safeCustomerInfo = customerInfo as Partial<CustomerInfo>;
+    const safeCustomerInfo = normalizeCustomerInfo(customerInfo);
 
     drawBrandLogo(doc, pageMarginX, 8, 50, 16, 22, layout);
 
@@ -165,7 +178,7 @@ export function drawHeader(doc, { pageWidth, quoteDate, customerInfo = {}, layou
 }
 
 export function renderCustomerInfoBlock(doc, { customerInfo = {}, pageWidth, layout = PDF_LAYOUT }) {
-    const safeCustomerInfo = customerInfo as Partial<CustomerInfo>;
+    const safeCustomerInfo = normalizeCustomerInfo(customerInfo);
     const customerLines = [];
     const recipient = safeCustomerInfo.company || safeCustomerInfo.name || '';
     if (recipient) {
@@ -207,7 +220,7 @@ export function renderCustomerInfoBlock(doc, { customerInfo = {}, pageWidth, lay
 }
 
 export function renderExtraNotesBlock(doc, { customerInfo = {}, pageWidth, pageHeight, drawMainHeader, currentY, layout = PDF_LAYOUT }) {
-    const safeCustomerInfo = customerInfo as Partial<CustomerInfo>;
+    const safeCustomerInfo = normalizeCustomerInfo(customerInfo);
 
     if (!safeCustomerInfo.extraNotes || !safeCustomerInfo.extraNotes.trim()) {
         return currentY;
@@ -251,10 +264,10 @@ export function renderGroupedTables(doc, {
     drawMainHeader,
     layout = PDF_LAYOUT
 }) {
-    const safeSummaryData = summaryData as Partial<QuoteTotalsResult>;
+    const totals = normalizeSummaryTotals(summaryData);
     const { groupedTotals, groupKeys } = groupSummaryTotalsByLine(summaryData);
 
-    if (groupKeys.length === 0 || !Array.isArray(safeSummaryData.totals) || safeSummaryData.totals.length === 0) {
+    if (groupKeys.length === 0 || totals.length === 0) {
         doc.setFont('helvetica', 'bold');
         doc.setFontSize(10);
         doc.text('Offertdetaljer', layout.pageMarginX, currentY);
@@ -262,7 +275,7 @@ export function renderGroupedTables(doc, {
         doc.setFontSize(8);
         let y = currentY + 6;
 
-        (safeSummaryData.totals || []).forEach((row) => {
+        totals.forEach((row) => {
             if (y > pageHeight - (layout.contentBottomSafe - 3)) {
                 y = startNewPage(doc, drawMainHeader, layout.contentStartY);
             }

@@ -42,6 +42,17 @@ export type StepInput = QuoteStep | number | string;
 
 export type UnknownRecord = Record<string, unknown>;
 
+export interface ErrorLike extends UnknownRecord {
+    name?: unknown;
+    code?: unknown;
+    message?: unknown;
+}
+
+export interface SnapshotSource<TData = unknown> {
+    id?: unknown;
+    data?: (() => TData | undefined) | TData | undefined;
+}
+
 export interface AccessUser {
     uid?: string | null;
     email?: string | null;
@@ -975,10 +986,7 @@ export interface ActivityLogWriteRef {
     id?: string;
 }
 
-export interface ActivityLogSnapshotLike {
-    id?: unknown;
-    data?: (() => unknown) | unknown;
-}
+export interface ActivityLogSnapshotLike extends SnapshotSource {}
 
 export type ActivityLogSource = ActivityLogSnapshotLike | UnknownRecord;
 

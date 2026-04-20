@@ -1,5 +1,5 @@
 import { buildEffectiveGridSelections } from '../utils/gridAutoScale';
-import type { GridAddonState } from '../types/contracts';
+import type { CatalogData, GridAddonState, QuoteState, QuoteTotalsResult } from '../types/contracts';
 
 const ADDONS_ONLY_SIZE = '__addons_only__';
 
@@ -163,9 +163,15 @@ function sortQuoteTotalsRows(rows) {
  * @param {{state: object, catalogData: object}} params
  * @returns {{ totals: object[], grossTotalSek: number, totalDiscountSek: number, finalTotalSek: number, globalDiscountAmt: number }}
  */
-export function computeQuoteTotals({ state, catalogData }) {
-    const safeState = state || {};
-    const safeCatalog = catalogData || {};
+export function computeQuoteTotals({
+    state,
+    catalogData
+}: {
+    state: Partial<QuoteState>;
+    catalogData: CatalogData;
+}): QuoteTotalsResult {
+    const safeState = (state || {}) as Record<string, any>;
+    const safeCatalog = (catalogData || {}) as Record<string, any>;
 
     const exchangeRate = toFloat(safeState.exchangeRate || 0);
     const totals = [];

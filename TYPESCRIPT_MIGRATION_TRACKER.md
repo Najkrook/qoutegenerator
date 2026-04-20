@@ -547,36 +547,61 @@ This is a living tracker for the QuoteGenerator TypeScript migration. Update it 
   - `npm run build`
   - `vitest run tests/quoteStateSchema.test.js`
 
-## Remaining Work
+### 29. Final app-source hardening slice: shared runtime boundaries + shipped text cleanup
 
-### 1. Improve type quality inside already-migrated files
+- [x] Added shared runtime contracts and helpers for the last repeated app-source boundary patterns:
+  - `ErrorLike`
+  - `SnapshotSource`
+  - `src/utils/runtime.ts`
+- [x] Replaced scattered local error and snapshot/document handling in shipped source with shared helpers across:
+  - `src/views/History.tsx`
+  - `src/views/InventoryManager.tsx`
+  - `src/views/SummaryExport.tsx`
+  - `src/views/RetailerManager.tsx`
+  - `src/views/Login.tsx`
+  - `src/views/Planner.tsx`
+  - `src/services/activityLogService.ts`
+- [x] Centralized the remaining inline inventory clone boundary by exporting `cloneInventoryData` from `src/views/inventoryData.ts` and isolating the XLSX sheet-row adapter inside `InventoryManager`.
+- [x] Tightened the remaining export-facing and summary callers by:
+  - giving `computeQuoteTotals` an explicit `QuoteTotalsResult` return type
+  - removing the remaining summary/pricing table casts
+  - replacing the last `Partial<...>` coercions in `src/features/pdfExportLayout.ts` with typed summary/customer normalization helpers
+- [x] Removed the last planner/runtime UI casts by:
+  - normalizing planner contractor/priority values through shared allowed-value helpers
+  - normalizing planner Firestore rows through a typed snapshot adapter instead of spreading raw snapshot data
+- [x] Fixed visible shipped-text mojibake in the touched source areas, including:
+  - login/auth messaging
+  - customer info labels/placeholders
+  - activity log labels/icons/metadata separators
+  - history/inventory/planner/export text touched during this slice
+- [x] Extended focused regression coverage in `tests/inventoryData.test.js` for deep inventory clone isolation while preserving the earlier activity-log and PDF boundary regressions.
+- [x] Verified the final app-source hardening slice with:
+  - `npm run typecheck`
+  - `npm run test:confidence`
+  - `npm run build`
+  - `vitest run tests/inventoryData.test.js tests/activityLogService.test.js tests/pdfExport.test.js tests/quoteSaveService.test.js`
 
-- [ ] Continue reducing permissive `unknown`-based payloads where stronger domain types are now safe and worthwhile.
-- [ ] Continue shrinking remaining small service/helper boundary casts and snapshot-like adapters where concrete runtime shapes are already known.
-- [ ] Continue tightening pure normalization helpers that still rely on ad hoc `Record<string, unknown>` shapes in sketch and inventory utilities.
+## Migration Status
 
-### 2. Continue mojibake cleanup outside the finished slices
+- [x] The app-source TypeScript migration for `src/` is complete.
+- [x] Remaining `src` casts are now limited to deliberate literal narrowing or isolated third-party/runtime adapters rather than broad migration debt.
+- [x] Future TypeScript work should be treated as incremental hardening, not unfinished migration work.
 
-- [ ] Fix visible mojibake in untouched admin, sketch, catalog, and helper-heavy files.
-- [ ] Keep text cleanup scoped to files actively being migrated so behavior changes stay reviewable.
+## Optional Follow-Ups
 
-### 3. Longer-term hardening
+These are intentionally not blockers for declaring the app-source migration complete:
 
-- [ ] Re-evaluate compiler strictness after the escape-hatch backlog is gone.
-- [ ] Consider tightening options like `noImplicitAny` and related strict flags in a dedicated follow-up.
-- [ ] Decide separately whether tests and scripts should also migrate to TypeScript. This is intentionally out of scope for the main app-source migration.
+1. Compiler strictness follow-up
+   - Re-evaluate `strict`, `noImplicitAny`, and related flags in a dedicated pass.
+   - Treat this as a separate hardening project, not as unfinished migration scope.
 
-## Recommended Next Slices
+2. Tests, scripts, and tooling migration
+   - Decide separately whether the JS test suite, scripts, and repo tooling should also move to TypeScript.
+   - Keep this outside the app-source migration boundary unless the team explicitly expands scope.
 
-Recommended order from here:
-
-1. `Type hardening` follow-up
-   - Target:
-     - selective `unknown` reduction in pure normalization helpers
-     - remaining small utility/runtime boundary tightening beyond the CSV/activity-log/retailer cleanup
-   - Why:
-     - the migration itself is now complete for `src/`
-     - the most concentrated remaining work is now in pure helper normalization code such as sketch/layout helpers and a few remaining inventory/runtime adapters, not in large app-surface migrations
+3. Performance and bundle splitting
+   - Investigate the long-standing Vite chunk-size warning, especially `export-tools`.
+   - Treat this as release/perf follow-up work rather than TypeScript migration debt.
 
 ## Definition of Done for the Migration
 

@@ -2,14 +2,13 @@ import React, { type ChangeEvent } from 'react';
 import { useQuote } from '../../store/QuoteContext';
 import { catalogData } from '../../data/catalog';
 import { computeQuoteTotals } from '../../services/calculationEngine';
-import type { QuoteTotalsResult } from '../../types/contracts';
 
 export function FinalSummaryTable() {
     const { state, dispatch } = useQuote();
     const { totals, grossTotalSek, totalDiscountSek, finalTotalSek, globalDiscountAmt } = computeQuoteTotals({
         state,
         catalogData
-    }) as QuoteTotalsResult;
+    });
 
     const formatSek = (value: number): string => Math.round(value).toLocaleString('sv-SE');
 

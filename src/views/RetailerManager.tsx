@@ -17,6 +17,7 @@ import {
     deleteRetailer,
     normalizeRetailerData
 } from '../services/retailerService';
+import { getErrorMessage } from '../utils/runtime';
 import type {
     RetailerFormState,
     RetailerManagerProps,
@@ -39,11 +40,6 @@ interface DeleteConfirmationProps {
 }
 
 const PRODUCT_LINE_IDS = getCatalogLineIds();
-
-function getErrorMessage(error: unknown, fallback: string): string {
-    if (error instanceof Error && error.message) return error.message;
-    return fallback;
-}
 
 function buildEmptyProductLines(): Record<string, RetailerProductLineDraftConfig> {
     return PRODUCT_LINE_IDS.reduce<Record<string, RetailerProductLineDraftConfig>>((acc, id) => {

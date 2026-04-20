@@ -8,6 +8,7 @@ import { InventoryItemModal } from '../components/features/InventoryItemModal';
 import { PendingChangesPanel } from '../components/features/PendingChangesPanel';
 import {
     buildImportedInventoryItem,
+    cloneInventoryData,
     createDefaultInventoryData,
     DEFAULT_CLICKITUP_ENTRY,
     normalizeInventorySheetHeaders,
@@ -15,6 +16,7 @@ import {
 } from './inventoryData';
 import * as XLSX from 'xlsx';
 import toast from 'react-hot-toast';
+import { getErrorMessage } from '../utils/runtime';
 import type {
     BahamaInventoryItem,
     ClickitupFieldKey,
@@ -33,17 +35,12 @@ type SheetRow = SheetCell[];
 
 const DEFAULT_INVENTORY_DATA: InventoryData = createDefaultInventoryData();
 
-function getErrorMessage(error: unknown, fallback: string): string {
-    if (error instanceof Error && error.message) return error.message;
-    return fallback;
-}
-
-function cloneInventoryData(inventory: InventoryData): InventoryData {
-    return JSON.parse(JSON.stringify(inventory)) as InventoryData;
-}
-
 function createEmptyModalState(): InventoryModalState {
     return { open: false, index: -1, item: null };
+}
+
+function readInventorySheetRows(sheet: XLSX.WorkSheet): SheetRow[] {
+    return XLSX.utils.sheet_to_json<SheetRow>(sheet, { header: 1 });
 }
 
 export function InventoryManager({ onBack }: InventoryManagerProps) {
@@ -111,7 +108,7 @@ export function InventoryManager({ onBack }: InventoryManagerProps) {
                 const data = new Uint8Array(result);
                 const workbook = XLSX.read(data, { type: 'array' });
                 const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
-                const jsonArr = XLSX.utils.sheet_to_json(firstSheet, { header: 1 }) as SheetRow[];
+                const jsonArr = readInventorySheetRows(firstSheet);
 
                 let headerIdx = -1;
                 for (let index = 0; index < Math.min(jsonArr.length, 10); index += 1) {

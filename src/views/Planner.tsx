@@ -11,12 +11,14 @@ import {
     doc,
     updateDoc
 } from '../services/firebase';
+import { normalizeAllowedValue, readSnapshotData } from '../utils/runtime';
 import type {
     PlannerContractor,
     PlannerPriority,
     PlannerProject,
     PlannerProjectDetailsPatch,
-    PlannerProps
+    PlannerProps,
+    SnapshotSource
 } from '../types/contracts';
 
 interface PlannerProjectDocument extends Omit<PlannerProject, 'id'> {}
@@ -92,6 +94,32 @@ function priorityDot(project: PlannerProject): string | null {
     return null;
 }
 
+function normalizePlannerContractor(value: string): PlannerContractor {
+    return normalizeAllowedValue(value, CONTRACTOR_OPTIONS, '');
+}
+
+function normalizePlannerPriority(value: string): PlannerPriority {
+    return normalizeAllowedValue(value, PRIORITY_OPTIONS, 'Normal');
+}
+
+function normalizePlannerProject(snapshot: SnapshotSource & { id?: unknown }): PlannerProject {
+    const raw = readSnapshotData<PlannerProjectDocument>(snapshot);
+
+    return {
+        id: String(snapshot.id || ''),
+        title: typeof raw.title === 'string' ? raw.title : '',
+        done: raw.done === true,
+        contractor: normalizePlannerContractor(String(raw.contractor || '')),
+        priority: normalizePlannerPriority(String(raw.priority || 'Normal')),
+        createdAt: typeof raw.createdAt === 'number' && Number.isFinite(raw.createdAt) ? raw.createdAt : 0,
+        createdBy: typeof raw.createdBy === 'string' ? raw.createdBy : '',
+        week: typeof raw.week === 'string' ? raw.week : '',
+        address: typeof raw.address === 'string' ? raw.address : '',
+        phone: typeof raw.phone === 'string' ? raw.phone : '',
+        notes: typeof raw.notes === 'string' ? raw.notes : ''
+    };
+}
+
 export function Planner({ onBack }: PlannerProps) {
     const { user } = useAuth();
     const [projects, setProjects] = useState<PlannerProject[]>([]);
@@ -112,10 +140,7 @@ export function Planner({ onBack }: PlannerProps) {
             const plannerQuery = query(ref, where('week', '==', selectedWeek));
             const snap = await getDocs(plannerQuery);
             const fetched = snap.docs
-                .map((snapshot) => ({
-                    id: snapshot.id,
-                    ...(snapshot.data() as PlannerProjectDocument)
-                }))
+                .map((snapshot) => normalizePlannerProject(snapshot))
                 .sort((a, b) => b.createdAt - a.createdAt);
             setProjects(fetched);
         } catch (error) {
@@ -288,7 +313,7 @@ export function Planner({ onBack }: PlannerProps) {
                         />
                         <select
                             value={contractor}
-                            onChange={(event) => setContractor(event.target.value as PlannerContractor)}
+                            onChange={(event) => setContractor(normalizePlannerContractor(event.target.value))}
                             className="bg-panel-bg border border-panel-border text-text-primary rounded-lg px-4 py-3 text-sm focus:outline-none focus:border-primary transition-colors cursor-pointer"
                         >
                             {CONTRACTOR_OPTIONS.map((option) => (
@@ -299,7 +324,7 @@ export function Planner({ onBack }: PlannerProps) {
                         </select>
                         <select
                             value={newPriority}
-                            onChange={(event) => setNewPriority(event.target.value as PlannerPriority)}
+                            onChange={(event) => setNewPriority(normalizePlannerPriority(event.target.value))}
                             className="bg-panel-bg border border-panel-border text-text-primary rounded-lg px-4 py-3 text-sm focus:outline-none focus:border-primary transition-colors cursor-pointer"
                         >
                             {PRIORITY_OPTIONS.map((priority) => (

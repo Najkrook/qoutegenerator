@@ -4,6 +4,7 @@ import { quoteRepository } from '../services/quoteRepositoryClient';
 import { normalizeQuoteStatus } from '../services/quoteRepository';
 import { notifyError, notifyInfo, notifySuccess, confirmAction } from '../services/notificationService';
 import { db, collection, getDocs } from '../services/firebase';
+import { getErrorMessage } from '../utils/runtime';
 import { buildHistoryOpenQuotePayload } from './historyPayload';
 import type {
     HistoryOwnerOption,
@@ -12,10 +13,6 @@ import type {
     QuoteRevision,
     QuoteStatus
 } from '../types/contracts';
-
-interface ErrorLike {
-    message?: string;
-}
 
 type HistoryOwnerSelection = '__mine__' | '__all__' | string;
 
@@ -26,13 +23,6 @@ const STATUS_LABELS: Record<QuoteStatus, string> = {
     lost: 'Förlorad',
     archived: 'Arkiverad'
 };
-
-function getErrorMessage(error: unknown, fallback: string): string {
-    if (error && typeof error === 'object' && 'message' in error) {
-        return String((error as ErrorLike).message || fallback);
-    }
-    return fallback;
-}
 
 export function History({ onBack, onOpenQuote }: HistoryProps) {
     const { user, canAccessQuoteHistory, canViewEverything } = useAuth();
