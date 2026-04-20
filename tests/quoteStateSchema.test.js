@@ -103,6 +103,47 @@ describe('quoteStateSchema', () => {
         expect(hydrated.scriveStatus).toBe('not_sent');
     });
 
+    it('normalizes persisted grid maps and clickitup stock rows into concrete numeric shapes', () => {
+        const hydrated = hydrateQuoteState({
+            inventoryData: {
+                bahama: [{ ID: 'B-1', BESKRIVNING: 'Parasollfot' }],
+                clickitup: {
+                    '3m': { sektion: '2', dorr_h: '3', hane_v: '4' },
+                    broken: null
+                }
+            },
+            gridSelections: {
+                ClickitUp: {
+                    items: {
+                        section_1500: { qty: '3', discountPct: '5' },
+                        broken_item: null
+                    },
+                    addons: {
+                        led: { qty: '2', discountPct: '4', syncMode: 'manual', discountSyncMode: 'global' },
+                        broken_addon: { qty: 'bad', discountPct: null, syncMode: 'weird' }
+                    },
+                    customAddonsByCategory: {}
+                }
+            }
+        });
+
+        expect(hydrated.inventoryData).toEqual({
+            bahama: [{ ID: 'B-1', BESKRIVNING: 'Parasollfot' }],
+            clickitup: {
+                '3m': { sektion: 2, dorr_h: 3, dorr_v: 0, hane_h: 0, hane_v: 4 },
+                broken: { sektion: 0, dorr_h: 0, dorr_v: 0, hane_h: 0, hane_v: 0 }
+            }
+        });
+        expect(hydrated.gridSelections.ClickitUp.items).toEqual({
+            section_1500: { qty: 3, discountPct: 5 },
+            broken_item: { qty: 0, discountPct: 0 }
+        });
+        expect(hydrated.gridSelections.ClickitUp.addons).toEqual({
+            led: { qty: 2, discountPct: 4, syncMode: 'manual', discountSyncMode: 'global' },
+            broken_addon: { qty: 0, discountPct: 0 }
+        });
+    });
+
     it('hydrates custom grid add-ons with safe defaults for older and partial state', () => {
         const hydrated = hydrateQuoteState({
             gridSelections: {

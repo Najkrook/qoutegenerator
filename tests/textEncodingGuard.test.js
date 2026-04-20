@@ -6,7 +6,7 @@ const ROOT_DIR = path.resolve(process.cwd());
 const USER_VISIBLE_DIRECTORIES = [
     {
         dirPath: path.join(ROOT_DIR, 'src'),
-        filePattern: /\.(js|jsx|json)$/
+        filePattern: /\.(ts|tsx|js|jsx|json)$/
     },
     {
         dirPath: path.join(ROOT_DIR, 'public'),
@@ -19,15 +19,18 @@ const ROOT_FILES = [
     'index.html'
 ];
 const HIGH_RISK_FILE_PATHS = [
-    'src/features/legalTemplates.js',
-    'src/views/Dashboard.jsx',
-    'src/views/Planner.jsx',
-    'src/views/InventoryManager.jsx',
-    'src/views/SketchTool.jsx',
-    'src/views/SummaryExport.jsx',
-    'src/components/layout/Header.jsx',
-    'src/services/quoteSaveService.js'
+    'src/features/legalTemplates.ts',
+    'src/views/Dashboard.tsx',
+    'src/views/Planner.tsx',
+    'src/views/InventoryManager.tsx',
+    'src/views/SketchTool.tsx',
+    'src/views/SummaryExport.tsx',
+    'src/components/layout/Header.tsx',
+    'src/services/quoteSaveService.ts'
 ];
+const ALLOWED_TOKEN_FILES = new Set([
+    'src/utils/csvNormalizer.ts'
+]);
 
 const SUSPICIOUS_TOKENS = [
     'Ã¤',
@@ -106,6 +109,10 @@ describe('text encoding guard', () => {
         const failures = [];
 
         filesToCheck.forEach((filePath) => {
+            if (ALLOWED_TOKEN_FILES.has(path.relative(ROOT_DIR, filePath))) {
+                return;
+            }
+
             const matches = findSuspiciousMatches(filePath);
             if (matches.length === 0) {
                 return;

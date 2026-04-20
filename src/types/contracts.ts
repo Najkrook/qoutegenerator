@@ -107,6 +107,14 @@ export interface ClickitupStockEntry {
     hane_v: number;
 }
 
+export interface RawClickitupStockEntry extends UnknownRecord {
+    sektion?: unknown;
+    dorr_h?: unknown;
+    dorr_v?: unknown;
+    hane_h?: unknown;
+    hane_v?: unknown;
+}
+
 export type ClickitupStockMap = Record<string, ClickitupStockEntry>;
 
 export interface InventoryData {
@@ -1066,9 +1074,20 @@ export interface DoorSegment {
     size: number;
 }
 
+export interface RawDoorSegment extends UnknownRecord {
+    index?: unknown;
+    size?: unknown;
+    doorSize?: unknown;
+}
+
 export interface ManualSectionPin {
     index: number;
     size: number;
+}
+
+export interface RawManualSectionPin extends UnknownRecord {
+    index?: unknown;
+    size?: unknown;
 }
 
 export type DoorSegmentsByEdge = Partial<Record<SketchEdgeKey, DoorSegment[]>>;
@@ -1076,6 +1095,12 @@ export type DoorSegmentsByEdge = Partial<Record<SketchEdgeKey, DoorSegment[]>>;
 export type ManualSectionsByEdge = Partial<Record<SketchEdgeKey, ManualSectionPin[]>>;
 
 export type SectionCountByEdge = Partial<Record<SketchEdgeKey, number>>;
+
+export type RawDoorSegmentsByEdge = Partial<Record<SketchEdgeKey, unknown>>;
+
+export type RawManualSectionsByEdge = Partial<Record<SketchEdgeKey, unknown>>;
+
+export type RawSectionCountByEdge = Partial<Record<SketchEdgeKey, unknown>>;
 
 export interface SketchAreaPoint {
     x: number;

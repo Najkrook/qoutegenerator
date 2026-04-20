@@ -10,12 +10,18 @@ import type {
     LayoutWarningLevel,
     ManualSectionPin,
     ManualSectionsByEdge,
+    RawDoorSegment,
+    RawDoorSegmentsByEdge,
+    RawManualSectionPin,
+    RawManualSectionsByEdge,
+    RawSectionCountByEdge,
     SectionCountByEdge,
     SketchConfigState,
     SketchEdgeKey,
     SketchPriorityMode,
     SketchRenderedSegment,
-    SketchSectionEntry
+    SketchSectionEntry,
+    UnknownRecord
 } from '../types/contracts';
 
 /**
@@ -278,10 +284,38 @@ function normalizeSectionSize(rawSectionSize: unknown): number {
     return nearestFromList(value, SECTION_SIZES);
 }
 
-function normalizeDoorSegment(rawSegment: unknown, fallbackIndex = 0): DoorSegment | null {
-    if (!rawSegment || typeof rawSegment !== 'object') return null;
+function isUnknownRecord(value: unknown): value is UnknownRecord {
+    return value != null && typeof value === 'object' && !Array.isArray(value);
+}
 
-    const candidate = rawSegment as Partial<DoorSegment> & Record<string, unknown>;
+function toRawDoorSegment(value: unknown): RawDoorSegment | null {
+    return isUnknownRecord(value) ? value : null;
+}
+
+function toRawManualSectionPin(value: unknown): RawManualSectionPin | null {
+    return isUnknownRecord(value) ? value : null;
+}
+
+function toRawDoorSegmentsByEdge(value: unknown): RawDoorSegmentsByEdge {
+    return isUnknownRecord(value) ? value : {};
+}
+
+function toRawManualSectionsByEdge(value: unknown): RawManualSectionsByEdge {
+    return isUnknownRecord(value) ? value : {};
+}
+
+function toRawSectionCountByEdge(value: unknown): RawSectionCountByEdge {
+    return isUnknownRecord(value) ? value : {};
+}
+
+function toRawDoorSizeByEdge(value: unknown): Partial<Record<SketchEdgeKey, unknown>> {
+    return isUnknownRecord(value) ? value : {};
+}
+
+function normalizeDoorSegment(rawSegment: unknown, fallbackIndex = 0): DoorSegment | null {
+    const candidate = toRawDoorSegment(rawSegment);
+    if (!candidate) return null;
+
     const parsedIndex = Number.parseInt(String(candidate.index), 10);
     return {
         index: Number.isFinite(parsedIndex) && parsedIndex >= 0 ? parsedIndex : fallbackIndex,
@@ -306,8 +340,9 @@ function normalizeManualPins(rawPins: unknown = [], doorSegments: DoorSegment[] 
     const deduped = new Map<number, ManualSectionPin>();
 
     (Array.isArray(rawPins) ? rawPins : []).forEach((pin, fallbackIndex) => {
-        if (!pin || typeof pin !== 'object') return;
-        const candidate = pin as Partial<ManualSectionPin> & Record<string, unknown>;
+        const candidate = toRawManualSectionPin(pin);
+        if (!candidate) return;
+
         const parsedIndex = Number.parseInt(String(candidate.index), 10);
         const index = Number.isFinite(parsedIndex) && parsedIndex >= 0 ? parsedIndex : fallbackIndex;
         if (occupiedDoorIndexes.has(index)) return;
@@ -488,14 +523,14 @@ function normalizeDoorSegmentsByEdge(
     enabledEdges: Record<SketchEdgeKey, boolean>
 ): DoorSegmentsByEdge {
     const normalized: DoorSegmentsByEdge = {};
-    const hasNewModel = !!rawDoorSegmentsByEdge && typeof rawDoorSegmentsByEdge === 'object';
+    const rawRecord = toRawDoorSegmentsByEdge(rawDoorSegmentsByEdge);
+    const hasNewModel = Object.keys(rawRecord).length > 0;
 
     EDGE_KEYS.forEach((edge) => {
         if (!enabledEdges[edge]) return;
 
         if (hasNewModel) {
-            const record = rawDoorSegmentsByEdge as Partial<Record<SketchEdgeKey, unknown>>;
-            const segments = normalizeDoorSegments(record[edge]);
+            const segments = normalizeDoorSegments(rawRecord[edge]);
             if (segments.length > 0) {
                 normalized[edge] = segments;
             }
@@ -509,7 +544,7 @@ function normalizeDoorSegmentsByEdge(
         if (edge === 'back' && !includeBack) legacyEdges.delete('back');
         if (!legacyEdges.has(edge)) return;
 
-        const sizeMap = (legacyDoorSizeByEdge ?? {}) as Partial<Record<SketchEdgeKey, number>>;
+        const sizeMap = toRawDoorSizeByEdge(legacyDoorSizeByEdge);
         normalized[edge] = [{
             index: 0,
             size: normalizeDoorSize(sizeMap[edge] ?? 1000)
@@ -524,7 +559,7 @@ function normalizeManualSectionsByEdge(
     doorSegmentsByEdge: DoorSegmentsByEdge
 ): ManualSectionsByEdge {
     const normalized: ManualSectionsByEdge = {};
-    const rawRecord = (rawManualSectionsByEdge ?? {}) as Partial<Record<SketchEdgeKey, unknown>>;
+    const rawRecord = toRawManualSectionsByEdge(rawManualSectionsByEdge);
 
     EDGE_KEYS.forEach((edge) => {
         const pins = normalizeManualPins(rawRecord[edge], doorSegmentsByEdge[edge] || []);
@@ -541,9 +576,7 @@ function normalizeSectionCountByEdge(
     enabledEdges: Record<SketchEdgeKey, boolean>
 ): SectionCountByEdge {
     const normalized: SectionCountByEdge = {};
-    if (!rawCounts || typeof rawCounts !== 'object') return normalized;
-
-    const record = rawCounts as Partial<Record<SketchEdgeKey, unknown>>;
+    const record = toRawSectionCountByEdge(rawCounts);
     EDGE_KEYS.forEach((edge) => {
         if (!enabledEdges[edge]) return;
         const parsed = Number.parseInt(String(record[edge]), 10);

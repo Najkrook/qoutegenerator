@@ -160,6 +160,25 @@ describe('computeLayout split depth handling', () => {
         expect(layout.frontEdge[1]).toBe('Dörr 700');
         expect(layout.frontEdge[3]).toBe('Dörr 1100');
     });
+
+    it('normalizes raw door, manual pin, and section-count inputs conservatively', () => {
+        const layout = computeLayout(baseConfig({
+            width: 5800,
+            doorSegmentsByEdge: {
+                front: [{ index: '2', doorSize: '730' }, 'broken']
+            },
+            manualSectionsByEdge: {
+                front: [{ index: '1', size: '1490' }, { index: '2', size: 1800 }]
+            },
+            sectionCountByEdge: {
+                front: '4'
+            }
+        }));
+
+        expect(layout.sectionCountByEdge.front).toBe(4);
+        expect(layout.frontEdge).toEqual([1800, 1500, 'Dörr 700', 1800]);
+        expect(layout.edgeSummaries.front.valid).toBe(true);
+    });
 });
 
 describe('computeLayout section count overrides', () => {

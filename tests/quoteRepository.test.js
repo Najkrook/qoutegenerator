@@ -35,7 +35,7 @@ const baseSummary = {
 
 describe('quoteRepository', () => {
     it('createQuote creates metadata and revision v1', async () => {
-        const { repo } = buildRepo();
+        const { repo, mock } = buildRepo();
         const saved = await repo.createQuote({
             user,
             state: baseState,
@@ -51,6 +51,29 @@ describe('quoteRepository', () => {
         expect(saved.metadata.customerReference).toBe('ER-01');
         expect(saved.revision.version).toBe(1);
         expect(saved.revision.state.customerInfo.company).toBe('Brixx AB');
+
+        const quotePath = `users/${user.uid}/quotes/${saved.quoteId}`;
+        const revisionPath = `users/${user.uid}/quotes/${saved.quoteId}/revisions/${saved.revision.revisionId}`;
+
+        expect(mock.__docs.get(quotePath)).toMatchObject({
+            customerName: 'Brixx AB',
+            customerReference: 'ER-01',
+            latestVersion: 1,
+            latestRevisionId: saved.revision.revisionId,
+            status: 'draft',
+            totalSek: 12345
+        });
+        expect(mock.__docs.get(revisionPath)).toMatchObject({
+            quoteId: saved.quoteId,
+            version: 1,
+            savedBy: 'sales@example.com',
+            savedByUid: 'user-1',
+            summary: {
+                finalTotalSek: 12345,
+                grossTotalSek: 14000,
+                totalDiscountSek: 1655
+            }
+        });
     });
 
     it('saveQuoteRevision increments version and updates latest metadata pointer', async () => {

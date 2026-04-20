@@ -6,14 +6,18 @@ import { InventoryTable } from '../components/features/InventoryTable';
 import { ClickitupStockGrid } from '../components/features/ClickitupStockGrid';
 import { InventoryItemModal } from '../components/features/InventoryItemModal';
 import { PendingChangesPanel } from '../components/features/PendingChangesPanel';
+import {
+    buildImportedInventoryItem,
+    createDefaultInventoryData,
+    DEFAULT_CLICKITUP_ENTRY,
+    normalizeInventorySheetHeaders,
+    normalizeStoredInventoryData
+} from './inventoryData';
 import * as XLSX from 'xlsx';
 import toast from 'react-hot-toast';
-import { normalizeInventoryItem, normalizeInventoryList, normalizeInventoryText } from '../utils/csvNormalizer';
 import type {
     BahamaInventoryItem,
     ClickitupFieldKey,
-    ClickitupStockEntry,
-    ClickitupStockMap,
     InventoryData,
     InventoryManagerProps
 } from '../types/contracts';
@@ -27,23 +31,7 @@ interface InventoryModalState {
 type SheetCell = string | number | boolean | null | undefined;
 type SheetRow = SheetCell[];
 
-const DEFAULT_CLICKITUP_ENTRY: ClickitupStockEntry = {
-    sektion: 0,
-    dorr_h: 0,
-    dorr_v: 0,
-    hane_h: 0,
-    hane_v: 0
-};
-
-const DEFAULT_INVENTORY_DATA: InventoryData = {
-    bahama: [],
-    clickitup: {},
-    notes: ''
-};
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-    return value != null && typeof value === 'object' && !Array.isArray(value);
-}
+const DEFAULT_INVENTORY_DATA: InventoryData = createDefaultInventoryData();
 
 function getErrorMessage(error: unknown, fallback: string): string {
     if (error instanceof Error && error.message) return error.message;
@@ -52,34 +40,6 @@ function getErrorMessage(error: unknown, fallback: string): string {
 
 function cloneInventoryData(inventory: InventoryData): InventoryData {
     return JSON.parse(JSON.stringify(inventory)) as InventoryData;
-}
-
-function toClickitupEntry(value: unknown): ClickitupStockEntry {
-    const raw = isRecord(value) ? value : {};
-    return {
-        sektion: Number(raw.sektion) || 0,
-        dorr_h: Number(raw.dorr_h) || 0,
-        dorr_v: Number(raw.dorr_v) || 0,
-        hane_h: Number(raw.hane_h) || 0,
-        hane_v: Number(raw.hane_v) || 0
-    };
-}
-
-function toInventoryData(value: unknown): InventoryData {
-    if (!isRecord(value)) {
-        return cloneInventoryData(DEFAULT_INVENTORY_DATA);
-    }
-
-    const bahama = normalizeInventoryList(value.bahama);
-    const clickitup = isRecord(value.clickitup)
-        ? Object.entries(value.clickitup).reduce<ClickitupStockMap>((acc, [size, entry]) => {
-            acc[size] = toClickitupEntry(entry);
-            return acc;
-        }, {})
-        : {};
-
-    const notes = typeof value.notes === 'string' ? value.notes : '';
-    return { bahama, clickitup, notes };
 }
 
 function createEmptyModalState(): InventoryModalState {
@@ -105,7 +65,7 @@ export function InventoryManager({ onBack }: InventoryManagerProps) {
             const docSnap = await getDoc(docRef);
 
             if (docSnap.exists()) {
-                const inventoryData = toInventoryData(docSnap.data());
+                const inventoryData = normalizeStoredInventoryData(docSnap.data());
                 dispatch({ type: 'SET_CLOUD_INVENTORY_DATA', payload: cloneInventoryData(inventoryData) });
                 dispatch({ type: 'SET_INVENTORY_DATA', payload: inventoryData });
             } else {
@@ -119,7 +79,7 @@ export function InventoryManager({ onBack }: InventoryManagerProps) {
             try {
                 const res = await fetch('/inventory_db.json');
                 if (res.ok) {
-                    const localData = toInventoryData(await res.json());
+                    const localData = normalizeStoredInventoryData(await res.json());
                     dispatch({ type: 'SET_INVENTORY_DATA', payload: cloneInventoryData(localData) });
                     dispatch({ type: 'SET_CLOUD_INVENTORY_DATA', payload: cloneInventoryData(localData) });
                     toast('Laddat lokalt lagersaldo (offline-läge)', { icon: '💾' });
@@ -166,29 +126,14 @@ export function InventoryManager({ onBack }: InventoryManagerProps) {
                     return;
                 }
 
-                const headers = jsonArr[headerIdx].map((header) => (
-                    typeof header === 'string' ? String(normalizeInventoryText(header.trim()) || '') : header
-                ));
+                const headers = normalizeInventorySheetHeaders(jsonArr[headerIdx] || []);
                 const inventory: BahamaInventoryItem[] = [];
 
                 for (let rowIndex = headerIdx + 1; rowIndex < jsonArr.length; rowIndex += 1) {
                     const row = jsonArr[rowIndex];
                     if (!row || row.length === 0) continue;
 
-                    const item: Record<string, unknown> = {};
-                    let hasData = false;
-
-                    headers.forEach((header, colIdx) => {
-                        if (header && typeof header === 'string') {
-                            const value = row[colIdx];
-                            item[header] = value;
-                            if (value !== undefined && value !== '') {
-                                hasData = true;
-                            }
-                        }
-                    });
-
-                    const cleanItem = normalizeInventoryItem(item);
+                    const { item: cleanItem, hasData } = buildImportedInventoryItem(headers, row);
                     if (hasData && cleanItem.BESKRIVNING) {
                         inventory.push(cleanItem);
                     }

@@ -1,4 +1,4 @@
-import { catalogData } from '../data/catalog';
+import { getBuilderCatalogLine } from '../data/catalogLookup';
 import type {
     ParasolPreset,
     PlacedFiesta,
@@ -6,16 +6,6 @@ import type {
     SketchConfigState,
     SketchPolygon
 } from '../types/contracts';
-
-interface CatalogWithJumbrella {
-    BaHaMa?: {
-        models?: {
-            Jumbrella?: {
-                sizes?: Record<string, unknown>;
-            };
-        };
-    };
-}
 
 interface ParsedJumbrellaSize {
     widthMm: number;
@@ -238,8 +228,7 @@ function buildPresetId(label: string): string {
 }
 
 export function buildJumbrellaParasolPresets(): ParasolPreset[] {
-    const catalog = catalogData as CatalogWithJumbrella;
-    const jumbrellaSizes = catalog?.BaHaMa?.models?.Jumbrella?.sizes || {};
+    const jumbrellaSizes = getBuilderCatalogLine('BaHaMa')?.models?.Jumbrella?.sizes || {};
 
     return Object.keys(jumbrellaSizes).reduce<ParasolPreset[]>((presets, sizeLabel) => {
         const parsed = parseJumbrellaSize(sizeLabel);

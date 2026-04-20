@@ -290,6 +290,47 @@ function buildQuoteMetadata({
     };
 }
 
+function buildRevisionWriteDoc(revision: NormalizedRevisionRecord): RawQuoteRevisionDoc {
+    return {
+        quoteId: revision.quoteId,
+        version: revision.version,
+        savedAtMs: revision.savedAtMs,
+        savedBy: revision.savedBy,
+        savedByUid: revision.savedByUid,
+        state: revision.state,
+        summary: revision.summary,
+        changeNote: revision.changeNote
+    };
+}
+
+function buildMetadataWriteDoc(metadata: QuoteMetadata): RawQuoteMetadataDoc {
+    return {
+        customerName: metadata.customerName,
+        company: metadata.company,
+        reference: metadata.reference,
+        customerReference: metadata.customerReference,
+        status: metadata.status,
+        createdAtMs: metadata.createdAtMs,
+        updatedAtMs: metadata.updatedAtMs,
+        savedBy: metadata.savedBy,
+        savedByUid: metadata.savedByUid,
+        latestVersion: metadata.latestVersion,
+        latestRevisionId: metadata.latestRevisionId,
+        totalSek: metadata.totalSek,
+        retailerName: metadata.retailerName,
+        searchText: metadata.searchText,
+        scriveEnabled: metadata.scriveEnabled,
+        scriveStatus: metadata.scriveStatus,
+        scriveDocumentId: metadata.scriveDocumentId,
+        scriveSignerName: metadata.scriveSignerName,
+        scriveSignerEmail: metadata.scriveSignerEmail,
+        scriveLastError: metadata.scriveLastError,
+        scriveSentAtMs: metadata.scriveSentAtMs,
+        scriveLastEventAtMs: metadata.scriveLastEventAtMs,
+        scriveCompletedAtMs: metadata.scriveCompletedAtMs
+    };
+}
+
 function normalizeQuoteRevision(
     quoteId: string,
     revisionId: string,
@@ -399,9 +440,11 @@ export function createQuoteRepository(deps: QuoteRepositoryDeps = {} as QuoteRep
             existing,
             retailerName
         });
+        const revisionWriteDoc = buildRevisionWriteDoc(revisionData);
+        const metadataWriteDoc = buildMetadataWriteDoc(metadata);
 
-        await setDoc(revisionRef, revisionData as unknown as UnknownRecord);
-        await setDoc(quoteRef, metadata as unknown as UnknownRecord, { merge: true });
+        await setDoc(revisionRef, revisionWriteDoc);
+        await setDoc(quoteRef, metadataWriteDoc, { merge: true });
 
         return { metadata, revision: { revisionId, ...revisionData } };
     };
@@ -471,9 +514,11 @@ export function createQuoteRepository(deps: QuoteRepositoryDeps = {} as QuoteRep
                 existing,
                 retailerName
             });
+            const revisionWriteDoc = buildRevisionWriteDoc(revisionData);
+            const metadataWriteDoc = buildMetadataWriteDoc(metadata);
 
-            transaction.set(revisionRef, revisionData as unknown as UnknownRecord);
-            transaction.set(quoteRef, metadata as unknown as UnknownRecord, { merge: true });
+            transaction.set(revisionRef, revisionWriteDoc);
+            transaction.set(quoteRef, metadataWriteDoc, { merge: true });
 
             return { metadata, revision: { revisionId, ...revisionData } };
         });

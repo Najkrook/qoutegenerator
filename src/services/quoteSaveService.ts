@@ -37,7 +37,7 @@ export async function saveQuoteToRepository({
     summary
 }: SaveQuoteToRepositoryParams): Promise<SaveQuoteToRepositoryResult> {
     if (!user?.uid) {
-        throw new Error('Du mÃ¥ste vara inloggad fÃ¶r att spara offerter.');
+        throw new Error('Du måste vara inloggad för att spara offerter.');
     }
 
     const basePayload: Omit<CreateQuoteInput, 'quoteId'> = {

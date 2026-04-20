@@ -1,6 +1,6 @@
 # TypeScript Migration Tracker
 
-Last updated: 2026-04-17
+Last updated: 2026-04-20
 Working branch: `feat/typescript-migration`
 
 This is a living tracker for the QuoteGenerator TypeScript migration. Update it after each migration slice so we keep one source of truth for what is done, what is intentionally deferred, and what should happen next.
@@ -473,6 +473,79 @@ This is a living tracker for the QuoteGenerator TypeScript migration. Update it 
   - `npm run test:confidence`
   - `npm run build`
   - `vitest run tests/csvNormalizer.test.js`
+
+### 26. Small hardening slice: sketch helpers + inventory runtime boundary
+
+- [x] Added small shared raw-input contracts for:
+  - `RawClickitupStockEntry`
+  - `RawDoorSegment`
+  - `RawManualSectionPin`
+  - `RawDoorSegmentsByEdge`
+  - `RawManualSectionsByEdge`
+  - `RawSectionCountByEdge`
+- [x] Replaced the remaining ad hoc structural casts in `src/utils/sectionCalculator.ts` with typed narrowing helpers around raw door, manual-pin, and edge-map inputs.
+- [x] Removed the local catalog cast in `src/utils/parasolGeometry.ts` by reading the typed BaHaMa builder catalog through the shared catalog lookup boundary.
+- [x] Extracted the inventory ingest/runtime normalization logic from `src/views/InventoryManager.tsx` into the pure helper module `src/views/inventoryData.ts` so Firestore payloads, ClickitUp stock entries, and imported Excel rows share one typed normalization boundary.
+- [x] Fixed the remaining visible mojibake in `src/services/quoteSaveService.ts`.
+- [x] Extended focused regression coverage for:
+  - raw sketch door/manual-pin/section-count normalization in `tests/sectionCalculator.test.js`
+  - malformed Jumbrella preset parsing in `tests/parasolGeometry.test.js`
+  - stored inventory payload and imported-row normalization in `tests/inventoryData.test.js`
+  - TypeScript source-file encoding guards in `tests/textEncodingGuard.test.js`
+- [x] Verified the sketch/inventory hardening slice with:
+  - `npm run typecheck`
+  - `npm run test:confidence`
+  - `npm run build`
+  - `vitest run tests/sectionCalculator.test.js tests/parasolGeometry.test.js tests/inventoryData.test.js tests/quoteSaveService.test.js tests/textEncodingGuard.test.js`
+
+### 27. Small hardening slice: schema + repository write boundaries
+
+- [x] Kept `src/store/quoteStateSchema.ts` in raw-record space during version migration so `migrateQuoteState` no longer needs quote-state double-casts before final hydration.
+- [x] Replaced the remaining schema migration double-casts around cloned raw state with direct `UnknownRecord` flows built from the existing object guards.
+- [x] Added explicit Firestore write-doc builders in `src/services/quoteRepository.ts` for:
+  - revision documents
+  - quote metadata documents
+- [x] Replaced the remaining repository `as unknown as UnknownRecord` save paths in both the fallback write flow and transaction write flow with the dedicated raw write-doc builders.
+- [x] Kept repository/runtime behavior unchanged for:
+  - create-vs-revision saves
+  - merge writes to quote metadata
+  - fallback saves without `runTransaction`
+  - stored revision/state/summary payload shapes
+- [x] Extended regression coverage for:
+  - persisted quote metadata/revision document shapes through the Firestore mock in `tests/quoteRepository.test.js`
+- [x] Verified the schema/repository boundary slice with:
+  - `npm run typecheck`
+  - `npm run test:confidence`
+  - `npm run build`
+  - `vitest run tests/quoteStateSchema.test.js tests/quoteRepository.test.js`
+
+### 28. Small hardening slice: quote-state normalization helpers
+
+- [x] Tightened `src/store/quoteStateSchema.ts` with generic raw-record helpers so the remaining schema normalization paths no longer need quote-state-specific casts for:
+  - persisted customer-info records
+  - persisted sketch-meta records
+  - persisted builder/grid raw rows
+- [x] Added explicit normalizers for persisted quote-state subshapes where concrete runtime fields are already known:
+  - ClickitUp stock entries in persisted inventory data
+  - grid item selection maps
+  - grid add-on state maps
+- [x] Replaced the remaining quote-state-specific array/value clone casts in hydration and migration paths with typed helper flows for:
+  - `customCosts`
+  - `inventoryBasket`
+  - `sketchDraft`
+- [x] Kept quote-state hydration behavior unchanged for:
+  - legacy state-version migration
+  - conservative forward-version hydration
+  - existing custom add-on normalization
+  - persisted sketch draft preservation
+- [x] Extended focused regression coverage in `tests/quoteStateSchema.test.js` for:
+  - numeric ClickitUp stock normalization from persisted state
+  - grid item/add-on map normalization from malformed persisted payloads
+- [x] Verified the quote-state normalization-helper slice with:
+  - `npm run typecheck`
+  - `npm run test:confidence`
+  - `npm run build`
+  - `vitest run tests/quoteStateSchema.test.js`
 
 ## Remaining Work
 

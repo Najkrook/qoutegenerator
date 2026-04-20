@@ -39,6 +39,12 @@ describe('parasolGeometry', () => {
         });
     });
 
+    it('rejects malformed preset labels instead of guessing a shape', () => {
+        expect(parseJumbrellaSize('')).toBeNull();
+        expect(parseJumbrellaSize('4x4 Triangel')).toBeNull();
+        expect(parseJumbrellaSize('stor parasoll')).toBeNull();
+    });
+
     it('classifies round sizes but excludes them from sketch presets', () => {
         expect(parseJumbrellaSize('3* Runda')).toEqual({
             widthMm: 3000,

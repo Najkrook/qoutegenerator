@@ -77,7 +77,7 @@ describe('quoteSaveService', () => {
             user: null,
             state: { customerInfo: {} },
             summary: { finalTotalSek: 0, grossTotalSek: 0, totalDiscountSek: 0 }
-        })).rejects.toThrow(/inloggad.*spara offerter/i);
+        })).rejects.toThrow('Du måste vara inloggad för att spara offerter.');
     });
 
     it('buildSavedQuoteStatePatch preserves fallback state when metadata is partial', () => {
