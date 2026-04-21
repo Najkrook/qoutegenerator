@@ -205,7 +205,7 @@ export function Dashboard({
                         onClick={onStartQuote}
                         className="flex-1 min-w-[300px] max-w-[400px] bg-panel-bg border border-panel-border rounded-xl p-12 cursor-pointer text-center transition-all hover:-translate-y-1 hover:shadow-lg hover:border-primary group"
                     >
-                        <div className="text-5xl mb-4 group-hover:scale-110 transition-transform" aria-hidden="true">Dok</div>
+                        <div className="text-5xl mb-4 group-hover:scale-110 transition-transform" aria-hidden="true">📄</div>
                         <h3 className="text-2xl font-semibold text-text-primary mb-2">Skapa Ny Offert</h3>
                         <p className="text-text-secondary leading-relaxed m-0">
                             Starta ett nytt offertflöde för kund. Konfigurera produkter, priser och generera PDF.
@@ -219,7 +219,7 @@ export function Dashboard({
                         onClick={onOpenInventory}
                         className="flex-1 min-w-[250px] max-w-[350px] bg-panel-bg border border-panel-border rounded-xl p-12 cursor-pointer text-center transition-all hover:-translate-y-1 hover:shadow-lg hover:border-primary group"
                     >
-                        <div className="text-5xl mb-4 group-hover:scale-110 transition-transform" aria-hidden="true">Inv</div>
+                        <div className="text-5xl mb-4 group-hover:scale-110 transition-transform" aria-hidden="true">📦</div>
                         <h3 className="text-2xl font-semibold text-text-primary mb-2">Hantera Lagersaldo</h3>
                         <p className="text-text-secondary leading-relaxed m-0">
                             Uppdatera lagersaldon för BaHaMa och ClickitUp. Se loggar och historik.
@@ -233,7 +233,7 @@ export function Dashboard({
                         onClick={onOpenSketch}
                         className="flex-1 min-w-[250px] max-w-[350px] bg-panel-bg border border-panel-border rounded-xl p-12 cursor-pointer text-center transition-all hover:-translate-y-1 hover:shadow-lg hover:border-primary group"
                     >
-                        <div className="text-5xl mb-4 group-hover:scale-110 transition-transform" aria-hidden="true">Pen</div>
+                        <div className="text-5xl mb-4 group-hover:scale-110 transition-transform" aria-hidden="true">✏️</div>
                         <h3 className="text-2xl font-semibold text-text-primary mb-2">Rita Uteservering</h3>
                         <p className="text-text-secondary leading-relaxed m-0">
                             Skissa snabbt en rektangel för att automatiskt beräkna optimala ClickitUp-sektioner.
@@ -247,7 +247,7 @@ export function Dashboard({
                         onClick={onOpenActivity}
                         className="flex-1 min-w-[250px] max-w-[350px] bg-panel-bg border border-panel-border rounded-xl p-12 cursor-pointer text-center transition-all hover:-translate-y-1 hover:shadow-lg hover:border-primary group"
                     >
-                        <div className="text-5xl mb-4 group-hover:scale-110 transition-transform" aria-hidden="true">Log</div>
+                        <div className="text-5xl mb-4 group-hover:scale-110 transition-transform" aria-hidden="true">🕘</div>
                         <h3 className="text-2xl font-semibold text-text-primary mb-2">Aktivitetslog</h3>
                         <p className="text-text-secondary leading-relaxed m-0">
                             Se vem som skapade offerter, exporterade filer och använde ritverktyget.
@@ -261,7 +261,7 @@ export function Dashboard({
                         onClick={onOpenPlanner}
                         className="flex-1 min-w-[250px] max-w-[350px] bg-panel-bg border border-panel-border rounded-xl p-12 cursor-pointer text-center transition-all hover:-translate-y-1 hover:shadow-lg hover:border-primary group"
                     >
-                        <div className="text-5xl mb-4 group-hover:scale-110 transition-transform" aria-hidden="true">Plan</div>
+                        <div className="text-5xl mb-4 group-hover:scale-110 transition-transform" aria-hidden="true">📋</div>
                         <h3 className="text-2xl font-semibold text-text-primary mb-2">Projektplanerare</h3>
                         <p className="text-text-secondary leading-relaxed m-0">
                             Planera och följ upp projekt. Lägg till, checka av och håll koll på framsteg.
@@ -275,7 +275,7 @@ export function Dashboard({
                         onClick={onOpenRetailers}
                         className="flex-1 min-w-[250px] max-w-[350px] bg-panel-bg border border-panel-border rounded-xl p-12 cursor-pointer text-center transition-all hover:-translate-y-1 hover:shadow-lg hover:border-primary group"
                     >
-                        <div className="text-5xl mb-4 group-hover:scale-110 transition-transform" aria-hidden="true">AF</div>
+                        <div className="text-5xl mb-4 group-hover:scale-110 transition-transform" aria-hidden="true">🏪</div>
                         <h3 className="text-2xl font-semibold text-text-primary mb-2">Återförsäljare</h3>
                         <p className="text-text-secondary leading-relaxed m-0">
                             Hantera återförsäljare, produktlinjer och rabatter.

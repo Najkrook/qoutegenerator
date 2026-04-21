@@ -7,17 +7,13 @@ import {
 } from '../src/features/legalTemplates';
 
 describe('legalTemplates', () => {
-    it('contains three selectable templates', () => {
-        expect(LEGAL_TEMPLATES).toHaveLength(3);
+    it('contains one selectable built-in template', () => {
+        expect(LEGAL_TEMPLATES).toHaveLength(1);
         expect(LEGAL_TEMPLATES.map((template) => template.id)).toEqual([
-            'standard',
-            'service_work',
-            'project_delivery'
+            'standard'
         ]);
         expect(LEGAL_TEMPLATES.map((template) => template.label)).toEqual([
-            'Standardvillkor',
-            'Standardvillkor (tidigare service)',
-            'Standardvillkor (tidigare projekt)'
+            'Standardvillkor'
         ]);
     });
 
@@ -29,11 +25,11 @@ describe('legalTemplates', () => {
     });
 
     it('validates known template ids', () => {
-        expect(isLegalTemplateId('service_work')).toBe(true);
+        expect(isLegalTemplateId('standard')).toBe(true);
         expect(isLegalTemplateId('missing')).toBe(false);
     });
 
-    it('uses the same main body for all built-in templates', () => {
+    it('uses the standard terms body for the built-in template', () => {
         const bodies = LEGAL_TEMPLATES.map((template) => template.body);
         expect(new Set(bodies).size).toBe(1);
         expect(bodies[0]).toContain('Samtliga priser i offerten anges i SEK exklusive moms');

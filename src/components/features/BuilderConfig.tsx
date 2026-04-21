@@ -49,20 +49,6 @@ export function BuilderConfig(_props: BuilderConfigProps) {
         dispatch({ type: 'SET_BUILDER_ITEMS', payload: [...builderItems, newItem] });
     }, [builderLines, builderItems, globalDiscountPct, dispatch]);
 
-    useEffect(() => {
-        if (builderItems.length > 0 || builderLines.length === 0) {
-            return;
-        }
-
-        const defaultLine = builderLines[0];
-        const lineData = getBuilderLine(defaultLine);
-        if (!lineData) {
-            return;
-        }
-
-        const newItem = createDefaultBuilderItem(lineData, defaultLine, globalDiscountPct);
-        dispatch({ type: 'SET_BUILDER_ITEMS', payload: [newItem] });
-    }, [builderItems.length, builderLines, globalDiscountPct, dispatch]);
 
     const removeItem = (id: string) => {
         dispatch({

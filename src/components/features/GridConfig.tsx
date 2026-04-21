@@ -275,6 +275,14 @@ export function GridConfig({ lineId }: GridConfigProps) {
         dispatch({ type: 'SET_GRID_SELECTIONS', payload: newSelections });
     };
 
+    const resetGrid = () => {
+        const newSelections = {
+            ...gridSelections,
+            [lineId]: createEmptyGridSelection()
+        };
+        dispatch({ type: 'SET_GRID_SELECTIONS', payload: newSelections });
+    };
+
     const addCustomItem = () => {
         const existingRows = selections.customItems || [];
         updateGrid({
@@ -447,7 +455,16 @@ export function GridConfig({ lineId }: GridConfigProps) {
 
     return (
         <div className="bg-panel-bg border border-panel-border rounded-lg p-6 mb-8 bg-black/5 animate-fade-in">
-            <h3 className="text-lg font-semibold mb-2">Grid View: {lineData.name}</h3>
+            <div className="flex items-center justify-between mb-2">
+                <h3 className="text-lg font-semibold">Grid View: {lineData.name}</h3>
+                <button
+                    type="button"
+                    onClick={resetGrid}
+                    className="text-danger bg-transparent border-none text-sm font-medium cursor-pointer hover:underline"
+                >
+                    Ta bort
+                </button>
+            </div>
             <p className="text-sm text-text-secondary mb-6 italic">Fyll i antal för de artiklar som ska ingå i offerten.</p>
 
             <div className="overflow-x-auto">

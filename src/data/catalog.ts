@@ -57,6 +57,7 @@ const rawCatalogData: CatalogData = {
                     "4x4 Kvadrat": { price: 3060 },
                     "4,5x4,5 Kvadrat": { price: 3360 },
                     "5x5 Kvadrat": { price: 4070 },
+                    "6x6 Kvadrat": { price: 5600 },
                     // Runda
                     "3* Runda": { price: 2110 },
                     "3,5* Runda": { price: 2230 },
@@ -155,7 +156,8 @@ const rawCatalogData: CatalogData = {
                             { id: "jumb_textil_35x35", name: "JUMBRELLA Textilduk 3,5x3,5", price: 1100 },
                             { id: "jumb_textil_4x4", name: "JUMBRELLA Textilduk 4x4", price: 1220 },
                             { id: "jumb_textil_45x45", name: "JUMBRELLA Textilduk 4,5x4,5", price: 1410 },
-                            { id: "jumb_textil_5x5", name: "JUMBRELLA Textilduk 5x5", price: 1780 }
+                            { id: "jumb_textil_5x5", name: "JUMBRELLA Textilduk 5x5", price: 1780 },
+                            { id: "jumb_textil_6x6", name: "JUMBRELLA Textilduk 6x6", price: 2240 }
                         ]
                     },
                     {
@@ -166,7 +168,7 @@ const rawCatalogData: CatalogData = {
                             { id: "jumb_hang_kv_4x4", name: "Hängränna 4x4", price: 710 },
                             { id: "jumb_hang_kv_45x45", name: "Hängränna 4,5x4,5", price: 810 },
                             { id: "jumb_hang_kv_5x5", name: "Hängränna 5x5", price: 830 },
-                            { id: "jumb_hang_kv_6x6", name: "Hängränna 6x6", price: 1060 }
+                            { id: "jumb_hang_kv_6x6", name: "Hängränna 6x6", price: 940 }
                         ]
                     },
                     {
@@ -620,6 +622,106 @@ const rawCatalogData: CatalogData = {
                 items: [
                     { id: "svartanodiserade", name: "Svartanodiserade profiler", price: 340, autoScale: true },
                     { id: "stoppknapp", name: "Stoppknapp 140 cm", price: 564, autoScale: true }
+                ]
+            },
+            {
+                id: "additional",
+                name: "Andra Tillval / Tillkommande",
+                items: [
+                    { id: "montering_gangjarn", name: "Montering Gångjärn Rostfritt", price: 1140 },
+                    { id: "rostfritt_vinkel", name: "Rostfritt vinkelbeslag", price: 124 },
+                    { id: "galvad_stall", name: "Galvad Ställfot (ovan mark inst)", price: 967 },
+                    { id: "vitlackerade_profiler", name: "Vitlackerade profiler", price: 680 },
+                    { id: "stallavgift_lackering", name: "Ställavgift lackering", price: 4900 },
+                    { id: "panikregel", name: "Panikregel", price: 5000 },
+                    { id: "projektering", name: "Projektering. (Fast timpris)", price: 720 }
+                ]
+            },
+            {
+                id: "blomsterlada",
+                name: "Blomsterlåda (svartlackad)",
+                items: [
+                    { id: "blomsterlada_1800", name: "Blomsterlåda 1800 mm", price: 6150 },
+                    { id: "blomsterlada_1500", name: "Blomsterlåda 1500 mm", price: 6000 },
+                    { id: "blomsterlada_1000", name: "Blomsterlåda 1000 mm", price: 5850 },
+                    { id: "tillval_hjul", name: "Tillval hjul", price: 600 },
+                    { id: "tillval_tralav", name: "Tillval Trälav", price: 2200 },
+                    { id: "startkostnad_special", name: "Startkostnad specialmått (närmast större sektionsstorlek + en startkostnad)", price: 3000 },
+                    { id: "startkostnad_ral", name: "Startkostnad RAL-lack (antal RAL + en startkostnad)", price: 4900 },
+                    { id: "ral_blomsterlador", name: "RAL (antal blomsterlådor)", price: 340 }
+                ]
+            },
+            {
+                id: "stickfotter",
+                name: "Stickfötter",
+                items: [
+                    { id: "stickfot_std_singel", name: "Stickfot Standard Singel", price: 222 },
+                    { id: "stickfot_std_dubbel", name: "Stickfot Standard Dubbel", price: 349 },
+                    { id: "stickfot_std_kapad", name: "Stickfot Standard Kapad", price: 295 },
+                    { id: "stickfot_plus30_singel", name: "Stickfot +30 Singel", price: 251 },
+                    { id: "stickfot_plus30_dubbel", name: "Stickfot +30 Dubbel", price: 412 },
+                    { id: "stickfot_plus60_singel", name: "Stickfot +60 Singel", price: 263 },
+                    { id: "stickfot_plus60_dubbel", name: "Stickfot +60 Dubbel", price: 414 }
+                ]
+            }
+        ]
+    },
+    ClickitUpFixed: {
+        name: "ClickitUp Fixed",
+        type: "grid",
+        currency: "SEK",
+        gridItems: [
+            {
+                model: "ClickitUp Sektion", sizes: [
+                    { size: "700", price: 4396 },
+                    { size: "1000", price: 4396 },
+                    { size: "1100", price: 4516 },
+                    { size: "1200", price: 4636 },
+                    { size: "1300", price: 4756 },
+                    { size: "1400", price: 4876 },
+                    { size: "1500", price: 4996 },
+                    { size: "1600", price: 5116 },
+                    { size: "1700", price: 5236 },
+                    { size: "1800", price: 5356 },
+                    { size: "1900", price: 5476 },
+                    { size: "2000", price: 5596 }
+                ]
+            },
+            {
+                model: "ClickitUp Hane", sizes: [
+                    { size: "1000", price: 4396 },
+                    { size: "1100", price: 4396 }
+                ]
+            },
+            {
+                model: "ClickitUp Dörr", sizes: [
+                    { size: "1000", price: 11756 },
+                    { size: "1100", price: 11836 }
+                ]
+            }
+        ],
+        addonCategories: [
+            {
+                id: "freight",
+                name: "Fraktkostnad",
+                items: [
+                    { id: "frakt_glas", name: "Glasfrakt Specialpall", price: 2120 }
+                ]
+            },
+            {
+                id: "required",
+                name: "Nödvändiga Tillval",
+                items: [
+                    { id: "stodben_stort", name: "Stödben stort (45°)", price: 1024 },
+                    { id: "stodben_litet", name: "Stödben litet (Slimline)", price: 364 },
+                    { id: "passbit_alu", name: "Passbit Alu stolpe (50x80mm) inkl. Täcklock", price: 1233 }
+                ]
+            },
+            {
+                id: "recommended",
+                name: "Rekommenderade tillval",
+                items: [
+                    { id: "svartanodiserade", name: "Svartanodiserade profiler", price: 340, autoScale: true }
                 ]
             },
             {

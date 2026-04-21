@@ -22,6 +22,10 @@ function getProductLineDescription(lineId: string): string {
         return 'Höj- och sänkbara glaspartier.';
     }
 
+    if (lineId === 'ClickitUpFixed') {
+        return 'Fasta glaspartier.';
+    }
+
     return 'Premium biogas';
 }
 

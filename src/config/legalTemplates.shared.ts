@@ -31,16 +31,6 @@ export const LEGAL_TEMPLATES = [
         id: 'standard',
         label: 'Standardvillkor',
         body: STANDARD_TERMS_BODY
-    },
-    {
-        id: 'service_work',
-        label: 'Standardvillkor (tidigare service)',
-        body: STANDARD_TERMS_BODY
-    },
-    {
-        id: 'project_delivery',
-        label: 'Standardvillkor (tidigare projekt)',
-        body: STANDARD_TERMS_BODY
     }
 ];
 

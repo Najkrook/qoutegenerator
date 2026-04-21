@@ -227,7 +227,15 @@ describe('UI text smoke', () => {
         };
 
         const html = renderWithProviders(
-            <Dashboard onStartQuote={() => {}} onOpenInventory={() => {}} onOpenSketch={() => {}} />
+            <Dashboard
+                onStartQuote={() => {}}
+                onOpenHistory={() => {}}
+                onOpenInventory={() => {}}
+                onOpenSketch={() => {}}
+                onOpenPlanner={() => {}}
+                onOpenActivity={() => {}}
+                onOpenRetailers={() => {}}
+            />
         );
 
         expect(html).toContain('Skapa Ny Offert');
@@ -244,7 +252,15 @@ describe('UI text smoke', () => {
         };
 
         const html = renderWithProviders(
-            <Dashboard onStartQuote={() => {}} onOpenInventory={() => {}} onOpenSketch={() => {}} />
+            <Dashboard
+                onStartQuote={() => {}}
+                onOpenHistory={() => {}}
+                onOpenInventory={() => {}}
+                onOpenSketch={() => {}}
+                onOpenPlanner={() => {}}
+                onOpenActivity={() => {}}
+                onOpenRetailers={() => {}}
+            />
         );
 
         expect(html).toContain('Rita Uteservering');
@@ -261,10 +277,30 @@ describe('UI text smoke', () => {
         };
 
         const html = renderWithProviders(
-            <Dashboard onStartQuote={() => {}} onOpenInventory={() => {}} onOpenSketch={() => {}} />
+            <Dashboard
+                onStartQuote={() => {}}
+                onOpenHistory={() => {}}
+                onOpenInventory={() => {}}
+                onOpenSketch={() => {}}
+                onOpenPlanner={() => {}}
+                onOpenActivity={() => {}}
+                onOpenRetailers={() => {}}
+            />
         );
 
         expect(html).toContain('Välkommen till Brixx portal');
+        expect(html).toContain('📄');
+        expect(html).toContain('📦');
+        expect(html).toContain('✏️');
+        expect(html).toContain('🕘');
+        expect(html).toContain('📋');
+        expect(html).toContain('🏪');
+        expect(html).not.toContain('aria-hidden="true">Dok<');
+        expect(html).not.toContain('aria-hidden="true">Inv<');
+        expect(html).not.toContain('aria-hidden="true">Pen<');
+        expect(html).not.toContain('aria-hidden="true">Log<');
+        expect(html).not.toContain('aria-hidden="true">Plan<');
+        expect(html).not.toContain('aria-hidden="true">AF<');
         expect(html).toContain('Skapa Ny Offert');
         expect(html).toContain('Rita Uteservering');
         expect(html).toContain('Inga loggade händelser ännu. Nya sparade offerter och exporter visas här.');
@@ -386,6 +422,8 @@ describe('UI text smoke', () => {
 
         const html = renderWithProviders(<Header />);
 
+        expect(html).toContain('🏠');
+        expect(html).toContain('🗑️');
         expect(html).toContain('Mina Offerter');
         expect(html).not.toContain('Lagerloggar');
     });
