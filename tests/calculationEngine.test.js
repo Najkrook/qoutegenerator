@@ -138,6 +138,120 @@ describe('computeQuoteTotals', () => {
         expect(customRow.model).toBe('  + Tillval: Egen rad');
     });
 
+    it('uses builder displayName overrides for main rows', () => {
+        const state = createStateFixture({
+            gridSelections: {},
+            customCosts: [],
+            builderItems: [
+                {
+                    id: 'builder_1',
+                    line: 'BaHaMa',
+                    model: 'Jumbrella',
+                    size: '3x3 Kvadrat',
+                    qty: 1,
+                    discountPct: 0,
+                    displayName: 'BaHaMa Jumbrella Merlot',
+                    addons: []
+                }
+            ]
+        });
+
+        const summary = computeQuoteTotals({ state, catalogData: createCatalogFixture() });
+
+        expect(summary.totals[0].model).toBe('BaHaMa Jumbrella Merlot');
+        expect(summary.totals[0].sortModel).toBe('BaHaMa Jumbrella');
+    });
+
+    it('uses builder catalog add-on displayName overrides', () => {
+        const state = createStateFixture({
+            gridSelections: {},
+            customCosts: [],
+            builderItems: [
+                {
+                    id: 'builder_1',
+                    line: 'BaHaMa',
+                    model: 'Jumbrella',
+                    size: '3x3 Kvadrat',
+                    qty: 1,
+                    discountPct: 0,
+                    addons: [
+                        {
+                            id: 'heater',
+                            qty: 1,
+                            discountPct: 0,
+                            displayName: 'Varmare svart finish'
+                        }
+                    ]
+                }
+            ]
+        });
+
+        const summary = computeQuoteTotals({ state, catalogData: createCatalogFixture() });
+        const addonRow = summary.totals.find((row) => row.source.type === 'builder-addon');
+
+        expect(addonRow.model).toBe('Varmare svart finish');
+    });
+
+    it('uses builder custom add-on displayName overrides', () => {
+        const state = createStateFixture({
+            gridSelections: {},
+            customCosts: [],
+            builderItems: [
+                {
+                    id: 'builder_1',
+                    line: 'BaHaMa',
+                    model: 'Jumbrella',
+                    size: '3x3 Kvadrat',
+                    qty: 1,
+                    discountPct: 0,
+                    addons: [
+                        {
+                            id: 'custom_1',
+                            qty: 1,
+                            discountPct: 0,
+                            isCustom: true,
+                            name: 'Speciallack',
+                            displayName: 'Speciallack Merlot',
+                            price: 500,
+                            categoryId: 'installation'
+                        }
+                    ]
+                }
+            ]
+        });
+
+        const summary = computeQuoteTotals({ state, catalogData: createCatalogFixture() });
+        const customRow = summary.totals.find((row) => row.source.type === 'builder-custom-addon');
+
+        expect(customRow.model).toBe('Speciallack Merlot');
+    });
+
+    it('falls back to default labels when displayName overrides are blank', () => {
+        const state = createStateFixture({
+            gridSelections: {},
+            customCosts: [],
+            builderItems: [
+                {
+                    id: 'builder_1',
+                    line: 'BaHaMa',
+                    model: 'Jumbrella',
+                    size: '3x3 Kvadrat',
+                    qty: 1,
+                    discountPct: 0,
+                    displayName: '   ',
+                    addons: [
+                        { id: 'heater', qty: 1, discountPct: 0, displayName: ' ' }
+                    ]
+                }
+            ]
+        });
+
+        const summary = computeQuoteTotals({ state, catalogData: createCatalogFixture() });
+
+        expect(summary.totals[0].model).toBe('BaHaMa Jumbrella');
+        expect(summary.totals[1].model).toBe('  + Tillval: Varmare');
+    });
+
     it('supports zero quantities, full discounts, and decimal exchange rates', () => {
         const state = createStateFixture({
             exchangeRate: 11.25,
@@ -251,10 +365,11 @@ describe('computeQuoteTotals', () => {
         ]);
     });
 
-    it('keeps addons after main rows and custom rows last', () => {
+    it('keeps builder products together with their add-ons before non-builder rows', () => {
         const state = createStateFixture({
             builderItems: [
                 {
+                    id: 'builder_1',
                     line: 'BaHaMa',
                     model: 'Jumbrella',
                     size: '4x4 Kvadrat',
@@ -285,14 +400,81 @@ describe('computeQuoteTotals', () => {
 
         expect(summary.totals.map((row) => row.source.type)).toEqual([
             'builder',
-            'grid',
             'builder-addon',
+            'grid',
             'grid-addon',
             'custom'
         ]);
     });
 
-    it('sorts builder dimensions with Swedish decimal parsing', () => {
+    it('keeps manual builder block order after sorting', () => {
+        const state = createStateFixture({
+            gridSelections: {},
+            customCosts: [],
+            builderItems: [
+                {
+                    id: 'builder_1',
+                    line: 'BaHaMa',
+                    model: 'Jumbrella',
+                    size: '4x4 Kvadrat',
+                    qty: 1,
+                    discountPct: 0,
+                    displayName: 'Produkt B',
+                    addons: [
+                        { id: 'heater', qty: 1, discountPct: 0, displayName: 'Tillval B1' }
+                    ]
+                },
+                {
+                    id: 'builder_2',
+                    line: 'BaHaMa',
+                    model: 'Jumbrella',
+                    size: '3x3 Kvadrat',
+                    qty: 1,
+                    discountPct: 0,
+                    displayName: 'Produkt A',
+                    addons: [
+                        { id: 'gutter-kit', qty: 1, discountPct: 0, displayName: 'Tillval A1' }
+                    ]
+                }
+            ]
+        });
+
+        const summary = computeQuoteTotals({ state, catalogData: createCatalogFixture() });
+
+        expect(summary.totals.map((row) => row.model)).toEqual([
+            'Produkt B',
+            'Tillval B1',
+            'Produkt A',
+            'Tillval A1'
+        ]);
+    });
+
+    it('keeps manual add-on order within each builder product after sorting', () => {
+        const state = createStateFixture({
+            gridSelections: {},
+            customCosts: [],
+            builderItems: [
+                {
+                    id: 'builder_1',
+                    line: 'BaHaMa',
+                    model: 'Jumbrella',
+                    size: '4x4 Kvadrat',
+                    qty: 1,
+                    discountPct: 0,
+                    addons: [
+                        { id: 'heater', qty: 1, discountPct: 0, displayName: 'Forst' },
+                        { id: 'gutter-kit', qty: 1, discountPct: 0, displayName: 'Sedan' }
+                    ]
+                }
+            ]
+        });
+
+        const summary = computeQuoteTotals({ state, catalogData: createCatalogFixture() });
+
+        expect(summary.totals.slice(1).map((row) => row.model)).toEqual(['Forst', 'Sedan']);
+    });
+
+    it('preserves builder item order from state even when sizes differ', () => {
         const state = createStateFixture({
             gridSelections: {},
             customCosts: [],
@@ -313,9 +495,9 @@ describe('computeQuoteTotals', () => {
         const summary = computeQuoteTotals({ state, catalogData });
 
         expect(summary.totals.filter((row) => !row.isAddon && !row.isCustom).map((row) => row.size)).toEqual([
+            '6x4,5',
             '3,5x3,5',
-            '4x4',
-            '6x4,5'
+            '4x4'
         ]);
     });
 

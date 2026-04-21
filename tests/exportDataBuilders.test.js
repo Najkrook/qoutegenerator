@@ -142,6 +142,51 @@ describe('export data builders', () => {
         expect(pdfRows.some((row) => row[0] === '  + Tillval: Speciallack')).toBe(true);
     });
 
+    it('uses renamed builder rows and preserved block order in export rows', () => {
+        const state = createStateFixture({
+            gridSelections: {},
+            customCosts: [],
+            builderItems: [
+                {
+                    id: 'builder_1',
+                    line: 'BaHaMa',
+                    model: 'Jumbrella',
+                    size: '4x4 Kvadrat',
+                    qty: 1,
+                    discountPct: 0,
+                    displayName: 'Produkt B',
+                    addons: [{ id: 'heater', qty: 1, discountPct: 0, displayName: 'Tillval B1' }]
+                },
+                {
+                    id: 'builder_2',
+                    line: 'BaHaMa',
+                    model: 'Jumbrella',
+                    size: '3x3 Kvadrat',
+                    qty: 1,
+                    discountPct: 0,
+                    displayName: 'Produkt A',
+                    addons: [{ id: 'gutter-kit', qty: 1, discountPct: 0, displayName: 'Tillval A1' }]
+                }
+            ]
+        });
+        const summary = computeQuoteTotals({
+            state,
+            catalogData: createCatalogFixture()
+        });
+
+        const wsData = buildExcelSheetData(state, summary);
+        const pdfRows = buildPdfTableData(summary.totals, formatSek);
+        const exportLabels = wsData.filter((row) => typeof row[0] === 'string').map((row) => row[0]);
+
+        expect(pdfRows.map((row) => row[0])).toEqual([
+            'Produkt B',
+            'Tillval B1',
+            'Produkt A',
+            'Tillval A1'
+        ]);
+        expect(exportLabels).toEqual(expect.arrayContaining(['Produkt B', 'Tillval B1', 'Produkt A', 'Tillval A1']));
+    });
+
     it('keeps backward compatibility when global discount amount is present', () => {
         const state = createStateFixture({
             includesVat: false,

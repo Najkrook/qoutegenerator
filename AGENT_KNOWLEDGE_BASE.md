@@ -2,47 +2,54 @@
 
 This file exists to help future agents understand the actual `QuoteGenerator` project shape before editing anything substantial.
 
-Last verified: `2026-04-14`
+Last verified: `2026-04-20`
+Active branch at verification: `main`
 
-`QuoteGenerator` is a React SPA repository. All active runtime logic lives under `src/`. `README.md` is useful for human onboarding; this file is the deeper agent map.
+`QuoteGenerator` is a React SPA repository. All active runtime logic lives under `src/`. `README.md` is useful for human onboarding; this file is the deeper agent map for implementation work.
 
 ## Executive Snapshot
-- Internal quote, inventory, sketch, planner, retailer management, and activity logging portal for BRIXX.
+
+- Internal quote, inventory, sketch, planner, retailer-management, and activity-logging portal for BRIXX.
 - Main frontend stack is React 19 + Vite 5 + Tailwind 4 + Firebase Auth/Firestore.
-- Runtime architecture is a unified React Single Page Application (SPA).
-- In-progress quote state is persisted in localStorage under `offertverktyg_state` through `src/store/QuoteContext.jsx` and `src/store/quoteStatePersistence.js`.
-- Persistent backend data lives in Firestore for quotes, revisions, templates, inventory, inventory logs, activity logs, and retailers.
-- Access control is UID-based and resolved in `src/config/accessControl.shared.js`.
-- Quote persistence and revisioning are centralized in `src/services/quoteRepository.js`.
-- Current fast-confidence workflow centers on `npm run test:confidence` plus `npm run build`.
-- A normal full-suite `npm run test:run` was not re-verified in this sandbox because plain `vitest run` still hit a local `spawn EPERM`.
-- CI exists in `.github/workflows/ci.yml` and now runs explicit install, fast-confidence tests, and build steps.
-- Planner uses the root `planner_projects` collection, and `firestore.rules` currently allow admin read/write access to it.
+- App-source TypeScript migration for `src/` is complete.
+- Runtime architecture is a single React SPA with state-driven view switching, not React Router.
+- In-progress quote state is persisted in localStorage under `offertverktyg_state` through `src/store/QuoteContext.tsx` and `src/store/quoteStatePersistence.ts`.
+- Persistent backend data lives in Firestore for quotes, revisions, templates, inventory, inventory logs, activity logs, planner projects, and retailers.
+- Access control is UID-based and resolved in `src/config/accessControl.shared.ts`, with retailer access detected from Firestore during auth bootstrap.
+- Quote persistence and revisioning are centralized in `src/services/quoteRepository.ts`.
+- Shared runtime/domain contracts live in `src/types/contracts.ts`.
+- Shared runtime boundary helpers now live in `src/utils/runtime.ts`.
+- CI in `.github/workflows/ci.yml` runs the safety script, clean-repo sanity check, `npm ci`, `npm run test:confidence`, `npm run typecheck`, and `npm run build`.
+- Verified on `main`:
+  - `npm run typecheck` passes
+  - `npm run test:confidence` passes
+  - full `vitest run` passes
+  - `npm run build` passes
 
 ## Repo Topology
 
 ### `src/`
 Primary active React runtime.
 
-- `src/main.jsx` bootstraps the app.
-- `src/App.jsx` switches views using `state.step`.
-- `src/store/` contains `AuthProvider` and `QuoteProvider`.
-- `src/views/` contains the main React feature surfaces.
-- `src/components/` contains the React UI pieces.
-- `src/services/` contains React-facing Firebase/auth/template/save/retailer/activity-log glue.
-- `src/features/` contains export modules (PDF, Excel, sketch export state).
-- `src/config/` contains shared access control and legal template definitions.
-- `src/utils/` contains sketch geometry, grid auto-scale, and client helpers.
-- `src/data/` contains catalog data.
-
-
+- `src/main.tsx` bootstraps the SPA and wraps `AuthProvider`, `QuoteProvider`, and the toast layer.
+- `src/App.tsx` switches views using `state.step` and lazy-loads heavier routes.
+- `src/store/` contains auth state, quote state, schema hydration, and localStorage persistence.
+- `src/views/` contains the main feature surfaces.
+- `src/components/` contains shared UI pieces, organized into `features/` (domain-specific widgets), `layout/` (shell and error boundary), and `modals/` (currently empty).
+- `src/services/` contains Firebase/auth/repository/export/activity-log/template/retailer glue.
+- `src/features/` contains PDF, Excel, legal-template re-exports, and sketch-export helpers.
+- `src/config/` contains access control and built-in legal templates.
+- `src/utils/` contains runtime helpers, sketch geometry/layout math, normalization, file-save utilities (`fileUtils.ts`), and input sanitization (`sanitize.ts`).
+- `src/data/` contains catalog data and typed catalog lookup helpers.
+- `src/types/` contains shared domain and interop contracts (`contracts.ts`) plus global Window augmentations (`global.d.ts`).
 
 ### `tests/`
 Vitest coverage.
 
-- Covers calculations, repository behavior, export builders, PDF behavior, quote save flow, text encoding guardrails, retailer service, activity log service, grid auto-scale, quote state schema, and UI smoke coverage.
-- `npm run test:confidence` runs 10 targeted test files; `npm run test:run` runs the full suite.
-- Test coverage exists, but the full-suite baseline is not guaranteed green.
+- `npm run test:confidence` runs the focused confidence suite used by CI.
+- Full `vitest run` currently passes on `main`.
+- Coverage includes access control, quote persistence/schema, calculations, exports, sketch helpers, retailer service, inventory normalization, activity logs, and UI smoke coverage.
+- Tests remain JavaScript/JSX by choice; that is outside the completed app-source TypeScript migration scope.
 
 ### `scripts/`
 Tooling and maintenance support.
@@ -50,7 +57,7 @@ Tooling and maintenance support.
 - `scripts/verify-git-safety.ps1` enforces tracked-file safety.
 - `scripts/backfill-quote-metadata.mjs` backfills quote metadata with Firebase Admin credentials.
 - `scripts/clean_black_inventory.mjs` exists but is not central to the main runtime.
-- `scripts/build_parasollkostnad.mjs` and related Python scripts generate parasol cost data.
+- `scripts/build_parasollkostnad.mjs` and the related Python helpers generate parasol cost data.
 
 ### `integrations/scrive-proxy/`
 Reference or scaffold code.
@@ -58,201 +65,248 @@ Reference or scaffold code.
 - Not an active runtime dependency for the main app.
 - Present as integration scaffolding only.
 
-### `styles/`
-Support for root HTML pages and older DOM-driven surfaces.
+### `docs/`
+Companion documentation.
 
-- `styles/` has been removed as it was only relevant to legacy HTML entry points.
+- `docs/COPY_EDITING_GUIDE.md` covers encoding conventions, mojibake prevention, and the text-editing verification checklist. Read this before changing any user-facing Swedish copy.
 
-### Root HTML files
-- `index.html` is the only active entry point, serving the React Single Page Application.
-- Older legacy entry points (`index_legacy.html`, `login.html`, `history.html`, `inventory-logs.html`) have been removed.
+### Root entry/build files
 
-## Active Entry Points and Build Inputs
-`vite.config.js` defines a single robust build around `index.html`.
+- `index.html` is the only active browser entry point.
+- `vite.config.js` builds exclusively around `index.html`.
+- `firebase.json` points Firestore rules at `firestore.rules`.
+- `roadmap.md` contains the 6-month engineering roadmap with phased goals and cross-cutting dependencies. Read this for strategic context before proposing new features.
 
-Operational notes:
+### Root-level legacy/dev-only files
 
-- `vite.config.js` builds exclusively `index.html`.
-- Export-related dependencies are loaded through npm/Vite modules rather than CDN script tags.
+The following root files are **not** part of the active runtime and should be ignored during normal development:
+
+- `injector.js`, `injector2.js` — one-off injection scripts.
+- `refactor.mjs`, `refactor2.mjs` — past refactoring helpers.
+- `tester.js`, `tester2.js`, `test_calc.js`, `test_manual.mjs` — ad-hoc manual test scripts.
+- `server.py`, `start_server.bat`, `start_tunnel.py` — local dev server/tunnel utilities.
+- `cloudflared.exe` — Cloudflare tunnel binary.
+- `_fix_canvas.cjs` — canvas polyfill workaround for test environments.
 
 ## Runtime Architecture
-The codebase completes the migration to a modern, separated React architecture.
 
 ### React shell
-- `src/main.jsx` wraps the app with `AuthProvider` and `QuoteProvider`.
-- `src/App.jsx` renders views by `state.step`, not React Router.
+
+- `src/main.tsx` wraps the app with `AuthProvider` and `QuoteProvider`.
+- `src/App.tsx` renders views by `state.step`, not route paths.
 - Numeric steps `1` through `4` represent the quote flow.
-- String steps such as `inventory`, `sketch`, `planner`, `history`, `activity-logs`, `inventory-logs`, and `retailers` represent side branches.
+- String steps such as `inventory`, `inventory-logs`, `activity-logs`, `planner`, `retailers`, `sketch`, and `history` represent side branches.
+- Heavier views are lazy-loaded in `App.tsx`:
+  - `SummaryExport`
+  - `InventoryManager`
+  - `SketchTool`
+  - `Planner`
+  - `History`
+  - `RetailerManager`
 
 ### Shared internal modules
-- All internal module dependencies are contained within `src/` (e.g., `src/features/` and `src/services/`).
+
+- All active runtime logic is inside `src/`.
+- Shared contracts in `src/types/contracts.ts` are the source of truth for app-domain types.
+- Shared normalization/runtime boundary helpers in `src/utils/runtime.ts` are the first place to look for `unknown` handling, snapshot extraction, and small clone/error helpers.
 
 ### Service layers
-- The application relies on `src/services/firebase.js` using the installed Firebase package.
-- `src/services/authService.js` is the React auth wrapper and acts as the sole authentication mechanism for the dashboard and quote routes.
+
+- `src/services/firebase.ts` exports the installed Firebase SDK bindings used by the app.
+- `src/services/authService.ts` wraps React-facing auth behavior.
+- `src/services/quoteRepositoryClient.ts` injects the browser Firebase bindings into `src/services/quoteRepository.ts`.
+- `src/services/quoteSaveService.ts` decides between quote creation and revision save.
 
 ### Direct answers for future agents
-- If you change quote calculations, start in `src/services/calculationEngine.js`.
-- If you change save or revision behavior, start in `src/services/quoteRepository.js`, then check `src/services/quoteSaveService.js` and `src/services/quoteRepositoryClient.js`.
-- This project uses a state-driven view-switching architecture inside the single React SPA. `src/App.jsx` dynamically renders `Login`, `Quote History`, `Inventory Logs`, `Activity Logs`, and `Retailer Manager` alongside other dashboard/quote flows.
+
+- If you change quote calculations, start in `src/services/calculationEngine.ts`.
+- If you change save or revision behavior, start in `src/services/quoteRepository.ts`, then check `src/services/quoteSaveService.ts` and `src/services/quoteRepositoryClient.ts`.
+- If you change runtime boundary handling, start in `src/utils/runtime.ts`.
+- If you change inventory ingest/normalization, start in `src/views/inventoryData.ts`.
+- If you change history hydration or reopen behavior, start in `src/views/historyPayload.ts`.
+- If you change catalog-safe lookups, start in `src/data/catalogLookup.ts`.
 
 ## Main User Flows
 
 ### Dashboard
+
 - Entry condition: `state.step === 0`.
 - Access gate: authenticated users; cards shown based on `useAuth()` booleans.
 - Main files:
-  - `src/views/Dashboard.jsx`
-  - `src/App.jsx`
+  - `src/views/Dashboard.tsx`
+  - `src/App.tsx`
 - Persistence:
-  - No dedicated Firestore object for the dashboard itself.
-  - Admin dashboard fetches recent `activity_logs` (not `inventory_logs`).
-- Notable dependencies:
-  - `src/services/firebase.js`
-  - `src/services/activityLogService.js`
-  - access booleans from `src/store/AuthContext.jsx`
+  - no dedicated dashboard document
+  - admin dashboard reads recent `activity_logs`
 
 ### Product Line Selection
+
 - Entry condition: `state.step === 1`.
 - Access gate: `canStartQuote`.
 - Main files:
-  - `src/views/ProductLineSelection.jsx`
-  - `src/store/QuoteContext.jsx`
+  - `src/views/ProductLineSelection.tsx`
+  - `src/store/QuoteContext.tsx`
 - Persistence:
-  - localStorage via `QuoteContext`.
-- Notable dependencies:
-  - selected product lines feed later config/pricing/export steps.
+  - localStorage via quote state
 
 ### Configuration
+
 - Entry condition: `state.step === 2`.
 - Access gate: `canStartQuote`.
 - Main files:
-  - `src/views/Configuration.jsx`
-- Persistence:
-  - localStorage via `QuoteContext`.
-- Notable dependencies:
-  - can branch back into the sketch tool.
-  - modifies `selectedLines`, `builderItems`, `gridSelections`, and related state.
+  - `src/views/Configuration.tsx`
+  - `src/components/features/BuilderConfig.tsx`
+  - `src/components/features/BuilderItem.tsx`
+  - `src/components/features/GridConfig.tsx`
+  - `src/components/features/CustomCosts.tsx`
+  - `src/components/features/CustomerInfoForm.tsx`
+- Behavior notes:
+  - modifies `selectedLines`, `builderItems`, `gridSelections`, and related quote state
+  - can branch back into the sketch tool
 
 ### Pricing
+
 - Entry condition: `state.step === 3`.
 - Access gate: `canStartQuote`.
 - Main files:
-  - `src/views/Pricing.jsx`
-  - `src/services/calculationEngine.js`
-  - `src/utils/gridAutoScale.js`
-- Persistence:
-  - localStorage via `QuoteContext`.
-- Notable dependencies:
-  - quote totals shown later in summary/export are derived from the calculation engine.
-  - grid auto-scale logic propagates discount and quantity changes across addons and custom items.
+  - `src/views/Pricing.tsx`
+  - `src/services/calculationEngine.ts`
+  - `src/utils/gridAutoScale.ts`
+- Behavior notes:
+  - quote totals shown later in summary/export are derived from the calculation engine
+  - grid auto-scale propagates quantity and discount behavior across grid add-ons
 
 ### Summary Export
+
 - Entry condition: `state.step === 4`.
 - Access gate: `canStartQuote`.
 - Main files:
-  - `src/views/SummaryExport.jsx`
-  - `src/services/quoteSaveService.js`
-  - `src/services/quoteRepositoryClient.js`
-  - `src/services/quoteRepository.js`
-  - `src/features/pdfExport.js`
-  - `src/features/pdfExportLayout.js`
-  - `src/features/excelExport.js`
+  - `src/views/SummaryExport.tsx`
+  - `src/services/quoteSaveService.ts`
+  - `src/services/quoteRepositoryClient.ts`
+  - `src/services/quoteRepository.ts`
+  - `src/features/pdfExport.ts`
+  - `src/features/pdfExportLayout.ts`
+  - `src/features/excelExport.ts`
 - Persistence:
-  - localStorage for in-progress state.
-  - Firestore for saved quotes and revisions.
+  - localStorage for in-progress state
+  - Firestore for saved quotes and revisions
 - Notable dependencies:
-  - computes summary with the calculation engine.
-  - templates and payment options come from `TermsAndPaymentPanel.jsx`.
-  - PDF preview is regenerated client-side as state changes.
-  - saves trigger activity logging via `activityLogService.js`.
+  - computes summary with the calculation engine
+  - templates and payment options flow through `src/components/features/TermsAndPaymentPanel.tsx`
+  - saves trigger activity logging through `src/services/activityLogService.ts`
 
 ### Inventory Manager
+
 - Entry condition: `state.step === 'inventory'`.
 - Access gate: `canViewEverything`.
 - Main files:
-  - `src/views/InventoryManager.jsx`
-  - `src/components/features/InventoryTable.jsx`
-  - `src/components/features/ClickitupStockGrid.jsx`
-  - `src/components/features/PendingChangesPanel.jsx`
+  - `src/views/InventoryManager.tsx`
+  - `src/views/inventoryData.ts`
+  - `src/components/features/InventoryTable.tsx`
+  - `src/components/features/ClickitupStockGrid.tsx`
+  - `src/components/features/PendingChangesPanel.tsx`
+  - `src/components/features/InventoryItemModal.tsx`
+  - `src/components/features/StockComparisonModal.tsx`
 - Persistence:
-  - localStorage mirrors working inventory state.
-  - Firestore persists `stock/main_inventory` and audit logs in `inventory_logs`.
+  - localStorage mirrors working inventory state
+  - Firestore persists `stock/main_inventory`
+  - audit entries are written to `inventory_logs`
 - Notable dependencies:
-  - falls back to `/inventory_db.json` if Firestore load fails.
-  - uses `xlsx` to import Bahama inventory spreadsheets.
+  - falls back to `/inventory_db.json` if Firestore load fails
+  - uses `xlsx` to import BaHaMa inventory spreadsheets
+
+### Inventory Logs
+
+- Entry condition: `state.step === 'inventory-logs'`.
+- Access gate: `canViewEverything`.
+- Main files:
+  - `src/views/InventoryLogs.tsx`
+- Persistence:
+  - Firestore collection `inventory_logs`
 
 ### Sketch Tool
+
 - Entry condition: `state.step === 'sketch'`.
 - Access gate: `canAccessSketch`.
 - Main files:
-  - `src/views/SketchTool.jsx`
-  - `src/utils/sectionCalculator.js`
-  - `src/utils/parasolGeometry.js`
-  - `src/components/features/SketchCanvas.jsx`
-  - `src/components/features/SketchConfig.jsx`
-  - `src/components/features/SketchBom.jsx`
+  - `src/views/SketchTool.tsx`
+  - `src/utils/sectionCalculator.ts`
+  - `src/utils/parasolGeometry.ts`
+  - `src/components/features/SketchCanvas.tsx`
+  - `src/components/features/SketchConfig.tsx`
+  - `src/components/features/SketchBom.tsx`
 - Persistence:
-  - sketch draft and workspace are stored in `QuoteContext`, then persisted to localStorage.
-- Notable dependencies:
-  - can export generated ClickitUp sections and parasol-derived builder items back into quote state.
-  - export-to-quote is effectively admin-only through `canExportSketchToQuote`.
+  - sketch draft and workspace are stored in quote state, then persisted to localStorage
+- Behavior notes:
+  - can export generated ClickitUp sections and parasol-derived builder items back into quote state
+  - export-to-quote is gated by `canExportSketchToQuote`, effectively admin-only
 
 ### Planner
+
 - Entry condition: `state.step === 'planner'`.
 - Access gate: `canViewEverything`.
-- Main files:
-  - `src/views/Planner.jsx`
-  - `src/App.jsx`
-  - `src/views/Dashboard.jsx`
+- Main file:
+  - `src/views/Planner.tsx`
 - Persistence:
-  - Firestore root collection `planner_projects` (not per-user).
-- Notable dependencies:
-  - live in the UI with matching admin-only Firestore rules.
+  - Firestore root collection `planner_projects`
+
+### Quote History
+
+- Entry condition: `state.step === 'history'`.
+- Access gate: `canAccessQuoteHistory`.
+- Main files:
+  - `src/views/History.tsx`
+  - `src/views/historyPayload.ts`
+  - `src/services/quoteRepository.ts`
+- Behavior notes:
+  - can open the latest revision or specific older revisions
+  - admin users can browse across owners via collection-group-backed repository reads
 
 ### Activity Logs
+
 - Entry condition: `state.step === 'activity-logs'`.
 - Access gate: `canViewEverything`.
 - Main files:
-  - `src/views/ActivityLogs.jsx`
-  - `src/services/activityLogService.js`
-  - `src/services/notificationService.js`
+  - `src/views/ActivityLogs.tsx`
+  - `src/services/activityLogService.ts`
+  - `src/services/notificationService.ts`
 - Persistence:
-  - Firestore collection `activity_logs`.
-- Notable dependencies:
-  - client-side filtering and cursor-based paging over Firestore batches.
-  - activity events are written by quote save, sketch export, and retailer CRUD operations.
+  - Firestore collection `activity_logs`
 
 ### Retailer Manager
+
 - Entry condition: `state.step === 'retailers'`.
 - Access gate: `canViewEverything`.
 - Main files:
-  - `src/views/RetailerManager.jsx`
-  - `src/services/retailerService.js`
-  - `src/services/authService.js`
+  - `src/views/RetailerManager.tsx`
+  - `src/services/retailerService.ts`
+  - `src/services/authService.ts`
 - Persistence:
-  - Firestore collection `retailers`.
-- Notable dependencies:
-  - retailers are linked to Firebase Auth users via `createRetailerAuthUser()`, which uses a secondary Firebase app to avoid signing out the current admin.
-  - each retailer has per-product-line enable/disable and discount configuration.
-  - CRUD operations are logged via `activityLogService.js`.
-  - on login, `AuthContext.jsx` queries the `retailers` collection to detect retailer users and set the `retailer` access level.
+  - Firestore collection `retailers`
+- Behavior notes:
+  - retailers are linked to Firebase Auth via `createRetailerAuthUser()`
+  - CRUD operations are logged through `src/services/activityLogService.ts`
+  - retailer product-line discounts and enablement live in Firestore
 
-## Authentication and Access Control
+## Authentication And Access Control
 
 ### Core React access model
-- `src/store/AuthContext.jsx` listens to auth state changes and derives `accessLevel`.
-- `src/config/accessControl.shared.js` is the source of truth for role resolution.
-- On login, `AuthContext` also queries the `retailers` Firestore collection to detect retailer users.
+
+- `src/store/AuthContext.tsx` listens to auth state changes and derives `accessLevel`.
+- `src/config/accessControl.shared.ts` is the source of truth for role resolution and step authorization.
+- On login, `AuthContext` queries the `retailers` collection by email to detect retailer users.
 
 Roles:
+
 - `guest`
 - `full`
 - `quote-only`
 - `sketch-only`
-- `retailer` — linked to a document in the `retailers` collection by email
+- `retailer`
 
 Permission booleans exposed by `useAuth()`:
+
 - `canViewEverything`
 - `canStartQuote`
 - `canAccessSketch`
@@ -260,76 +314,92 @@ Permission booleans exposed by `useAuth()`:
 - `canExportSketchToQuote`
 
 Additional values exposed by `useAuth()`:
-- `retailer` — the retailer document if the user is a retailer, else `null`
-- `isRetailer` — boolean shortcut for `accessLevel === 'retailer'`
-- `login`, `logout` — auth functions
+
+- `retailer`
+- `isRetailer`
+- `login`
+- `logout`
 
 ### App-level enforcement
-- `src/App.jsx` sanitizes step transitions through `getAuthorizedStepForAccess()` in `src/config/accessControl.shared.js`.
+
+- `src/App.tsx` sanitizes step transitions through `getAuthorizedStepForAccess()` in `src/config/accessControl.shared.ts`.
 - Full-access-only views are `inventory`, `inventory-logs`, `activity-logs`, `planner`, and `retailers`.
-- Quote-flow numeric steps require `canStartQuote` (granted to `full`, `quote-only`, and `retailer`).
+- Quote-flow numeric steps require `canStartQuote`.
 - `sketch` requires `canAccessSketch`.
-- `history` is allowed for `full`, `quote-only`, and `retailer`.
+- `history` requires `canAccessQuoteHistory`.
 
 ### Operational implication
-If you change roles or access expectations:
-- update `src/config/accessControl.shared.js`
-- review `src/store/AuthContext.jsx`
-- review `src/App.jsx`, `src/components/layout/Header.jsx`, and `src/views/History.jsx`
-- if the change involves retailers, also review `src/services/retailerService.js` and `src/views/RetailerManager.jsx`
 
-## State Model and Persistence
-`src/store/QuoteContext.jsx` is the main state container for the React app.
+If you change roles or access expectations:
+
+- update `src/config/accessControl.shared.ts`
+- review `src/store/AuthContext.tsx`
+- review `src/App.tsx`, `src/components/layout/Header.tsx`, and `src/views/History.tsx`
+- if the change involves retailers, also review `src/services/retailerService.ts` and `src/views/RetailerManager.tsx`
+- keep `ADMIN_UIDS` synchronized with `firestore.rules`
+
+## State Model And Persistence
+
+`src/store/QuoteContext.tsx` is the main state container for the React app.
 
 ### Storage
+
 - localStorage key: `offertverktyg_state`
-- state is loaded from localStorage on boot
-- state is written back on every change
+- state schema and initial defaults live in `src/store/quoteStateSchema.ts`
+- persistence helpers live in `src/store/quoteStatePersistence.ts`
 
 ### Main state domains
+
 - quote flow step and selected product lines
-- builder items and grid selections (including `customItems` and `customAddonsByCategory` per line)
-- custom costs, VAT, discounts, exchange rate, previous global discount
-- customer info (including `extraNotes` for PDF export)
+- builder items and grid selections
+- custom costs, VAT, discounts, exchange rate, and prior discount baseline
+- customer info and PDF/export-related fields
 - inventory data and cloud inventory baseline
 - sketch draft and sketch metadata
 - inventory basket
 - active quote ID and version
-- quote status
-- terms, template selection, payment box, signature block, validity/payment days
+- quote status and Scrive metadata
+- legal-template/payment/signature toggles and validity/payment days
 - `hideZeroDiscountReferencesInPdf`
-- Scrive-related metadata
 
 ### Reducer and reset behavior
-- The reducer lives in `src/store/QuoteContext.jsx`.
-- `RESET_STATE` restores initial defaults.
-- PDF-related defaults are normalized through helper functions in the same file.
 
-### History-page rehydration flow
-- `src/views/History.jsx` loads quote revisions from Firestore through `quoteRepository`.
-- Opening a saved quote dispatches `HYDRATE_STATE` in the SPA and returns the user to quote step `1`.
-- Quote-history hydration therefore shares the same schema and reducer path as normal in-app state restores.
+- reducer lives in `src/store/QuoteContext.tsx`
+- `HYDRATE_STATE` routes all incoming persisted/history data through `hydrateQuoteState()`
+- `RESET_STATE` restores initial defaults from `createInitialQuoteState()`
 
 ### Operational implication
-The React app, history page, and some older flows depend on the same serialized state shape. Schema changes to quote state should be treated as cross-cutting and backward-compatibility-sensitive.
 
-## Quote Persistence and Data Model
-The authoritative quote repository is `src/services/quoteRepository.js`.
+Quote-state changes are backward-compatibility-sensitive because the same state shape is used by:
+
+- localStorage persistence
+- quote save/revision snapshots
+- history-page rehydration
+- sketch-to-quote and export flows
+
+## Quote Persistence And Data Model
+
+The authoritative quote repository is `src/services/quoteRepository.ts`.
 
 ### Firestore layout
+
 - Quotes: `users/{uid}/quotes/{quoteId}`
 - Revisions: `users/{uid}/quotes/{quoteId}/revisions/{revisionId}`
+- Templates: `users/{uid}/templates/{templateId}`
 
 ### Save flow
-1. `src/views/SummaryExport.jsx` computes quote totals.
-2. `src/services/quoteSaveService.js` decides between create and revision save.
-3. `src/services/quoteRepositoryClient.js` injects React-side Firestore functions into the repository.
-4. `src/services/quoteRepository.js` persists quote metadata and revision snapshots.
+
+1. `src/views/SummaryExport.tsx` computes quote totals.
+2. `src/services/quoteSaveService.ts` decides between create and revision save.
+3. `src/services/quoteRepositoryClient.ts` injects browser Firebase functions into the repository.
+4. `src/services/quoteRepository.ts` persists quote metadata and revision snapshots.
 
 ### Metadata stored on quotes
+
 - customer name
 - company
 - reference
+- customer reference
 - total amount
 - status
 - created and updated timestamps
@@ -337,23 +407,21 @@ The authoritative quote repository is `src/services/quoteRepository.js`.
 - latest revision ID
 - saved-by metadata
 - Scrive metadata
-- `searchText` for filtering
-- `retailerName` (if saved by a retailer user)
-
-### Revision behavior
-- Each revision stores a full state snapshot plus summary data.
-- If transactions are unavailable, the repository falls back to a non-transactional save path.
-- `src/views/History.jsx` can open the latest revision or fetch older revisions.
+- `searchText`
+- `retailerName`
 
 ### Lifecycle status values
-Quote statuses in `src/services/quoteRepository.js`:
+
+Quote statuses:
+
 - `draft`
 - `sent`
 - `won`
 - `lost`
 - `archived`
 
-Scrive statuses in `src/services/quoteRepository.js`:
+Scrive statuses:
+
 - `not_sent`
 - `preparation`
 - `pending`
@@ -363,275 +431,270 @@ Scrive statuses in `src/services/quoteRepository.js`:
 - `timedout`
 - `failed`
 
-### Admin quote browsing
-- Admins can browse all users' quotes via `collectionGroup` queries using `getAllUsersQuotes()` in `src/services/quoteRepository.js`.
-- `src/views/History.jsx` supports a user-selection dropdown for admins to switch between their own quotes and other users' quotes.
-- Firestore rules include a `/{path=**}/quotes/{quoteId}` admin read rule to support this.
-
-## Templates, PDF Terms, and Feature Flags
+## Templates, Export, And Feature Flags
 
 ### Built-in and custom templates
-- Built-in legal templates live in `src/config/legalTemplates.shared.js`.
-- Custom templates are stored under `users/{uid}/templates/{templateId}`.
-- Admins can fetch all templates using `collectionGroup` reads via `src/services/templateService.js`.
 
-### Main UI
-- `src/components/features/TermsAndPaymentPanel.jsx` is the central UI for:
-  - selecting a built-in template
-  - loading custom templates
-  - saving templates
-  - deleting templates
-  - toggling payment box and signature block
-  - editing terms text
+- Built-in legal templates live in `src/config/legalTemplates.shared.ts`.
+- Custom templates are stored under `users/{uid}/templates/{templateId}`.
+- `src/services/templateService.ts` owns template reads/writes.
+- `src/components/features/TermsAndPaymentPanel.tsx` is the main template/payment/signature UI.
+
+### Export modules
+
+- PDF entry: `src/features/pdfExport.ts`
+- PDF layout helpers: `src/features/pdfExportLayout.ts`
+- Excel entry: `src/features/excelExport.ts`
+- Shared export totals/builders: `src/services/exportDataBuilders.ts`
 
 ### Feature flags
+
 - Quote lifecycle: `window.FEATURE_QUOTE_LIFECYCLE !== false`
 - PDF legal templates: `window.FEATURE_PDF_LEGAL_TEMPLATES !== false`
 
-### Cross-cutting caveat
-Legal-template behavior affects both modern and older export paths. Template or PDF-terms changes should be treated as cross-cutting, not isolated to one React component.
+## Firestore Rules And Security Reality
 
-## Inventory, Logs, Sketch, and Planner
-
-### Inventory
-- Main React UI: `src/views/InventoryManager.jsx`
-- Main inventory document: `stock/main_inventory`
-- Audit log collection: `inventory_logs`
-- Local fallback: `/inventory_db.json`
-- Spreadsheet import uses the `xlsx` dependency
-
-Behavior notes:
-- Inventory state is staged locally before commit.
-- Commit writes both inventory and generated audit logs in a batch.
-- The dashboard reads recent `activity_logs` for admins (via `activityLogService.js`).
-
-### Inventory Logs Page
-- Main React UI: `src/views/InventoryLogs.jsx`
-- Access: full-access only
-- Behavior: client-side filtering and paging over Firestore batches
-
-### Sketch Tool
-- Main React UI: `src/views/SketchTool.jsx`
-- Layout math: `src/utils/sectionCalculator.js`
-- Parasol logic: `src/utils/parasolGeometry.js`
-- Export behavior: generated sections and parasol-derived builder rows are pushed back into quote state
-- Export permission: gated by `canExportSketchToQuote`, effectively admin-only
-
-### Planner
-- Main React UI: `src/views/Planner.jsx`
-- Collection path: `planner_projects`
-- UI access gate: admin-only branch from the dashboard
-- Status: live in the UI with matching admin-only Firestore rules
-
-## Firestore Rules and Security Reality
 `firestore.rules` currently allow:
 
-- quote documents under `users/{uid}/quotes/{quoteId}` for the signed-in owner **or admin**
-- quote revisions under `users/{uid}/quotes/{quoteId}/revisions/{revisionId}` for the signed-in owner **or admin**
-- template documents under `users/{uid}/templates/{templateId}` for the signed-in owner
+- quote documents for the signed-in owner or admins
+- quote revision documents for the signed-in owner or admins
 - `stock/{docId}` for admins
 - `inventory_logs/{logId}` for admins
-- `activity_logs/{logId}` — admin read; any signed-in user can create (with schema validation on required fields)
+- `activity_logs/{logId}` with admin read and signed-in self-authenticated create
+- `users/{userId}/templates/{templateId}` for the signed-in owner
 - `planner_projects/{projectId}` for admins
-- `retailers/{retailerId}` — admin read/write; signed-in users can read their own retailer document (matched by email)
-- admin reads of `templates` through collection-group queries
-- admin reads of `quotes` through collection-group queries (for admin quote browsing)
-- deny-all fallback for everything else
+- `retailers/{retailerId}` for admins, plus self-read by matching auth email
+- admin collection-group reads for `templates`
+- admin collection-group reads for `quotes`
 
 ### Current mismatches / caution
-- Any new feature that writes to a new collection must be reflected in Firestore rules.
-- Admin UIDs are hardcoded in both `firestore.rules` and `src/config/accessControl.shared.js` and must stay synchronized.
 
-## Tooling, Scripts, and CI
+- Any new feature that writes to a new collection must be reflected in Firestore rules.
+- Admin UIDs are hardcoded in both `firestore.rules` and `src/config/accessControl.shared.ts` and must stay synchronized.
+
+## Tooling, Scripts, And CI
 
 ### Local commands
+
 - `npm ci`
 - `npm run dev`
 - `npm run build`
+- `npm run typecheck`
 - `npm run test:confidence`
 - `npm run test:run`
+- `vitest run`
 
 ### PowerShell caveat
-If `npm.ps1` is blocked by execution policy, use:
 
-- `cmd /c npm ci`
-- `cmd /c npm run dev`
-- `cmd /c npm run test:confidence`
-- `cmd /c npm run test:run`
+If `npm.ps1` is blocked by execution policy, use `cmd /c npm ...` or invoke Node directly.
 
 ### Scripts
+
 - `scripts/verify-git-safety.ps1`
-  - fails if blocked sensitive or local-only files are tracked
 - `scripts/backfill-quote-metadata.mjs`
-  - backfills legacy quote metadata
-  - requires Firebase Admin credentials
 - `scripts/clean_black_inventory.mjs`
-  - present, but not central to the app runtime
 - `scripts/build_parasollkostnad.mjs`
-  - generates parasol cost data
-- `scripts/build_parasollkostnad_excel.py` and `scripts/patch_parasollkostnad_current_workbook.py`
-  - Python helpers for parasol cost Excel files
+- `scripts/build_parasollkostnad_excel.py`
+- `scripts/patch_parasollkostnad_current_workbook.py`
 
 ### CI
+
 - Workflow: `.github/workflows/ci.yml`
 - Runs:
   - tracked-file safety check
   - clean-repo sanity check
   - `npm ci`
   - `npm run test:confidence`
+  - `npm run typecheck`
   - `npm run build`
 
-CI is explicit and matches the recommended local confidence workflow.
+## Known Issues And Repo Traps
 
-### Build output
-- `dist/` exists in the repo right now.
-- Treat `dist/` as build output, not source-of-truth implementation.
-
-## Known Issues and Repo Traps
-- Full-suite status is not re-verified in this pass: focused sketch/export tests and `vite build` passed, but a normal `vitest run` hit sandbox `spawn EPERM`.
-- Previous `exportDataBuilders.test.js` drift notes require fresh confirmation before action; do not assume that exact test failure is still current without rerunning the full suite outside this sandbox.
-- CI implication: use `.github/workflows/ci.yml` and the local `test:confidence` + `build` pair as the default verification baseline.
-- Encoding or mojibake risk: some files visibly contain corrupted Swedish text or symbols.
-- Known mojibake examples include:
-  - `src/config/legalTemplates.shared.js`
-  - `src/views/Dashboard.jsx`
-  - `src/views/Planner.jsx`
-  - `src/views/InventoryManager.jsx`
-  - `src/views/SketchTool.jsx`
-  - `src/services/quoteSaveService.js`
-- `tests/textEncodingGuard.test.js` exists, but it does not catch every visibly broken encoding pattern in the repo.
-- Lazy-load trap: large view imports and export modules affect the code-splitting strategy, not just local component behavior.
+- Vite still warns about large chunks in production builds, especially `export-tools`.
+- `vite.config.js` manually groups:
+  - `export-tools`
+  - `firebase`
+  - `react-vendor`
+- Quote-state schema changes are high-risk because they affect local persistence, saved revisions, and history rehydration together.
+- Firestore collection changes must be paired with rule updates.
+- Optional post-migration follow-up work remains non-blocking:
+  - compiler strictness hardening
+  - tests/scripts/tooling TypeScript migration
+  - bundle/performance follow-up
 
 ## Where To Edit
 
 ### Change quote totals or calculation logic
+
 Start with:
-- `src/services/calculationEngine.js`
-- `src/utils/gridAutoScale.js`
-- `src/components/features/PricingTable.jsx`
-- `src/components/features/GridConfig.jsx`
-- `src/components/features/FinalSummaryTable.jsx`
-- `src/views/SummaryExport.jsx`
-- `src/data/catalog.js`
+
+- `src/services/calculationEngine.ts`
+- `src/utils/gridAutoScale.ts`
+- `src/components/features/PricingTable.tsx`
+- `src/components/features/GridConfig.tsx`
+- `src/components/features/FinalSummaryTable.tsx`
+- `src/views/SummaryExport.tsx`
+- `src/data/catalog.ts`
+- `src/data/catalogLookup.ts`
+
+### Change configuration UI or builder items
+
+Start with:
+
+- `src/views/Configuration.tsx`
+- `src/components/features/BuilderConfig.tsx`
+- `src/components/features/BuilderItem.tsx`
+- `src/components/features/GridConfig.tsx`
+- `src/components/features/CustomCosts.tsx`
+- `src/components/features/CustomerInfoForm.tsx`
+- `src/data/catalog.ts`
 
 ### Change quote save or revision behavior
+
 Start with:
-- `src/services/quoteRepository.js`
-- `src/services/quoteSaveService.js`
-- `src/services/quoteRepositoryClient.js`
-- `src/views/History.jsx`
-- `src/services/activityLogService.js`
+
+- `src/services/quoteRepository.ts`
+- `src/services/quoteSaveService.ts`
+- `src/services/quoteRepositoryClient.ts`
+- `src/views/History.tsx`
+- `src/views/historyPayload.ts`
+- `src/services/activityLogService.ts`
 
 ### Change PDF or Excel export output
+
 Start with:
-- `src/features/pdfExport.js`
-- `src/features/pdfExportLayout.js`
-- `src/features/excelExport.js`
-- `src/services/exportDataBuilders.js`
-- `src/views/SummaryExport.jsx`
-- `src/components/features/TermsAndPaymentPanel.jsx`
+
+- `src/features/pdfExport.ts`
+- `src/features/pdfExportLayout.ts`
+- `src/features/excelExport.ts`
+- `src/services/exportDataBuilders.ts`
+- `src/views/SummaryExport.tsx`
+- `src/components/features/TermsAndPaymentPanel.tsx`
 
 ### Change access roles or permissions
+
 Start with:
-- `src/config/accessControl.shared.js`
-- `src/App.jsx`
-- `src/store/AuthContext.jsx`
-- `src/components/layout/Header.jsx`
-- `src/views/History.jsx`
-- `src/services/retailerService.js`
-- `src/views/RetailerManager.jsx`
+
+- `src/config/accessControl.shared.ts`
+- `src/App.tsx`
+- `src/store/AuthContext.tsx`
+- `src/components/layout/Header.tsx`
+- `src/views/History.tsx`
+- `src/services/retailerService.ts`
+- `src/views/RetailerManager.tsx`
+- `firestore.rules`
+
+### Change runtime-boundary handling
+
+Start with:
+
+- `src/utils/runtime.ts`
+- `src/types/contracts.ts`
+- the feature-specific caller you are tightening
 
 ### Change legal templates or terms behavior
+
 Start with:
-- `src/config/legalTemplates.shared.js`
-- `src/components/features/TermsAndPaymentPanel.jsx`
-- `src/services/templateService.js`
-- `src/features/pdfExport.js`
+
+- `src/config/legalTemplates.shared.ts`
+- `src/components/features/TermsAndPaymentPanel.tsx`
+- `src/services/templateService.ts`
+- `src/features/pdfExport.ts`
 
 ### Change sketch layout behavior
-Start with:
-- `src/views/SketchTool.jsx`
-- `src/utils/sectionCalculator.js`
-- `src/utils/parasolGeometry.js`
-- `src/components/features/SketchCanvas.jsx`
-- `src/components/features/SketchConfig.jsx`
 
-### Change inventory sync or audit logs
 Start with:
-- `src/views/InventoryManager.jsx`
-- `src/views/Dashboard.jsx`
-- `src/views/InventoryLogs.jsx`
+
+- `src/views/SketchTool.tsx`
+- `src/utils/sectionCalculator.ts`
+- `src/utils/parasolGeometry.ts`
+- `src/components/features/SketchCanvas.tsx`
+- `src/components/features/SketchConfig.tsx`
+- `src/features/sketchExportState.ts`
+
+### Change inventory sync or ingest behavior
+
+Start with:
+
+- `src/views/InventoryManager.tsx`
+- `src/views/inventoryData.ts`
+- `src/utils/csvNormalizer.ts`
+- `src/views/InventoryLogs.tsx`
+- `src/components/features/InventoryTable.tsx`
+- `src/components/features/InventoryItemModal.tsx`
+- `src/components/features/StockComparisonModal.tsx`
+- `src/components/features/PendingChangesPanel.tsx`
 - `firestore.rules`
 
-### Change quote history page behavior
+### Change quote history behavior
+
 Start with:
-- `src/views/History.jsx`
-- `src/App.jsx`
-- `src/components/layout/Header.jsx`
-- `src/services/quoteRepository.js`
+
+- `src/views/History.tsx`
+- `src/views/historyPayload.ts`
+- `src/App.tsx`
+- `src/components/layout/Header.tsx`
+- `src/services/quoteRepository.ts`
 
 ### Change login or auth redirect behavior
-Start with:
-- `src/views/Login.jsx`
-- `src/App.jsx`
-- `src/store/AuthContext.jsx`
-- `src/services/authService.js`
 
-### Change Firestore permissions
 Start with:
-- `firestore.rules`
-- `src/config/accessControl.shared.js`
-- any feature-specific writer such as `src/views/Planner.jsx`, `src/views/InventoryManager.jsx`, or `src/views/RetailerManager.jsx`
+
+- `src/views/Login.tsx`
+- `src/App.tsx`
+- `src/store/AuthContext.tsx`
+- `src/services/authService.ts`
 
 ### Change planner behavior
+
 Start with:
-- `src/views/Planner.jsx`
-- `src/views/Dashboard.jsx`
-- `src/App.jsx`
+
+- `src/views/Planner.tsx`
+- `src/views/Dashboard.tsx`
+- `src/App.tsx`
+- `firestore.rules`
+
+### Change error boundary or crash-recovery behavior
+
+Start with:
+
+- `src/components/layout/ErrorBoundary.tsx`
+- `src/App.tsx`
+
+### Change retailer management
+
+Start with:
+
+- `src/views/RetailerManager.tsx`
+- `src/services/retailerService.ts`
+- `src/services/authService.ts`
+- `src/store/AuthContext.tsx`
+- `src/config/accessControl.shared.ts`
 - `firestore.rules`
 
 ## Recommended First Read Order
+
 If you are new to the repo, read these files in order:
 
 1. `README.md`
-2. `src/App.jsx`
-3. `src/store/AuthContext.jsx`
-4. `src/store/QuoteContext.jsx`
-5. `src/store/quoteStateSchema.js`
-6. `src/services/quoteRepository.js`
-7. `src/views/SummaryExport.jsx`
-8. `firestore.rules`
-9. `src/config/accessControl.shared.js`
-10. `vite.config.js`
+2. `src/App.tsx`
+3. `src/types/contracts.ts`
+4. `src/store/AuthContext.tsx`
+5. `src/store/QuoteContext.tsx`
+6. `src/store/quoteStateSchema.ts`
+7. `src/services/quoteRepository.ts`
+8. `src/views/SummaryExport.tsx`
+9. `src/config/accessControl.shared.ts`
+10. `firestore.rules`
+11. `vite.config.js`
+12. `docs/COPY_EDITING_GUIDE.md`
+13. `roadmap.md`
 
-### Change activity logging behavior
-Start with:
-- `src/services/activityLogService.js`
-- `src/views/ActivityLogs.jsx`
-- `src/views/Dashboard.jsx`
-- `firestore.rules`
+## Validation Expectations For Future Changes
 
-### Change retailer management
-Start with:
-- `src/views/RetailerManager.jsx`
-- `src/services/retailerService.js`
-- `src/services/authService.js`
-- `src/store/AuthContext.jsx`
-- `src/config/accessControl.shared.js`
-- `firestore.rules`
-
-### Change grid behavior (ClickitUp items/addons)
-Start with:
-- `src/components/features/GridConfig.jsx`
-- `src/utils/gridAutoScale.js`
-- `src/services/calculationEngine.js`
-- `src/data/catalog.js`
-- `src/store/quoteStateSchema.js`
-
-## Validation Expectations for Future Changes
-- Run relevant tests, but do not assume the baseline is green.
-- If you touch quote persistence, inspect both React and root-page consumers.
+- Run the narrowest relevant tests first, then expand to broader validation if the change touches shared flows.
+- If you touch quote persistence or quote-state schema, test both save behavior and history rehydration.
 - If you touch Firestore collections, update rules and access expectations together.
-- If you touch strings or Swedish copy, manually watch for encoding corruption.
+- If you touch strings or docs, run `tests/textEncodingGuard.test.js`.
 - If you touch entrypoints or build behavior, check `vite.config.js` chunking and lazy-loaded view boundaries.
 - Before push, run `scripts/verify-git-safety.ps1`.

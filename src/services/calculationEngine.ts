@@ -1,5 +1,5 @@
 import { buildEffectiveGridSelections } from '../utils/gridAutoScale';
-import type { CatalogData, GridAddonState, QuoteState, QuoteTotalsResult } from '../types/contracts';
+import type { CatalogData, GridAddonState, QuoteState, QuoteTotalsResult, QuoteTotalsRow } from '../types/contracts';
 
 const ADDONS_ONLY_SIZE = '__addons_only__';
 
@@ -112,10 +112,20 @@ function compareDimensionArrays(a = [], b = []) {
     return 0;
 }
 
+function isBuilderTotalsRow(row: QuoteTotalsRow) {
+    return row.source.type === 'builder'
+        || row.source.type === 'builder-addon'
+        || row.source.type === 'builder-custom-addon';
+}
+
 function sortQuoteTotalsRows(rows) {
-    const mainRows = rows.filter((row) => !row.isAddon && !row.isCustom);
-    const addonRows = rows.filter((row) => row.isAddon);
-    const customRows = rows.filter((row) => row.isCustom);
+    const builderRows = rows
+        .filter((row) => isBuilderTotalsRow(row))
+        .sort((left, right) => left.originalIndex - right.originalIndex);
+    const nonBuilderRows = rows.filter((row) => !isBuilderTotalsRow(row));
+    const mainRows = nonBuilderRows.filter((row) => !row.isAddon && !row.isCustom);
+    const addonRows = nonBuilderRows.filter((row) => row.isAddon);
+    const customRows = nonBuilderRows.filter((row) => row.isCustom);
 
     const modelOrder = new Map();
     mainRows.forEach((row) => {
@@ -155,7 +165,7 @@ function sortQuoteTotalsRows(rows) {
         return left.originalIndex - right.originalIndex;
     });
 
-    return [...sortedMainRows, ...addonRows, ...customRows];
+    return [...builderRows, ...sortedMainRows, ...addonRows, ...customRows];
 }
 
 /**
@@ -181,6 +191,8 @@ export function computeQuoteTotals({
 
     for (const item of safeState.builderItems || []) {
         const isAddonsOnly = item?.size === ADDONS_ONLY_SIZE;
+        const defaultModelLabel = `${item?.line || ''} ${item?.model || ''}`.trim();
+        const displayModelLabel = String(item?.displayName || '').trim() || defaultModelLabel;
 
         let basePrice = 0;
         if (!isAddonsOnly && item?.line && item?.model && item?.size) {
@@ -204,7 +216,7 @@ export function computeQuoteTotals({
             totalDiscountSek += discountSek;
 
             totals.push({
-                model: `${item?.line || ''} ${item?.model || ''}`.trim(),
+                model: displayModelLabel,
                 size: formattedSize,
                 unitPrice,
                 qty,
@@ -226,18 +238,20 @@ export function computeQuoteTotals({
         for (const addon of item?.addons || []) {
             const addonQty = toInt(addon?.qty, 1);
             const addonDiscountPct = toFloat(addon?.discountPct || 0);
+            const addonDisplayName = String(addon?.displayName || '').trim();
 
             if (addon?.isCustom === true) {
                 const addonUnitPrice = toFloat(addon?.price || 0);
                 const addonGross = addonUnitPrice * addonQty;
                 const addonDiscountSek = addonGross * (addonDiscountPct / 100);
                 const addonNet = addonGross - addonDiscountSek;
+                const defaultCustomAddonLabel = `  + Tillval: ${String(addon?.name || '').trim() || 'Egen rad'}`;
 
                 grossTotalSek += addonGross;
                 totalDiscountSek += addonDiscountSek;
 
                 totals.push({
-                    model: `  + Tillval: ${String(addon?.name || '').trim() || 'Egen rad'}`,
+                    model: addonDisplayName || defaultCustomAddonLabel,
                     size: '-',
                     unitPrice: addonUnitPrice,
                     qty: addonQty,
@@ -269,12 +283,13 @@ export function computeQuoteTotals({
             const addonGross = addonUnitPrice * addonQty;
             const addonDiscountSek = addonGross * (addonDiscountPct / 100);
             const addonNet = addonGross - addonDiscountSek;
+            const defaultAddonLabel = `  + Tillval: ${addonDef?.name || addon?.id || 'Okant tillval'}`;
 
             grossTotalSek += addonGross;
             totalDiscountSek += addonDiscountSek;
 
             totals.push({
-                model: `  + Tillval: ${addonDef?.name || addon?.id || 'Okant tillval'}`,
+                model: addonDisplayName || defaultAddonLabel,
                 size: '-',
                 unitPrice: addonUnitPrice,
                 qty: addonQty,

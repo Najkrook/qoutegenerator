@@ -60,4 +60,46 @@ describe('quoteStatePersistence', () => {
 
         expect(storage.removeItem).toHaveBeenCalledTimes(1);
     });
+
+    it('round-trips builder displayName overrides through persistence', () => {
+        persistQuoteState({
+            ...createInitialQuoteState(),
+            builderItems: [
+                {
+                    id: 'builder_1',
+                    line: 'BaHaMa',
+                    model: 'Jumbrella',
+                    size: '4x4 Kvadrat',
+                    qty: 1,
+                    discountPct: 0,
+                    displayName: 'BaHaMa Jumbrella Merlot',
+                    addons: [
+                        {
+                            id: 'heater',
+                            qty: 1,
+                            discountPct: 0,
+                            displayName: 'Varmare Merlot'
+                        },
+                        {
+                            id: 'custom_1',
+                            qty: 2,
+                            discountPct: 0,
+                            isCustom: true,
+                            name: 'Speciallack',
+                            displayName: 'Speciallack Merlot',
+                            price: 900,
+                            categoryId: 'installation'
+                        }
+                    ]
+                }
+            ]
+        }, storage);
+
+        const loaded = loadPersistedQuoteState(storage);
+
+        expect(loaded.builderItems[0].displayName).toBe('BaHaMa Jumbrella Merlot');
+        expect(loaded.builderItems[0].addons[0].displayName).toBe('Varmare Merlot');
+        expect(loaded.builderItems[0].addons[1].displayName).toBe('Speciallack Merlot');
+        expect(loaded.builderItems[0].addons.map((addon) => addon.id)).toEqual(['heater', 'custom_1']);
+    });
 });

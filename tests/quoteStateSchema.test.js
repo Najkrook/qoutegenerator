@@ -185,14 +185,16 @@ describe('quoteStateSchema', () => {
                     size: '4x4 Kvadrat',
                     qty: '2',
                     discountPct: '4',
+                    displayName: 'Produktnamn override',
                     addons: [
-                        { id: 'heater', qty: '3', discountPct: '5' },
+                        { id: 'heater', qty: '3', discountPct: '5', displayName: 'Tillval override' },
                         {
                             id: 'custom_1',
                             qty: '2',
                             discountPct: '7',
                             isCustom: true,
                             name: 'Speciallack',
+                            displayName: 'Custom override',
                             price: '900',
                             categoryId: 'installationsalternativ'
                         }
@@ -207,12 +209,14 @@ describe('quoteStateSchema', () => {
             model: 'Jumbrella',
             size: '4x4 Kvadrat',
             qty: 2,
-            discountPct: 4
+            discountPct: 4,
+            displayName: 'Produktnamn override'
         });
         expect(hydrated.builderItems[0].addons[0]).toEqual({
             id: 'heater',
             qty: 3,
-            discountPct: 5
+            discountPct: 5,
+            displayName: 'Tillval override'
         });
         expect(hydrated.builderItems[0].addons[1]).toEqual({
             id: 'custom_1',
@@ -220,9 +224,31 @@ describe('quoteStateSchema', () => {
             discountPct: 7,
             isCustom: true,
             name: 'Speciallack',
+            displayName: 'Custom override',
             price: 900,
             categoryId: 'installationsalternativ'
         });
+    });
+
+    it('drops blank builder displayName overrides during hydration', () => {
+        const hydrated = hydrateQuoteState({
+            builderItems: [
+                {
+                    id: 'builder_1',
+                    line: 'BaHaMa',
+                    model: 'Jumbrella',
+                    size: '4x4 Kvadrat',
+                    qty: 1,
+                    addons: [
+                        { id: 'heater', qty: 1, discountPct: 0, displayName: '   ' }
+                    ],
+                    displayName: ' '
+                }
+            ]
+        });
+
+        expect(hydrated.builderItems[0].displayName).toBeUndefined();
+        expect(hydrated.builderItems[0].addons[0].displayName).toBeUndefined();
     });
 
     it('conservatively hydrates forward-version blobs and warns', () => {

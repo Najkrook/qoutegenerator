@@ -194,6 +194,7 @@ export interface CatalogBuilderAddon {
     id: string;
     qty: number;
     discountPct: number;
+    displayName?: string;
 }
 
 export interface CustomBuilderAddon extends CatalogBuilderAddon {
@@ -201,6 +202,7 @@ export interface CustomBuilderAddon extends CatalogBuilderAddon {
     name: string;
     price: number;
     categoryId: string;
+    displayName?: string;
 }
 
 export type BuilderAddon = CatalogBuilderAddon | CustomBuilderAddon;
@@ -213,6 +215,7 @@ export interface RawPersistedBuilderAddon extends UnknownRecord {
     name?: unknown;
     price?: unknown;
     categoryId?: unknown;
+    displayName?: unknown;
 }
 
 export interface BuilderCatalogSizeOption {
@@ -288,6 +291,7 @@ export interface BuilderItem {
     qty: number;
     discountPct: number;
     addons: BuilderAddon[];
+    displayName?: string;
     source?: string;
     sourceType?: string;
     [key: string]: unknown;
@@ -301,6 +305,7 @@ export interface RawPersistedBuilderItem extends UnknownRecord {
     qty?: unknown;
     discountPct?: unknown;
     addons?: unknown;
+    displayName?: unknown;
 }
 
 export interface EffectiveGridLineSelection {

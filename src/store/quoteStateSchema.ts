@@ -126,6 +126,11 @@ function normalizeNonNegativeInt(value: unknown, fallback = 0): number {
     return Number.isFinite(parsed) && parsed >= 0 ? parsed : fallback;
 }
 
+function normalizeOptionalDisplayName(value: unknown): string | undefined {
+    const normalized = String(value ?? '').trim();
+    return normalized.length > 0 ? normalized : undefined;
+}
+
 function parseValidityDays(value: unknown): number | null {
     const match = String(value ?? '').match(/(\d+)/);
     if (!match) return null;
@@ -213,7 +218,8 @@ function normalizeBuilderAddon(addon: unknown, index: number): BuilderAddon {
         return {
             id: String(safeAddon.id || `addon_${index}`),
             qty: normalizePositiveInt(safeAddon.qty, 1),
-            discountPct: toNumber(safeAddon.discountPct, 0)
+            discountPct: toNumber(safeAddon.discountPct, 0),
+            displayName: normalizeOptionalDisplayName(safeAddon.displayName)
         };
     }
 
@@ -224,7 +230,8 @@ function normalizeBuilderAddon(addon: unknown, index: number): BuilderAddon {
         isCustom: true,
         name: String(safeAddon.name || ''),
         price: toNumber(safeAddon.price, 0),
-        categoryId: String(safeAddon.categoryId || '__uncategorized__')
+        categoryId: String(safeAddon.categoryId || '__uncategorized__'),
+        displayName: normalizeOptionalDisplayName(safeAddon.displayName)
     };
 }
 
@@ -243,6 +250,7 @@ function normalizeBuilderItems(value: unknown): QuoteState['builderItems'] {
             size: String(safeItem.size || ''),
             qty: normalizePositiveInt(safeItem.qty, 1),
             discountPct: toNumber(safeItem.discountPct, 0),
+            displayName: normalizeOptionalDisplayName(safeItem.displayName),
             addons: Array.isArray(safeItem.addons)
                 ? safeItem.addons.map((addon, addonIndex) => normalizeBuilderAddon(addon, addonIndex))
                 : []
