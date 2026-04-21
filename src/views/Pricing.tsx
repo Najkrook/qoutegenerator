@@ -2,6 +2,7 @@ import React, { type ChangeEvent } from 'react';
 import { useQuote } from '../store/QuoteContext';
 import { useAuth } from '../store/AuthContext';
 import { catalogData } from '../data/catalog';
+import { getCatalogLineName } from '../data/catalogLookup';
 import { PricingTable } from '../components/features/PricingTable';
 import { CustomCosts } from '../components/features/CustomCosts';
 import {
@@ -48,8 +49,13 @@ function findGridAddonDefinition(
 
 export function Pricing({ onNext, onPrev }: PricingProps) {
     const { state, dispatch } = useQuote();
-    const { canViewEverything, isRetailer } = useAuth();
-    const { globalDiscountPct, exchangeRate, prevGlobalDiscountPct } = state;
+    const { canViewEverything, isRetailer, retailer } = useAuth();
+    const { globalDiscountPct, exchangeRate, prevGlobalDiscountPct, selectedLines } = state;
+    const selectedLineId = selectedLines[0] || '';
+    const selectedLineName = selectedLineId ? (getCatalogLineName(selectedLineId) || selectedLineId) : 'Ingen vald produktlinje';
+    const retailerDiscountPct = isRetailer
+        ? (Number(retailer?.productLines?.[selectedLineId]?.discountPct) || globalDiscountPct || 0)
+        : 0;
 
     const handleGlobalDiscountChange = (event: ChangeEvent<HTMLInputElement>): void => {
         const nextGlobalDiscount = parseDiscount(event.target.value);
@@ -150,6 +156,30 @@ export function Pricing({ onNext, onPrev }: PricingProps) {
                 </p>
             </div>
 
+            {isRetailer && (
+                <div className="mb-6 rounded-xl border border-primary/20 bg-primary/5 p-5 shadow-sm">
+                    <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+                        <div>
+                            <p className="m-0 text-[11px] font-bold uppercase tracking-[0.18em] text-primary">
+                                Retailer-prissättning
+                            </p>
+                            <h3 className="mt-2 text-xl font-semibold text-text-primary">
+                                Vald produktlinje: {selectedLineName}
+                            </h3>
+                            <p className="mt-2 max-w-2xl text-sm leading-relaxed text-text-secondary">
+                                Den här prisbilden följer ert retailer-avtal. Global rabatt och radrabatter är låsta,
+                                medan extra poster under Övriga kostnader fortfarande kan läggas till vid behov.
+                            </p>
+                        </div>
+
+                        <div className="rounded-lg border border-primary/30 bg-white/5 px-4 py-3 text-sm">
+                            <div className="text-text-secondary">Avtalad retailer-rabatt</div>
+                            <div className="mt-1 text-2xl font-black text-primary">{retailerDiscountPct}%</div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             <PricingTable />
 
             <CustomCosts />
@@ -183,7 +213,9 @@ export function Pricing({ onNext, onPrev }: PricingProps) {
                         />
                     </div>
                     <p className="text-[10px] text-text-secondary mt-2 italic">
-                        * Ändrar snabbt alla rader som följer standardrabatten. Manuellt justerade rader behåller sitt värde.
+                        {isRetailer
+                            ? `* Rabatt enligt retailer-avtal för ${selectedLineName}. Radrabatter i prislistan är också låsta.`
+                            : '* Ändrar snabbt alla rader som följer standardrabatten. Manuellt justerade rader behåller sitt värde.'}
                     </p>
                 </div>
 

@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
+import { getCatalogLineIds, getCatalogLineName } from '../data/catalogLookup';
 import { useAuth } from '../store/AuthContext';
 import { db, collection, query, orderBy, limit, getDocs } from '../services/firebase';
 import {
@@ -6,19 +7,52 @@ import {
     getActivityLogVisual,
     normalizeActivityLog
 } from '../services/activityLogService';
-import type { DashboardProps } from '../types/contracts';
+import type { DashboardProps, RetailerRecord } from '../types/contracts';
 
 type ActivityLogEntry = ReturnType<typeof normalizeActivityLog>;
 
+interface RetailerLineSummary {
+    id: string;
+    name: string;
+    discountPct: number;
+}
+
+function getRetailerLineSummaries(retailer: RetailerRecord | null): RetailerLineSummary[] {
+    if (!retailer?.productLines) {
+        return [];
+    }
+
+    return getCatalogLineIds().flatMap((lineId) => {
+        const lineConfig = retailer.productLines?.[lineId];
+        if (!lineConfig?.enabled) {
+            return [];
+        }
+
+        return [{
+            id: lineId,
+            name: getCatalogLineName(lineId) || lineId,
+            discountPct: Number(lineConfig.discountPct) || 0
+        }];
+    });
+}
+
 export function Dashboard({
     onStartQuote,
+    onOpenHistory,
     onOpenInventory,
     onOpenSketch,
     onOpenPlanner,
     onOpenActivity,
     onOpenRetailers
 }: DashboardProps) {
-    const { canViewEverything, canStartQuote, canAccessSketch } = useAuth();
+    const {
+        canViewEverything,
+        canStartQuote,
+        canAccessSketch,
+        canAccessQuoteHistory,
+        isRetailer,
+        retailer
+    } = useAuth();
     const [logs, setLogs] = useState<ActivityLogEntry[]>([]);
     const [logsLoading, setLogsLoading] = useState(false);
     const [logsError, setLogsError] = useState(false);
@@ -52,6 +86,112 @@ export function Dashboard({
         void fetchLogs();
     }, [fetchLogs]);
 
+    const retailerLineSummaries = getRetailerLineSummaries(retailer);
+    const retailerName = retailer?.name || 'Er retailerprofil';
+
+    if (isRetailer) {
+        return (
+            <div className="mx-auto flex max-w-6xl flex-col gap-8 animate-slide-in">
+                <section className="w-full rounded-2xl border border-panel-border bg-panel-bg p-8 shadow-lg">
+                    <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
+                        <div className="max-w-3xl">
+                            <span className="inline-flex rounded-full border border-primary/30 bg-primary/10 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.2em] text-primary">
+                                Retailer Workspace
+                            </span>
+                            <h2 className="mt-4 text-4xl font-semibold tracking-tight text-text-primary">
+                                Välkommen, {retailerName}
+                            </h2>
+                            <p className="mt-3 max-w-2xl text-sm leading-relaxed text-text-secondary">
+                                Här ser du vilka produktlinjer ni får sälja och vilken standardrabatt som gäller.
+                                Produktutbud och standardrabatt styrs av ert retailer-konto, så du slipper gissa vad
+                                som ingår.
+                            </p>
+                        </div>
+
+                        <div className="grid min-w-[240px] grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-1">
+                            <div className="rounded-xl border border-panel-border bg-black/10 p-4">
+                                <div className="text-[11px] font-bold uppercase tracking-[0.18em] text-text-secondary">
+                                    Aktiva produktlinjer
+                                </div>
+                                <div className="mt-2 text-3xl font-black text-text-primary">
+                                    {retailerLineSummaries.length}
+                                </div>
+                            </div>
+                            <div className="rounded-xl border border-panel-border bg-black/10 p-4">
+                                <div className="text-[11px] font-bold uppercase tracking-[0.18em] text-text-secondary">
+                                    Historik
+                                </div>
+                                <div className="mt-2 text-sm font-medium text-text-primary">
+                                    {canAccessQuoteHistory ? 'Mina Offerter tillgängligt' : 'Historik ej tillgänglig'}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="mt-6 flex flex-wrap gap-3">
+                        {canStartQuote && (
+                            <button
+                                type="button"
+                                onClick={onStartQuote}
+                                className="rounded-md bg-primary px-6 py-3 text-sm font-bold text-white shadow-lg shadow-primary/20 transition-colors hover:bg-primary-hover"
+                            >
+                                Starta Ny Offert
+                            </button>
+                        )}
+                        {canAccessQuoteHistory && onOpenHistory && (
+                            <button
+                                type="button"
+                                onClick={onOpenHistory}
+                                className="rounded-md border border-panel-border bg-black/10 px-6 py-3 text-sm font-medium text-text-primary transition-colors hover:bg-white/5"
+                            >
+                                Mina Offerter
+                            </button>
+                        )}
+                    </div>
+                </section>
+
+                <section className="w-full rounded-2xl border border-panel-border bg-panel-bg p-8 shadow-sm">
+                    <div className="flex items-center justify-between gap-4 border-b border-panel-border pb-4">
+                        <div>
+                            <h3 className="m-0 text-xl font-semibold text-text-primary">Aktiva produktlinjer och rabatter</h3>
+                            <p className="mt-1 text-sm text-text-secondary">
+                                Rabatten appliceras som standard när du väljer en av era aktiva linjer i offertflödet.
+                            </p>
+                        </div>
+                    </div>
+
+                    {retailerLineSummaries.length === 0 ? (
+                        <div className="mt-6 rounded-xl border border-warning/30 bg-warning/10 p-4 text-sm text-text-secondary">
+                            Inga produktlinjer är aktiva för det här retailer-kontot ännu. Kontakta Brixx om ni behöver
+                            utöka ert sortiment.
+                        </div>
+                    ) : (
+                        <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+                            {retailerLineSummaries.map((line) => (
+                                <div
+                                    key={line.id}
+                                    className="rounded-xl border border-panel-border bg-black/10 p-5"
+                                >
+                                    <div className="flex items-start justify-between gap-3">
+                                        <div>
+                                            <h4 className="m-0 text-lg font-semibold text-text-primary">{line.name}</h4>
+                                            <p className="mt-2 text-sm text-text-secondary">
+                                                Standardrabatt för nya offerter inom denna produktlinje.
+                                            </p>
+                                        </div>
+                                        <span className="rounded-full border border-primary/30 bg-primary/10 px-3 py-1 text-xs font-bold text-primary">
+                                            {line.discountPct}% rabatt
+                                        </span>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </section>
+            </div>
+        );
+    }
+
     return (
         <div className="flex flex-col items-center animate-slide-in">
             <h2 className="text-center mb-12 text-4xl font-semibold tracking-tight text-text-primary">
@@ -65,7 +205,7 @@ export function Dashboard({
                         onClick={onStartQuote}
                         className="flex-1 min-w-[300px] max-w-[400px] bg-panel-bg border border-panel-border rounded-xl p-12 cursor-pointer text-center transition-all hover:-translate-y-1 hover:shadow-lg hover:border-primary group"
                     >
-                        <div className="text-5xl mb-4 group-hover:scale-110 transition-transform" aria-hidden="true">📄</div>
+                        <div className="text-5xl mb-4 group-hover:scale-110 transition-transform" aria-hidden="true">Dok</div>
                         <h3 className="text-2xl font-semibold text-text-primary mb-2">Skapa Ny Offert</h3>
                         <p className="text-text-secondary leading-relaxed m-0">
                             Starta ett nytt offertflöde för kund. Konfigurera produkter, priser och generera PDF.
@@ -79,7 +219,7 @@ export function Dashboard({
                         onClick={onOpenInventory}
                         className="flex-1 min-w-[250px] max-w-[350px] bg-panel-bg border border-panel-border rounded-xl p-12 cursor-pointer text-center transition-all hover:-translate-y-1 hover:shadow-lg hover:border-primary group"
                     >
-                        <div className="text-5xl mb-4 group-hover:scale-110 transition-transform" aria-hidden="true">📦</div>
+                        <div className="text-5xl mb-4 group-hover:scale-110 transition-transform" aria-hidden="true">Inv</div>
                         <h3 className="text-2xl font-semibold text-text-primary mb-2">Hantera Lagersaldo</h3>
                         <p className="text-text-secondary leading-relaxed m-0">
                             Uppdatera lagersaldon för BaHaMa och ClickitUp. Se loggar och historik.
@@ -93,7 +233,7 @@ export function Dashboard({
                         onClick={onOpenSketch}
                         className="flex-1 min-w-[250px] max-w-[350px] bg-panel-bg border border-panel-border rounded-xl p-12 cursor-pointer text-center transition-all hover:-translate-y-1 hover:shadow-lg hover:border-primary group"
                     >
-                        <div className="text-5xl mb-4 group-hover:scale-110 transition-transform" aria-hidden="true">✏️</div>
+                        <div className="text-5xl mb-4 group-hover:scale-110 transition-transform" aria-hidden="true">Pen</div>
                         <h3 className="text-2xl font-semibold text-text-primary mb-2">Rita Uteservering</h3>
                         <p className="text-text-secondary leading-relaxed m-0">
                             Skissa snabbt en rektangel för att automatiskt beräkna optimala ClickitUp-sektioner.
@@ -107,7 +247,7 @@ export function Dashboard({
                         onClick={onOpenActivity}
                         className="flex-1 min-w-[250px] max-w-[350px] bg-panel-bg border border-panel-border rounded-xl p-12 cursor-pointer text-center transition-all hover:-translate-y-1 hover:shadow-lg hover:border-primary group"
                     >
-                        <div className="text-5xl mb-4 group-hover:scale-110 transition-transform" aria-hidden="true">🕘</div>
+                        <div className="text-5xl mb-4 group-hover:scale-110 transition-transform" aria-hidden="true">Log</div>
                         <h3 className="text-2xl font-semibold text-text-primary mb-2">Aktivitetslog</h3>
                         <p className="text-text-secondary leading-relaxed m-0">
                             Se vem som skapade offerter, exporterade filer och använde ritverktyget.
@@ -121,7 +261,7 @@ export function Dashboard({
                         onClick={onOpenPlanner}
                         className="flex-1 min-w-[250px] max-w-[350px] bg-panel-bg border border-panel-border rounded-xl p-12 cursor-pointer text-center transition-all hover:-translate-y-1 hover:shadow-lg hover:border-primary group"
                     >
-                        <div className="text-5xl mb-4 group-hover:scale-110 transition-transform" aria-hidden="true">📋</div>
+                        <div className="text-5xl mb-4 group-hover:scale-110 transition-transform" aria-hidden="true">Plan</div>
                         <h3 className="text-2xl font-semibold text-text-primary mb-2">Projektplanerare</h3>
                         <p className="text-text-secondary leading-relaxed m-0">
                             Planera och följ upp projekt. Lägg till, checka av och håll koll på framsteg.
@@ -135,7 +275,7 @@ export function Dashboard({
                         onClick={onOpenRetailers}
                         className="flex-1 min-w-[250px] max-w-[350px] bg-panel-bg border border-panel-border rounded-xl p-12 cursor-pointer text-center transition-all hover:-translate-y-1 hover:shadow-lg hover:border-primary group"
                     >
-                        <div className="text-5xl mb-4 group-hover:scale-110 transition-transform" aria-hidden="true">🏪</div>
+                        <div className="text-5xl mb-4 group-hover:scale-110 transition-transform" aria-hidden="true">AF</div>
                         <h3 className="text-2xl font-semibold text-text-primary mb-2">Återförsäljare</h3>
                         <p className="text-text-secondary leading-relaxed m-0">
                             Hantera återförsäljare, produktlinjer och rabatter.

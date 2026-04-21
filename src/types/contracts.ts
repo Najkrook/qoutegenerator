@@ -803,6 +803,7 @@ export interface HeaderProps {
 
 export interface DashboardProps {
     onStartQuote?: () => void;
+    onOpenHistory?: () => void;
     onOpenInventory?: () => void;
     onOpenSketch?: () => void;
     onOpenPlanner?: () => void;

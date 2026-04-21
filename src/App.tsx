@@ -117,6 +117,7 @@ function App() {
                     {step === 0 && (
                         <Dashboard
                             onStartQuote={canStartQuote ? () => setStep(1) : undefined}
+                            onOpenHistory={canAccessQuoteHistory ? () => setStep('history') : undefined}
                             onOpenInventory={canViewEverything ? () => setStep('inventory') : undefined}
                             onOpenSketch={
                                 canAccessSketch

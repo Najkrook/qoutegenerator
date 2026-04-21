@@ -54,13 +54,17 @@ Success signals:
 - Critical shared shapes have typed coverage before more workflow work lands on top of them.
 - Common contract mistakes are caught earlier in local development.
 
-### 2. Retailer Workspace
-Turn retailer access from a hidden role variant into a clearer dedicated workspace experience. Concrete improvements include: a retailer-specific dashboard layout that hides admin-only cards and surfaces the retailer's applied discount and allowed product lines prominently; clear visual treatment for restricted product lines (greyed out with explanation rather than silently hidden); and retailer-specific onboarding cues so new retailer users understand their scope without trial and error. Keep retailer management and admin controls aligned with the same model so the admin-facing configuration stays easy to reason about.
+### [~] 2. Retailer Workspace
+Status: Retailer Workspace V1 is now live. The first delivery includes a retailer-specific dashboard/workspace, visible enabled/disabled product lines with explanation, retailer discount preview during product-line selection, and retailer-specific pricing guidance with lock copy in the pricing step.
+
+Turn retailer access from a hidden role variant into a clearer dedicated workspace experience. The current V1 now covers the core "understand my scope" path, but the initiative remains active until retailer workflows feel fully intentional across the whole quote flow. Keep retailer management and admin controls aligned with the same model so the admin-facing configuration stays easy to reason about.
+
+Remaining follow-up work includes: consistent notification and feedback behavior across retailer flows; continued review of retailer-specific edge cases; and an explicit product decision on whether `CustomCosts`, save/export behavior, or other pricing-adjacent actions should be further restricted for retailer users.
 
 Success signals:
-- Retailer users can see their discount and product scope without guessing.
-- Restricted product lines are visibly explained, not silently absent.
-- Fewer retailer-specific edge cases show up during quote setup.
+- Retailer users can now see their discount and product scope without guessing.
+- Restricted product lines are now visibly explained instead of silently absent.
+- Remaining retailer-specific edge cases and permission inconsistencies continue to trend down as the follow-up work lands.
 
 ### 3. Quote Duplication
 Add a first-class way to duplicate an existing quote into a new draft so users can reuse similar customer configurations without starting from scratch. The initial workflow should live in History, where a `Duplicera` action clones a quote's saved state into a new draft quote with a new ID and fresh save lineage. This should preserve the original quote as history while making the duplicate immediately editable as a separate working copy.

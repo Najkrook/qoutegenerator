@@ -2,7 +2,7 @@
 
 This file exists to help future agents understand the actual `QuoteGenerator` project shape before editing anything substantial.
 
-Last verified: `2026-04-20`
+Last verified: `2026-04-21`
 Active branch at verification: `main`
 
 `QuoteGenerator` is a React SPA repository. All active runtime logic lives under `src/`. `README.md` is useful for human onboarding; this file is the deeper agent map for implementation work.
@@ -16,6 +16,7 @@ Active branch at verification: `main`
 - In-progress quote state is persisted in localStorage under `offertverktyg_state` through `src/store/QuoteContext.tsx` and `src/store/quoteStatePersistence.ts`.
 - Persistent backend data lives in Firestore for quotes, revisions, templates, inventory, inventory logs, activity logs, planner projects, and retailers.
 - Access control is UID-based and resolved in `src/config/accessControl.shared.ts`, with retailer access detected from Firestore during auth bootstrap.
+- Retailer Workspace V1 is live: retailer users now see scope and discount guidance directly in dashboard, product-line selection, and pricing.
 - Quote persistence and revisioning are centralized in `src/services/quoteRepository.ts`.
 - Shared runtime/domain contracts live in `src/types/contracts.ts`.
 - Shared runtime boundary helpers now live in `src/utils/runtime.ts`.
@@ -138,6 +139,10 @@ The following root files are **not** part of the active runtime and should be ig
 - Persistence:
   - no dedicated dashboard document
   - admin dashboard reads recent `activity_logs`
+- Behavior notes:
+  - retailer users see a dedicated workspace variant instead of the generic quote-only dashboard
+  - retailer workspace surfaces enabled product lines, per-line default discounts, and CTA access to new quotes and quote history
+  - admin-only cards and the recent activity panel remain hidden from retailer users
 
 ### Product Line Selection
 
@@ -148,6 +153,10 @@ The following root files are **not** part of the active runtime and should be ig
   - `src/store/QuoteContext.tsx`
 - Persistence:
   - localStorage via quote state
+- Behavior notes:
+  - retailer users see the full catalog, but only enabled product lines are selectable
+  - disabled retailer lines are shown with explanatory copy instead of being silently filtered out
+  - retailer selection is single-line only, and the selected line's configured discount is applied to `globalDiscountPct` when continuing
 
 ### Configuration
 
@@ -175,6 +184,9 @@ The following root files are **not** part of the active runtime and should be ig
 - Behavior notes:
   - quote totals shown later in summary/export are derived from the calculation engine
   - grid auto-scale propagates quantity and discount behavior across grid add-ons
+  - retailer users see a dedicated pricing info panel with selected line context and the configured default discount
+  - global discount controls and row-level discounts are locked for retailer users
+  - `CustomCosts` is still editable for retailer users in the current implementation
 
 ### Summary Export
 
@@ -337,6 +349,14 @@ If you change roles or access expectations:
 - review `src/App.tsx`, `src/components/layout/Header.tsx`, and `src/views/History.tsx`
 - if the change involves retailers, also review `src/services/retailerService.ts` and `src/views/RetailerManager.tsx`
 - keep `ADMIN_UIDS` synchronized with `firestore.rules`
+
+Current retailer reality:
+
+- retailer users are identified by auth-email match against the `retailers` collection during auth bootstrap
+- retailer users have access to the quote flow and quote history
+- retailer users do not have access to admin views or the sketch tool
+- retailer users currently see locked global/rad-level discount controls, but `CustomCosts` remains editable
+- retailer users can still save and export from step 4 in the current implementation
 
 ## State Model And Persistence
 
@@ -665,6 +685,9 @@ Start with:
 
 Start with:
 
+- `src/views/Dashboard.tsx`
+- `src/views/ProductLineSelection.tsx`
+- `src/views/Pricing.tsx`
 - `src/views/RetailerManager.tsx`
 - `src/services/retailerService.ts`
 - `src/services/authService.ts`
