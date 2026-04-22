@@ -1,10 +1,8 @@
-import { useState, useEffect, useCallback, type KeyboardEvent, type MouseEvent } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef, type CSSProperties, type DragEvent, type KeyboardEvent, type MouseEvent } from 'react';
 import { useAuth } from '../store/AuthContext';
 import {
     db,
     collection,
-    query,
-    where,
     getDocs,
     addDoc,
     deleteDoc,
@@ -35,6 +33,18 @@ interface GroupedPlannerDay {
     projects: PlannerProject[];
 }
 
+interface PlannerWeekSummary {
+    week: string;
+    totalCount: number;
+    doneCount: number;
+    completionRatio: number;
+}
+
+interface PlannerAssigneeOption {
+    email: string;
+    label: string;
+}
+
 interface ProjectDetailsModalProps {
     project: PlannerProject;
     onClose: () => void;
@@ -44,6 +54,45 @@ interface ProjectDetailsModalProps {
 const PLANNER_COLLECTION_PATH = 'planner_projects';
 const PRIORITY_OPTIONS: PlannerPriority[] = ['Låg', 'Normal', 'Hög'];
 const CONTRACTOR_OPTIONS: PlannerContractor[] = ['', 'Stabil', 'Tavi'];
+export const PLANNER_ASSIGNEE_OPTIONS: PlannerAssigneeOption[] = [
+    { email: 'johan@brixx.se', label: 'Johan' },
+    { email: 'info@brixx.se', label: 'Info' },
+    { email: 'erik@brixx.se', label: 'Erik' }
+];
+const WEEK_LIST_SCROLLBAR_STYLE: CSSProperties = {
+    scrollbarWidth: 'thin',
+    scrollbarColor: 'rgba(59, 130, 246, 0.45) transparent'
+};
+
+function getPlannerAssigneeOption(email: string): PlannerAssigneeOption | undefined {
+    return PLANNER_ASSIGNEE_OPTIONS.find((option) => option.email === email);
+}
+
+export function normalizePlannerAssignees(value: unknown): string[] {
+    if (!Array.isArray(value)) return [];
+
+    const normalized = value
+        .map((entry) => (typeof entry === 'string' ? entry.trim().toLowerCase() : ''))
+        .filter((entry) => Boolean(getPlannerAssigneeOption(entry)));
+
+    return Array.from(new Set(normalized));
+}
+
+export function addPlannerAssignee(currentAssignees: string[] = [], email: string): string[] {
+    const normalizedEmail = typeof email === 'string' ? email.trim().toLowerCase() : '';
+    if (!getPlannerAssigneeOption(normalizedEmail)) return [...currentAssignees];
+    if (currentAssignees.includes(normalizedEmail)) return [...currentAssignees];
+    return [...currentAssignees, normalizedEmail];
+}
+
+export function removePlannerAssignee(currentAssignees: string[] = [], email: string): string[] {
+    const normalizedEmail = typeof email === 'string' ? email.trim().toLowerCase() : '';
+    return currentAssignees.filter((entry) => entry !== normalizedEmail);
+}
+
+function getPlannerAssigneeLabel(email: string): string {
+    return getPlannerAssigneeOption(email)?.label || email;
+}
 
 function getISOWeekString(date = new Date()): string {
     const utcDate = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
@@ -54,16 +103,89 @@ function getISOWeekString(date = new Date()): string {
     return `${utcDate.getUTCFullYear()}-W${weekNo.toString().padStart(2, '0')}`;
 }
 
-function generateWeeksList(currentDate = new Date()): string[] {
+function compareISOWeekStrings(left: string, right: string): number {
+    return left.localeCompare(right);
+}
+
+function generateCurrentAndFutureWeeks(currentDate = new Date(), weeksAhead = 8): string[] {
     const weeks: string[] = [];
     const msPerWeek = 7 * 24 * 60 * 60 * 1000;
 
-    for (let i = -4; i <= 2; i += 1) {
+    for (let i = 0; i <= weeksAhead; i += 1) {
         const date = new Date(currentDate.getTime() + i * msPerWeek);
         weeks.push(getISOWeekString(date));
     }
 
     return weeks;
+}
+
+export function getWeekCompletionTone(
+    summary: Pick<PlannerWeekSummary, 'totalCount' | 'completionRatio'>
+): 'success' | 'warning' | 'danger' | null {
+    if ((summary.totalCount || 0) <= 0) return null;
+    if (summary.completionRatio >= 1) return 'success';
+    if (summary.completionRatio > 0.3) return 'warning';
+    return 'danger';
+}
+
+export function buildPlannerWeekSummaries(
+    projects: PlannerProject[] = [],
+    currentDate = new Date(),
+    futureWeeksAhead = 8
+): PlannerWeekSummary[] {
+    const currentWeek = getISOWeekString(currentDate);
+    const futureWeeks = generateCurrentAndFutureWeeks(currentDate, futureWeeksAhead);
+    const weekStats = projects.reduce<Record<string, { totalCount: number; doneCount: number }>>((acc, project) => {
+        const week = String(project.week || '').trim();
+        if (!week) return acc;
+
+        if (!acc[week]) {
+            acc[week] = { totalCount: 0, doneCount: 0 };
+        }
+
+        acc[week].totalCount += 1;
+        if (project.done) {
+            acc[week].doneCount += 1;
+        }
+
+        return acc;
+    }, {});
+
+    const visibleWeeks = new Set<string>(futureWeeks);
+    Object.keys(weekStats).forEach((week) => {
+        visibleWeeks.add(week);
+    });
+
+    return Array.from(visibleWeeks)
+        .map((week) => {
+            const stats = weekStats[week] || { totalCount: 0, doneCount: 0 };
+            const completionRatio = stats.totalCount > 0 ? stats.doneCount / stats.totalCount : 0;
+
+            return {
+                week,
+                totalCount: stats.totalCount,
+                doneCount: stats.doneCount,
+                completionRatio
+            };
+        })
+        .filter((summary) => (
+            summary.totalCount > 0 || compareISOWeekStrings(summary.week, currentWeek) >= 0
+        ))
+        .sort((left, right) => compareISOWeekStrings(left.week, right.week));
+}
+
+function getWeekBadgeClassName(summary: PlannerWeekSummary): string {
+    const tone = getWeekCompletionTone(summary);
+
+    if (tone === 'success') {
+        return 'border-success/40 bg-success/10 text-success';
+    }
+
+    if (tone === 'warning') {
+        return 'border-amber-400/40 bg-amber-500/10 text-amber-200';
+    }
+
+    return 'border-danger/40 bg-danger/10 text-danger';
 }
 
 function createEmptyPlannerProjectDocument(
@@ -83,7 +205,8 @@ function createEmptyPlannerProjectDocument(
         week,
         address: '',
         phone: '',
-        notes: ''
+        notes: '',
+        assignees: []
     };
 }
 
@@ -102,7 +225,7 @@ function normalizePlannerPriority(value: string): PlannerPriority {
     return normalizeAllowedValue(value, PRIORITY_OPTIONS, 'Normal');
 }
 
-function normalizePlannerProject(snapshot: SnapshotSource & { id?: unknown }): PlannerProject {
+export function normalizePlannerProject(snapshot: SnapshotSource & { id?: unknown }): PlannerProject {
     const raw = readSnapshotData<PlannerProjectDocument>(snapshot);
 
     return {
@@ -116,13 +239,14 @@ function normalizePlannerProject(snapshot: SnapshotSource & { id?: unknown }): P
         week: typeof raw.week === 'string' ? raw.week : '',
         address: typeof raw.address === 'string' ? raw.address : '',
         phone: typeof raw.phone === 'string' ? raw.phone : '',
-        notes: typeof raw.notes === 'string' ? raw.notes : ''
+        notes: typeof raw.notes === 'string' ? raw.notes : '',
+        assignees: normalizePlannerAssignees(raw.assignees)
     };
 }
 
 export function Planner({ onBack }: PlannerProps) {
     const { user } = useAuth();
-    const [projects, setProjects] = useState<PlannerProject[]>([]);
+    const [allProjects, setAllProjects] = useState<PlannerProject[]>([]);
     const [newTitle, setNewTitle] = useState('');
     const [contractor, setContractor] = useState<PlannerContractor>('');
     const [newPriority, setNewPriority] = useState<PlannerPriority>('Normal');
@@ -130,29 +254,56 @@ export function Planner({ onBack }: PlannerProps) {
     const [saving, setSaving] = useState(false);
     const [selectedProjectDetails, setSelectedProjectDetails] = useState<PlannerProject | null>(null);
     const [toastMessage, setToastMessage] = useState<PlannerToastMessage | null>(null);
-    const [selectedWeek, setSelectedWeek] = useState(() => getISOWeekString(new Date()));
-    const [availableWeeks] = useState(() => generateWeeksList(new Date()));
+    const currentWeek = getISOWeekString(new Date());
+    const [selectedWeek, setSelectedWeek] = useState(() => currentWeek);
+    const selectedWeekButtonRef = useRef<HTMLButtonElement | null>(null);
 
     const fetchProjects = useCallback(async () => {
         setLoading(true);
         try {
             const ref = collection(db, PLANNER_COLLECTION_PATH);
-            const plannerQuery = query(ref, where('week', '==', selectedWeek));
-            const snap = await getDocs(plannerQuery);
+            const snap = await getDocs(ref);
             const fetched = snap.docs
                 .map((snapshot) => normalizePlannerProject(snapshot))
                 .sort((a, b) => b.createdAt - a.createdAt);
-            setProjects(fetched);
+            setAllProjects(fetched);
         } catch (error) {
-            console.error('Failed to fetch planner projects by week:', error);
+            console.error('Failed to fetch planner projects:', error);
         } finally {
             setLoading(false);
         }
-    }, [selectedWeek]);
+    }, []);
 
     useEffect(() => {
         void fetchProjects();
     }, [fetchProjects]);
+
+    const weekSummaries = useMemo(
+        () => buildPlannerWeekSummaries(allProjects, new Date()),
+        [allProjects]
+    );
+
+    const projects = useMemo(
+        () => allProjects
+            .filter((project) => project.week === selectedWeek)
+            .sort((a, b) => b.createdAt - a.createdAt),
+        [allProjects, selectedWeek]
+    );
+
+    useEffect(() => {
+        if (weekSummaries.some((summary) => summary.week === selectedWeek)) {
+            return;
+        }
+
+        setSelectedWeek(currentWeek);
+    }, [currentWeek, selectedWeek, weekSummaries]);
+
+    useEffect(() => {
+        selectedWeekButtonRef.current?.scrollIntoView({
+            block: 'center',
+            behavior: 'smooth'
+        });
+    }, [selectedWeek]);
 
     const handleAdd = async () => {
         const title = newTitle.trim();
@@ -169,7 +320,7 @@ export function Planner({ onBack }: PlannerProps) {
                 selectedWeek
             );
             const docRef = await addDoc(ref, newProject);
-            setProjects((prev) => [{ id: docRef.id, ...newProject }, ...prev]);
+            setAllProjects((prev) => [{ id: docRef.id, ...newProject }, ...prev]);
             setNewTitle('');
             setContractor('');
             setNewPriority('Normal');
@@ -182,7 +333,7 @@ export function Planner({ onBack }: PlannerProps) {
 
     const handleToggle = async (project: PlannerProject) => {
         const newDone = !project.done;
-        setProjects((prev) =>
+        setAllProjects((prev) =>
             prev.map((entry) => (entry.id === project.id ? { ...entry, done: newDone } : entry))
         );
 
@@ -190,14 +341,14 @@ export function Planner({ onBack }: PlannerProps) {
             await updateDoc(doc(db, PLANNER_COLLECTION_PATH, project.id), { done: newDone });
         } catch (error) {
             console.error('Failed to toggle project:', error);
-            setProjects((prev) =>
+            setAllProjects((prev) =>
                 prev.map((entry) => (entry.id === project.id ? { ...entry, done: !newDone } : entry))
             );
         }
     };
 
     const handleSaveDetails = async (projectId: string, updates: PlannerProjectDetailsPatch) => {
-        setProjects((prev) => prev.map((entry) => (entry.id === projectId ? { ...entry, ...updates } : entry)));
+        setAllProjects((prev) => prev.map((entry) => (entry.id === projectId ? { ...entry, ...updates } : entry)));
         try {
             await updateDoc(doc(db, PLANNER_COLLECTION_PATH, projectId), updates);
         } catch (error) {
@@ -206,13 +357,13 @@ export function Planner({ onBack }: PlannerProps) {
     };
 
     const handleDelete = (project: PlannerProject) => {
-        setProjects((prev) => prev.filter((entry) => entry.id !== project.id));
+        setAllProjects((prev) => prev.filter((entry) => entry.id !== project.id));
         const timeoutId = setTimeout(async () => {
             try {
                 await deleteDoc(doc(db, PLANNER_COLLECTION_PATH, project.id));
             } catch (error) {
                 console.error('Failed to delete project:', error);
-                setProjects((prev) => {
+                setAllProjects((prev) => {
                     if (prev.some((entry) => entry.id === project.id)) return prev;
                     return [...prev, project].sort((a, b) => a.createdAt - b.createdAt);
                 });
@@ -226,7 +377,7 @@ export function Planner({ onBack }: PlannerProps) {
     const handleUndoDelete = () => {
         if (!toastMessage) return;
         clearTimeout(toastMessage.timeoutId);
-        setProjects((prev) => [...prev, toastMessage.project].sort((a, b) => a.createdAt - b.createdAt));
+        setAllProjects((prev) => [...prev, toastMessage.project].sort((a, b) => a.createdAt - b.createdAt));
         setToastMessage(null);
     };
 
@@ -266,20 +417,36 @@ export function Planner({ onBack }: PlannerProps) {
                     <h3 className="text-text-primary font-semibold m-0 text-sm uppercase tracking-widest opacity-60">Veckor</h3>
                 </div>
 
-                <div className="flex flex-col gap-2">
-                    {availableWeeks.map((week) => (
-                        <button
-                            key={week}
-                            onClick={() => setSelectedWeek(week)}
-                            className={`w-full text-left px-4 py-3 rounded-lg text-sm font-medium transition-colors cursor-pointer border ${
-                                selectedWeek === week
-                                    ? 'bg-primary/20 border-primary text-primary'
-                                    : 'bg-panel-bg border-panel-border text-text-secondary hover:border-primary/50'
-                            }`}
-                        >
-                            {week === getISOWeekString(new Date()) ? `Denna vecka (${week})` : week}
-                        </button>
-                    ))}
+                <div className="relative rounded-2xl border border-panel-border bg-panel-bg/30 p-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
+                    <div className="pointer-events-none absolute inset-x-2 top-2 h-6 rounded-t-xl bg-gradient-to-b from-bg via-bg/80 to-transparent" />
+                    <div className="pointer-events-none absolute inset-x-2 bottom-2 h-8 rounded-b-xl bg-gradient-to-t from-bg via-bg/80 to-transparent" />
+
+                    <div
+                        className="flex flex-col gap-2 overflow-y-auto pr-1 md:max-h-[calc(100vh-236px)]"
+                        style={WEEK_LIST_SCROLLBAR_STYLE}
+                    >
+                        {weekSummaries.map((summary) => (
+                            <button
+                                key={summary.week}
+                                ref={selectedWeek === summary.week ? selectedWeekButtonRef : null}
+                                onClick={() => setSelectedWeek(summary.week)}
+                                className={`w-full flex items-center justify-between gap-3 text-left px-4 py-3 rounded-lg text-sm font-medium transition-all cursor-pointer border backdrop-blur-sm ${
+                                    selectedWeek === summary.week
+                                        ? 'bg-primary/20 border-primary text-primary shadow-[0_0_0_1px_rgba(59,130,246,0.18),0_10px_24px_rgba(37,99,235,0.12)]'
+                                        : 'bg-panel-bg/80 border-panel-border text-text-secondary hover:border-primary/50 hover:bg-panel-bg'
+                                }`}
+                            >
+                                <span className="min-w-0 flex-1 leading-snug">
+                                    {summary.week === currentWeek ? `Denna vecka (${summary.week})` : summary.week}
+                                </span>
+                                {summary.totalCount > 0 && (
+                                    <span className={`shrink-0 min-w-7 h-7 px-2 rounded-full border inline-flex items-center justify-center text-[11px] font-bold ${getWeekBadgeClassName(summary)}`}>
+                                        {summary.totalCount}
+                                    </span>
+                                )}
+                            </button>
+                        ))}
+                    </div>
                 </div>
             </div>
 
@@ -404,7 +571,7 @@ export function Planner({ onBack }: PlannerProps) {
                                                             <div
                                                                 key={project.id}
                                                                 onClick={() => setSelectedProjectDetails(project)}
-                                                                className={`group relative w-full max-w-[170px] flex flex-col items-center bg-panel-bg border rounded-lg px-3 pt-3 pb-6 text-center transition-all cursor-pointer hover:border-primary/60 ${
+                                                                className={`group relative w-full max-w-[170px] flex flex-col items-center bg-panel-bg border rounded-lg px-3 pt-3 pb-8 text-center transition-all cursor-pointer hover:border-primary/60 ${
                                                                     project.done
                                                                         ? 'border-success/30 opacity-60'
                                                                         : 'border-panel-border'
@@ -443,6 +610,19 @@ export function Planner({ onBack }: PlannerProps) {
                                                                         day: 'numeric'
                                                                     })}
                                                                 </p>
+                                                                {project.assignees && project.assignees.length > 0 && (
+                                                                    <div className="mt-2 flex flex-wrap items-center justify-center gap-1">
+                                                                        {project.assignees.map((assignee) => (
+                                                                            <span
+                                                                                key={assignee}
+                                                                                className="max-w-full truncate rounded-full border border-primary/25 bg-primary/10 px-2 py-0.5 text-[9px] font-semibold text-primary"
+                                                                                title={assignee}
+                                                                            >
+                                                                                {getPlannerAssigneeLabel(assignee)}
+                                                                            </span>
+                                                                        ))}
+                                                                    </div>
+                                                                )}
                                                                 {project.contractor && (
                                                                     <span className={`absolute bottom-2 left-1/2 -translate-x-1/2 text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full ${
                                                                         project.contractor === 'Stabil' ? 'bg-blue-500/20 text-blue-400' : 'bg-purple-500/20 text-purple-400'
@@ -512,15 +692,17 @@ export function Planner({ onBack }: PlannerProps) {
     );
 }
 
-function ProjectDetailsModal({ project, onClose, onSave }: ProjectDetailsModalProps) {
+export function ProjectDetailsModal({ project, onClose, onSave }: ProjectDetailsModalProps) {
     const [address, setAddress] = useState(project.address || '');
     const [phone, setPhone] = useState(project.phone || '');
     const [notes, setNotes] = useState(project.notes || '');
+    const [assignees, setAssignees] = useState<string[]>(() => normalizePlannerAssignees(project.assignees));
     const [saving, setSaving] = useState(false);
+    const [isAssigneeDragOver, setIsAssigneeDragOver] = useState(false);
 
     const handleSave = async () => {
         setSaving(true);
-        await onSave({ address, phone, notes });
+        await onSave({ address, phone, notes, assignees });
         setSaving(false);
         onClose();
     };
@@ -529,15 +711,103 @@ function ProjectDetailsModal({ project, onClose, onSave }: ProjectDetailsModalPr
         event.stopPropagation();
     };
 
+    const handleAssigneeDragStart = (event: DragEvent<HTMLButtonElement>, email: string) => {
+        event.dataTransfer.setData('text/plain', email);
+        event.dataTransfer.effectAllowed = 'move';
+    };
+
+    const handleAssigneeDragOver = (event: DragEvent<HTMLDivElement>) => {
+        event.preventDefault();
+        event.dataTransfer.dropEffect = 'move';
+        if (!isAssigneeDragOver) {
+            setIsAssigneeDragOver(true);
+        }
+    };
+
+    const handleAssigneeDragLeave = (event: DragEvent<HTMLDivElement>) => {
+        if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
+            setIsAssigneeDragOver(false);
+        }
+    };
+
+    const handleAssigneeDrop = (event: DragEvent<HTMLDivElement>) => {
+        event.preventDefault();
+        setIsAssigneeDragOver(false);
+        const droppedEmail = event.dataTransfer.getData('text/plain');
+        setAssignees((current) => addPlannerAssignee(current, droppedEmail));
+    };
+
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4" onClick={onClose}>
-            <div className="bg-bg border border-panel-border rounded-xl shadow-2xl w-full max-w-md flex flex-col overflow-hidden" onClick={handleModalClick}>
+            <div className="bg-bg border border-panel-border rounded-xl shadow-2xl w-full max-w-lg flex flex-col overflow-hidden" onClick={handleModalClick}>
                 <div className="px-6 py-4 flex justify-between items-center border-b border-panel-border bg-panel-bg">
                     <h3 className="text-lg font-semibold text-text-primary m-0 pr-4 truncate">{project.title}</h3>
                     <button onClick={onClose} className="text-text-secondary hover:text-text-primary bg-transparent border-none cursor-pointer text-xl leading-none">X</button>
                 </div>
 
                 <div className="p-6 flex flex-col gap-4">
+                    <div className="flex flex-col gap-2">
+                        <label className="text-xs font-semibold uppercase tracking-wider text-text-secondary">{'Tillg\u00E4ngliga anv\u00E4ndare'}</label>
+                        <div className="flex flex-wrap gap-2" data-testid="planner-assignee-pool">
+                            {PLANNER_ASSIGNEE_OPTIONS.map((option) => {
+                                const isAssigned = assignees.includes(option.email);
+
+                                return (
+                                    <button
+                                        key={option.email}
+                                        type="button"
+                                        draggable
+                                        onDragStart={(event) => handleAssigneeDragStart(event, option.email)}
+                                        className={`rounded-full border px-3 py-2 text-left transition-colors ${isAssigned ? 'border-primary/40 bg-primary/10 text-primary' : 'border-panel-border bg-panel-bg text-text-primary hover:border-primary/50'}`}
+                                        title={option.email}
+                                        data-testid={`planner-assignee-option-${option.email}`}
+                                    >
+                                        <span className="block text-xs font-semibold">{option.label}</span>
+                                        <span className="block text-[11px] text-text-secondary">{option.email}</span>
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    </div>
+
+                    <div className="flex flex-col gap-2">
+                        <label className="text-xs font-semibold uppercase tracking-wider text-text-secondary">{'Tilldelade anv\u00E4ndare'}</label>
+                        <div
+                            onDragOver={handleAssigneeDragOver}
+                            onDragLeave={handleAssigneeDragLeave}
+                            onDrop={handleAssigneeDrop}
+                            className={`min-h-24 rounded-xl border border-dashed p-3 transition-all ${isAssigneeDragOver ? 'border-primary bg-primary/10 shadow-[0_0_0_1px_rgba(59,130,246,0.15)]' : 'border-panel-border bg-panel-bg/60'}`}
+                            data-testid="planner-assignee-dropzone"
+                        >
+                            {assignees.length > 0 ? (
+                                <div className="flex flex-wrap gap-2">
+                                    {assignees.map((assignee) => (
+                                        <span
+                                            key={assignee}
+                                            className="inline-flex items-center gap-2 rounded-full border border-primary/25 bg-primary/10 px-3 py-1 text-xs font-semibold text-primary"
+                                            title={assignee}
+                                        >
+                                            <span>{getPlannerAssigneeLabel(assignee)}</span>
+                                            <button
+                                                type="button"
+                                                onClick={() => setAssignees((current) => removePlannerAssignee(current, assignee))}
+                                                className="bg-transparent border-none p-0 text-primary/70 hover:text-primary cursor-pointer"
+                                                aria-label={`Ta bort ${assignee}`}
+                                                data-testid={`planner-assignee-remove-${assignee}`}
+                                            >
+                                                X
+                                            </button>
+                                        </span>
+                                    ))}
+                                </div>
+                            ) : (
+                                <p className="m-0 text-sm text-text-secondary italic">
+                                    {'Dra en anv\u00E4ndare hit f\u00F6r att tilldela tasket.'}
+                                </p>
+                            )}
+                        </div>
+                    </div>
+
                     <div className="flex flex-col gap-1.5">
                         <label className="text-xs font-semibold uppercase tracking-wider text-text-secondary">Adress</label>
                         <input
@@ -588,6 +858,7 @@ function ProjectDetailsModal({ project, onClose, onSave }: ProjectDetailsModalPr
                         onClick={() => void handleSave()}
                         disabled={saving}
                         className="px-6 py-2 rounded-lg text-sm font-medium text-white bg-primary hover:bg-primary-hover border-none cursor-pointer transition-colors"
+                        data-testid="planner-assignee-save"
                     >
                         {saving ? 'Sparar...' : 'Spara'}
                     </button>

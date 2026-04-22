@@ -538,6 +538,29 @@ describe('UI text smoke', () => {
         expect(html).toContain('Laddar projekt...');
     });
 
+    it('renders a scrollable planner week list while hiding empty historical weeks', () => {
+        vi.useFakeTimers();
+        vi.setSystemTime(new Date('2026-04-22T12:00:00.000Z'));
+
+        authState.value = {
+            canViewEverything: true,
+            canStartQuote: true,
+            canAccessSketch: true,
+            canAccessQuoteHistory: true,
+            canExportSketchToQuote: true,
+            user: { uid: 'admin-1', email: 'admin@example.com' }
+        };
+
+        const html = renderWithProviders(<Planner onBack={() => {}} />);
+
+        expect(html).toContain('overflow-y-auto');
+        expect(html).not.toContain('2025-W43');
+        expect(html).toContain('Denna vecka (2026-W17)');
+        expect(html).toContain('2026-W25');
+
+        vi.useRealTimers();
+    });
+
     it('renders BuilderConfig empty state labels for selected builder lines', () => {
         quoteState.value = {
             state: {

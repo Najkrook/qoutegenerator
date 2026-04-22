@@ -864,6 +864,7 @@ export interface PlannerProjectDetailsPatch {
     address: string;
     phone: string;
     notes: string;
+    assignees: string[];
     [key: `${string}.${string}`]: string | undefined;
 }
 
@@ -1060,6 +1061,7 @@ export interface PlannerProject {
     address?: string;
     phone?: string;
     notes?: string;
+    assignees?: string[];
 }
 
 export interface AuthContextValue {
