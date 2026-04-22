@@ -150,10 +150,7 @@ export function SummaryExport({ onPrev, onBackToSketch }: SummaryExportProps) {
     const handleBack = (): void => {
         if (onPrev) {
             onPrev();
-            return;
         }
-
-        dispatch({ type: 'SET_STEP', payload: 3 });
     };
 
     const handleExportPDF = async (): Promise<void> => {

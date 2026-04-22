@@ -1,4 +1,12 @@
-import React, { Suspense, lazy, useEffect, useState } from 'react';
+import React, { Suspense, lazy } from 'react';
+import {
+    createBrowserRouter,
+    Navigate,
+    Outlet,
+    useLocation,
+    useSearchParams,
+    type RouteObject
+} from 'react-router-dom';
 import { Header } from './components/layout/Header';
 import { ErrorBoundary } from './components/layout/ErrorBoundary';
 import { Dashboard } from './views/Dashboard';
@@ -10,8 +18,20 @@ import { ActivityLogs } from './views/ActivityLogs';
 import { Login } from './views/Login';
 import { useQuote } from './store/QuoteContext';
 import { useAuth } from './store/AuthContext';
-import { getAuthorizedStepForAccess, isQuoteStep } from './config/accessControl.shared';
-import type { HistoryOpenQuotePayload, QuoteStep } from './types/contracts';
+import {
+    APP_PATHS,
+    APP_ROUTE_IDS,
+    getAppPath,
+    getAppRouteIdFromPath,
+    getAuthorizedRouteForAccess,
+    getNextLoginRedirectTarget,
+    getQuoteDraftGuardRedirect,
+    parseSketchReturnTarget,
+    resolveLoginRedirectTarget,
+    type AppRouteId
+} from './navigation/routes';
+import { useAppNavigation } from './navigation/useAppNavigation';
+import type { HistoryOpenQuotePayload } from './types/contracts';
 
 const SummaryExport = lazy(() => import('./views/SummaryExport').then((module) => ({ default: module.SummaryExport })));
 const InventoryManager = lazy(() => import('./views/InventoryManager').then((module) => ({ default: module.InventoryManager })));
@@ -28,17 +48,185 @@ function ViewLoader() {
     );
 }
 
-type SketchBackStep = 0 | 2 | 4;
+function FullScreenLoader() {
+    return (
+        <div className="min-h-screen bg-bg text-text-primary flex items-center justify-center">
+            <p className="text-text-secondary text-sm">Laddar...</p>
+        </div>
+    );
+}
 
-function App() {
-    const { state, dispatch } = useQuote();
-    const { user, loading, accessLevel, canViewEverything, canStartQuote, canAccessSketch, canAccessQuoteHistory } = useAuth();
-    const step = isQuoteStep(state.step) ? state.step : 0;
-    const [sketchBackStep, setSketchBackStep] = useState<SketchBackStep>(0);
+function RouteShell() {
+    const location = useLocation();
+    const routeId = getAppRouteIdFromPath(location.pathname);
+    const isSummaryRoute = routeId === APP_ROUTE_IDS.quoteSummary;
 
-    const setStep = (newStep: QuoteStep) => {
-        dispatch({ type: 'SET_STEP', payload: newStep });
-    };
+    return (
+        <div className="min-h-screen bg-bg text-text-primary p-4 md:p-8 font-sans antialiased">
+            <div className={`${isSummaryRoute ? 'max-w-[1920px]' : 'max-w-[1400px]'} mx-auto relative`}>
+                <ErrorBoundary resetHref={APP_PATHS[APP_ROUTE_IDS.dashboard]}>
+                    <Header />
+                    <main>
+                        <Suspense fallback={<ViewLoader />}>
+                            <Outlet />
+                        </Suspense>
+                    </main>
+                </ErrorBoundary>
+            </div>
+        </div>
+    );
+}
+
+function LoginRouteElement() {
+    const { user, loading } = useAuth();
+    const [searchParams] = useSearchParams();
+
+    if (loading) {
+        return <FullScreenLoader />;
+    }
+
+    if (user) {
+        return <Navigate to={resolveLoginRedirectTarget(searchParams.get('next'))} replace />;
+    }
+
+    return <Login />;
+}
+
+function ProtectedAppLayout() {
+    const { user, loading } = useAuth();
+    const location = useLocation();
+
+    if (loading) {
+        return <FullScreenLoader />;
+    }
+
+    if (!user) {
+        return (
+            <Navigate
+                to={`${APP_PATHS[APP_ROUTE_IDS.login]}?next=${getNextLoginRedirectTarget(
+                    location.pathname,
+                    location.search,
+                    location.hash
+                )}`}
+                replace
+            />
+        );
+    }
+
+    return <RouteShell />;
+}
+
+interface RouteAccessBoundaryProps {
+    children: React.ReactNode;
+    routeId: AppRouteId;
+}
+
+function RouteAccessBoundary({ children, routeId }: RouteAccessBoundaryProps) {
+    const { accessLevel } = useAuth();
+    const authorizedPath = getAuthorizedRouteForAccess(routeId, accessLevel);
+
+    if (authorizedPath !== getAppPath(routeId)) {
+        return <Navigate to={authorizedPath} replace />;
+    }
+
+    return <>{children}</>;
+}
+
+function QuoteDraftBoundary({ children, routeId }: RouteAccessBoundaryProps) {
+    const { state } = useQuote();
+    const redirectPath = getQuoteDraftGuardRedirect(routeId, state);
+
+    if (redirectPath) {
+        return <Navigate to={redirectPath} replace />;
+    }
+
+    return <>{children}</>;
+}
+
+function DashboardPage() {
+    const navigation = useAppNavigation();
+
+    return (
+        <Dashboard
+            onStartQuote={() => navigation.goToQuoteStep('product-lines')}
+            onOpenHistory={() => navigation.goToHistory()}
+            onOpenInventory={() => navigation.goToInventory()}
+            onOpenSketch={() => navigation.goToSketch('dashboard')}
+            onOpenPlanner={() => navigation.goToPlanner()}
+            onOpenActivity={() => navigation.goToActivity()}
+            onOpenRetailers={() => navigation.goToRetailers()}
+        />
+    );
+}
+
+function ProductLineSelectionPage() {
+    const navigation = useAppNavigation();
+
+    return <ProductLineSelection onNext={() => navigation.goToQuoteStep('configuration')} />;
+}
+
+function ConfigurationPage() {
+    const navigation = useAppNavigation();
+    const { canAccessSketch } = useAuth();
+
+    return (
+        <Configuration
+            onNext={() => navigation.goToQuoteStep('pricing')}
+            onPrev={() => navigation.goToQuoteStep('product-lines')}
+            onBackToSketch={canAccessSketch ? () => navigation.goToSketch('quote-configuration') : undefined}
+        />
+    );
+}
+
+function PricingPage() {
+    const navigation = useAppNavigation();
+
+    return (
+        <Pricing
+            onNext={() => navigation.goToQuoteStep('summary')}
+            onPrev={() => navigation.goToQuoteStep('configuration')}
+        />
+    );
+}
+
+function SummaryExportPage() {
+    const navigation = useAppNavigation();
+    const { canAccessSketch } = useAuth();
+
+    return (
+        <SummaryExport
+            onPrev={() => navigation.goToQuoteStep('pricing')}
+            onBackToSketch={canAccessSketch ? () => navigation.goToSketch('quote-summary') : undefined}
+        />
+    );
+}
+
+function InventoryManagerPage() {
+    const navigation = useAppNavigation();
+    return <InventoryManager onBack={() => navigation.goToDashboard()} />;
+}
+
+function SketchPage() {
+    const navigation = useAppNavigation();
+    const [searchParams] = useSearchParams();
+    const returnTarget = parseSketchReturnTarget(searchParams.get('return'));
+
+    return (
+        <SketchTool
+            onBack={() => navigation.goToSketchReturnTarget(returnTarget)}
+            onExportToQuoteComplete={() => navigation.goToQuoteStep('configuration')}
+        />
+    );
+}
+
+function PlannerPage() {
+    const navigation = useAppNavigation();
+    return <Planner onBack={() => navigation.goToDashboard()} />;
+}
+
+function HistoryPage() {
+    const navigation = useAppNavigation();
+    const { dispatch } = useQuote();
 
     const handleOpenQuote = (payload: HistoryOpenQuotePayload) => {
         dispatch({
@@ -48,130 +236,140 @@ function App() {
                 step: 1
             }
         });
+        navigation.goToQuoteStep('product-lines');
     };
 
-    const handleBackToSketchFromConfiguration = () => {
-        const cleanedBuilderItems = (state.builderItems || []).filter(
-            (item) => !(item.source === 'sketch' && (item.sourceType === 'parasol' || item.sourceType === 'fiesta'))
-        );
-        const hasNonSketchBahamaBuilder = cleanedBuilderItems.some((item) => item.line === 'BaHaMa');
-        const hasNonSketchFiestaBuilder = cleanedBuilderItems.some((item) => item.line === 'Fiesta');
-        const shouldRemoveBahamaLine = Boolean(state.sketchMeta?.addedBahamaLine) && !hasNonSketchBahamaBuilder;
-        const shouldRemoveFiestaLine = Boolean(state.sketchMeta?.addedFiestaLine) && !hasNonSketchFiestaBuilder;
-        const cleanedSelectedLines = (state.selectedLines || []).filter((line) => {
-            if (shouldRemoveBahamaLine && line === 'BaHaMa') return false;
-            if (shouldRemoveFiestaLine && line === 'Fiesta') return false;
-            return true;
-        });
-
-        dispatch({ type: 'SET_BUILDER_ITEMS', payload: cleanedBuilderItems });
-        if (shouldRemoveBahamaLine || shouldRemoveFiestaLine) {
-            dispatch({ type: 'SET_SELECTED_LINES', payload: cleanedSelectedLines });
-        }
-        dispatch({
-            type: 'UPDATE_STATE',
-            payload: {
-                sketchMeta: {
-                    ...(state.sketchMeta || {}),
-                    addedBahamaLine: false,
-                    addedFiestaLine: false
-                }
-            }
-        });
-        setSketchBackStep(2);
-        setStep('sketch');
-    };
-
-    useEffect(() => {
-        // Auth state changes are handled reactively by rendering <Login /> when !user
-    }, [loading, user]);
-
-    useEffect(() => {
-        if (loading || !user) return;
-        const authorizedStep = getAuthorizedStepForAccess(step, accessLevel);
-        if (authorizedStep !== step) {
-            dispatch({ type: 'SET_STEP', payload: authorizedStep });
-        }
-    }, [loading, user, accessLevel, step, dispatch]);
-
-    if (loading) {
-        return (
-            <div className="min-h-screen bg-bg text-text-primary flex items-center justify-center">
-                <p className="text-text-secondary text-sm">Laddar...</p>
-            </div>
-        );
-    }
-
-    if (!user) {
-        return <Login />;
-    }
-
-    return (
-        <div className="min-h-screen bg-bg text-text-primary p-4 md:p-8 font-sans antialiased">
-            <div className={`${step === 4 ? 'max-w-[1920px]' : 'max-w-[1400px]'} mx-auto relative`}>
-                <ErrorBoundary>
-                    <Header currentStep={step} />
-
-                    <main>
-                    <Suspense fallback={<ViewLoader />}>
-                    {step === 0 && (
-                        <Dashboard
-                            onStartQuote={canStartQuote ? () => setStep(1) : undefined}
-                            onOpenHistory={canAccessQuoteHistory ? () => setStep('history') : undefined}
-                            onOpenInventory={canViewEverything ? () => setStep('inventory') : undefined}
-                            onOpenSketch={
-                                canAccessSketch
-                                    ? () => {
-                                        setSketchBackStep(0);
-                                        setStep('sketch');
-                                    }
-                                    : undefined
-                            }
-                            onOpenPlanner={canViewEverything ? () => setStep('planner') : undefined}
-                            onOpenActivity={canViewEverything ? () => setStep('activity-logs') : undefined}
-                            onOpenRetailers={canViewEverything ? () => setStep('retailers') : undefined}
-                        />
-                    )}
-                    {canStartQuote && step === 1 && <ProductLineSelection onNext={() => setStep(2)} />}
-                    {canStartQuote && step === 2 && (
-                        <Configuration
-                            onNext={() => setStep(3)}
-                            onPrev={() => setStep(1)}
-                            onBackToSketch={canAccessSketch ? handleBackToSketchFromConfiguration : undefined}
-                        />
-                    )}
-                    {canStartQuote && step === 3 && <Pricing onNext={() => setStep(4)} onPrev={() => setStep(2)} />}
-                    {canStartQuote && step === 4 && (
-                        <SummaryExport 
-                            onPrev={() => setStep(3)}
-                            onBackToSketch={
-                                canAccessSketch
-                                    ? () => {
-                                        setSketchBackStep(4);
-                                        setStep('sketch');
-                                    }
-                                    : undefined
-                            }
-                        />
-                    )}
-                    {canViewEverything && step === 'inventory' && <InventoryManager onBack={() => setStep(0)} />}
-                    {canAccessSketch && step === 'sketch' && <SketchTool onBack={() => setStep(sketchBackStep)} />}
-                    {canViewEverything && step === 'planner' && <Planner onBack={() => setStep(0)} />}
-                    {canAccessQuoteHistory && step === 'history' && (
-                        <History 
-                            onBack={() => setStep(0)} 
-                            onOpenQuote={handleOpenQuote}
-                        />
-                    )}
-                    {canViewEverything && step === 'activity-logs' && <ActivityLogs onBack={() => setStep(0)} />}
-                    {canViewEverything && step === 'inventory-logs' && <InventoryLogs onBack={() => setStep(0)} />}
-                    {canViewEverything && step === 'retailers' && <RetailerManager onBack={() => setStep(0)} />}
-                    </Suspense>
-                </main>
-                </ErrorBoundary>
-            </div>
-        </div>
-    );
+    return <History onBack={() => navigation.goToDashboard()} onOpenQuote={handleOpenQuote} />;
 }
 
-export default App;
+function ActivityLogsPage() {
+    const navigation = useAppNavigation();
+    return <ActivityLogs onBack={() => navigation.goToDashboard()} />;
+}
+
+function InventoryLogsPage() {
+    const navigation = useAppNavigation();
+    return <InventoryLogs onBack={() => navigation.goToDashboard()} />;
+}
+
+function RetailerManagerPage() {
+    const navigation = useAppNavigation();
+    return <RetailerManager onBack={() => navigation.goToDashboard()} />;
+}
+
+export const appRoutes: RouteObject[] = [
+    {
+        path: APP_PATHS[APP_ROUTE_IDS.login],
+        element: <LoginRouteElement />
+    },
+    {
+        path: APP_PATHS[APP_ROUTE_IDS.dashboard],
+        element: <ProtectedAppLayout />,
+        children: [
+            {
+                index: true,
+                element: <DashboardPage />
+            },
+            {
+                path: APP_PATHS[APP_ROUTE_IDS.quoteProductLines].slice(1),
+                element: (
+                    <RouteAccessBoundary routeId={APP_ROUTE_IDS.quoteProductLines}>
+                        <ProductLineSelectionPage />
+                    </RouteAccessBoundary>
+                )
+            },
+            {
+                path: APP_PATHS[APP_ROUTE_IDS.quoteConfiguration].slice(1),
+                element: (
+                    <RouteAccessBoundary routeId={APP_ROUTE_IDS.quoteConfiguration}>
+                        <QuoteDraftBoundary routeId={APP_ROUTE_IDS.quoteConfiguration}>
+                            <ConfigurationPage />
+                        </QuoteDraftBoundary>
+                    </RouteAccessBoundary>
+                )
+            },
+            {
+                path: APP_PATHS[APP_ROUTE_IDS.quotePricing].slice(1),
+                element: (
+                    <RouteAccessBoundary routeId={APP_ROUTE_IDS.quotePricing}>
+                        <QuoteDraftBoundary routeId={APP_ROUTE_IDS.quotePricing}>
+                            <PricingPage />
+                        </QuoteDraftBoundary>
+                    </RouteAccessBoundary>
+                )
+            },
+            {
+                path: APP_PATHS[APP_ROUTE_IDS.quoteSummary].slice(1),
+                element: (
+                    <RouteAccessBoundary routeId={APP_ROUTE_IDS.quoteSummary}>
+                        <QuoteDraftBoundary routeId={APP_ROUTE_IDS.quoteSummary}>
+                            <SummaryExportPage />
+                        </QuoteDraftBoundary>
+                    </RouteAccessBoundary>
+                )
+            },
+            {
+                path: APP_PATHS[APP_ROUTE_IDS.quotes].slice(1),
+                element: (
+                    <RouteAccessBoundary routeId={APP_ROUTE_IDS.quotes}>
+                        <HistoryPage />
+                    </RouteAccessBoundary>
+                )
+            },
+            {
+                path: APP_PATHS[APP_ROUTE_IDS.sketch].slice(1),
+                element: (
+                    <RouteAccessBoundary routeId={APP_ROUTE_IDS.sketch}>
+                        <SketchPage />
+                    </RouteAccessBoundary>
+                )
+            },
+            {
+                path: APP_PATHS[APP_ROUTE_IDS.inventory].slice(1),
+                element: (
+                    <RouteAccessBoundary routeId={APP_ROUTE_IDS.inventory}>
+                        <InventoryManagerPage />
+                    </RouteAccessBoundary>
+                )
+            },
+            {
+                path: APP_PATHS[APP_ROUTE_IDS.inventoryLogs].slice(1),
+                element: (
+                    <RouteAccessBoundary routeId={APP_ROUTE_IDS.inventoryLogs}>
+                        <InventoryLogsPage />
+                    </RouteAccessBoundary>
+                )
+            },
+            {
+                path: APP_PATHS[APP_ROUTE_IDS.activity].slice(1),
+                element: (
+                    <RouteAccessBoundary routeId={APP_ROUTE_IDS.activity}>
+                        <ActivityLogsPage />
+                    </RouteAccessBoundary>
+                )
+            },
+            {
+                path: APP_PATHS[APP_ROUTE_IDS.planner].slice(1),
+                element: (
+                    <RouteAccessBoundary routeId={APP_ROUTE_IDS.planner}>
+                        <PlannerPage />
+                    </RouteAccessBoundary>
+                )
+            },
+            {
+                path: APP_PATHS[APP_ROUTE_IDS.retailers].slice(1),
+                element: (
+                    <RouteAccessBoundary routeId={APP_ROUTE_IDS.retailers}>
+                        <RetailerManagerPage />
+                    </RouteAccessBoundary>
+                )
+            }
+        ]
+    },
+    {
+        path: '*',
+        element: <Navigate to={APP_PATHS[APP_ROUTE_IDS.dashboard]} replace />
+    }
+];
+
+export const appRouter = createBrowserRouter(appRoutes);

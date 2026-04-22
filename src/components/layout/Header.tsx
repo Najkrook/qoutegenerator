@@ -1,41 +1,51 @@
 import React from 'react';
+import { useLocation } from 'react-router-dom';
 import { useQuote } from '../../store/QuoteContext';
 import { useAuth } from '../../store/AuthContext';
-import { isQuoteStep } from '../../config/accessControl.shared';
-import type { HeaderProps } from '../../types/contracts';
+import {
+    APP_ROUTE_IDS,
+    getAppRouteIdFromPath,
+    getQuoteRouteStepFromPath,
+    getQuoteStepNumber
+} from '../../navigation/routes';
+import { useAppNavigation } from '../../navigation/useAppNavigation';
 
-export function Header({ currentStep }: HeaderProps) {
-    const { state, dispatch } = useQuote();
+export function Header() {
+    const { dispatch } = useQuote();
     const { user, logout, canViewEverything, canAccessQuoteHistory } = useAuth();
-    const nextStep = currentStep ?? state.step;
-    const step = isQuoteStep(nextStep) ? nextStep : 0;
-    const showQuoteStepper = typeof step === 'number' && step >= 1 && step <= 4;
+    const location = useLocation();
+    const navigation = useAppNavigation();
+    const routeId = getAppRouteIdFromPath(location.pathname);
+    const quoteStep = getQuoteRouteStepFromPath(location.pathname);
+    const showQuoteStepper = quoteStep !== null;
+    const currentStepNumber = quoteStep ? getQuoteStepNumber(quoteStep) : null;
 
     const steps = [
-        '1. Produktlinje',
-        '2. Konfiguration',
-        '3. Priser & Rabatter',
-        '4. Offertsammanställning'
-    ];
+        { id: 'product-lines', label: '1. Produktlinje' },
+        { id: 'configuration', label: '2. Konfiguration' },
+        { id: 'pricing', label: '3. Priser & Rabatter' },
+        { id: 'summary', label: '4. Offertsammanställning' }
+    ] as const;
 
     const resetToStart = (): void => {
         dispatch({ type: 'RESET_STATE' });
+        navigation.goToDashboard();
     };
 
     const handleLogout = async (): Promise<void> => {
         await logout();
-        dispatch({ type: 'SET_STEP', payload: 0 });
+        navigation.goToDashboard({ replace: true });
     };
 
     return (
         <header className="mb-8">
             <div className="flex items-center justify-between gap-4 flex-wrap mb-6">
                 <div className="flex items-center gap-3">
-                    {step !== 0 && (
+                    {routeId !== APP_ROUTE_IDS.dashboard && (
                         <div className="flex items-center gap-2">
                             <button
                                 type="button"
-                                onClick={() => dispatch({ type: 'SET_STEP', payload: 0 })}
+                                onClick={() => navigation.goToDashboard()}
                                 className="bg-panel-bg border border-panel-border text-text-primary text-sm font-medium px-4 py-2 rounded-lg cursor-pointer hover:bg-panel-border transition-colors shadow-sm flex items-center gap-2"
                                 title="Tillbaka till startskärmen"
                             >
@@ -63,8 +73,12 @@ export function Header({ currentStep }: HeaderProps) {
                     {canAccessQuoteHistory && (
                         <button
                             type="button"
-                            onClick={() => dispatch({ type: 'SET_STEP', payload: 'history' })}
-                            className={`text-text-primary no-underline font-medium text-sm px-3 py-1.5 rounded-md border transition-colors cursor-pointer ${step === 'history' ? 'bg-panel-border border-panel-border' : 'bg-panel-bg border-panel-border hover:bg-panel-border'}`}
+                            onClick={() => navigation.goToHistory()}
+                            className={`text-text-primary no-underline font-medium text-sm px-3 py-1.5 rounded-md border transition-colors cursor-pointer ${
+                                routeId === APP_ROUTE_IDS.quotes
+                                    ? 'bg-panel-border border-panel-border'
+                                    : 'bg-panel-bg border-panel-border hover:bg-panel-border'
+                            }`}
                         >
                             Mina Offerter
                         </button>
@@ -73,8 +87,12 @@ export function Header({ currentStep }: HeaderProps) {
                     {canViewEverything && (
                         <button
                             type="button"
-                            onClick={() => dispatch({ type: 'SET_STEP', payload: 'activity-logs' })}
-                            className={`text-text-primary no-underline font-medium text-sm px-3 py-1.5 rounded-md border transition-colors cursor-pointer ${step === 'activity-logs' ? 'bg-panel-border border-panel-border' : 'bg-panel-bg border-panel-border hover:bg-panel-border'}`}
+                            onClick={() => navigation.goToActivity()}
+                            className={`text-text-primary no-underline font-medium text-sm px-3 py-1.5 rounded-md border transition-colors cursor-pointer ${
+                                routeId === APP_ROUTE_IDS.activity
+                                    ? 'bg-panel-border border-panel-border'
+                                    : 'bg-panel-bg border-panel-border hover:bg-panel-border'
+                            }`}
                         >
                             Aktivitetslog
                         </button>
@@ -83,8 +101,12 @@ export function Header({ currentStep }: HeaderProps) {
                     {canViewEverything && (
                         <button
                             type="button"
-                            onClick={() => dispatch({ type: 'SET_STEP', payload: 'inventory-logs' })}
-                            className={`text-text-primary no-underline font-medium text-sm px-3 py-1.5 rounded-md border transition-colors cursor-pointer ${step === 'inventory-logs' ? 'bg-panel-border border-panel-border' : 'bg-panel-bg border-panel-border hover:bg-panel-border'}`}
+                            onClick={() => navigation.goToInventoryLogs()}
+                            className={`text-text-primary no-underline font-medium text-sm px-3 py-1.5 rounded-md border transition-colors cursor-pointer ${
+                                routeId === APP_ROUTE_IDS.inventoryLogs
+                                    ? 'bg-panel-border border-panel-border'
+                                    : 'bg-panel-bg border-panel-border hover:bg-panel-border'
+                            }`}
                         >
                             Lagerloggar
                         </button>
@@ -108,17 +130,21 @@ export function Header({ currentStep }: HeaderProps) {
 
             {showQuoteStepper && (
                 <div className="flex justify-between items-center bg-panel-bg border border-panel-border rounded-lg p-2 overflow-x-auto gap-2">
-                    {steps.map((label, index) => {
-                        const stepNumber = index + 1;
-                        const isActive = step === stepNumber;
+                    {steps.map((step) => {
+                        const stepNumber = getQuoteStepNumber(step.id);
+                        const isActive = currentStepNumber === stepNumber;
                         return (
                             <button
-                                key={label}
+                                key={step.id}
                                 type="button"
-                                onClick={() => dispatch({ type: 'SET_STEP', payload: stepNumber })}
-                                className={`flex-1 text-center py-2 px-4 rounded-md text-sm font-medium whitespace-nowrap transition-colors cursor-pointer border-none outline-none ${isActive ? 'bg-primary text-white' : 'bg-transparent text-text-secondary hover:bg-panel-border hover:text-text-primary'}`}
+                                onClick={() => navigation.goToQuoteStep(step.id)}
+                                className={`flex-1 text-center py-2 px-4 rounded-md text-sm font-medium whitespace-nowrap transition-colors cursor-pointer border-none outline-none ${
+                                    isActive
+                                        ? 'bg-primary text-white'
+                                        : 'bg-transparent text-text-secondary hover:bg-panel-border hover:text-text-primary'
+                                }`}
                             >
-                                {label}
+                                {step.label}
                             </button>
                         );
                     })}

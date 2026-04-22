@@ -6,7 +6,7 @@ QuoteGenerator is an internal quote, sketch, and inventory application for BRIXX
 The primary UI is a React + Vite Single Page Application (SPA) under `src/`.
 
 - `src/` contains the main entrypoint, views, context providers, client-facing services, configuration, and data models.
-- The application uses context-based routing to handle navigation to features like Login, Quote History, and Inventory Logs.
+- The application uses URL-based routing with `react-router-dom` for login, quote flow steps, history, sketch, and admin views.
 - Legacy vanilla JS files and multi-page HTML entrypoints have been removed to consolidate the architecture.
 
 This repository is a fully isolated `src/`-only React SPA environment.
@@ -85,7 +85,7 @@ Current active directories:
 The active application is fully encapsulated within the `src/` directory.
 
 ## Core Workflow
-The quote flow uses state-driven navigation rather than URL routing:
+The quote flow uses semantic browser URLs:
 
 1. Dashboard
 2. Product Line Selection
@@ -97,7 +97,7 @@ Other active paths:
 
 - Inventory management is an admin-only branch from the dashboard.
 - Sketch mode is a separate branch from the dashboard.
-- Quote history, inventory logs, and activity logs are state-driven SPA views launched from the header or dashboard rather than legacy standalone pages.
+- Quote history, inventory logs, and activity logs are routed SPA views launched from the header or dashboard.
 
 ## Useful Local Checks
 Useful local validation commands:
@@ -157,6 +157,13 @@ Before deploy:
 
 1. If admin UIDs change, keep `firestore.rules` and `config/accessControl.shared.js` synchronized.
 2. Deploy rules through Firebase Console or Firebase CLI.
+
+Firebase Hosting SPA fallback is configured in `firebase.json`:
+
+- Hosting public dir: `dist`
+- Catch-all rewrite: `** -> /index.html`
+
+This rewrite is required so deep links such as `/quote/new/summary` and `/quotes` work on refresh in production.
 
 ## Quote Lifecycle and Backfill
 Quote lifecycle is enabled by default.

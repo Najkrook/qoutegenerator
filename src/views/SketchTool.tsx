@@ -356,7 +356,7 @@ function warnIfActivityLogFailed(result: { ok?: boolean } | null | undefined, me
     }
 }
 
-export function SketchTool({ onBack }: SketchToolProps) {
+export function SketchTool({ onBack, onExportToQuoteComplete }: SketchToolProps) {
     const { state, dispatch } = useQuote();
     const { user, canExportSketchToQuote } = useAuth();
 
@@ -817,7 +817,7 @@ export function SketchTool({ onBack }: SketchToolProps) {
             type: 'UPDATE_STATE',
             payload: sketchExportStatePatch
         });
-        dispatch({ type: 'SET_STEP', payload: 2 });
+        onExportToQuoteComplete?.();
         void safeLogActivity({
             user,
             eventType: 'sketch_export_to_quote',
@@ -968,7 +968,7 @@ export function SketchTool({ onBack }: SketchToolProps) {
             type: 'UPDATE_STATE',
             payload: sketchDraftStatePatch
         });
-        dispatch({ type: 'SET_STEP', payload: 2 });
+        onBack?.();
     }, [config, dispatch, onBack, workspace]);
 
     return (

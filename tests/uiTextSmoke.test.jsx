@@ -1,6 +1,7 @@
 ﻿import React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
+import { MemoryRouter } from 'react-router-dom';
 
 const authState = vi.hoisted(() => ({
     value: {
@@ -170,13 +171,16 @@ function renderWithProviders(node, overrides = {}) {
         ...quoteState.value,
         ...(overrides.quote || {})
     };
+    const routeEntries = [overrides.route || '/'];
 
     return renderToStaticMarkup(
-        <AuthContext.Provider value={authValue}>
-            <QuoteContext.Provider value={quoteValue}>
-                {node}
-            </QuoteContext.Provider>
-        </AuthContext.Provider>
+        <MemoryRouter initialEntries={routeEntries}>
+            <AuthContext.Provider value={authValue}>
+                <QuoteContext.Provider value={quoteValue}>
+                    {node}
+                </QuoteContext.Provider>
+            </AuthContext.Provider>
+        </MemoryRouter>
     );
 }
 
@@ -412,15 +416,7 @@ describe('UI text smoke', () => {
             canExportSketchToQuote: false,
             user: { email: 'sales@example.com' }
         };
-        quoteState.value = {
-            state: {
-                ...quoteState.value.state,
-                step: 1
-            },
-            dispatch: vi.fn()
-        };
-
-        const html = renderWithProviders(<Header />);
+        const html = renderWithProviders(<Header />, { route: '/quote/new/product-lines' });
 
         expect(html).toContain('🏠');
         expect(html).toContain('🗑️');

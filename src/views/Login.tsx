@@ -16,7 +16,7 @@ export function Login() {
 
         try {
             await login(email, password);
-            // onAuthChange in App will handle redirect to step 0
+            // Auth route handling will redirect to the requested URL or dashboard.
         } catch (error) {
             console.error('Firebase Auth Error:', error);
             const authErrorCode = getErrorCode(error);

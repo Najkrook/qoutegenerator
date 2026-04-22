@@ -1,4 +1,5 @@
 import React, { Component, type ErrorInfo } from 'react';
+import { APP_PATHS, APP_ROUTE_IDS } from '../../navigation/routes';
 import { clearPersistedQuoteState } from '../../store/quoteStatePersistence';
 import type { ErrorBoundaryProps, ErrorBoundaryState } from '../../types/contracts';
 
@@ -18,7 +19,7 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
 
     handleReset = (): void => {
         clearPersistedQuoteState();
-        window.location.href = '/';
+        window.location.assign(this.props.resetHref || APP_PATHS[APP_ROUTE_IDS.dashboard]);
     };
 
     render() {

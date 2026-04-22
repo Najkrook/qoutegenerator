@@ -9,7 +9,7 @@
     "preview": "vite preview",
     "test": "vitest",
     "test:watch": "vitest --watch",
-    "test:confidence": "vitest run --reporter=basic tests/accessControl.shared.test.js tests/quoteStateSchema.test.js tests/quoteStatePersistence.test.js tests/sketchExportState.test.js tests/parasolGeometry.test.js tests/sketchConfig.test.jsx tests/exportDataBuilders.test.js tests/pdfExport.test.js tests/textEncodingGuard.test.js tests/uiTextSmoke.test.jsx",
+    "test:confidence": "vitest run --reporter=basic tests/accessControl.shared.test.js tests/quoteStateSchema.test.js tests/quoteStatePersistence.test.js tests/sketchExportState.test.js tests/parasolGeometry.test.js tests/sketchConfig.test.jsx tests/exportDataBuilders.test.js tests/pdfExport.test.js tests/textEncodingGuard.test.js tests/uiTextSmoke.test.jsx tests/routes.test.js tests/appRouting.test.jsx",
     "test:run": "vitest run --reporter=basic",
     "typecheck": "tsc --noEmit"
   },
@@ -19,6 +19,7 @@
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^5.1.4",
     "autoprefixer": "^10.4.27",
+    "jsdom": "^29.0.2",
     "postcss": "^8.5.8",
     "tailwindcss": "^4.2.1",
     "typescript": "^6.0.2",
@@ -33,6 +34,7 @@
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
     "react-hot-toast": "^2.6.0",
+    "react-router-dom": "^7.14.2",
     "xlsx": "^0.18.5"
   }
 }

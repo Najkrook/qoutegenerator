@@ -865,6 +865,7 @@ export interface TermsAndPaymentPanelProps {
 
 export interface ErrorBoundaryProps {
     children?: ReactNode;
+    resetHref?: string;
 }
 
 export interface ErrorBoundaryState {
@@ -1352,6 +1353,7 @@ export interface ComputedLayoutResult {
 
 export interface SketchToolProps {
     onBack?: () => void;
+    onExportToQuoteComplete?: () => void;
 }
 
 export interface SketchCanvasProps {

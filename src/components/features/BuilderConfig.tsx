@@ -90,12 +90,12 @@ export function BuilderConfig(_props: BuilderConfigProps) {
                         ))}
                     </div>
 
-                    <div className="flex justify-end">
+                    <div className="bg-panel-bg border-2 border-dashed border-panel-border rounded-xl p-8 text-center flex flex-col items-center justify-center mt-2 transition-colors hover:border-primary/30 hover:bg-white/[0.01]">
                         <button
                             onClick={addNewItem}
-                            className="bg-panel-bg border border-panel-border text-text-primary text-sm px-4 py-2 rounded-md font-bold cursor-pointer hover:bg-white/5 transition-colors flex items-center gap-2"
+                            className="bg-primary text-white px-8 py-3 rounded-lg font-black shadow-lg shadow-primary/20 hover:bg-primary-hover hover:-translate-y-1 transition-all flex items-center gap-3 uppercase tracking-wide"
                         >
-                            <span className="text-lg leading-none">+</span> Lägg till produkt
+                            <span className="text-xl leading-none">+</span> Lägg till produkt
                         </button>
                     </div>
                 </>
