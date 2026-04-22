@@ -146,7 +146,7 @@ import { Planner } from '../src/views/Planner';
 import { Header } from '../src/components/layout/Header';
 import { SketchBom } from '../src/components/features/SketchBom';
 import { SketchTool } from '../src/views/SketchTool';
-import { SummaryExport } from '../src/views/SummaryExport';
+import { SummaryExport, getPdfExportBlockReason } from '../src/views/SummaryExport';
 import { AuthContext } from '../src/store/AuthContext';
 import { QuoteContext } from '../src/store/QuoteContext';
 
@@ -471,6 +471,11 @@ describe('UI text smoke', () => {
         expect(html).toContain('PDF förhandsvisning');
         expect(html).toContain('Exportera som PDF');
         expect(html).toContain('Exportera som Excel');
+    });
+
+    it('returns a clear save-first message when PDF export is attempted before quote numbering', () => {
+        expect(getPdfExportBlockReason(null)).toBe('Spara offerten först för att tilldela ett offertnummer innan PDF-export.');
+        expect(getPdfExportBlockReason('BRIXX - 260422-101')).toBeNull();
     });
 
     it('renders Pricing labels for discounts and quote review', () => {

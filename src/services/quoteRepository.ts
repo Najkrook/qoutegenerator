@@ -37,12 +37,20 @@ const EMPTY_SUMMARY: RawQuoteSummary = {
     totalDiscountSek: 0
 };
 
+const QUOTE_COUNTER_COLLECTION = 'quote_counters';
+const QUOTE_NUMBER_TIME_ZONE = 'Europe/Stockholm';
+
 interface QuoteSearchSource extends UnknownRecord {
     customerName?: unknown;
     company?: unknown;
     reference?: unknown;
     customerReference?: unknown;
     status?: unknown;
+}
+
+interface QuoteCounterDoc extends UnknownRecord {
+    lastSequence?: unknown;
+    updatedAtMs?: unknown;
 }
 
 interface BuildQuoteMetadataInput {
@@ -57,6 +65,9 @@ interface BuildQuoteMetadataInput {
     latestRevisionId: string;
     existing?: Partial<QuoteMetadata> | unknown;
     retailerName?: string | null;
+    quoteNumber?: string | null;
+    quoteDateKey?: string | null;
+    quoteSequence?: number | null;
 }
 
 type RevisionSaveContext = QuoteRevisionSaveInput & { retailerName?: string | null };
@@ -87,6 +98,34 @@ function toNumber(value: unknown, fallback: null): number | null;
 function toNumber(value: unknown, fallback: number | null = 0): number | null {
     const parsed = Number(value);
     return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+function formatQuoteDateKey(nowMs: number): string {
+    const formatter = new Intl.DateTimeFormat('sv-SE', {
+        timeZone: QUOTE_NUMBER_TIME_ZONE,
+        year: '2-digit',
+        month: '2-digit',
+        day: '2-digit'
+    });
+    const parts = formatter.formatToParts(new Date(nowMs));
+    const year = parts.find((part) => part.type === 'year')?.value || '00';
+    const month = parts.find((part) => part.type === 'month')?.value || '00';
+    const day = parts.find((part) => part.type === 'day')?.value || '00';
+    return `${year}${month}${day}`;
+}
+
+function buildQuoteNumber(dateKey: string, quoteSequence: number): string {
+    return `BRIXX - ${dateKey}-${String(quoteSequence).padStart(3, '0')}`;
+}
+
+function normalizeQuoteSequence(value: unknown): number | null {
+    const parsed = toNumber(value, null);
+    return parsed != null && parsed >= 0 ? parsed : null;
+}
+
+function getNextQuoteSequence(counter: QuoteCounterDoc | unknown): number {
+    const current = Math.max(100, toNumber(toRecord<QuoteCounterDoc>(counter).lastSequence, 100) || 100);
+    return current + 1;
 }
 
 export function normalizeQuoteStatus(status: unknown): QuoteStatus {
@@ -136,6 +175,9 @@ export function normalizeQuoteMetadata(quoteId: string, raw: RawQuoteMetadataDoc
     const safeRaw = toRecord<RawQuoteMetadataDoc>(raw);
     const fallbackState = toRecord(safeRaw.state);
     const fallbackCustomer = toRecord<RawPersistedCustomerInfo>(fallbackState.customerInfo);
+    const quoteNumber = safeRaw.quoteNumber ? String(safeRaw.quoteNumber) : null;
+    const quoteDateKey = safeRaw.quoteDateKey ? String(safeRaw.quoteDateKey) : null;
+    const quoteSequence = normalizeQuoteSequence(safeRaw.quoteSequence);
     const customerName = String(safeRaw.customerName || fallbackCustomer.company || fallbackCustomer.name || 'Okand kund');
     const company = String(safeRaw.company || fallbackCustomer.company || '');
     const reference = String(safeRaw.reference || fallbackCustomer.reference || '-');
@@ -151,6 +193,9 @@ export function normalizeQuoteMetadata(quoteId: string, raw: RawQuoteMetadataDoc
 
     return {
         quoteId,
+        quoteNumber,
+        quoteDateKey,
+        quoteSequence,
         customerName,
         company,
         reference,
@@ -212,7 +257,10 @@ function buildQuoteMetadata({
     latestVersion,
     latestRevisionId,
     existing = {},
-    retailerName = null
+    retailerName = null,
+    quoteNumber,
+    quoteDateKey,
+    quoteSequence
 }: BuildQuoteMetadataInput): QuoteMetadata {
     const safeCustomerInfo = toRecord<RawPersistedCustomerInfo>(customerInfo);
     const safeSummary = toRecord<RawQuoteSummary>(summary);
@@ -221,6 +269,15 @@ function buildQuoteMetadata({
     const normalizedStatus = normalizeQuoteStatus(status || existingMetadata.status);
     const company = String(safeCustomerInfo.company || existingMetadata.company || '');
     const customerName = String(company || safeCustomerInfo.name || existingMetadata.customerName || existingMetadata.company || 'Okand kund');
+    const normalizedQuoteNumber = quoteNumber !== undefined
+        ? (quoteNumber ? String(quoteNumber) : null)
+        : (existingMetadata.quoteNumber ? String(existingMetadata.quoteNumber) : null);
+    const normalizedQuoteDateKey = quoteDateKey !== undefined
+        ? (quoteDateKey ? String(quoteDateKey) : null)
+        : (existingMetadata.quoteDateKey ? String(existingMetadata.quoteDateKey) : null);
+    const normalizedQuoteSequence = quoteSequence !== undefined
+        ? normalizeQuoteSequence(quoteSequence)
+        : normalizeQuoteSequence(existingMetadata.quoteSequence);
     const reference = String(safeCustomerInfo.reference || existingMetadata.reference || '-');
     const customerReference = String(safeCustomerInfo.customerReference || existingMetadata.customerReference || '');
     const existingScrive = normalizeScriveMetadata(existingMetadata, safeCustomerInfo);
@@ -258,6 +315,9 @@ function buildQuoteMetadata({
 
     return {
         quoteId,
+        quoteNumber: normalizedQuoteNumber,
+        quoteDateKey: normalizedQuoteDateKey,
+        quoteSequence: normalizedQuoteSequence,
         customerName,
         company,
         reference,
@@ -305,6 +365,9 @@ function buildRevisionWriteDoc(revision: NormalizedRevisionRecord): RawQuoteRevi
 
 function buildMetadataWriteDoc(metadata: QuoteMetadata): RawQuoteMetadataDoc {
     return {
+        quoteNumber: metadata.quoteNumber,
+        quoteDateKey: metadata.quoteDateKey,
+        quoteSequence: metadata.quoteSequence,
         customerName: metadata.customerName,
         company: metadata.company,
         reference: metadata.reference,
@@ -536,18 +599,88 @@ export function createQuoteRepository(deps: QuoteRepositoryDeps = {} as QuoteRep
     }: QuoteRevisionSaveInput): Promise<{ quoteId: string; metadata: QuoteMetadata; revision: QuoteRevision }> {
         if (!user?.uid) throw new Error('Missing authenticated user.');
         const quoteId = `quote_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-        const saved = await saveQuoteRevision({
-            user,
-            quoteId,
-            state,
-            summary,
-            customerInfo,
-            status,
-            scrive,
-            changeNote,
-            retailerName
+        const quoteRef = quoteDocRef(String(user.uid), quoteId);
+        const nowMs = Date.now();
+        const dateKey = formatQuoteDateKey(nowMs);
+        const counterRef = doc(db, QUOTE_COUNTER_COLLECTION, dateKey);
+
+        const buildCreatePayload = (quoteSequence: number) => {
+            const quoteNumber = buildQuoteNumber(dateKey, quoteSequence);
+            const revisionId = `v0001_${nowMs}`;
+            const revisionRef = doc(db, 'users', String(user.uid), 'quotes', quoteId, 'revisions', revisionId);
+            const revisionData = buildRevisionData({
+                quoteId,
+                version: 1,
+                nowMs,
+                user,
+                state,
+                summary,
+                changeNote
+            });
+            const metadata = buildQuoteMetadata({
+                quoteId,
+                customerInfo,
+                summary,
+                status,
+                scrive,
+                nowMs,
+                user,
+                latestVersion: 1,
+                latestRevisionId: revisionId,
+                retailerName,
+                quoteNumber,
+                quoteDateKey: dateKey,
+                quoteSequence
+            });
+
+            return {
+                quoteNumber,
+                revisionId,
+                revisionRef,
+                revisionData,
+                metadata,
+                metadataWriteDoc: buildMetadataWriteDoc(metadata),
+                revisionWriteDoc: buildRevisionWriteDoc(revisionData)
+            };
+        };
+
+        if (typeof runTransaction !== 'function') {
+            const counterSnap = await getDoc(counterRef);
+            const quoteSequence = getNextQuoteSequence(counterSnap.exists() ? counterSnap.data() : {});
+            const payload = buildCreatePayload(quoteSequence);
+
+            await setDoc(counterRef, {
+                lastSequence: quoteSequence,
+                updatedAtMs: nowMs
+            }, { merge: true });
+            await setDoc(payload.revisionRef, payload.revisionWriteDoc);
+            await setDoc(quoteRef, payload.metadataWriteDoc, { merge: true });
+
+            return {
+                quoteId,
+                metadata: payload.metadata,
+                revision: { revisionId: payload.revisionId, ...payload.revisionData }
+            };
+        }
+
+        return runTransaction<{ quoteId: string; metadata: QuoteMetadata; revision: QuoteRevision }>(db, async (transaction) => {
+            const counterSnap = await transaction.get(counterRef);
+            const quoteSequence = getNextQuoteSequence(counterSnap.exists() ? counterSnap.data() : {});
+            const payload = buildCreatePayload(quoteSequence);
+
+            transaction.set(counterRef, {
+                lastSequence: quoteSequence,
+                updatedAtMs: nowMs
+            }, { merge: true });
+            transaction.set(payload.revisionRef, payload.revisionWriteDoc);
+            transaction.set(quoteRef, payload.metadataWriteDoc, { merge: true });
+
+            return {
+                quoteId,
+                metadata: payload.metadata,
+                revision: { revisionId: payload.revisionId, ...payload.revisionData }
+            };
         });
-        return { quoteId, ...saved };
     }
 
     async function getUserQuotes({ userId, status = '', search = '' }: GetUserQuotesInput): Promise<QuoteMetadata[]> {

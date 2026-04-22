@@ -48,6 +48,10 @@ service cloud.firestore {
       allow create: if isOwnActivityLogCreate();
     }
 
+    match /quote_counters/{dateKey} {
+      allow read, create, update: if isSignedIn();
+    }
+
     match /users/{userId}/templates/{templateId} {
       allow read, create, delete: if isSignedIn() && request.auth.uid == userId;
     }

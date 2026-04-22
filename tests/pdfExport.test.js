@@ -192,6 +192,7 @@ describe('pdfExport helpers', () => {
 
     it('writes project reference and customer reference on separate rows in the PDF header', () => {
         const state = createZeroDiscountState({
+            quoteNumber: 'BRIXX - 260422-103',
             customerInfo: {
                 name: '',
                 company: 'Two Forks',
@@ -210,6 +211,7 @@ describe('pdfExport helpers', () => {
         const textValues = pdfMockState.textCalls.map((call) => call.value);
 
         expect(pdfBlob).toBeInstanceOf(Blob);
+        expect(textValues).toContain('OffertNr: BRIXX - 260422-103');
         expect(textValues).toContain('Projektreferens: PROJ-1');
         expect(textValues).toContain('Er referens: ER-900');
     });

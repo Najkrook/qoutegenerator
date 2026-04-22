@@ -49,6 +49,12 @@ function getActivityCustomerLabel(customerInfo: QuoteState['customerInfo']): str
     return customerInfo.company || customerInfo.name || '';
 }
 
+export function getPdfExportBlockReason(quoteNumber: QuoteState['quoteNumber'] | null | undefined): string | null {
+    return quoteNumber
+        ? null
+        : 'Spara offerten först för att tilldela ett offertnummer innan PDF-export.';
+}
+
 async function createPdfBlob(state: QuoteState, summaryData: QuoteTotalsResult): Promise<Blob | null> {
     try {
         const pdfModule: PdfExportModule = await import('../features/pdfExport');
@@ -154,6 +160,12 @@ export function SummaryExport({ onPrev, onBackToSketch }: SummaryExportProps) {
     };
 
     const handleExportPDF = async (): Promise<void> => {
+        const exportBlockReason = getPdfExportBlockReason(state.quoteNumber);
+        if (exportBlockReason) {
+            toast.error(exportBlockReason);
+            return;
+        }
+
         const fileName = buildPdfFileName(state.customerInfo);
         const pdfBlob = await createPdfBlob(state, summaryData);
         if (!pdfBlob) {

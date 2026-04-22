@@ -5,7 +5,7 @@ describe('quoteSaveService', () => {
     it('creates a new quote when activeQuoteId is missing', async () => {
         const createQuote = vi.fn(async () => ({
             quoteId: 'quote_123',
-            metadata: { latestVersion: 1, status: 'draft' },
+            metadata: { latestVersion: 1, status: 'draft', quoteNumber: 'BRIXX - 260422-101' },
             revision: { version: 1 }
         }));
         const saveQuoteRevision = vi.fn();
@@ -29,6 +29,7 @@ describe('quoteSaveService', () => {
         expect(saveQuoteRevision).not.toHaveBeenCalled();
         expect(result.isNewQuote).toBe(true);
         expect(result.statePatch.activeQuoteId).toBe('quote_123');
+        expect(result.statePatch.quoteNumber).toBe('BRIXX - 260422-101');
         expect(result.statePatch.activeQuoteVersion).toBe(1);
         expect(result.statePatch.quoteStatus).toBe('draft');
     });
@@ -39,7 +40,8 @@ describe('quoteSaveService', () => {
             metadata: {
                 latestVersion: 3,
                 status: 'sent',
-                scriveStatus: 'pending'
+                scriveStatus: 'pending',
+                quoteNumber: 'BRIXX - 260422-101'
             },
             revision: { version: 3 }
         }));
@@ -66,6 +68,7 @@ describe('quoteSaveService', () => {
         expect(saveQuoteRevision.mock.calls[0][0].quoteId).toBe('quote_123');
         expect(result.isNewQuote).toBe(false);
         expect(result.statePatch.activeQuoteId).toBe('quote_123');
+        expect(result.statePatch.quoteNumber).toBe('BRIXX - 260422-101');
         expect(result.statePatch.activeQuoteVersion).toBe(3);
         expect(result.statePatch.quoteStatus).toBe('sent');
         expect(result.statePatch.scriveStatus).toBe('pending');
@@ -88,6 +91,7 @@ describe('quoteSaveService', () => {
             },
             {
                 activeQuoteId: 'quote_999',
+                quoteNumber: 'BRIXX - 260421-101',
                 scriveEnabled: true,
                 scriveStatus: 'closed',
                 scriveDocumentId: 'doc_1'
@@ -95,6 +99,7 @@ describe('quoteSaveService', () => {
         );
 
         expect(patch.activeQuoteId).toBe('quote_999');
+        expect(patch.quoteNumber).toBe('BRIXX - 260421-101');
         expect(patch.activeQuoteVersion).toBe(4);
         expect(patch.quoteStatus).toBe('won');
         expect(patch.scriveEnabled).toBe(true);
@@ -109,6 +114,7 @@ describe('quoteSaveService', () => {
                 metadata: {
                     latestVersion: 7,
                     status: 'sent',
+                    quoteNumber: 'BRIXX - 260422-107',
                     scriveEnabled: true,
                     scriveStatus: 'pending',
                     scriveDocumentId: 'scrive_7',
@@ -126,6 +132,7 @@ describe('quoteSaveService', () => {
 
         expect(patch).toMatchObject({
             activeQuoteId: 'quote_321',
+            quoteNumber: 'BRIXX - 260422-107',
             activeQuoteVersion: 7,
             quoteStatus: 'sent',
             scriveEnabled: true,

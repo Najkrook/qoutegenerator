@@ -348,6 +348,7 @@ export interface QuoteState {
     sketchMeta: SketchMeta;
     inventoryBasket: InventoryBasketItem[];
     activeQuoteId: string | null;
+    quoteNumber: string | null;
     activeQuoteVersion: number;
     quoteStatus: QuoteStatus;
     includeTerms: boolean;
@@ -384,6 +385,7 @@ export type CustomerInfoPatch = Partial<CustomerInfo> | UnknownRecord;
 
 export interface QuoteIdentityPatch {
     activeQuoteId: string | null;
+    quoteNumber: string | null;
     activeQuoteVersion: number;
     quoteStatus: QuoteStatus;
 }
@@ -476,6 +478,9 @@ export interface ScriveMetadata {
 
 export interface QuoteMetadata extends ScriveMetadata {
     quoteId: string;
+    quoteNumber: string | null;
+    quoteDateKey: string | null;
+    quoteSequence: number | null;
     customerName: string;
     company: string;
     reference: string;
@@ -575,6 +580,9 @@ export interface RawQuoteSummary extends UnknownRecord {
 export type RepositoryQuoteSummaryPayload = QuoteSummary | RawQuoteSummary;
 
 export interface RawQuoteMetadataDoc extends UnknownRecord {
+    quoteNumber?: unknown;
+    quoteDateKey?: unknown;
+    quoteSequence?: unknown;
     customerName?: unknown;
     company?: unknown;
     reference?: unknown;

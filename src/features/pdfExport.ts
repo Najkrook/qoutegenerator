@@ -103,6 +103,7 @@ export function generatePDF(
         const drawMainHeader = () => drawHeader(doc, {
             pageWidth,
             quoteDate,
+            quoteNumber: state.quoteNumber || null,
             customerInfo,
             layout: PDF_LAYOUT
         });

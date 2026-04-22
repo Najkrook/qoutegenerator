@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
     applyQuoteFilters,
     createQuoteRepository,
@@ -34,7 +34,14 @@ const baseSummary = {
 };
 
 describe('quoteRepository', () => {
+    afterEach(() => {
+        vi.useRealTimers();
+    });
+
     it('createQuote creates metadata and revision v1', async () => {
+        vi.useFakeTimers();
+        vi.setSystemTime(new Date('2026-04-22T08:00:00.000Z'));
+
         const { repo, mock } = buildRepo();
         const saved = await repo.createQuote({
             user,
@@ -47,6 +54,9 @@ describe('quoteRepository', () => {
         expect(saved.quoteId).toContain('quote_');
         expect(saved.metadata.latestVersion).toBe(1);
         expect(saved.metadata.status).toBe('draft');
+        expect(saved.metadata.quoteNumber).toBe('BRIXX - 260422-101');
+        expect(saved.metadata.quoteDateKey).toBe('260422');
+        expect(saved.metadata.quoteSequence).toBe(101);
         expect(saved.metadata.customerName).toBe('Brixx AB');
         expect(saved.metadata.customerReference).toBe('ER-01');
         expect(saved.revision.version).toBe(1);
@@ -56,6 +66,9 @@ describe('quoteRepository', () => {
         const revisionPath = `users/${user.uid}/quotes/${saved.quoteId}/revisions/${saved.revision.revisionId}`;
 
         expect(mock.__docs.get(quotePath)).toMatchObject({
+            quoteNumber: 'BRIXX - 260422-101',
+            quoteDateKey: '260422',
+            quoteSequence: 101,
             customerName: 'Brixx AB',
             customerReference: 'ER-01',
             latestVersion: 1,
@@ -74,9 +87,15 @@ describe('quoteRepository', () => {
                 totalDiscountSek: 1655
             }
         });
+        expect(mock.__docs.get('quote_counters/260422')).toMatchObject({
+            lastSequence: 101
+        });
     });
 
     it('saveQuoteRevision increments version and updates latest metadata pointer', async () => {
+        vi.useFakeTimers();
+        vi.setSystemTime(new Date('2026-04-22T09:00:00.000Z'));
+
         const { repo } = buildRepo();
         const created = await repo.createQuote({
             user,
@@ -110,8 +129,70 @@ describe('quoteRepository', () => {
         expect(updated.metadata.latestVersion).toBe(2);
         expect(updated.metadata.latestRevisionId).toBe(updated.revision.revisionId);
         expect(updated.metadata.status).toBe('sent');
+        expect(updated.metadata.quoteNumber).toBe(created.metadata.quoteNumber);
+        expect(updated.metadata.quoteDateKey).toBe(created.metadata.quoteDateKey);
+        expect(updated.metadata.quoteSequence).toBe(created.metadata.quoteSequence);
         expect(updated.metadata.customerReference).toBe('ER-02');
         expect(updated.revision.version).toBe(2);
+    });
+
+    it('assigns a global daily quote sequence across multiple new quotes on the same day', async () => {
+        vi.useFakeTimers();
+        vi.setSystemTime(new Date('2026-04-22T10:00:00.000Z'));
+
+        const { repo } = buildRepo();
+
+        const first = await repo.createQuote({
+            user,
+            state: baseState,
+            summary: baseSummary,
+            customerInfo: baseState.customerInfo,
+            status: 'draft'
+        });
+        const second = await repo.createQuote({
+            user,
+            state: baseState,
+            summary: baseSummary,
+            customerInfo: baseState.customerInfo,
+            status: 'draft'
+        });
+        const third = await repo.createQuote({
+            user,
+            state: baseState,
+            summary: baseSummary,
+            customerInfo: baseState.customerInfo,
+            status: 'draft'
+        });
+
+        expect(first.metadata.quoteNumber).toBe('BRIXX - 260422-101');
+        expect(second.metadata.quoteNumber).toBe('BRIXX - 260422-102');
+        expect(third.metadata.quoteNumber).toBe('BRIXX - 260422-103');
+    });
+
+    it('resets the daily quote sequence when the Stockholm business day changes', async () => {
+        vi.useFakeTimers();
+        const { repo } = buildRepo();
+
+        vi.setSystemTime(new Date('2026-04-22T21:30:00.000Z'));
+        const firstDay = await repo.createQuote({
+            user,
+            state: baseState,
+            summary: baseSummary,
+            customerInfo: baseState.customerInfo,
+            status: 'draft'
+        });
+
+        vi.setSystemTime(new Date('2026-04-23T08:00:00.000Z'));
+        const secondDay = await repo.createQuote({
+            user,
+            state: baseState,
+            summary: baseSummary,
+            customerInfo: baseState.customerInfo,
+            status: 'draft'
+        });
+
+        expect(firstDay.metadata.quoteNumber).toBe('BRIXX - 260422-101');
+        expect(secondDay.metadata.quoteNumber).toBe('BRIXX - 260423-101');
     });
 
     it('getUserQuotes supports status and search filtering', async () => {
@@ -269,6 +350,9 @@ describe('quoteRepository', () => {
     });
 
     it('saveQuoteRevision falls back cleanly when runTransaction is unavailable', async () => {
+        vi.useFakeTimers();
+        vi.setSystemTime(new Date('2026-04-22T12:00:00.000Z'));
+
         const mock = createFirestoreMock();
         delete mock.runTransaction;
         const repo = createQuoteRepository(mock);
@@ -293,6 +377,7 @@ describe('quoteRepository', () => {
         expect(updated.metadata.latestVersion).toBe(2);
         expect(updated.revision.version).toBe(2);
         expect(updated.metadata.latestRevisionId).toBe(updated.revision.revisionId);
+        expect(updated.metadata.quoteNumber).toBe(created.metadata.quoteNumber);
     });
 
     it('getQuoteLatestRevision falls back to the revision list when latestRevisionId is missing', async () => {
@@ -375,6 +460,9 @@ describe('quoteRepository', () => {
 describe('quoteRepository pure helpers', () => {
     it('normalizeQuoteMetadata defaults status/version for legacy payload', () => {
         const normalized = normalizeQuoteMetadata('q1', {
+            quoteNumber: 'BRIXX - 260422-101',
+            quoteDateKey: '260422',
+            quoteSequence: 101,
             customerName: 'A',
             customerReference: 'ER-7',
             reference: 'X',
@@ -383,6 +471,9 @@ describe('quoteRepository pure helpers', () => {
 
         expect(normalized.status).toBe('draft');
         expect(normalized.latestVersion).toBe(1);
+        expect(normalized.quoteNumber).toBe('BRIXX - 260422-101');
+        expect(normalized.quoteDateKey).toBe('260422');
+        expect(normalized.quoteSequence).toBe(101);
         expect(normalized.scriveEnabled).toBe(false);
         expect(normalized.scriveStatus).toBe('not_sent');
         expect(normalized.customerReference).toBe('ER-7');

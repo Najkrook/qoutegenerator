@@ -13,6 +13,7 @@ describe('historyPayload', () => {
                 selectedLines: ['ClickitUp']
             },
             'quote_123',
+            'BRIXX - 260422-105',
             5,
             'sent'
         );
@@ -24,6 +25,7 @@ describe('historyPayload', () => {
             company: 'Brixx AB'
         });
         expect(payload.activeQuoteId).toBe('quote_123');
+        expect(payload.quoteNumber).toBe('BRIXX - 260422-105');
         expect(payload.activeQuoteVersion).toBe(5);
         expect(payload.quoteStatus).toBe('sent');
     });
@@ -34,12 +36,14 @@ describe('historyPayload', () => {
                 step: 2
             },
             'quote_234',
+            null,
             2,
             'draft'
         );
 
         expect(payload.customerInfo).toEqual({});
         expect(payload.activeQuoteId).toBe('quote_234');
+        expect(payload.quoteNumber).toBeNull();
         expect(payload.activeQuoteVersion).toBe(2);
         expect(payload.quoteStatus).toBe('draft');
     });
@@ -50,11 +54,13 @@ describe('historyPayload', () => {
                 customerInfo: 'broken'
             },
             'quote_345',
+            'BRIXX - 260422-103',
             3,
             'won'
         );
 
         expect(payload.customerInfo).toEqual({});
+        expect(payload.quoteNumber).toBe('BRIXX - 260422-103');
         expect(payload.quoteStatus).toBe('won');
     });
 
@@ -62,12 +68,14 @@ describe('historyPayload', () => {
         const payload = buildHistoryOpenQuotePayload(
             'broken',
             'quote_456',
+            undefined,
             0,
             'draft'
         );
 
         expect(payload.customerInfo).toEqual({});
         expect(payload.activeQuoteId).toBe('quote_456');
+        expect(payload.quoteNumber).toBeNull();
         expect(payload.activeQuoteVersion).toBe(1);
         expect(payload.quoteStatus).toBe('draft');
     });
@@ -80,6 +88,7 @@ describe('historyPayload', () => {
                 }
             },
             'quote_567',
+            'BRIXX - 260422-107',
             7,
             'bad-status'
         );
@@ -88,6 +97,7 @@ describe('historyPayload', () => {
             name: 'Fallback Kund'
         });
         expect(payload.activeQuoteId).toBe('quote_567');
+        expect(payload.quoteNumber).toBe('BRIXX - 260422-107');
         expect(payload.activeQuoteVersion).toBe(7);
         expect(payload.quoteStatus).toBe('draft');
     });

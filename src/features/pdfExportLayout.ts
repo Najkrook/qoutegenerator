@@ -150,9 +150,10 @@ function drawGroupSubtitle(doc, title, y, layout, pageMarginX) {
     doc.text(title, pageMarginX, y);
 }
 
-export function drawHeader(doc, { pageWidth, quoteDate, customerInfo = {}, layout = PDF_LAYOUT }) {
-    const { pageMarginX, headerTopY, headerLineY } = layout;
+export function drawHeader(doc, { pageWidth, quoteDate, quoteNumber = null, customerInfo = {}, layout = PDF_LAYOUT }) {
+    const { pageMarginX, headerTopY } = layout;
     const safeCustomerInfo = normalizeCustomerInfo(customerInfo);
+    const headerLineY = quoteNumber ? layout.headerLineY + 2 : layout.headerLineY;
 
     drawBrandLogo(doc, pageMarginX, 8, 50, 16, 22, layout);
 
@@ -165,11 +166,14 @@ export function drawHeader(doc, { pageWidth, quoteDate, customerInfo = {}, layou
     doc.setFontSize(9);
     doc.setTextColor(...layout.colors.grayText);
     doc.text(`Datum: ${quoteDate}`, pageWidth - pageMarginX, 22, { align: 'right' });
+    if (quoteNumber) {
+        doc.text(`OffertNr: ${quoteNumber}`, pageWidth - pageMarginX, 26, { align: 'right' });
+    }
     if (safeCustomerInfo.reference) {
-        doc.text(`Projektreferens: ${safeCustomerInfo.reference}`, pageWidth - pageMarginX, 26, { align: 'right' });
+        doc.text(`Projektreferens: ${safeCustomerInfo.reference}`, pageWidth - pageMarginX, quoteNumber ? 30 : 26, { align: 'right' });
     }
     if (safeCustomerInfo.customerReference) {
-        doc.text(`Er referens: ${safeCustomerInfo.customerReference}`, pageWidth - pageMarginX, 30, { align: 'right' });
+        doc.text(`Er referens: ${safeCustomerInfo.customerReference}`, pageWidth - pageMarginX, quoteNumber ? 34 : 30, { align: 'right' });
     }
 
     doc.setDrawColor(...layout.colors.brandOrange);

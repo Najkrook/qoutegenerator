@@ -15,6 +15,7 @@ export function buildSavedQuoteStatePatch(
 
     return {
         activeQuoteId: saved?.quoteId || state.activeQuoteId || null,
+        quoteNumber: metadata.quoteNumber ?? state.quoteNumber ?? null,
         activeQuoteVersion: metadata.latestVersion || saved?.revision?.version || state.activeQuoteVersion || 1,
         quoteStatus: metadata.status || state.quoteStatus || 'draft',
         scriveEnabled: typeof metadata.scriveEnabled === 'boolean' ? metadata.scriveEnabled : state.scriveEnabled,

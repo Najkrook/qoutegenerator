@@ -18,6 +18,7 @@ function toCustomerInfoPatch(value: unknown): CustomerInfoPatch {
 export function buildHistoryOpenQuotePayload(
     revisionState: QuoteRevision['state'],
     quoteId: string,
+    quoteNumber: string | null | undefined,
     version: number,
     status: QuoteStatus | string | null | undefined
 ): HistoryOpenQuotePayload {
@@ -27,6 +28,7 @@ export function buildHistoryOpenQuotePayload(
         ...safeRevisionState,
         customerInfo: toCustomerInfoPatch(safeRevisionState.customerInfo),
         activeQuoteId: quoteId,
+        quoteNumber: quoteNumber ? String(quoteNumber) : null,
         activeQuoteVersion: Number(version) || 1,
         quoteStatus: normalizeQuoteStatus(status || 'draft')
     };

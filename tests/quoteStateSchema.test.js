@@ -77,12 +77,14 @@ describe('quoteStateSchema', () => {
                 name: 'Revision Kund'
             },
             activeQuoteId: 'quote_123',
+            quoteNumber: 'BRIXX - 260422-103',
             activeQuoteVersion: 4,
             quoteStatus: 'sent'
         });
 
         expect(hydrated.stateVersion).toBe(1);
         expect(hydrated.activeQuoteId).toBe('quote_123');
+        expect(hydrated.quoteNumber).toBe('BRIXX - 260422-103');
         expect(hydrated.activeQuoteVersion).toBe(4);
         expect(hydrated.quoteStatus).toBe('sent');
         expect(hydrated.customerInfo.name).toBe('Revision Kund');
@@ -309,6 +311,7 @@ describe('quoteStateSchema', () => {
             payload: {
                 step: 1,
                 activeQuoteId: 'quote_123',
+                quoteNumber: 'BRIXX - 260422-105',
                 activeQuoteVersion: 5,
                 quoteStatus: 'sent',
                 customerInfo: {
@@ -320,6 +323,7 @@ describe('quoteStateSchema', () => {
 
         expect(nextState.step).toBe(1);
         expect(nextState.activeQuoteId).toBe('quote_123');
+        expect(nextState.quoteNumber).toBe('BRIXX - 260422-105');
         expect(nextState.activeQuoteVersion).toBe(5);
         expect(nextState.quoteStatus).toBe('sent');
         expect(nextState.customerInfo.name).toBe('Historik Kund');

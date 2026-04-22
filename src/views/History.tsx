@@ -246,7 +246,13 @@ export function History({ onBack, onOpenQuote }: HistoryProps) {
         }
 
         const metadata = quotes.find((quote) => quote.quoteId === quoteId);
-        const nextState = buildHistoryOpenQuotePayload(revision.state, quoteId, revision.version, metadata?.status || 'draft');
+        const nextState = buildHistoryOpenQuotePayload(
+            revision.state,
+            quoteId,
+            metadata?.quoteNumber || null,
+            revision.version,
+            metadata?.status || 'draft'
+        );
 
         onOpenQuote?.(nextState);
     };
