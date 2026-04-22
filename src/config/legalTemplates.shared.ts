@@ -3,7 +3,7 @@
 - Offerten gäller under den giltighetstid som anges i offerten. Därefter förbehåller sig BRIXX rätten att justera pris och leveransvillkor.
 
 BETALNINGSVILLKOR
-- Betalning sker mot faktura med 30 dagars netto om inget annat anges i offerten.
+- Betalningsvilkor lämnas efter utförd kreditprövning.
 - Vid försenad betalning debiteras dröjsmålsränta och eventuella lagstadgade påminnelseavgifter.
 
 LEVERANS
@@ -17,6 +17,7 @@ MONTERING OCH FÖRUTSÄTTNINGAR
 
 SPECIALBESTÄLLNINGAR
 - Kundunika eller specialbeställda produkter tas hem eller produceras särskilt för kunden och kan därför inte avbeställas eller returneras utan att faktisk uppkommen kostnad debiteras.
+- I sammanband med specialbeställningar erläggs en procentuell handpenning enligt diskusion med kund. Denna handpenning återbetalas ej vid avbeställning.
 
 REKLAMATION
 - Eventuella reklamationer ska göras skriftligen inom skälig tid efter att felet upptäckts eller borde ha upptäckts.
