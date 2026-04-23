@@ -26,6 +26,10 @@ interface ActivityLogResultLike {
     ok?: boolean;
 }
 
+interface PdfExportOptions {
+    allowMissingQuoteNumber?: boolean;
+}
+
 function sanitizeFileNamePart(value: string): string {
     return String(value || '')
         .normalize('NFKD')
@@ -50,6 +54,11 @@ function getActivityCustomerLabel(customerInfo: QuoteState['customerInfo']): str
 }
 
 export function getPdfExportBlockReason(quoteNumber: QuoteState['quoteNumber'] | null | undefined): string | null {
+    if (quoteNumber) {
+        return null;
+    }
+
+    return 'Offerten saknar offertnummer. Spara offerten f\u00F6r att tilldela ett nummer, eller exportera \u00E4nd\u00E5 utan nummer.';
     return quoteNumber
         ? null
         : 'Spara offerten först för att tilldela ett offertnummer innan PDF-export.';
@@ -89,6 +98,35 @@ function warnIfActivityLogFailed(result: ActivityLogResultLike | null | undefine
     }
 }
 
+function logPdfExportActivity({
+    user,
+    state,
+    fileName,
+    missingQuoteNumber
+}: {
+    user: ReturnType<typeof useAuth>['user'];
+    state: QuoteState;
+    fileName: string;
+    missingQuoteNumber: boolean;
+}): void {
+    void safeLogActivity({
+        user,
+        eventType: 'quote_export_pdf',
+        system: 'quote',
+        targetType: 'quote',
+        targetId: state.activeQuoteId || 'unsaved_quote',
+        details: `PDF exporterad: ${fileName}`,
+        metadata: {
+            format: 'pdf',
+            fileName,
+            version: state.activeQuoteVersion || null,
+            customerName: getActivityCustomerLabel(state.customerInfo),
+            reference: state.customerInfo.reference || '',
+            missingQuoteNumber
+        }
+    }).then((result) => warnIfActivityLogFailed(result, 'PDF-exporten lyckades, men aktivitetsloggen kunde inte uppdateras.'));
+}
+
 export function SummaryExport({ onPrev, onBackToSketch }: SummaryExportProps) {
     const { state, dispatch } = useQuote();
     const { user, retailer } = useAuth();
@@ -100,6 +138,7 @@ export function SummaryExport({ onPrev, onBackToSketch }: SummaryExportProps) {
     const [previewError, setPreviewError] = useState('');
     const [isSavingQuote, setIsSavingQuote] = useState(false);
     const previewUrlRef = useRef<string>('');
+    const exportBlockReason = getPdfExportBlockReason(state.quoteNumber);
 
     useEffect(() => {
         if (hasZeroDiscountSummary(summaryData) || state.hideZeroDiscountReferencesInPdf !== true) {
@@ -159,9 +198,8 @@ export function SummaryExport({ onPrev, onBackToSketch }: SummaryExportProps) {
         }
     };
 
-    const handleExportPDF = async (): Promise<void> => {
-        const exportBlockReason = getPdfExportBlockReason(state.quoteNumber);
-        if (exportBlockReason) {
+    const handleExportPDF = async ({ allowMissingQuoteNumber = false }: PdfExportOptions = {}): Promise<void> => {
+        if (exportBlockReason && !allowMissingQuoteNumber) {
             toast.error(exportBlockReason);
             return;
         }
@@ -175,21 +213,12 @@ export function SummaryExport({ onPrev, onBackToSketch }: SummaryExportProps) {
 
         const pickerResult = await saveBlobWithPicker(pdfBlob, fileName);
         if (pickerResult === 'saved') {
-            void safeLogActivity({
+            logPdfExportActivity({
                 user,
-                eventType: 'quote_export_pdf',
-                system: 'quote',
-                targetType: 'quote',
-                targetId: state.activeQuoteId || 'unsaved_quote',
-                details: `PDF exporterad: ${fileName}`,
-                metadata: {
-                    format: 'pdf',
-                    fileName,
-                    version: state.activeQuoteVersion || null,
-                    customerName: getActivityCustomerLabel(state.customerInfo),
-                    reference: state.customerInfo.reference || ''
-                }
-            }).then((result) => warnIfActivityLogFailed(result, 'PDF-exporten lyckades, men aktivitetsloggen kunde inte uppdateras.'));
+                state,
+                fileName,
+                missingQuoteNumber: !state.quoteNumber
+            });
             toast.success(`PDF sparad: ${fileName}`);
             return;
         }
@@ -205,21 +234,12 @@ export function SummaryExport({ onPrev, onBackToSketch }: SummaryExportProps) {
 
         if (pickerResult === 'failed' || pickerResult === 'unavailable') {
             downloadBlob(pdfBlob, fileName);
-            void safeLogActivity({
+            logPdfExportActivity({
                 user,
-                eventType: 'quote_export_pdf',
-                system: 'quote',
-                targetType: 'quote',
-                targetId: state.activeQuoteId || 'unsaved_quote',
-                details: `PDF exporterad: ${fileName}`,
-                metadata: {
-                    format: 'pdf',
-                    fileName,
-                    version: state.activeQuoteVersion || null,
-                    customerName: getActivityCustomerLabel(state.customerInfo),
-                    reference: state.customerInfo.reference || ''
-                }
-            }).then((result) => warnIfActivityLogFailed(result, 'PDF-exporten lyckades, men aktivitetsloggen kunde inte uppdateras.'));
+                state,
+                fileName,
+                missingQuoteNumber: !state.quoteNumber
+            });
             toast.success(`PDF nedladdad: ${fileName}`);
         }
     };
@@ -355,16 +375,37 @@ export function SummaryExport({ onPrev, onBackToSketch }: SummaryExportProps) {
                                 Tillbaka för att ändra priser
                             </button>
 
-                            <div className="flex flex-col sm:flex-row gap-3 md:gap-4 w-full md:w-auto md:justify-end">
+                            <div className="flex flex-col gap-3 w-full md:w-auto md:items-end">
+                                {exportBlockReason && (
+                                    <div className="max-w-[420px] rounded-xl border border-amber-400/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">
+                                        <p className="m-0 font-semibold">{'Offerten saknar offertnummer'}</p>
+                                        <p className="m-0 mt-1 text-amber-100/90">{exportBlockReason}</p>
+                                        <p className="m-0 mt-2 text-amber-100/80">{'Spara offert \u00E4r rekommenderat, men du kan fortfarande exportera PDF:n utan nummer.'}</p>
+                                    </div>
+                                )}
+
+                                <div className="flex flex-col sm:flex-row gap-3 md:gap-4 w-full md:w-auto md:justify-end">
                                 <button
                                     type="button"
                                     onClick={() => {
                                         void handleExportPDF();
                                     }}
-                                    className="px-6 py-3 bg-primary text-white rounded-lg font-bold hover:bg-primary-hover shadow-lg shadow-primary/20 transition-all tracking-wide flex items-center justify-center gap-2"
+                                    disabled={Boolean(exportBlockReason)}
+                                    className="px-6 py-3 bg-primary text-white rounded-lg font-bold hover:bg-primary-hover shadow-lg shadow-primary/20 transition-all tracking-wide flex items-center justify-center gap-2 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-primary"
                                 >
                                     <span aria-hidden="true">📄</span> Exportera som PDF
                                 </button>
+                                {exportBlockReason && (
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            void handleExportPDF({ allowMissingQuoteNumber: true });
+                                        }}
+                                        className="px-6 py-3 bg-amber-500/15 text-amber-100 border border-amber-400/35 rounded-lg font-bold hover:bg-amber-500/25 transition-all tracking-wide flex items-center justify-center gap-2"
+                                    >
+                                        <span aria-hidden="true">!</span> {'Exportera \u00E4nd\u00E5'}
+                                    </button>
+                                )}
                                 <button
                                     type="button"
                                     onClick={() => {
@@ -374,6 +415,7 @@ export function SummaryExport({ onPrev, onBackToSketch }: SummaryExportProps) {
                                 >
                                     <span aria-hidden="true">📊</span> Exportera som Excel
                                 </button>
+                            </div>
                             </div>
                         </section>
                     </div>

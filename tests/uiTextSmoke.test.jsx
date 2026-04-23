@@ -470,11 +470,13 @@ describe('UI text smoke', () => {
         expect(html).toContain('Spara offert');
         expect(html).toContain('PDF förhandsvisning');
         expect(html).toContain('Exportera som PDF');
+        expect(html).toContain('Offerten saknar offertnummer');
+        expect(html).toContain('Exportera ändå');
         expect(html).toContain('Exportera som Excel');
     });
 
     it('returns a clear save-first message when PDF export is attempted before quote numbering', () => {
-        expect(getPdfExportBlockReason(null)).toBe('Spara offerten först för att tilldela ett offertnummer innan PDF-export.');
+        expect(getPdfExportBlockReason(null)).toBe('Offerten saknar offertnummer. Spara offerten för att tilldela ett nummer, eller exportera ändå utan nummer.');
         expect(getPdfExportBlockReason('BRIXX - 260422-101')).toBeNull();
     });
 
