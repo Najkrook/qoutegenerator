@@ -1,4 +1,4 @@
-import React, { Suspense, lazy } from 'react';
+import React, { Suspense, lazy, useEffect, useRef } from 'react';
 import {
     createBrowserRouter,
     Navigate,
@@ -18,6 +18,8 @@ import { ActivityLogs } from './views/ActivityLogs';
 import { Login } from './views/Login';
 import { useQuote } from './store/QuoteContext';
 import { useAuth } from './store/AuthContext';
+import { db, doc, getDoc } from './services/firebase';
+import { cloneInventoryData, createDefaultInventoryData, normalizeStoredInventoryData } from './views/inventoryData';
 import {
     APP_PATHS,
     APP_ROUTE_IDS,
@@ -94,7 +96,65 @@ function LoginRouteElement() {
 
 function ProtectedAppLayout() {
     const { user, loading } = useAuth();
+    const { state, dispatch } = useQuote();
     const location = useLocation();
+    const inventoryBootstrappedRef = useRef(false);
+
+    useEffect(() => {
+        if (!user || inventoryBootstrappedRef.current) {
+            return;
+        }
+
+        const hasLoadedInventory =
+            (state.inventoryData?.bahama?.length || 0) > 0 ||
+            Object.keys(state.inventoryData?.clickitup || {}).length > 0 ||
+            Boolean(state.inventoryData?.notes) ||
+            (state.cloudInventoryData?.bahama?.length || 0) > 0 ||
+            Object.keys(state.cloudInventoryData?.clickitup || {}).length > 0 ||
+            Boolean(state.cloudInventoryData?.notes);
+
+        if (hasLoadedInventory) {
+            inventoryBootstrappedRef.current = true;
+            return;
+        }
+
+        inventoryBootstrappedRef.current = true;
+        let cancelled = false;
+
+        const bootstrapInventory = async () => {
+            try {
+                const docRef = doc(db, 'stock', 'main_inventory');
+                const docSnap = await getDoc(docRef);
+                const inventoryData = docSnap.exists()
+                    ? normalizeStoredInventoryData(docSnap.data())
+                    : createDefaultInventoryData();
+
+                if (cancelled) return;
+
+                dispatch({ type: 'SET_CLOUD_INVENTORY_DATA', payload: cloneInventoryData(inventoryData) });
+                dispatch({ type: 'SET_INVENTORY_DATA', payload: cloneInventoryData(inventoryData) });
+            } catch (err) {
+                console.error('Failed to bootstrap inventory data:', err);
+                try {
+                    const res = await fetch('/inventory_db.json');
+                    if (!res.ok) return;
+                    const inventoryData = normalizeStoredInventoryData(await res.json());
+                    if (cancelled) return;
+
+                    dispatch({ type: 'SET_CLOUD_INVENTORY_DATA', payload: cloneInventoryData(inventoryData) });
+                    dispatch({ type: 'SET_INVENTORY_DATA', payload: cloneInventoryData(inventoryData) });
+                } catch (fallbackErr) {
+                    console.error('Failed to bootstrap local inventory fallback:', fallbackErr);
+                }
+            }
+        };
+
+        void bootstrapInventory();
+
+        return () => {
+            cancelled = true;
+        };
+    }, [dispatch, state.cloudInventoryData, state.inventoryData, user]);
 
     if (loading) {
         return <FullScreenLoader />;

@@ -60,7 +60,7 @@ describe('PricingTable name editing UX', () => {
         const html = renderPricingTable();
 
         expect(html).toContain('value="BaHaMa Jumbrella"');
-        expect(html).toContain('value="  + Tillval: heater"');
+        expect(html).toContain('value="Tillval: heater"');
         expect(html).not.toContain('placeholder="BaHaMa Jumbrella"');
     });
 

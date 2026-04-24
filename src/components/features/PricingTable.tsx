@@ -3,6 +3,7 @@ import { useQuote } from '../../store/QuoteContext';
 import { useAuth } from '../../store/AuthContext';
 import { catalogData } from '../../data/catalog';
 import { computeQuoteTotals } from '../../services/calculationEngine';
+import { DEFAULT_UNKNOWN_ADDON_NAME, formatAddonLabel } from '../../utils/addonLabels';
 import { buildEffectiveGridSelections } from '../../utils/gridAutoScale';
 import type {
     BuilderAddon,
@@ -233,20 +234,20 @@ export function PricingTable() {
         if (source.type === 'builder-addon') {
             const position = getBuilderAddonPosition(source);
             if (!position) {
-                return `  + Tillval: ${source.addonId || 'Okant tillval'}`;
+                return formatAddonLabel(source.addonId, DEFAULT_UNKNOWN_ADDON_NAME);
             }
 
             const item = state.builderItems[position.itemIndex];
             const lineData = catalogData[item.line];
             const modelData = lineData?.type === 'builder' ? lineData.models?.[item.model] : null;
             const addonDef = findBuilderAddonDefinition(modelData, source.addonId);
-            return `  + Tillval: ${addonDef?.name || source.addonId || 'Okant tillval'}`;
+            return formatAddonLabel(addonDef?.name || source.addonId, DEFAULT_UNKNOWN_ADDON_NAME);
         }
 
         if (source.type === 'builder-custom-addon') {
             const position = getBuilderAddonPosition(source);
             if (!position) {
-                return '  + Tillval: Egen rad';
+                return formatAddonLabel('');
             }
 
             const addon = state.builderItems[position.itemIndex].addons[position.addonIndex];
@@ -254,7 +255,7 @@ export function PricingTable() {
             if (isCustomBuilderAddon(addon)) {
                 customAddonName = String(addon.name || '').trim();
             }
-            return `  + Tillval: ${customAddonName || 'Egen rad'}`;
+            return formatAddonLabel(customAddonName);
         }
 
         return '';

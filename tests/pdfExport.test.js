@@ -270,7 +270,43 @@ describe('pdfExport helpers', () => {
         const firstTableBody = pdfMockState.autoTableCalls[0].body;
 
         expect(pdfBlob).toBeInstanceOf(Blob);
-        expect(firstTableBody.some((row) => row[0] === '  + Tillval: Speciallack')).toBe(true);
+        expect(firstTableBody.some((row) => row[0] === 'Tillval: Speciallack')).toBe(true);
+    });
+
+    it('preserves negative custom cost amounts in the generated PDF table body', () => {
+        const state = createZeroDiscountState({
+            builderItems: [],
+            gridSelections: {},
+            customCosts: [
+                {
+                    description: 'Extra goodwill-rabatt',
+                    price: -4117,
+                    qty: 1,
+                    discountPct: 0
+                }
+            ]
+        });
+        const summary = computeQuoteTotals({
+            state,
+            catalogData: createCatalogFixture()
+        });
+
+        const pdfBlob = generatePDF(state, summary, true);
+        const firstTableBody = pdfMockState.autoTableCalls[0].body;
+
+        expect(pdfBlob).toBeInstanceOf(Blob);
+        expect(firstTableBody).toEqual([
+            [
+                'Övrigt: Extra goodwill-rabatt',
+                '-',
+                '-4 117 SEK',
+                '1',
+                '-4 117 SEK',
+                '-4 117 SEK',
+                '0 SEK',
+                '0%'
+            ]
+        ]);
     });
 
     it('paginates long terms text instead of truncating the last lines', () => {

@@ -138,8 +138,8 @@ describe('export data builders', () => {
         const wsData = buildExcelSheetData(state, summary);
         const pdfRows = buildPdfTableData(summary.totals, formatSek);
 
-        expect(wsData.some((row) => row[0] === '  + Tillval: Speciallack')).toBe(true);
-        expect(pdfRows.some((row) => row[0] === '  + Tillval: Speciallack')).toBe(true);
+        expect(wsData.some((row) => row[0] === 'Tillval: Speciallack')).toBe(true);
+        expect(pdfRows.some((row) => row[0] === 'Tillval: Speciallack')).toBe(true);
     });
 
     it('uses renamed builder rows and preserved block order in export rows', () => {

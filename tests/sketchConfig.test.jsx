@@ -39,8 +39,49 @@ describe('SketchConfig zero-depth controls', () => {
 
         expect(html).toContain('Rak 0 mm');
         expect(html).toContain('aria-pressed="true"');
+        expect(html).toContain('data-control="include-back-toggle"');
         expect(html).toContain('Rak layout (0 mm djup) kan inte ha bak');
+        expect(html).toContain('data-surface="sketch-setup-controls"');
         expect(html).not.toContain('Dörrplacering');
+    });
+
+    it('hides the straight-layout toggle when equal depth is disabled', () => {
+        const html = renderToStaticMarkup(
+            <SketchConfig
+                config={{
+                    activeMode: 'clickitup',
+                    parasols: [],
+                    selectedParasolId: null,
+                    width: 8000,
+                    depth: 4000,
+                    depthLeft: 3200,
+                    depthRight: 4000,
+                    equalDepth: false,
+                    includeBack: false,
+                    prioMode: 'symmetrical',
+                    targetLength: 1500,
+                    doorSegmentsByEdge: {},
+                    manualSectionsByEdge: {}
+                }}
+                onChange={vi.fn()}
+                selectedEdge={null}
+                selectedSegmentIndex={null}
+                onSelectEdge={vi.fn()}
+                onSetManualPin={vi.fn()}
+                onClearManualPins={vi.fn()}
+                onConvertSegmentToDoor={vi.fn()}
+                onSetDoorSegmentSize={vi.fn()}
+                onResetDoorSegment={vi.fn()}
+                edgeSummaries={{}}
+                onDeleteParasol={vi.fn()}
+                onRotateParasol={vi.fn()}
+            />
+        );
+
+        expect(html).toContain('Lika djup');
+        expect(html).toContain('data-surface="sketch-measurements"');
+        expect(html).toContain('data-surface="sketch-section-counts"');
+        expect(html).not.toContain('Rak 0 mm');
     });
 
     it('shows a rotation control for selected rectangular parasols only', () => {

@@ -75,6 +75,17 @@ interface DragHandleProps {
 }
 
 const DEFAULT_CAMERA: SketchCamera = { zoom: 1, panX: 0, panY: 0 };
+const EDGE_LABELS: Record<SketchEdgeKey, string> = {
+    front: 'Fram',
+    left: 'Vänster',
+    right: 'Höger',
+    back: 'Bak'
+};
+const MODE_HELP_TEXT: Record<NonNullable<SketchCanvasProps['activeMode']>, string> = {
+    clickitup: 'Klicka på en sektion för att redigera den, eller på en stolpe i kanten för kantens verktyg i inspektören.',
+    parasol: 'Välj modell i inspektören och klicka sedan i ytan för att placera parasollet.',
+    fiesta: 'Klicka i ytan för att placera Fiesta och markera den sedan för att justera eller ta bort.'
+};
 
 function clamp(value: number, min: number, max: number): number {
     if (value < min) return min;
@@ -142,8 +153,6 @@ export function SketchCanvas({
     backEdge,
     edgeDiagnostics = {},
     edgeSummaries = {},
-    layoutWarnings = [],
-    suggestions = [],
     camera = DEFAULT_CAMERA,
     selection,
     uiDensity = 'desktop',
@@ -157,7 +166,6 @@ export function SketchCanvas({
     onResizeCommit,
     onSelectEdge,
     onSelectSection,
-    onApplySuggestion,
     onCameraChange,
     onChangeMode,
     onPlaceParasol,
@@ -166,7 +174,6 @@ export function SketchCanvas({
     onPlaceFiesta,
     onSelectFiesta,
     onMoveFiesta,
-    onReset
 }: SketchCanvasProps) {
     const svgRef = useRef<SVGSVGElement | null>(null);
     const [activeDrag, setActiveDrag] = useState<ActiveDrag | null>(null);
@@ -234,15 +241,22 @@ export function SketchCanvas({
     );
 
     const selectedEdge = selection?.edgeKey || null;
-    const selectedEdgeSuggestions = useMemo(
-        () => suggestions.filter((suggestion) => suggestion.edge === selectedEdge),
-        [suggestions, selectedEdge]
-    );
-
-    const criticalWarnings = useMemo(
-        () => layoutWarnings.filter((warning) => warning.level === 'critical'),
-        [layoutWarnings]
-    );
+    const activeSelectionLabel = useMemo(() => {
+        if (activeMode === 'parasol') {
+            return selectedParasolId ? 'Markerat parasoll' : 'Ingen markerad parasoll';
+        }
+        if (activeMode === 'fiesta') {
+            return selectedFiestaId ? 'Markerad Fiesta' : 'Ingen markerad Fiesta';
+        }
+        if (!selectedEdge) {
+            return 'Ingen markerad kant';
+        }
+        const edgeLabel = EDGE_LABELS[selectedEdge] || selectedEdge;
+        if (selection?.segmentIndex === null || selection?.segmentIndex === undefined) {
+            return `Vald kant: ${edgeLabel}`;
+        }
+        return `${edgeLabel} · segment ${selection.segmentIndex + 1}`;
+    }, [activeMode, selectedEdge, selectedFiestaId, selectedParasolId, selection?.segmentIndex]);
 
     const emitCamera = useCallback(
         (nextCamera) => {
@@ -281,6 +295,32 @@ export function SketchCanvas({
         },
         [activeCamera, emitCamera, totalWidth, totalHeight]
     );
+
+    const setCenteredZoom = useCallback((targetZoom) => {
+        const nextZoom = clamp(targetZoom, 0.55, 3.5);
+        const centerX = activeCamera.panX + viewWidth / 2;
+        const centerY = activeCamera.panY + viewHeight / 2;
+        const nextViewWidth = totalWidth / nextZoom;
+        const nextViewHeight = totalHeight / nextZoom;
+
+        emitCamera({
+            zoom: nextZoom,
+            panX: centerX - nextViewWidth / 2,
+            panY: centerY - nextViewHeight / 2
+        });
+    }, [activeCamera.panX, activeCamera.panY, emitCamera, totalHeight, totalWidth, viewHeight, viewWidth]);
+
+    const handleZoomIn = useCallback(() => {
+        setCenteredZoom(activeCamera.zoom * 1.15);
+    }, [activeCamera.zoom, setCenteredZoom]);
+
+    const handleZoomOut = useCallback(() => {
+        setCenteredZoom(activeCamera.zoom / 1.15);
+    }, [activeCamera.zoom, setCenteredZoom]);
+
+    const handleFitView = useCallback(() => {
+        emitCamera(DEFAULT_CAMERA);
+    }, [emitCamera]);
 
     const beginResize = useCallback(
         (edgeId, event) => {
@@ -784,6 +824,11 @@ export function SketchCanvas({
         const isInvalid = diagnostics?.valid === false;
         const isSelected = selectedEdge === edgeKey;
         const objects = [];
+        const selectWholeEdge = (event) => {
+            event.stopPropagation();
+            onSelectEdge?.(edgeKey);
+            onSelectSection?.(edgeKey, null);
+        };
 
         let cx = startX;
         let cy = startY;
@@ -797,6 +842,8 @@ export function SketchCanvas({
                 fill={isInvalid ? 'rgba(239,68,68,0.35)' : 'rgba(15,23,42,0.9)'}
                 stroke={isSelected ? '#3b82f6' : 'rgba(148,163,184,0.4)'}
                 strokeWidth={isSelected ? 34 : 24}
+                style={{ cursor: 'pointer' }}
+                onClick={selectWholeEdge}
             />
         );
 
@@ -839,6 +886,8 @@ export function SketchCanvas({
                     fill={isInvalid ? 'rgba(239,68,68,0.35)' : 'rgba(15,23,42,0.9)'}
                     stroke={isSelected ? '#3b82f6' : 'rgba(148,163,184,0.4)'}
                     strokeWidth={isSelected ? 34 : 24}
+                    style={{ cursor: 'pointer' }}
+                    onClick={selectWholeEdge}
                 />
             );
         });
@@ -860,6 +909,8 @@ export function SketchCanvas({
                     stroke="rgba(148,163,184,0.65)"
                     strokeWidth={20}
                     rx="10"
+                    style={{ cursor: 'pointer' }}
+                    onClick={selectWholeEdge}
                 />
             );
         }
@@ -1088,18 +1139,15 @@ export function SketchCanvas({
     };
 
     return (
-        <div id="sketchCanvasContainer" className="bg-panel-bg border border-panel-border rounded-xl p-4 space-y-3 text-text-primary">
-            <div className="flex flex-wrap items-center justify-between gap-3 text-sm" data-html2canvas-ignore="true">
-                <div className="flex items-center gap-4">
-                    <div className="text-text-secondary">
-                        Zoom: <b className="text-text-primary">{activeCamera.zoom.toFixed(2)}x</b>
-                    </div>
-                    <div className="flex items-center gap-2">
+        <div id="sketchCanvasContainer" className="bg-panel-bg border border-panel-border rounded-xl p-4 space-y-2 text-text-primary">
+            <div className="space-y-2" data-html2canvas-ignore="true">
+                <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
+                    <div className="flex flex-wrap items-center gap-1.5">
                         <button
                             type="button"
                             aria-pressed={activeMode === 'clickitup'}
                             onClick={() => onChangeMode && onChangeMode('clickitup')}
-                            className={`h-8 px-3.5 rounded-md border text-xs font-semibold tracking-wide transition-all ${activeMode === 'clickitup'
+                            className={`h-8 px-3 rounded-md border text-xs font-semibold tracking-wide transition-all ${activeMode === 'clickitup'
                                 ? 'bg-primary/95 text-white border-blue-200/60 shadow-[0_0_0_1px_rgba(191,219,254,0.55),0_8px_18px_rgba(37,99,235,0.35)]'
                                 : 'bg-blue-900/20 text-blue-300 border-blue-800/50 hover:text-white hover:border-blue-500/60 hover:bg-blue-800/40'
                                 }`}
@@ -1110,7 +1158,7 @@ export function SketchCanvas({
                             type="button"
                             aria-pressed={activeMode === 'parasol'}
                             onClick={() => onChangeMode && onChangeMode('parasol')}
-                            className={`h-8 px-3.5 rounded-md border text-xs font-semibold tracking-wide transition-all ${activeMode === 'parasol'
+                            className={`h-8 px-3 rounded-md border text-xs font-semibold tracking-wide transition-all ${activeMode === 'parasol'
                                 ? 'bg-emerald-600/95 text-white border-emerald-300/60 shadow-[0_0_0_1px_rgba(110,231,183,0.55),0_8px_18px_rgba(5,150,105,0.35)]'
                                 : 'bg-emerald-900/20 text-emerald-300 border-emerald-800/50 hover:text-white hover:border-emerald-500/60 hover:bg-emerald-800/40'
                                 }`}
@@ -1121,35 +1169,47 @@ export function SketchCanvas({
                             type="button"
                             aria-pressed={activeMode === 'fiesta'}
                             onClick={() => onChangeMode && onChangeMode('fiesta')}
-                            className={`h-8 px-3.5 rounded-md border text-xs font-semibold tracking-wide transition-all ${activeMode === 'fiesta'
+                            className={`h-8 px-3 rounded-md border text-xs font-semibold tracking-wide transition-all ${activeMode === 'fiesta'
                                 ? 'bg-amber-500/95 text-white border-amber-200/60 shadow-[0_0_0_1px_rgba(253,230,138,0.55),0_8px_18px_rgba(217,119,6,0.35)]'
                                 : 'bg-amber-900/20 text-amber-300 border-amber-800/50 hover:text-white hover:border-amber-500/60 hover:bg-amber-800/40'
                                 }`}
                         >
                             Fiesta
                         </button>
+                        <span className="rounded-full border border-panel-border bg-input-bg px-2.5 py-1 text-xs font-medium text-text-primary">
+                            {activeSelectionLabel}
+                        </span>
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-1.5">
+                        <button
+                            type="button"
+                            onClick={handleZoomOut}
+                            className="h-8 px-3 rounded-md border border-panel-border bg-input-bg text-xs font-semibold text-text-primary hover:bg-white/5 transition-colors"
+                        >
+                            Zoom -
+                        </button>
+                        <button
+                            type="button"
+                            onClick={handleZoomIn}
+                            className="h-8 px-3 rounded-md border border-panel-border bg-input-bg text-xs font-semibold text-text-primary hover:bg-white/5 transition-colors"
+                        >
+                            Zoom +
+                        </button>
+                        <button
+                            type="button"
+                            onClick={handleFitView}
+                            className="h-8 px-3 rounded-md border border-panel-border bg-input-bg text-xs font-semibold text-text-primary hover:bg-white/5 transition-colors"
+                        >
+                            Anpassa vy
+                        </button>
+                        <span className="text-xs text-text-secondary">
+                            Zoom: <b className="text-text-primary">{activeCamera.zoom.toFixed(2)}x</b>
+                        </span>
                     </div>
                 </div>
 
-                <div className="flex items-center gap-6">
-                    <div className="flex items-center gap-4">
-                        <div className="text-text-secondary">
-                            Aktiv kant: <b className="text-text-primary">{selectedEdge || 'Ingen'}</b>
-                        </div>
-                        {onReset && (
-                            <button
-                                onClick={onReset}
-                                className="px-3 py-1.5 rounded-md text-xs font-semibold tracking-wide border border-red-900/50 bg-red-950/20 text-red-300 hover:text-white hover:border-red-500/60 hover:bg-red-800/40 transition-colors"
-                            >
-                                Återställ ritning
-                            </button>
-                        )}
-                    </div>
-
-                    <div className="text-text-secondary">
-                        Kritiska varningar: <b className="text-text-primary">{criticalWarnings.length}</b>
-                    </div>
-                </div>
+                <p className="m-0 px-0.5 text-xs text-text-secondary">{MODE_HELP_TEXT[activeMode]}</p>
             </div>
 
             <svg
@@ -1232,22 +1292,6 @@ export function SketchCanvas({
                 )}
             </svg>
 
-            {selectedEdgeSuggestions.length > 0 && (
-                <div className="bg-input-bg border border-panel-border rounded-lg p-3">
-                    <p className="text-xs uppercase font-semibold text-text-secondary m-0 mb-2">Förslag för vald kant</p>
-                    <div className="flex flex-wrap gap-2">
-                        {selectedEdgeSuggestions.slice(0, 4).map((suggestion) => (
-                            <button
-                                key={suggestion.id}
-                                onClick={() => onApplySuggestion?.(suggestion.id)}
-                                className="px-3 py-1.5 rounded-md text-xs border border-panel-border bg-panel-bg text-text-primary hover:bg-white/5"
-                            >
-                                {suggestion.text}
-                            </button>
-                        ))}
-                    </div>
-                </div>
-            )}
         </div>
     );
 }

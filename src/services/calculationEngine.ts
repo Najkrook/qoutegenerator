@@ -1,4 +1,5 @@
 import { buildEffectiveGridSelections } from '../utils/gridAutoScale';
+import { DEFAULT_UNKNOWN_ADDON_NAME, formatAddonLabel } from '../utils/addonLabels';
 import type { CatalogData, GridAddonState, QuoteState, QuoteTotalsResult, QuoteTotalsRow } from '../types/contracts';
 
 const ADDONS_ONLY_SIZE = '__addons_only__';
@@ -245,7 +246,7 @@ export function computeQuoteTotals({
                 const addonGross = addonUnitPrice * addonQty;
                 const addonDiscountSek = addonGross * (addonDiscountPct / 100);
                 const addonNet = addonGross - addonDiscountSek;
-                const defaultCustomAddonLabel = `  + Tillval: ${String(addon?.name || '').trim() || 'Egen rad'}`;
+                const defaultCustomAddonLabel = formatAddonLabel(addon?.name);
 
                 grossTotalSek += addonGross;
                 totalDiscountSek += addonDiscountSek;
@@ -283,7 +284,7 @@ export function computeQuoteTotals({
             const addonGross = addonUnitPrice * addonQty;
             const addonDiscountSek = addonGross * (addonDiscountPct / 100);
             const addonNet = addonGross - addonDiscountSek;
-            const defaultAddonLabel = `  + Tillval: ${addonDef?.name || addon?.id || 'Okant tillval'}`;
+            const defaultAddonLabel = formatAddonLabel(addonDef?.name || addon?.id, DEFAULT_UNKNOWN_ADDON_NAME);
 
             grossTotalSek += addonGross;
             totalDiscountSek += addonDiscountSek;
@@ -369,7 +370,7 @@ export function computeQuoteTotals({
             totalDiscountSek += discountSek;
 
             totals.push({
-                model: `  + Tillval: ${addonDef?.name || addonId}`,
+                model: formatAddonLabel(addonDef?.name || addonId, DEFAULT_UNKNOWN_ADDON_NAME),
                 size: '-',
                 unitPrice,
                 qty,
@@ -443,7 +444,7 @@ export function computeQuoteTotals({
                 totalDiscountSek += discountSek;
 
                 totals.push({
-                    model: `  + Tillval: ${String(row?.name || '').trim() || 'Egen rad'}`,
+                    model: formatAddonLabel(row?.name),
                     size: '-',
                     unitPrice,
                     qty,
@@ -485,7 +486,7 @@ export function computeQuoteTotals({
                 totalDiscountSek += discountSek;
 
                 totals.push({
-                    model: `  + Tillval: ${String(row?.name || '').trim() || 'Egen rad'}`,
+                    model: formatAddonLabel(row?.name),
                     size: '-',
                     unitPrice,
                     qty,

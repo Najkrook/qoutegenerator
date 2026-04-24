@@ -64,8 +64,18 @@ vi.mock('../src/components/features/SketchCanvas', () => ({
 }));
 
 vi.mock('../src/components/features/SketchConfig', () => ({
-    SketchConfig: () => React.createElement('div', null, 'SketchConfigMock')
+    SketchConfig: () => React.createElement('div', null, 'SketchConfigMock'),
+    SketchSetupPanel: () => React.createElement('div', null, 'SketchSetupPanelMock'),
+    SketchInspectorPanel: () => React.createElement('div', null, 'SketchInspectorPanelMock')
 }));
+
+vi.mock('../src/components/features/SketchBom', async (importOriginal) => {
+    const actual = await importOriginal();
+    return {
+        ...actual,
+        SketchReviewPanel: () => React.createElement('div', null, 'SketchReviewPanelMock')
+    };
+});
 
 vi.mock('../src/components/features/StockComparisonModal', () => ({
     StockComparisonModal: () => null
@@ -436,8 +446,12 @@ describe('UI text smoke', () => {
         const html = renderWithProviders(<SketchTool onBack={() => {}} />);
 
         expect(html).toContain('Rita Uteservering');
-        expect(html).toContain('Gå till offert');
-        expect(html).toContain('Förslag');
+        expect(html).toContain('Till offert');
+        expect(html).toContain('SketchSetupPanelMock');
+        expect(html).toContain('SketchReviewPanelMock');
+        expect(html).toContain('xl:grid-cols-[308px_minmax(0,1fr)_340px]');
+        expect(html).toContain('hidden xl:flex xl:flex-col xl:gap-4 xl:self-start');
+        expect(html).toContain('space-y-3 xl:hidden');
     });
 
     it('renders SummaryExport labels for save, preview, and export actions', () => {

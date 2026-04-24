@@ -89,7 +89,7 @@ describe('computeQuoteTotals', () => {
         const customRow = summary.totals.find((row) => row.source.type === 'builder-custom-addon');
 
         expect(customRow).toMatchObject({
-            model: '  + Tillval: Speciallack',
+            model: 'Tillval: Speciallack',
             unitPrice: 500,
             qty: 2,
             gross: 1000,
@@ -135,7 +135,7 @@ describe('computeQuoteTotals', () => {
         const summary = computeQuoteTotals({ state, catalogData: createCatalogFixture() });
         const customRow = summary.totals.find((row) => row.source.type === 'builder-custom-addon');
 
-        expect(customRow.model).toBe('  + Tillval: Egen rad');
+        expect(customRow.model).toBe('Tillval: Egen rad');
     });
 
     it('uses builder displayName overrides for main rows', () => {
@@ -249,7 +249,7 @@ describe('computeQuoteTotals', () => {
         const summary = computeQuoteTotals({ state, catalogData: createCatalogFixture() });
 
         expect(summary.totals[0].model).toBe('BaHaMa Jumbrella');
-        expect(summary.totals[1].model).toBe('  + Tillval: Varmare');
+        expect(summary.totals[1].model).toBe('Tillval: Varmare');
     });
 
     it('supports zero quantities, full discounts, and decimal exchange rates', () => {
@@ -770,7 +770,7 @@ describe('computeQuoteTotals', () => {
         const customRow = summary.totals.find((row) => row.source.type === 'grid-custom-addon');
 
         expect(customRow).toMatchObject({
-            model: '  + Tillval: Specialdörr',
+            model: 'Tillval: Specialdörr',
             unitPrice: 1500,
             qty: 2,
             gross: 3000,
@@ -808,6 +808,6 @@ describe('computeQuoteTotals', () => {
         const summary = computeQuoteTotals({ state, catalogData: createCatalogFixture() });
         const customRow = summary.totals.find((row) => row.source.type === 'grid-custom-addon');
 
-        expect(customRow.model).toBe('  + Tillval: Egen rad');
+        expect(customRow.model).toBe('Tillval: Egen rad');
     });
 });

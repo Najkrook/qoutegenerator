@@ -1406,6 +1406,32 @@ export interface SketchCanvasProps {
     onReset?: () => void;
 }
 
+export interface SketchSetupPanelProps {
+    config: SketchConfigState;
+    onChange: (partial: Partial<SketchConfigState>) => void;
+    edgeSummaries?: Partial<Record<SketchEdgeKey, EdgeSummary>>;
+    onSetSectionCount?: (edgeKey: SketchEdgeKey, count: number) => void;
+    onClearSectionCount?: (edgeKey: SketchEdgeKey) => void;
+}
+
+export interface SketchInspectorPanelProps {
+    config: SketchConfigState;
+    onChange: (partial: Partial<SketchConfigState>) => void;
+    selectedEdge: SketchEdgeKey | null;
+    selectedSegmentIndex: number | null;
+    edgeSummaries?: Partial<Record<SketchEdgeKey, EdgeSummary>>;
+    suggestions?: LayoutSuggestion[];
+    onSetManualPin?: (edgeKey: SketchEdgeKey, segmentIndex: number, size: number | null) => void;
+    onClearManualPins?: (edgeKey: SketchEdgeKey) => void;
+    onConvertSegmentToDoor?: (edgeKey: SketchEdgeKey, segmentIndex: number, size: number) => void;
+    onSetDoorSegmentSize?: (edgeKey: SketchEdgeKey, segmentIndex: number, size: number) => void;
+    onResetDoorSegment?: (edgeKey: SketchEdgeKey, segmentIndex: number) => void;
+    onApplySuggestion?: (suggestionId: string) => void;
+    onDeleteParasol?: (id: string) => void;
+    onRotateParasol?: (id: string, rotationDeg: 0 | 90) => void;
+    onDeleteFiesta?: (id: string) => void;
+}
+
 export interface SketchConfigProps {
     config: SketchConfigState;
     onChange: (partial: Partial<SketchConfigState>) => void;
@@ -1423,6 +1449,40 @@ export interface SketchConfigProps {
     onDeleteFiesta?: (id: string) => void;
     onSetSectionCount?: (edgeKey: SketchEdgeKey, count: number) => void;
     onClearSectionCount?: (edgeKey: SketchEdgeKey) => void;
+}
+
+export interface SketchReviewRow {
+    id: string;
+    label: string;
+    qty: number;
+    tone?: 'default' | 'secondary';
+}
+
+export interface SketchReviewState {
+    health: 'ready' | 'attention' | 'blocked';
+    healthLabel: string;
+    healthText: string;
+    criticalWarnings: LayoutWarning[];
+    recommendationWarnings: LayoutWarning[];
+    suggestions: LayoutSuggestion[];
+    invalidEdges: Array<[SketchEdgeKey, EdgeDiagnostic]>;
+    autoAdjustedEdges: Array<[SketchEdgeKey, EdgeDiagnostic]>;
+    parasolWarnings: Array<{ id: string; text: string }>;
+    materialRows: SketchReviewRow[];
+    totalGlassLength: number;
+    sectionCount: number;
+    parasolCount: number;
+    fiestaCount: number;
+    exportReady: boolean;
+    hasInvalidEdges: boolean;
+}
+
+export interface SketchReviewPanelProps {
+    reviewState: SketchReviewState;
+    canExportToQuote?: boolean;
+    onApplySuggestion?: (suggestionId: string) => void;
+    onExport?: () => void;
+    onExportImage?: () => void;
 }
 
 export interface SketchBomProps {

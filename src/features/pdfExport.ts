@@ -44,10 +44,17 @@ function getPdfPageCount(doc: JsPdfDocument): number {
 }
 
 function formatSek(value: number): string {
+    const roundedValue = Math.round(value);
+    const safeValue = Object.is(roundedValue, -0) ? 0 : roundedValue;
+
     return new Intl.NumberFormat('sv-SE', {
         minimumFractionDigits: 0,
         maximumFractionDigits: 0
-    }).format(value);
+    })
+        .format(safeValue)
+        // jsPDF's built-in fonts can mangle Unicode minus signs in negative values.
+        .replace(/\u2212/g, '-')
+        .replace(/\u00A0/g, ' ');
 }
 
 function createPdfDocument(): JsPdfDocument {

@@ -25,6 +25,14 @@ if (typeof window !== 'undefined') {
     window.fetch = globalThis.fetch;
 }
 
+const firebaseMocks = vi.hoisted(() => ({
+    db: {},
+    doc: vi.fn(() => ({})),
+    getDoc: vi.fn(async () => ({ exists: () => false, data: () => ({}) }))
+}));
+
+vi.mock('../src/services/firebase', () => firebaseMocks);
+
 vi.mock('../src/views/Dashboard', () => ({
     Dashboard: () => <div>DashboardView</div>
 }));

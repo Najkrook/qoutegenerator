@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback, useRef } from 'react';
+import { useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import { useQuote } from '../store/QuoteContext';
 import { useAuth } from '../store/AuthContext';
 import {
@@ -27,8 +27,8 @@ import {
 import { downloadBlob, saveBlobWithPicker } from '../utils/fileUtils';
 import { buildSketchExportState } from '../features/sketchExportState';
 import { SketchCanvas } from '../components/features/SketchCanvas';
-import { SketchConfig } from '../components/features/SketchConfig';
-import { SketchBom } from '../components/features/SketchBom';
+import { SketchInspectorPanel, SketchSetupPanel } from '../components/features/SketchConfig';
+import { SketchReviewPanel } from '../components/features/SketchBom';
 import { StockComparisonModal } from '../components/features/StockComparisonModal';
 import toast from 'react-hot-toast';
 import { safeLogActivity } from '../services/activityLogService';
@@ -48,6 +48,7 @@ import type {
     SketchDensity,
     SketchDraftStatePatch,
     SketchEdgeKey,
+    SketchReviewState,
     SketchSectionEntry,
     SketchToolProps,
     SketchWorkspace
@@ -356,6 +357,66 @@ function warnIfActivityLogFailed(result: { ok?: boolean } | null | undefined, me
     }
 }
 
+function buildMaterialRows(layout: ComputedLayoutResult, parasols: PlacedParasol[] = [], fiestaItems: PlacedFiesta[] = []): SketchReviewState['materialRows'] {
+    const keys = Object.keys(layout.counts || {});
+    const doorKeys = keys
+        .filter((key) => String(key).includes('Dörr'))
+        .sort((a, b) => Number.parseInt(b, 10) - Number.parseInt(a, 10));
+    const sectionKeys = keys
+        .filter((key) => !String(key).includes('Dörr'))
+        .sort((a, b) => Number.parseFloat(b) - Number.parseFloat(a));
+
+    const rows: SketchReviewState['materialRows'] = [...doorKeys, ...sectionKeys].map((key) => ({
+        id: key,
+        label: String(key).includes('Dörr') ? key : `ClickitUp Sektion ${key} mm`,
+        qty: layout.counts[key],
+        tone: 'default' as const
+    }));
+
+    if (layout.slimlineCount > 0) {
+        rows.push({
+            id: 'slimline',
+            label: 'Slimline (stöd för dörr)',
+            qty: layout.slimlineCount,
+            tone: 'secondary' as const
+        });
+    }
+
+    if (layout.stodbenCount > 0) {
+        rows.push({
+            id: 'stodben',
+            label: 'Stödben 45° (för fri ände)',
+            qty: layout.stodbenCount,
+            tone: 'secondary' as const
+        });
+    }
+
+    const parasolCounts = parasols.reduce<Record<string, number>>((acc, parasol) => {
+        acc[parasol.label] = (acc[parasol.label] || 0) + 1;
+        return acc;
+    }, {});
+
+    Object.keys(parasolCounts).sort().forEach((label) => {
+        rows.push({
+            id: `parasol-${label}`,
+            label: `Parasoll ${label}`,
+            qty: parasolCounts[label],
+            tone: 'default' as const
+        });
+    });
+
+    if (fiestaItems.length > 0) {
+        rows.push({
+            id: 'fiesta',
+            label: 'Fiesta 70 cm',
+            qty: fiestaItems.length,
+            tone: 'default' as const
+        });
+    }
+
+    return rows;
+}
+
 export function SketchTool({ onBack, onExportToQuoteComplete }: SketchToolProps) {
     const { state, dispatch } = useQuote();
     const { user, canExportSketchToQuote } = useAuth();
@@ -368,6 +429,7 @@ export function SketchTool({ onBack, onExportToQuoteComplete }: SketchToolProps)
 
     const [showStockModal, setShowStockModal] = useState(false);
     const [dragPreview, setDragPreview] = useState<DragPreview | null>(null);
+    const [activeSidebarTab, setActiveSidebarTab] = useState<'inspector' | 'review'>('inspector');
 
     const updateConfig = useCallback((partial: Partial<SketchConfigState>) => {
         setConfig((prev) => {
@@ -486,7 +548,6 @@ export function SketchTool({ onBack, onExportToQuoteComplete }: SketchToolProps)
     );
 
     const canExport = layout.allSections.length > 0 || (config.parasols || []).length > 0 || (config.fiestaItems || []).length > 0;
-
     const handleResizePreview = useCallback((dims) => {
         if (!dims || Object.keys(dims).length === 0) {
             setDragPreview(null);
@@ -514,7 +575,7 @@ export function SketchTool({ onBack, onExportToQuoteComplete }: SketchToolProps)
     const handleSelectEdge = useCallback((edgeKey) => {
         setWorkspace((prev) => ({
             ...prev,
-            selection: { ...prev.selection, edgeKey }
+            selection: { edgeKey, segmentIndex: null }
         }));
     }, []);
 
@@ -593,12 +654,63 @@ export function SketchTool({ onBack, onExportToQuoteComplete }: SketchToolProps)
         [config.width, config.depth, config.depthLeft, config.depthRight, config.equalDepth]
     );
 
+    const sketchReviewState = useMemo<SketchReviewState>(() => {
+        const materialRows = buildMaterialRows(layout, config.parasols || [], config.fiestaItems || []);
+        const health = criticalWarnings.length > 0 || invalidEdges.length > 0
+            ? 'blocked'
+            : (warningWarnings.length > 0 || autoAdjustedEdges.length > 0 || parasolWarnings.length > 0 || layout.suggestions.length > 0)
+                ? 'attention'
+                : 'ready';
+
+        const healthLabel = health === 'blocked'
+            ? 'Kräver åtgärd'
+            : health === 'attention'
+                ? 'Behöver översyn'
+                : 'Redo';
+
+        const healthText = health === 'blocked'
+            ? 'Layouten har blockerande problem som bör granskas innan export.'
+            : health === 'attention'
+                ? 'Layouten är exportbar men har rekommendationer eller autojusteringar att granska.'
+                : 'Layouten ser klar ut och kan exporteras direkt.';
+
+        return {
+            health,
+            healthLabel,
+            healthText,
+            criticalWarnings,
+            recommendationWarnings: warningWarnings,
+            suggestions: layout.suggestions || [],
+            invalidEdges,
+            autoAdjustedEdges,
+            parasolWarnings,
+            materialRows,
+            totalGlassLength: layout.totalGlassLength,
+            sectionCount: layout.allSections.length,
+            parasolCount: (config.parasols || []).length,
+            fiestaCount: (config.fiestaItems || []).length,
+            exportReady: canExport,
+            hasInvalidEdges: layout.hasInvalidEdges
+        };
+    }, [
+        autoAdjustedEdges,
+        canExport,
+        config.fiestaItems,
+        config.parasols,
+        criticalWarnings,
+        invalidEdges,
+        layout,
+        parasolWarnings,
+        warningWarnings
+    ]);
+
     const handleChangeMode = useCallback((mode) => {
         updateConfig({
             activeMode: mode,
             selectedParasolId: mode === 'parasol' ? config.selectedParasolId : null,
             selectedFiestaId: mode === 'fiesta' ? config.selectedFiestaId : null
         });
+        setActiveSidebarTab('inspector');
     }, [config.selectedFiestaId, config.selectedParasolId, updateConfig]);
 
     const handlePlaceParasol = useCallback((xMm, yMm) => {
@@ -728,6 +840,18 @@ export function SketchTool({ onBack, onExportToQuoteComplete }: SketchToolProps)
             selectedFiestaId: config.selectedFiestaId === id ? null : config.selectedFiestaId
         });
     }, [config.fiestaItems, config.selectedFiestaId, updateConfig]);
+
+    useEffect(() => {
+        const hasFocusedSelection = Boolean(
+            config.selectedParasolId ||
+            config.selectedFiestaId ||
+            workspace.selection.segmentIndex !== null ||
+            workspace.selection.edgeKey
+        );
+        if (hasFocusedSelection) {
+            setActiveSidebarTab('inspector');
+        }
+    }, [config.selectedFiestaId, config.selectedParasolId, workspace.selection.edgeKey, workspace.selection.segmentIndex]);
 
     const handleExportClick = () => {
         if (!canExportSketchToQuote) {
@@ -972,28 +1096,62 @@ export function SketchTool({ onBack, onExportToQuoteComplete }: SketchToolProps)
     }, [config, dispatch, onBack, workspace]);
 
     return (
-        <div className="animate-slide-in space-y-6">
-            <div className="flex justify-between items-center">
-                <div>
-                    <h2 className="text-3xl font-semibold text-text-primary m-0">Rita Uteservering</h2>
-                    <p className="text-text-secondary mt-1 m-0">
-                        Skissa en rektangel och beräkna optimala ClickitUp-sektioner automatiskt.
-                    </p>
-                </div>
-                <div className="flex items-center gap-3">
+        <div className="animate-slide-in space-y-5">
+            <div className="sticky top-4 z-20 rounded-2xl border border-panel-border bg-panel-bg/95 p-3 shadow-lg backdrop-blur md:p-4">
+                <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
+                    <div className="space-y-1">
+                        <h2 className="text-3xl font-semibold text-text-primary m-0">Rita Uteservering</h2>
+                        <p className="text-text-secondary m-0">
+                            Skissa en rektangel och beräkna optimala ClickitUp-sektioner automatiskt.
+                        </p>
+                    </div>
 
-                    <button
-                        onClick={handleBackClick}
-                        className="px-5 py-2 border border-panel-border bg-panel-bg text-text-primary rounded-lg cursor-pointer hover:bg-white/5 shadow-sm"
-                    >
-                        Gå till offert
-                    </button>
+                    <div className="flex flex-wrap items-center gap-2 xl:justify-end">
+                        <span
+                            className={`rounded-full border px-3 py-1 text-xs font-semibold ${sketchReviewState.health === 'blocked'
+                                ? 'border-danger/50 text-danger bg-danger/10'
+                                : sketchReviewState.health === 'attention'
+                                    ? 'border-amber-400/40 text-amber-200 bg-amber-500/10'
+                                    : 'border-success/40 text-success bg-success/10'
+                                }`}
+                        >
+                            {sketchReviewState.healthLabel}
+                        </span>
+                        <button
+                            onClick={handleBackClick}
+                            className="h-10 px-4 border border-panel-border bg-panel-bg text-text-primary rounded-lg cursor-pointer hover:bg-white/5 transition-colors"
+                        >
+                            Till offert
+                        </button>
+                        <div className="flex flex-wrap items-center gap-2">
+                            <button
+                                onClick={handleExportImage}
+                                disabled={!canExport}
+                                className="h-10 px-4 border border-panel-border bg-panel-bg text-text-primary rounded-lg cursor-pointer hover:bg-white/5 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                            >
+                                Ladda ner bild
+                            </button>
+                            <button
+                                onClick={resetSketch}
+                                className="h-10 px-4 border border-red-900/50 bg-red-950/20 text-red-300 rounded-lg cursor-pointer hover:text-white hover:border-red-500/60 hover:bg-red-800/40 transition-colors"
+                            >
+                                Återställ
+                            </button>
+                        </div>
+                        <button
+                            onClick={handleExportClick}
+                            disabled={!canExport || !canExportSketchToQuote}
+                            className="h-10 px-4 bg-primary text-white border-none rounded-lg cursor-pointer font-semibold hover:brightness-110 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+                        >
+                            Exportera till offert
+                        </button>
+                    </div>
                 </div>
             </div>
 
             {criticalWarnings.length > 0 && (
-                <div className="p-4 rounded-lg border border-danger/40 bg-danger/10 text-danger text-sm">
-                    <p className="font-semibold m-0 mb-1">Kritiska varningar ({criticalWarnings.length})</p>
+                <div className="rounded-2xl border border-danger/40 bg-danger/10 px-4 py-3 text-danger text-sm">
+                    <p className="font-semibold m-0 mb-1">Blockerande problem ({criticalWarnings.length})</p>
                     <ul className="m-0 pl-5 space-y-1">
                         {criticalWarnings.map((warning) => (
                             <li key={warning.id}>{warning.text}</li>
@@ -1002,78 +1160,18 @@ export function SketchTool({ onBack, onExportToQuoteComplete }: SketchToolProps)
                 </div>
             )}
 
-            {warningWarnings.length > 0 && (
-                <div className="p-4 rounded-lg border border-amber-400/40 bg-amber-500/10 text-amber-200 text-sm">
-                    <p className="font-semibold m-0 mb-1">Rekommendationer ({warningWarnings.length})</p>
-                    <ul className="m-0 pl-5 space-y-1">
-                        {warningWarnings.map((warning) => (
-                            <li key={warning.id}>{warning.text}</li>
-                        ))}
-                    </ul>
-                </div>
-            )}
-
-            <div className="grid grid-cols-1 xl:grid-cols-[360px_1fr] gap-6">
-                <div className="space-y-6">
-                    <SketchConfig
+            <div className="grid grid-cols-1 items-start gap-4 xl:grid-cols-[308px_minmax(0,1fr)_340px] xl:gap-4 2xl:gap-5">
+                <div className="space-y-5 xl:self-start">
+                    <SketchSetupPanel
                         config={config}
                         onChange={updateConfig}
-                        selectedEdge={workspace.selection.edgeKey}
-                        selectedSegmentIndex={workspace.selection.segmentIndex}
-                        onSelectEdge={handleSelectEdge}
-                        onSetManualPin={setManualPin}
-                        onClearManualPins={clearManualPins}
-                        onConvertSegmentToDoor={setDoorSegmentSize}
-                        onSetDoorSegmentSize={setDoorSegmentSize}
-                        onResetDoorSegment={resetDoorSegment}
                         edgeSummaries={layout.edgeSummaries}
-                        onDeleteParasol={handleDeleteParasol}
-                        onRotateParasol={handleRotateParasol}
-                        onDeleteFiesta={handleDeleteFiesta}
                         onSetSectionCount={setSectionCount}
                         onClearSectionCount={clearSectionCount}
                     />
-
-                    <div className="bg-panel-bg border border-panel-border rounded-xl p-5">
-                        <h3 className="text-lg font-semibold text-text-primary m-0 mb-3">Förslag</h3>
-                        {layout.suggestions.length === 0 ? (
-                            <p className="text-sm text-text-secondary m-0">Inga aktiva förslag just nu.</p>
-                        ) : (
-                            <div className="space-y-2">
-                                {layout.suggestions.slice(0, 8).map((suggestion) => (
-                                    <button
-                                        key={suggestion.id}
-                                        onClick={() => applySuggestion(suggestion.id)}
-                                        className="w-full text-left p-3 rounded-lg border border-panel-border bg-input-bg hover:bg-white/5 transition-colors"
-                                    >
-                                        <span className="block text-sm text-text-primary">{suggestion.text}</span>
-                                        <span className="block text-xs text-text-secondary mt-1">
-                                            {EDGE_LABELS[suggestion.edge] || suggestion.edge} · prioritet {suggestion.priority}
-                                        </span>
-                                    </button>
-                                ))}
-                            </div>
-                        )}
-                    </div>
-
-                    <SketchBom
-                        counts={layout.counts}
-                        totalGlassLength={layout.totalGlassLength}
-                        slimlineCount={layout.slimlineCount}
-                        stodbenCount={layout.stodbenCount}
-                        hasInvalidEdges={layout.hasInvalidEdges}
-                        invalidEdges={invalidEdges}
-                        autoAdjustedEdges={autoAdjustedEdges}
-                        parasols={config.parasols}
-                        fiestaItems={config.fiestaItems}
-                        parasolWarnings={parasolWarnings}
-                        canExportToQuote={canExportSketchToQuote}
-                        onExport={handleExportClick}
-                        onExportImage={handleExportImage}
-                    />
                 </div>
 
-                <div className="xl:sticky xl:top-4 xl:self-start space-y-4">
+                <div className="min-w-0 space-y-2">
                     <SketchCanvas
                         activeMode={config.activeMode}
                         parasols={config.parasols}
@@ -1106,19 +1204,18 @@ export function SketchTool({ onBack, onExportToQuoteComplete }: SketchToolProps)
                         uiDensity={workspace.uiDensity}
                         onSelectEdge={handleSelectEdge}
                         onSelectSection={(edgeKey, segmentIndex) => {
+                            setActiveSidebarTab('inspector');
                             setWorkspace((prev) => ({
                                 ...prev,
                                 selection: { edgeKey, segmentIndex }
                             }));
                         }}
-                        onApplySuggestion={applySuggestion}
                         onCameraChange={handleCameraChange}
                         onResizePreview={handleResizePreview}
                         onResizeCommit={handleResizeCommit}
-                        onReset={resetSketch}
                     />
 
-                    <div className="flex flex-wrap justify-center gap-4 text-sm text-text-secondary">
+                    <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1 rounded-xl border border-panel-border bg-panel-bg/70 px-4 py-2 text-xs text-text-secondary">
                         <span>
                             Bredd: <b className="text-text-primary">{layout.edgeSummaries?.front?.effectiveLength ?? config.width} mm</b>
                         </span>
@@ -1135,6 +1232,87 @@ export function SketchTool({ onBack, onExportToQuoteComplete }: SketchToolProps)
                         </span>
                     </div>
                 </div>
+
+                <div className="hidden xl:flex xl:flex-col xl:gap-4 xl:self-start">
+                    <SketchInspectorPanel
+                        config={config}
+                        onChange={updateConfig}
+                        selectedEdge={workspace.selection.edgeKey}
+                        selectedSegmentIndex={workspace.selection.segmentIndex}
+                        edgeSummaries={layout.edgeSummaries}
+                        suggestions={layout.suggestions}
+                        onSetManualPin={setManualPin}
+                        onClearManualPins={clearManualPins}
+                        onConvertSegmentToDoor={setDoorSegmentSize}
+                        onSetDoorSegmentSize={setDoorSegmentSize}
+                        onResetDoorSegment={resetDoorSegment}
+                        onApplySuggestion={applySuggestion}
+                        onDeleteParasol={handleDeleteParasol}
+                        onRotateParasol={handleRotateParasol}
+                        onDeleteFiesta={handleDeleteFiesta}
+                    />
+
+                    <SketchReviewPanel
+                        reviewState={sketchReviewState}
+                        canExportToQuote={canExportSketchToQuote}
+                        onApplySuggestion={applySuggestion}
+                        onExport={handleExportClick}
+                        onExportImage={handleExportImage}
+                    />
+                </div>
+            </div>
+
+            <div className="space-y-3 xl:hidden">
+                <div className="flex items-center gap-2">
+                    <button
+                        type="button"
+                        onClick={() => setActiveSidebarTab('inspector')}
+                        className={`px-4 py-2 rounded-lg border text-sm font-semibold transition-colors ${activeSidebarTab === 'inspector'
+                            ? 'border-blue-200/60 bg-primary text-white'
+                            : 'border-panel-border bg-panel-bg text-text-primary hover:bg-white/5'
+                            }`}
+                    >
+                        Inspektör
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => setActiveSidebarTab('review')}
+                        className={`px-4 py-2 rounded-lg border text-sm font-semibold transition-colors ${activeSidebarTab === 'review'
+                            ? 'border-blue-200/60 bg-primary text-white'
+                            : 'border-panel-border bg-panel-bg text-text-primary hover:bg-white/5'
+                            }`}
+                    >
+                        Granska & exportera
+                    </button>
+                </div>
+
+                {activeSidebarTab === 'inspector' ? (
+                    <SketchInspectorPanel
+                        config={config}
+                        onChange={updateConfig}
+                        selectedEdge={workspace.selection.edgeKey}
+                        selectedSegmentIndex={workspace.selection.segmentIndex}
+                        edgeSummaries={layout.edgeSummaries}
+                        suggestions={layout.suggestions}
+                        onSetManualPin={setManualPin}
+                        onClearManualPins={clearManualPins}
+                        onConvertSegmentToDoor={setDoorSegmentSize}
+                        onSetDoorSegmentSize={setDoorSegmentSize}
+                        onResetDoorSegment={resetDoorSegment}
+                        onApplySuggestion={applySuggestion}
+                        onDeleteParasol={handleDeleteParasol}
+                        onRotateParasol={handleRotateParasol}
+                        onDeleteFiesta={handleDeleteFiesta}
+                    />
+                ) : (
+                    <SketchReviewPanel
+                        reviewState={sketchReviewState}
+                        canExportToQuote={canExportSketchToQuote}
+                        onApplySuggestion={applySuggestion}
+                        onExport={handleExportClick}
+                        onExportImage={handleExportImage}
+                    />
+                )}
             </div>
 
             {showStockModal && (
