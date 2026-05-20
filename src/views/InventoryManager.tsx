@@ -15,7 +15,12 @@ import {
     normalizeStoredInventoryData
 } from './inventoryData';
 import * as XLSX from 'xlsx';
-import toast from 'react-hot-toast';
+import {
+    confirmAction,
+    notifyError,
+    notifySuccess,
+    notifyWarn
+} from '../services/notificationService';
 import { getErrorMessage } from '../utils/runtime';
 import type {
     BahamaInventoryItem,
@@ -79,7 +84,7 @@ export function InventoryManager({ onBack }: InventoryManagerProps) {
                     const localData = normalizeStoredInventoryData(await res.json());
                     dispatch({ type: 'SET_INVENTORY_DATA', payload: cloneInventoryData(localData) });
                     dispatch({ type: 'SET_CLOUD_INVENTORY_DATA', payload: cloneInventoryData(localData) });
-                    toast('Laddat lokalt lagersaldo (offline-läge)', { icon: '💾' });
+                    notifyWarn('Laddat lokalt lagersaldo i offline-läge.');
                 }
             } catch (localErr) {
                 console.error('Failed to load local inventory fallback:', localErr);
@@ -119,7 +124,7 @@ export function InventoryManager({ onBack }: InventoryManagerProps) {
                 }
 
                 if (headerIdx === -1) {
-                    toast.error("Kunde inte hitta kolumnen 'BESKRIVNING'. Kontrollera att det är rätt lagersaldo-fil.");
+                    notifyError("Kunde inte hitta kolumnen 'BESKRIVNING'. Kontrollera att det är rätt lagersaldo-fil.");
                     return;
                 }
 
@@ -138,10 +143,10 @@ export function InventoryManager({ onBack }: InventoryManagerProps) {
 
                 const newData: InventoryData = { ...state.inventoryData, bahama: inventory };
                 dispatch({ type: 'SET_INVENTORY_DATA', payload: newData });
-                toast.success(`Lagersaldo inläst: ${inventory.length} artiklar. Klicka "Spara ändringar" för att synkronisera.`);
+                notifySuccess(`Lagersaldo inläst: ${inventory.length} artiklar. Klicka "Spara ändringar" för att synkronisera.`);
             } catch (err) {
                 console.error(err);
-                toast.error(`Fel vid inläsning: ${getErrorMessage(err, 'Okänt fel')}`);
+                notifyError(`Fel vid inläsning: ${getErrorMessage(err, 'Okänt fel')}`);
             }
         };
 
@@ -159,22 +164,29 @@ export function InventoryManager({ onBack }: InventoryManagerProps) {
 
         dispatch({ type: 'SET_INVENTORY_DATA', payload: { ...state.inventoryData, bahama: newBahama } });
         setModalState(createEmptyModalState());
-        toast.success(editIndex >= 0 ? 'Artikel uppdaterad' : 'Artikel tillagd');
+        notifySuccess(editIndex >= 0 ? 'Artikel uppdaterad' : 'Artikel tillagd');
     };
 
-    const handleDeleteItem = (index: number, item: BahamaInventoryItem) => {
-        if (!confirm(`Ta bort artikel ID: ${String(item.ID || '-')}?`)) return;
+    const handleDeleteItem = async (index: number, item: BahamaInventoryItem) => {
+        const confirmed = await confirmAction({
+            title: 'Ta bort artikel',
+            message: `Ta bort artikel ID: ${String(item.ID || '-')}?`,
+            confirmText: 'Ta bort',
+            cancelText: 'Avbryt',
+            tone: 'danger'
+        });
+        if (!confirmed) return;
 
         const newBahama = [...state.inventoryData.bahama];
         newBahama.splice(index, 1);
         dispatch({ type: 'SET_INVENTORY_DATA', payload: { ...state.inventoryData, bahama: newBahama } });
-        toast.success('Artikel borttagen');
+        notifySuccess('Artikel borttagen');
     };
 
     const handleAddToBasket = (item: BahamaInventoryItem) => {
         const newBasket = [...state.inventoryBasket, item];
         dispatch({ type: 'SET_INVENTORY_BASKET', payload: newBasket });
-        toast.success(`${String(item.ID || 'Artikel')} tillagd i korg`);
+        notifySuccess(`${String(item.ID || 'Artikel')} tillagd i korg`);
     };
 
     const handleUpdateStock = (size: string, field: ClickitupFieldKey, delta: number) => {
@@ -191,7 +203,7 @@ export function InventoryManager({ onBack }: InventoryManagerProps) {
 
     const handleCommit = async () => {
         if (!user) {
-            toast.error('Du måste vara inloggad för att spara ändringar.');
+            notifyError('Du måste vara inloggad för att spara ändringar.');
             return;
         }
 
@@ -337,10 +349,10 @@ export function InventoryManager({ onBack }: InventoryManagerProps) {
 
             await batch.commit();
             dispatch({ type: 'SET_CLOUD_INVENTORY_DATA', payload: cloneInventoryData(state.inventoryData) });
-            toast.success('Ändringar sparade till molnet!');
+            notifySuccess('Ändringar sparade till molnet!');
         } catch (err) {
             console.error('Failed to commit:', err);
-            toast.error('Nätverksfel. Kontrollera din internetuppkoppling.');
+            notifyError('Nätverksfel. Kontrollera din internetuppkoppling.');
         } finally {
             setIsSaving(false);
         }
@@ -419,7 +431,9 @@ export function InventoryManager({ onBack }: InventoryManagerProps) {
                                     searchTerm={searchTerm}
                                     onAddToBasket={handleAddToBasket}
                                     onEdit={(index, item) => setModalState({ open: true, index, item })}
-                                    onDelete={handleDeleteItem}
+                                    onDelete={(index, item) => {
+                                        void handleDeleteItem(index, item);
+                                    }}
                                 />
                             </div>
                         )}

@@ -30,8 +30,17 @@ import { SketchCanvas } from '../components/features/SketchCanvas';
 import { SketchInspectorPanel, SketchSetupPanel } from '../components/features/SketchConfig';
 import { SketchReviewPanel } from '../components/features/SketchBom';
 import { StockComparisonModal } from '../components/features/StockComparisonModal';
-import toast from 'react-hot-toast';
 import { safeLogActivity } from '../services/activityLogService';
+import {
+    confirmAction,
+    dismissNotification,
+    notifyError,
+    notifyInfo,
+    notifyLoading,
+    notifySuccess,
+    notifyWarn,
+    updateNotification
+} from '../services/notificationService';
 import type {
     ComputedLayoutResult,
     DoorSegment,
@@ -353,7 +362,7 @@ function cloneWorkspace(saved: Partial<SketchWorkspace> = {}): SketchWorkspace {
 
 function warnIfActivityLogFailed(result: { ok?: boolean } | null | undefined, message: string): void {
     if (result?.ok === false) {
-        toast(message, { icon: '!' });
+        notifyWarn(message);
     }
 }
 
@@ -639,7 +648,7 @@ export function SketchTool({ onBack, onExportToQuoteComplete }: SketchToolProps)
                 selection: { ...prev.selection, edgeKey: suggestion.edge }
             }));
 
-            toast.success('Förslag applicerat.');
+            notifySuccess('Förslag applicerat.');
         },
         [clearSectionCount, config.equalDepth, layout.suggestions, resetDoorSegment, setDoorSegmentSize, setSectionCount, updateConfig]
     );
@@ -722,7 +731,7 @@ export function SketchTool({ onBack, onExportToQuoteComplete }: SketchToolProps)
         const snappedY = snapToStep100(yMm);
 
         if (!pointInPolygon(snappedX, snappedY, parasolAreaPolygon)) {
-            toast.error('Parasollens centrum måste vara inom ytan.');
+            notifyError('Parasollens centrum måste vara inom ytan.');
             return;
         }
 
@@ -793,7 +802,7 @@ export function SketchTool({ onBack, onExportToQuoteComplete }: SketchToolProps)
         const snappedY = snapToStep100(yMm);
 
         if (!pointInPolygon(snappedX, snappedY, parasolAreaPolygon)) {
-            toast.error('Fiestas centrum måste vara inom ytan.');
+            notifyError('Fiestas centrum måste vara inom ytan.');
             return;
         }
 
@@ -855,21 +864,29 @@ export function SketchTool({ onBack, onExportToQuoteComplete }: SketchToolProps)
 
     const handleExportClick = () => {
         if (!canExportSketchToQuote) {
-            toast.error('Du har inte behörighet att exportera till offert.');
+            notifyError('Du har inte behörighet att exportera till offert.');
             return;
         }
 
         if (!canExport) {
-            toast.error('Ingen layout att exportera ännu.');
+            notifyError('Ingen layout att exportera ännu.');
             return;
         }
 
         if (criticalWarnings.length > 0) {
             const warningText = criticalWarnings.map((warning) => `• ${warning.text}`).join('\n');
-            const confirmed = window.confirm(
-                `Layouten har kritiska varningar:\n\n${warningText}\n\nFortsätt export ändå?`
-            );
-            if (!confirmed) return;
+            void (async () => {
+                const confirmed = await confirmAction({
+                    title: 'Exportera trots varningar?',
+                    message: `Layouten har kritiska varningar:\n\n${warningText}\n\nFortsätt export ändå?`,
+                    confirmText: 'Exportera ändå',
+                    cancelText: 'Avbryt',
+                    tone: 'danger'
+                });
+                if (!confirmed) return;
+                setShowStockModal(true);
+            })();
+            return;
         }
 
         setShowStockModal(true);
@@ -970,7 +987,7 @@ export function SketchTool({ onBack, onExportToQuoteComplete }: SketchToolProps)
                         `${EDGE_LABELS[edge] || edge}: ${diag.requestedDoorSize} -> ${diag.resolvedDoorSize} mm`
                 )
                 .join(', ');
-            toast('Dörrstorlek justerades automatiskt: ' + adjusted, { icon: '⚠️' });
+            notifyWarn(`Dörrstorlek justerades automatiskt: ${adjusted}`);
         }
 
         const successMsg = hasParasols
@@ -979,13 +996,13 @@ export function SketchTool({ onBack, onExportToQuoteComplete }: SketchToolProps)
                 ? `Exporterade skissen och ${config.fiestaItems.length} st Fiesta till offerten.`
                 : 'Exporterade skissen till offerten.';
 
-        toast.success(successMsg);
+        notifySuccess(successMsg);
     };
 
     const handleExportImage = async () => {
         const element = document.getElementById('sketchCanvasContainer');
         if (!element) {
-            toast.error('Kan inte hitta skissen att exportera.');
+            notifyError('Kan inte hitta skissen att exportera.');
             return;
         }
 
@@ -998,7 +1015,7 @@ export function SketchTool({ onBack, onExportToQuoteComplete }: SketchToolProps)
         const originalBg = element.style.backgroundColor;
         element.style.backgroundColor = '#0b1220';
 
-        const toastId = toast.loading('Genererar bild...');
+        const toastId = notifyLoading('Genererar bild...');
         const fileName = `Uteservering_Skiss_${config.width}x${config.depthLeft}.png`;
 
         try {
@@ -1016,7 +1033,7 @@ export function SketchTool({ onBack, onExportToQuoteComplete }: SketchToolProps)
                 element.style.backgroundColor = originalBg;
 
                 if (!blob) {
-                    toast.error('Kunde inte skapa bildfil.', { id: toastId });
+                    updateNotification(toastId, { type: 'error', message: 'Kunde inte skapa bildfil.' });
                     return;
                 }
 
@@ -1041,13 +1058,13 @@ export function SketchTool({ onBack, onExportToQuoteComplete }: SketchToolProps)
                             fiestaCount: (config.fiestaItems || []).length
                         }
                     }).then((result) => warnIfActivityLogFailed(result, 'Bildexporten lyckades, men aktivitetsloggen kunde inte uppdateras.'));
-                    toast.success(`Skiss sparad: ${fileName}`, { id: toastId });
+                    updateNotification(toastId, { type: 'success', message: `Skiss sparad: ${fileName}` });
                 } else if (pickerResult === 'canceled') {
-                    toast.dismiss(toastId);
-                    toast('Bildexport avbröts.', { icon: '!' });
+                    dismissNotification(toastId);
+                    notifyInfo('Bildexport avbröts.');
                 } else {
                     if (pickerResult === 'failed') {
-                        toast('Kunde inte öppna spara-dialog. Använder nedladdning istället.', { icon: '!' });
+                        notifyWarn('Kunde inte öppna spara-dialog. Använder nedladdning istället.');
                     }
                     downloadBlob(blob, fileName);
                     void safeLogActivity({
@@ -1068,7 +1085,7 @@ export function SketchTool({ onBack, onExportToQuoteComplete }: SketchToolProps)
                             fiestaCount: (config.fiestaItems || []).length
                         }
                     }).then((result) => warnIfActivityLogFailed(result, 'Bildexporten lyckades, men aktivitetsloggen kunde inte uppdateras.'));
-                    toast.success(`Skiss nedladdad: ${fileName}`, { id: toastId });
+                    updateNotification(toastId, { type: 'success', message: `Skiss nedladdad: ${fileName}` });
                 }
             }, 'image/png');
         } catch (err) {
@@ -1077,7 +1094,7 @@ export function SketchTool({ onBack, onExportToQuoteComplete }: SketchToolProps)
             });
             element.style.backgroundColor = originalBg;
             const errorMessage = err instanceof Error ? err.message : 'okänt fel';
-            toast.error(`Kunde inte skapa bild: ${errorMessage}`, { id: toastId });
+            updateNotification(toastId, { type: 'error', message: `Kunde inte skapa bild: ${errorMessage}` });
         }
     };
 

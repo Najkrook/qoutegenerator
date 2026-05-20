@@ -5,7 +5,6 @@ import React, {
     type ChangeEvent,
     type KeyboardEvent
 } from 'react';
-import toast from 'react-hot-toast';
 import { useQuote } from '../../store/QuoteContext';
 import { useAuth } from '../../store/AuthContext';
 import {
@@ -21,6 +20,7 @@ import {
     deleteTemplate
 } from '../../services/templateService';
 import { hasZeroDiscountSummary } from '../../services/exportDataBuilders';
+import { notifyError, notifySuccess } from '../../services/notificationService';
 import type { LegalTemplateOption, TermsAndPaymentPanelProps } from '../../types/contracts';
 
 function normalizePositiveInt(value: string, fallback: number): number {
@@ -78,18 +78,18 @@ export function TermsAndPaymentPanel({ summaryData }: TermsAndPaymentPanelProps)
     const handleSaveTemplate = async (): Promise<void> => {
         const name = newTemplateName.trim();
         if (!name) {
-            toast.error('Ange ett namn för mallen');
+            notifyError('Ange ett namn för mallen');
             return;
         }
 
         const currentText = state.termsText || '';
         if (!currentText.trim()) {
-            toast.error('Villkorstexten är tom');
+            notifyError('Villkorstexten är tom');
             return;
         }
 
         if (!user?.uid) {
-            toast.error('Du måste vara inloggad för att spara mallar');
+            notifyError('Du måste vara inloggad för att spara mallar');
             return;
         }
 
@@ -101,10 +101,10 @@ export function TermsAndPaymentPanel({ summaryData }: TermsAndPaymentPanelProps)
             await loadCustomTemplates();
             setShowSaveDialog(false);
             setNewTemplateName('');
-            toast.success(`Mall "${name}" sparad`);
+            notifySuccess(`Mall "${name}" sparad`);
         } catch (error) {
             console.error('Failed to save template:', error);
-            toast.error('Kunde inte spara mallen');
+            notifyError('Kunde inte spara mallen');
         } finally {
             setSavingTemplate(false);
         }
@@ -112,7 +112,7 @@ export function TermsAndPaymentPanel({ summaryData }: TermsAndPaymentPanelProps)
 
     const handleDeleteTemplate = async (): Promise<void> => {
         if (isBuiltinTemplateId(selectedTemplateId)) {
-            toast.error('Standardmallar kan inte tas bort');
+            notifyError('Standardmallar kan inte tas bort');
             return;
         }
 
@@ -124,10 +124,10 @@ export function TermsAndPaymentPanel({ summaryData }: TermsAndPaymentPanelProps)
             await deleteTemplate(ownerUid, selectedTemplateId);
             dispatch({ type: 'SET_TERMS_TEMPLATE_ID', payload: DEFAULT_TEMPLATE_ID });
             await loadCustomTemplates();
-            toast.success(`Mall "${template.label}" borttagen`);
+            notifySuccess(`Mall "${template.label}" borttagen`);
         } catch (error) {
             console.error('Failed to delete template:', error);
-            toast.error('Kunde inte ta bort mallen');
+            notifyError('Kunde inte ta bort mallen');
         }
     };
 

@@ -9,6 +9,11 @@ import {
     doc,
     updateDoc
 } from '../services/firebase';
+import {
+    dismissNotification,
+    notifyAction,
+    notifyError
+} from '../services/notificationService';
 import { normalizeAllowedValue, readSnapshotData } from '../utils/runtime';
 import type {
     PlannerContractor,
@@ -20,13 +25,6 @@ import type {
 } from '../types/contracts';
 
 interface PlannerProjectDocument extends Omit<PlannerProject, 'id'> {}
-
-interface PlannerToastMessage {
-    id: string;
-    title: string;
-    project: PlannerProject;
-    timeoutId: ReturnType<typeof setTimeout>;
-}
 
 interface GroupedPlannerDay {
     displayDate: Date;
@@ -253,10 +251,14 @@ export function Planner({ onBack }: PlannerProps) {
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [selectedProjectDetails, setSelectedProjectDetails] = useState<PlannerProject | null>(null);
-    const [toastMessage, setToastMessage] = useState<PlannerToastMessage | null>(null);
     const currentWeek = getISOWeekString(new Date());
     const [selectedWeek, setSelectedWeek] = useState(() => currentWeek);
     const selectedWeekButtonRef = useRef<HTMLButtonElement | null>(null);
+    const pendingDeleteRef = useRef<Record<string, {
+        project: PlannerProject;
+        timeoutId: ReturnType<typeof setTimeout>;
+        notificationId: string;
+    }>>({});
 
     const fetchProjects = useCallback(async () => {
         setLoading(true);
@@ -269,6 +271,7 @@ export function Planner({ onBack }: PlannerProps) {
             setAllProjects(fetched);
         } catch (error) {
             console.error('Failed to fetch planner projects:', error);
+            notifyError('Kunde inte ladda projektplaneringen.');
         } finally {
             setLoading(false);
         }
@@ -305,6 +308,14 @@ export function Planner({ onBack }: PlannerProps) {
         });
     }, [selectedWeek]);
 
+    useEffect(() => () => {
+        Object.values(pendingDeleteRef.current).forEach((pendingDelete) => {
+            clearTimeout(pendingDelete.timeoutId);
+            dismissNotification(pendingDelete.notificationId);
+        });
+        pendingDeleteRef.current = {};
+    }, []);
+
     const handleAdd = async () => {
         const title = newTitle.trim();
         if (!title) return;
@@ -326,6 +337,7 @@ export function Planner({ onBack }: PlannerProps) {
             setNewPriority('Normal');
         } catch (error) {
             console.error('Failed to add project:', error);
+            notifyError('Kunde inte lägga till projektet.');
         } finally {
             setSaving(false);
         }
@@ -344,6 +356,7 @@ export function Planner({ onBack }: PlannerProps) {
             setAllProjects((prev) =>
                 prev.map((entry) => (entry.id === project.id ? { ...entry, done: !newDone } : entry))
             );
+            notifyError('Kunde inte uppdatera projektstatusen.');
         }
     };
 
@@ -353,32 +366,70 @@ export function Planner({ onBack }: PlannerProps) {
             await updateDoc(doc(db, PLANNER_COLLECTION_PATH, projectId), updates);
         } catch (error) {
             console.error('Failed to update project details:', error);
+            notifyError('Kunde inte spara projektdetaljerna.');
         }
     };
 
+    const restoreDeletedProject = useCallback((project: PlannerProject) => {
+        setAllProjects((prev) => {
+            if (prev.some((entry) => entry.id === project.id)) {
+                return prev;
+            }
+
+            return [...prev, project].sort((a, b) => b.createdAt - a.createdAt);
+        });
+    }, []);
+
+    const clearPendingDelete = useCallback((projectId: string) => {
+        const pendingDelete = pendingDeleteRef.current[projectId];
+        if (!pendingDelete) return null;
+
+        clearTimeout(pendingDelete.timeoutId);
+        delete pendingDeleteRef.current[projectId];
+        return pendingDelete;
+    }, []);
+
+    const finalizeDelete = useCallback(async (projectId: string) => {
+        const pendingDelete = clearPendingDelete(projectId);
+        if (!pendingDelete) return;
+
+        dismissNotification(pendingDelete.notificationId);
+
+        try {
+            await deleteDoc(doc(db, PLANNER_COLLECTION_PATH, projectId));
+        } catch (error) {
+            console.error('Failed to delete project:', error);
+            restoreDeletedProject(pendingDelete.project);
+            notifyError('Kunde inte ta bort projektet.');
+        }
+    }, [clearPendingDelete, restoreDeletedProject]);
+
+    const handleUndoDelete = useCallback((projectId: string) => {
+        const pendingDelete = clearPendingDelete(projectId);
+        if (!pendingDelete) return;
+
+        dismissNotification(pendingDelete.notificationId);
+        restoreDeletedProject(pendingDelete.project);
+    }, [clearPendingDelete, restoreDeletedProject]);
+
     const handleDelete = (project: PlannerProject) => {
         setAllProjects((prev) => prev.filter((entry) => entry.id !== project.id));
-        const timeoutId = setTimeout(async () => {
-            try {
-                await deleteDoc(doc(db, PLANNER_COLLECTION_PATH, project.id));
-            } catch (error) {
-                console.error('Failed to delete project:', error);
-                setAllProjects((prev) => {
-                    if (prev.some((entry) => entry.id === project.id)) return prev;
-                    return [...prev, project].sort((a, b) => a.createdAt - b.createdAt);
-                });
-            }
-            setToastMessage((current) => (current?.id === project.id ? null : current));
+        const timeoutId = setTimeout(() => {
+            void finalizeDelete(project.id);
         }, 5000);
 
-        setToastMessage({ id: project.id, title: project.title, project, timeoutId });
-    };
+        const notificationId = notifyAction({
+            message: `"${project.title}" raderades`,
+            actionLabel: 'Ångra',
+            onAction: () => handleUndoDelete(project.id),
+            onDismiss: () => finalizeDelete(project.id)
+        });
 
-    const handleUndoDelete = () => {
-        if (!toastMessage) return;
-        clearTimeout(toastMessage.timeoutId);
-        setAllProjects((prev) => [...prev, toastMessage.project].sort((a, b) => a.createdAt - b.createdAt));
-        setToastMessage(null);
+        pendingDeleteRef.current[project.id] = {
+            project,
+            timeoutId,
+            notificationId
+        };
     };
 
     const handleKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
@@ -663,31 +714,6 @@ export function Planner({ onBack }: PlannerProps) {
                 />
             )}
 
-            {toastMessage && (
-                <div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-[60] bg-bg border border-panel-border shadow-2xl px-5 py-3 rounded-xl flex items-center gap-4">
-                    <p className="text-sm font-medium text-text-primary m-0 truncate max-w-[200px]">
-                        "{toastMessage.title}" raderades
-                    </p>
-                    <div className="flex items-center gap-2 border-l border-panel-border pl-4">
-                        <button
-                            onClick={handleUndoDelete}
-                            className="text-sm font-bold text-primary bg-primary/10 hover:bg-primary/20 px-3 py-1.5 rounded transition-colors cursor-pointer border-none"
-                        >
-                            Ångra
-                        </button>
-                        <button
-                            onClick={() => {
-                                clearTimeout(toastMessage.timeoutId);
-                                void deleteDoc(doc(db, PLANNER_COLLECTION_PATH, toastMessage.id));
-                                setToastMessage(null);
-                            }}
-                            className="text-text-secondary hover:text-text-primary bg-transparent border-none cursor-pointer p-1"
-                        >
-                            X
-                        </button>
-                    </div>
-                </div>
-            )}
         </div>
     );
 }

@@ -1,4 +1,5 @@
 import React, { useState, type ChangeEvent, type FormEvent, type KeyboardEvent, type MouseEvent } from 'react';
+import { notifyError } from '../../services/notificationService';
 import type { BahamaInventoryItem, InventoryItemModalProps } from '../../types/contracts';
 
 function buildInitialFormData(item: BahamaInventoryItem | null): BahamaInventoryItem {
@@ -27,7 +28,7 @@ export function InventoryItemModal({ item, editIndex, onSave, onClose }: Invento
     const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
         event.preventDefault();
         if (!String(formData.ID || '').trim() || !String(formData.BESKRIVNING || '').trim()) {
-            alert('Du måste minst ange ID och beskrivning.');
+            notifyError('Du måste minst ange ID och beskrivning.');
             return;
         }
 

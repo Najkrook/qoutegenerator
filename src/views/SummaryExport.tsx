@@ -1,5 +1,4 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import toast from 'react-hot-toast';
 import { useQuote } from '../store/QuoteContext';
 import { useAuth } from '../store/AuthContext';
 import { catalogData } from '../data/catalog';
@@ -12,6 +11,12 @@ import { quoteRepository } from '../services/quoteRepositoryClient';
 import { saveQuoteToRepository } from '../services/quoteSaveService';
 import { safeLogActivity } from '../services/activityLogService';
 import { hasZeroDiscountSummary } from '../services/exportDataBuilders';
+import {
+    notifyError,
+    notifyInfo,
+    notifySuccess,
+    notifyWarn
+} from '../services/notificationService';
 import { getErrorMessage } from '../utils/runtime';
 import type {
     ExcelExportModule,
@@ -94,7 +99,7 @@ async function exportExcelWorkbook(state: QuoteState, summaryData: QuoteTotalsRe
 
 function warnIfActivityLogFailed(result: ActivityLogResultLike | null | undefined, message: string): void {
     if (result?.ok === false) {
-        toast(message, { icon: '!' });
+        notifyWarn(message);
     }
 }
 
@@ -200,14 +205,14 @@ export function SummaryExport({ onPrev, onBackToSketch }: SummaryExportProps) {
 
     const handleExportPDF = async ({ allowMissingQuoteNumber = false }: PdfExportOptions = {}): Promise<void> => {
         if (exportBlockReason && !allowMissingQuoteNumber) {
-            toast.error(exportBlockReason);
+            notifyError(exportBlockReason);
             return;
         }
 
         const fileName = buildPdfFileName(state.customerInfo);
         const pdfBlob = await createPdfBlob(state, summaryData);
         if (!pdfBlob) {
-            toast.error('Kunde inte skapa PDF.');
+            notifyError('Kunde inte skapa PDF.');
             return;
         }
 
@@ -219,17 +224,17 @@ export function SummaryExport({ onPrev, onBackToSketch }: SummaryExportProps) {
                 fileName,
                 missingQuoteNumber: !state.quoteNumber
             });
-            toast.success(`PDF sparad: ${fileName}`);
+            notifySuccess(`PDF sparad: ${fileName}`);
             return;
         }
 
         if (pickerResult === 'canceled') {
-            toast('PDF-export avbröts.', { icon: '!' });
+            notifyInfo('PDF-export avbröts.');
             return;
         }
 
         if (pickerResult === 'failed') {
-            toast('Kunde inte öppna spara-dialog. Använder nedladdning i stället.', { icon: '!' });
+            notifyWarn('Kunde inte öppna spara-dialog. Använder nedladdning i stället.');
         }
 
         if (pickerResult === 'failed' || pickerResult === 'unavailable') {
@@ -240,7 +245,7 @@ export function SummaryExport({ onPrev, onBackToSketch }: SummaryExportProps) {
                 fileName,
                 missingQuoteNumber: !state.quoteNumber
             });
-            toast.success(`PDF nedladdad: ${fileName}`);
+            notifySuccess(`PDF nedladdad: ${fileName}`);
         }
     };
 
@@ -264,7 +269,7 @@ export function SummaryExport({ onPrev, onBackToSketch }: SummaryExportProps) {
             }).then((result) => warnIfActivityLogFailed(result, 'Excel-exporten lyckades, men aktivitetsloggen kunde inte uppdateras.'));
         } catch (error) {
             console.error('Failed to export Excel:', error);
-            toast.error('Kunde inte skapa Excel.');
+            notifyError('Kunde inte skapa Excel.');
         }
     };
 
@@ -305,13 +310,13 @@ export function SummaryExport({ onPrev, onBackToSketch }: SummaryExportProps) {
             }).then((result) => warnIfActivityLogFailed(result, 'Offerten sparades, men aktivitetsloggen kunde inte uppdateras.'));
 
             if (isNewQuote) {
-                toast.success('Offerten sparades i Mina Offerter.');
+                notifySuccess('Offerten sparades i Mina Offerter.');
             } else {
-                toast.success(`Offerten sparades som version ${saveStatePatch.activeQuoteVersion}.`);
+                notifySuccess(`Offerten sparades som version ${saveStatePatch.activeQuoteVersion}.`);
             }
         } catch (error) {
             console.error('Failed to save quote:', error);
-            toast.error(`Kunde inte spara offerten: ${getErrorMessage(error, 'okänt fel')}`);
+            notifyError(`Kunde inte spara offerten: ${getErrorMessage(error, 'okänt fel')}`);
         } finally {
             setIsSavingQuote(false);
         }

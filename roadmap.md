@@ -47,8 +47,10 @@ Success signals:
 
 ## Phase 2: Workflow Upgrades
 
-### 1. Incremental TypeScript Migration
-Start introducing TypeScript incrementally around the highest-risk shared contracts rather than attempting a full conversion at once. Begin with `.d.ts` declaration files for quote state, repository metadata, access roles, and other cross-service shapes that currently rely on convention. This approach adds type safety at edit time without requiring build-config changes, test-setup modifications, or workflow disruption for other in-flight work. Defer `.ts` file conversion until after the workflow upgrades in this phase have stabilized.
+### [x] 1. Incremental TypeScript Migration
+Status: App-source TypeScript migration for `src/` is complete, including shared contracts, state, views, and service-layer code.
+
+The original incremental migration goal has been achieved for the active runtime. Remaining TypeScript follow-up work is now optional hardening rather than foundational migration work, and is better framed as compiler strictness improvements plus selective migration of tests, scripts, or tooling where it provides clear value without disrupting delivery.
 
 Success signals:
 - Critical shared shapes have typed coverage before more workflow work lands on top of them.
@@ -96,8 +98,10 @@ Success signals:
 
 ## Phase 3: Commercial Polish
 
-### 1. Proper URL Routing
-Replace the current state-driven view switching model with proper URL-based navigation so browser back and forward actions, bookmarking, deep linking, and refresh behavior become predictable. The existing `step` to view mapping can be translated into routes incrementally, but the migration should also address how navigation state and persisted state interact so refreshes no longer depend on whichever step localStorage last captured. This is a one-time structural investment that improves usability across the entire app.
+### [x] 1. Proper URL Routing
+Status: React Router-based URL routing is now in place for login, dashboard, quote steps, history, sketch, and admin surfaces.
+
+The core routing migration has landed and the app no longer relies solely on internal step switching for view navigation. Browser navigation, deep linking, guarded route access, and quote-step URLs are now part of the runtime model. Any remaining routing work should be treated as follow-up polish around specific workflows rather than as a still-pending platform migration.
 
 Success signals:
 - Browser navigation works as users expect across major app views.
@@ -122,8 +126,8 @@ Success signals:
 - Notification consistency should land before or alongside retailer, history, and planner work so new flows inherit one messaging model.
 - Quote duplication should land alongside the history-hub work so cloning and reopen flows share the same metadata and draft-creation rules.
 - Quote history and planner linking should share identifiers and reference conventions rather than inventing separate linking schemes.
-- URL routing should be coordinated with quote duplication, global search, and history improvements so navigation patterns are not redesigned twice.
-- Type coverage should expand ahead of or alongside routing and quote-state-heavy workflow work to reduce regression risk.
+- Routing follow-up for quote duplication, global search, and history improvements should stay coordinated so navigation patterns are not redesigned twice.
+- Type hardening should continue alongside quote-state-heavy workflow work to reduce regression risk, even though the main app-source TypeScript migration is complete.
 - Admin UID centralization (moving hardcoded UIDs in `firestore.rules` and `accessControl.shared.js` to a Firestore-based role model or shared constant) should be resolved before Phase 2 work adds more admin-gated features, to prevent synchronization drift.
 - Validation should be updated whenever quote state, export rendering, or business-critical admin flows are changed.
 
@@ -141,11 +145,11 @@ Success signals:
 - Access-control backend redesign or Firebase custom-claims migration.
 - Major data-model rewrite for quotes or planner.
 - Full Scrive/e-signature rollout.
-- Full TypeScript conversion of every file (incremental `.d.ts` declarations are in scope).
+- Full repo-wide TypeScript conversion of every remaining file, including tests/scripts/tooling.
 
 ## Assumptions
 - Target file is `QuoteGenerator/roadmap.md`.
 - Audience is the engineering team.
 - Horizon is 6 months.
 - This is an execution-oriented roadmap, not a PRD or implementation spec.
-- The roadmap stays aligned with the current Firebase-backed model while allowing targeted structural upgrades such as URL routing and incremental type adoption.
+- The roadmap stays aligned with the current Firebase-backed model while allowing targeted structural follow-up such as routing polish and TypeScript hardening where it materially reduces risk.
