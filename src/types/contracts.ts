@@ -1389,12 +1389,18 @@ export interface SketchCanvasProps {
     selectedParasolId?: string | null;
     fiestaItems?: PlacedFiesta[];
     selectedFiestaId?: string | null;
+    hoverPreviewLayout?: ComputedLayoutResult | null;
+    undo?: () => void;
+    redo?: () => void;
+    canUndo?: boolean;
+    canRedo?: boolean;
     onResize?: (dims: Partial<Pick<SketchConfigState, 'width' | 'depth' | 'depthLeft' | 'depthRight'>>) => void;
     onResizePreview?: (dims: Partial<Pick<SketchConfigState, 'width' | 'depth' | 'depthLeft' | 'depthRight'>> | null) => void;
     onResizeCommit?: (dims: Partial<Pick<SketchConfigState, 'width' | 'depth' | 'depthLeft' | 'depthRight'>>) => void;
     onSelectEdge?: (edgeKey: SketchEdgeKey) => void;
     onSelectSection?: (edgeKey: SketchEdgeKey, segmentIndex: number | null) => void;
     onApplySuggestion?: (suggestionId: string) => void;
+    onHoverSuggestion?: (suggestion: LayoutSuggestion | null) => void;
     onCameraChange?: (camera: SketchCamera) => void;
     onChangeMode?: (mode: SketchMode) => void;
     onPlaceParasol?: (xMm: number, yMm: number) => void;
@@ -1427,6 +1433,7 @@ export interface SketchInspectorPanelProps {
     onSetDoorSegmentSize?: (edgeKey: SketchEdgeKey, segmentIndex: number, size: number) => void;
     onResetDoorSegment?: (edgeKey: SketchEdgeKey, segmentIndex: number) => void;
     onApplySuggestion?: (suggestionId: string) => void;
+    onHoverSuggestion?: (suggestion: LayoutSuggestion | null) => void;
     onDeleteParasol?: (id: string) => void;
     onRotateParasol?: (id: string, rotationDeg: 0 | 90) => void;
     onDeleteFiesta?: (id: string) => void;
@@ -1481,6 +1488,7 @@ export interface SketchReviewPanelProps {
     reviewState: SketchReviewState;
     canExportToQuote?: boolean;
     onApplySuggestion?: (suggestionId: string) => void;
+    onHoverSuggestion?: (suggestion: LayoutSuggestion | null) => void;
     onExport?: () => void;
     onExportImage?: () => void;
 }
@@ -1488,8 +1496,6 @@ export interface SketchReviewPanelProps {
 export interface SketchBomProps {
     counts: Record<string, number>;
     totalGlassLength: number;
-    slimlineCount: number;
-    stodbenCount: number;
     hasInvalidEdges: boolean;
     invalidEdges: Array<[SketchEdgeKey, EdgeDiagnostic]>;
     autoAdjustedEdges: Array<[SketchEdgeKey, EdgeDiagnostic]>;

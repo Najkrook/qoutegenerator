@@ -167,7 +167,8 @@ function getEdgeSummaryLabel(summary?: Partial<EdgeSummary>) {
 
 function renderSuggestionButtons(
     suggestions: Array<{ id: string; text: string; priority?: string }>,
-    onApplySuggestion?: (suggestionId: string) => void
+    onApplySuggestion?: (suggestionId: string) => void,
+    onHoverSuggestion?: (suggestion: any | null) => void
 ) {
     if (suggestions.length === 0) {
         return (
@@ -180,7 +181,12 @@ function renderSuggestionButtons(
     return (
         <div className="space-y-2">
             {suggestions.slice(0, 4).map((suggestion) => (
-                <div key={suggestion.id} className="rounded-xl border border-panel-border bg-input-bg/70 p-3 space-y-2">
+                <div
+                    key={suggestion.id}
+                    className="glass-card p-3 space-y-2 hover:scale-[1.02] hover:border-amber-500/40 hover:shadow-[0_8px_20px_-6px_rgba(245,158,11,0.2)]"
+                    onMouseEnter={() => onHoverSuggestion?.(suggestion)}
+                    onMouseLeave={() => onHoverSuggestion?.(null)}
+                >
                     <div className="flex items-start justify-between gap-3">
                         <p className="text-sm text-text-primary m-0">{suggestion.text}</p>
                         {suggestion.priority && (
@@ -256,7 +262,7 @@ export function SketchSetupPanel({
     };
 
     return (
-        <div className="bg-panel-bg border border-panel-border rounded-2xl p-4 space-y-5 md:p-5">
+        <div className="glass-panel rounded-2xl p-4 space-y-5 md:p-5">
             <div className="space-y-1">
                 <h3 className="text-lg font-semibold text-text-primary m-0">Grundinställningar</h3>
                 <p className="text-sm text-text-secondary m-0">
@@ -499,6 +505,7 @@ export function SketchInspectorPanel({
     onSetDoorSegmentSize,
     onResetDoorSegment,
     onApplySuggestion,
+    onHoverSuggestion,
     onDeleteParasol,
     onRotateParasol,
     onDeleteFiesta
@@ -542,7 +549,7 @@ export function SketchInspectorPanel({
 
     if (activeMode === 'parasol') {
         return (
-            <div className="bg-panel-bg border border-panel-border rounded-2xl p-5 space-y-5">
+            <div className="glass-panel rounded-2xl p-5 space-y-5">
                 <div className="space-y-1">
                     <h3 className="text-lg font-semibold text-text-primary m-0">Inspektör: Parasoll</h3>
                     <p className="text-sm text-text-secondary m-0">
@@ -629,7 +636,7 @@ export function SketchInspectorPanel({
 
     if (activeMode === 'fiesta') {
         return (
-            <div className="bg-panel-bg border border-panel-border rounded-2xl p-5 space-y-5">
+            <div className="glass-panel rounded-2xl p-5 space-y-5">
                 <div className="space-y-1">
                     <h3 className="text-lg font-semibold text-text-primary m-0">Inspektör: Fiesta</h3>
                     <p className="text-sm text-text-secondary m-0">
@@ -677,7 +684,7 @@ export function SketchInspectorPanel({
 
     if (selectedSegment && selectedEdge && selectedSegmentIndex !== null) {
         return (
-            <div className="bg-panel-bg border border-panel-border rounded-2xl p-5 space-y-5">
+            <div className="glass-panel rounded-2xl p-5 space-y-5">
                 <div className="space-y-1">
                     <h3 className="text-lg font-semibold text-text-primary m-0">Inspektör: {EDGE_LABELS[selectedEdge]}</h3>
                     <p className="text-sm text-text-secondary m-0">
@@ -765,7 +772,7 @@ export function SketchInspectorPanel({
                 </div>
 
                 <PanelSection title="Rekommendationer för vald kant">
-                    {renderSuggestionButtons(selectedEdgeSuggestions, onApplySuggestion)}
+                    {renderSuggestionButtons(selectedEdgeSuggestions, onApplySuggestion, onHoverSuggestion)}
                 </PanelSection>
             </div>
         );
@@ -773,7 +780,7 @@ export function SketchInspectorPanel({
 
     if (selectedEdge) {
         return (
-            <div className="bg-panel-bg border border-panel-border rounded-2xl p-5 space-y-5">
+            <div className="glass-panel rounded-2xl p-5 space-y-5">
                 <div className="space-y-1">
                     <h3 className="text-lg font-semibold text-text-primary m-0">Inspektör: {EDGE_LABELS[selectedEdge]}</h3>
                     <p className="text-sm text-text-secondary m-0">
@@ -811,14 +818,14 @@ export function SketchInspectorPanel({
                 </div>
 
                 <PanelSection title="Rekommendationer för vald kant">
-                    {renderSuggestionButtons(selectedEdgeSuggestions, onApplySuggestion)}
+                    {renderSuggestionButtons(selectedEdgeSuggestions, onApplySuggestion, onHoverSuggestion)}
                 </PanelSection>
             </div>
         );
     }
 
     return (
-        <div className="bg-panel-bg border border-panel-border rounded-2xl p-5 space-y-5">
+        <div className="glass-panel rounded-2xl p-5 space-y-5">
             <div className="space-y-1">
                 <h3 className="text-lg font-semibold text-text-primary m-0">Inspektör</h3>
                 <p className="text-sm text-text-secondary m-0">

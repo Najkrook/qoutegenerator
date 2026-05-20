@@ -15,6 +15,19 @@
   --color-success: #10b981;
   --color-danger: #ef4444;
   --color-warning: #f59e0b;
+  
+  --animate-pulse-warning: pulse-warning 2s infinite ease-in-out;
+  --animate-snap-glow: snap-glow 0.8s ease-out forwards;
+
+  @keyframes pulse-warning {
+    0%, 100% { filter: drop-shadow(0 0 4px rgba(239, 68, 68, 0.4)); opacity: 0.8; }
+    50% { filter: drop-shadow(0 0 16px rgba(239, 68, 68, 0.95)); opacity: 1.0; }
+  }
+  @keyframes snap-glow {
+    0% { opacity: 0.3; stroke-width: 1; }
+    50% { opacity: 0.8; stroke-width: 2.5; }
+    100% { opacity: 0.5; stroke-width: 1.5; }
+  }
 }
 
 body {
@@ -38,4 +51,73 @@ select optgroup {
   font-size: 0.7rem;
   text-transform: uppercase;
   letter-spacing: 0.05em;
+}
+
+/* Glassmorphism panel styling */
+.glass-panel {
+  background: rgba(30, 30, 46, 0.65);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.4);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.glass-panel:hover {
+  border-color: rgba(255, 255, 255, 0.12);
+  box-shadow: 0 8px 32px 0 rgba(59, 130, 246, 0.08);
+}
+
+/* Glassmorphism cards */
+.glass-card {
+  background: rgba(15, 15, 26, 0.45);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.04);
+  border-radius: 0.75rem;
+  transition: all 0.2s ease-in-out;
+}
+
+.glass-card:hover {
+  background: rgba(15, 15, 26, 0.6);
+  border-color: rgba(59, 130, 246, 0.3);
+  box-shadow: 0 4px 20px rgba(59, 130, 246, 0.12);
+}
+
+/* High-fidelity primary text glow */
+.glow-text-primary {
+  text-shadow: 0 0 10px rgba(59, 130, 246, 0.6), 0 0 20px rgba(59, 130, 246, 0.2);
+}
+
+/* Custom modern dark scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(15, 15, 26, 0.2);
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 3px;
+  transition: background 0.3s;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(59, 130, 246, 0.5);
+}
+
+/* Custom animations and utilities */
+.glow-danger {
+  filter: drop-shadow(0 0 8px rgba(239, 68, 68, 0.8));
+}
+
+.glow-warning {
+  filter: drop-shadow(0 0 8px rgba(245, 158, 11, 0.8));
+}
+
+.glow-success {
+  filter: drop-shadow(0 0 8px rgba(16, 185, 129, 0.8));
 }

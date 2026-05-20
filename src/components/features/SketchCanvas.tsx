@@ -161,6 +161,12 @@ export function SketchCanvas({
     selectedParasolId = null,
     fiestaItems = [],
     selectedFiestaId = null,
+    hoverPreviewLayout,
+    onHoverSuggestion,
+    undo,
+    redo,
+    canUndo = false,
+    canRedo = false,
     onResize,
     onResizePreview,
     onResizeCommit,
@@ -178,6 +184,8 @@ export function SketchCanvas({
     const svgRef = useRef<SVGSVGElement | null>(null);
     const [activeDrag, setActiveDrag] = useState<ActiveDrag | null>(null);
     const dragRef = useRef<ResizeDragState>({ startX: 0, startY: 0, initialW: 0, initialD: 0, initialDLeft: 0, initialDRight: 0 });
+    const [snapLines, setSnapLines] = useState<{ x: number | null, y: number | null } | null>(null);
+
     const [dragWidth, setDragWidth] = useState<number | null>(null);
     const [dragDepth, setDragDepth] = useState<number | null>(null);
     const [dragDepthLeft, setDragDepthLeft] = useState<number | null>(null);
@@ -196,6 +204,98 @@ export function SketchCanvas({
     const currentDepthLeft = dragDepthLeft ?? (equalDepth ? (dragDepth ?? propDepthLeft ?? depth) : (propDepthLeft ?? depth));
     const currentDepthRight = dragDepthRight ?? (equalDepth ? (dragDepth ?? propDepthRight ?? depth) : (propDepthRight ?? depth));
     const currentMaxDepth = Math.max(currentDepthLeft, currentDepthRight);
+
+    const isPointInBoundary = useCallback((x: number, y: number) => {
+        if (x < 0 || x > currentWidth) return false;
+        const t = x / currentWidth;
+        const yTop = (currentMaxDepth - currentDepthLeft) * (1 - t) + (currentMaxDepth - currentDepthRight) * t;
+        const yBottom = currentMaxDepth;
+        return y >= yTop && y <= yBottom;
+    }, [currentWidth, currentMaxDepth, currentDepthLeft, currentDepthRight]);
+
+    const isParasolInBoundary = useCallback((px: number, py: number, w: number, d: number) => {
+        return (
+            isPointInBoundary(px - w / 2, py - d / 2) &&
+            isPointInBoundary(px + w / 2, py - d / 2) &&
+            isPointInBoundary(px - w / 2, py + d / 2) &&
+            isPointInBoundary(px + w / 2, py + d / 2)
+        );
+    }, [isPointInBoundary]);
+
+    const isFiestaInBoundary = useCallback((fx: number, fy: number, r: number) => {
+        return (
+            isPointInBoundary(fx - r, fy) &&
+            isPointInBoundary(fx + r, fy) &&
+            isPointInBoundary(fx, fy - r) &&
+            isPointInBoundary(fx, fy + r)
+        );
+    }, [isPointInBoundary]);
+
+    const checkOverlapParasolFiesta = useCallback((px: number, py: number, pw: number, pd: number, fx: number, fy: number, fr: number) => {
+        const halfW = pw / 2;
+        const halfD = pd / 2;
+        const closestX = clamp(fx, px - halfW, px + halfW);
+        const closestY = clamp(fy, py - halfD, py + halfD);
+        const dx = fx - closestX;
+        const dy = fy - closestY;
+        return (dx * dx + dy * dy) < (fr * fr);
+    }, []);
+
+    const hasCollision = useCallback((itemId: string, type: 'parasol' | 'fiesta') => {
+        if (type === 'parasol') {
+            const p = parasols.find(item => item.id === itemId);
+            if (!p) return false;
+            const dims = getEffectiveParasolDimensions(p);
+            if (!isParasolInBoundary(p.xMm, p.yMm, dims.widthMm, dims.depthMm)) return true;
+            for (const other of parasols) {
+                if (other.id === itemId) continue;
+                const oDims = getEffectiveParasolDimensions(other);
+                const rect1 = { left: p.xMm - dims.widthMm / 2, right: p.xMm + dims.widthMm / 2, top: p.yMm - dims.depthMm / 2, bottom: p.yMm + dims.depthMm / 2 };
+                const rect2 = { left: other.xMm - oDims.widthMm / 2, right: other.xMm + oDims.widthMm / 2, top: other.yMm - oDims.depthMm / 2, bottom: other.yMm + oDims.depthMm / 2 };
+                const overlap = !(rect1.right < rect2.left || rect1.left > rect2.right || rect1.bottom < rect2.top || rect1.top > rect2.bottom);
+                if (overlap) return true;
+            }
+            for (const fiesta of fiestaItems) {
+                const fr = getFiestaRadiusMm(fiesta);
+                if (checkOverlapParasolFiesta(p.xMm, p.yMm, dims.widthMm, dims.depthMm, fiesta.xMm, fiesta.yMm, fr)) return true;
+            }
+        } else {
+            const f = fiestaItems.find(item => item.id === itemId);
+            if (!f) return false;
+            const r = getFiestaRadiusMm(f);
+            if (!isFiestaInBoundary(f.xMm, f.yMm, r)) return true;
+            for (const other of fiestaItems) {
+                if (other.id === itemId) continue;
+                const or = getFiestaRadiusMm(other);
+                const dx = f.xMm - other.xMm;
+                const dy = f.yMm - other.yMm;
+                if ((dx * dx + dy * dy) < (r + or) * (r + or)) return true;
+            }
+            for (const p of parasols) {
+                const dims = getEffectiveParasolDimensions(p);
+                if (checkOverlapParasolFiesta(p.xMm, p.yMm, dims.widthMm, dims.depthMm, f.xMm, f.yMm, r)) return true;
+            }
+        }
+        return false;
+    }, [parasols, fiestaItems, isParasolInBoundary, isFiestaInBoundary, checkOverlapParasolFiesta]);
+
+    const isShowingPreview = useMemo(() => {
+        if (!hoverPreviewLayout) return false;
+        if (hoverPreviewLayout.width !== width) return true;
+        if (hoverPreviewLayout.depthLeft !== (propDepthLeft ?? depth)) return true;
+        if (hoverPreviewLayout.depthRight !== (propDepthRight ?? depth)) return true;
+        
+        const edges: SketchEdgeKey[] = ['front', 'left', 'right', 'back'];
+        for (const edge of edges) {
+            const currentEdge = edge === 'front' ? frontEdge : edge === 'left' ? leftEdge : edge === 'right' ? rightEdge : backEdge;
+            const previewEdge = hoverPreviewLayout[`${edge}Edge` as const] || [];
+            if (currentEdge.length !== previewEdge.length) return true;
+            for (let i = 0; i < currentEdge.length; i++) {
+                if (String(currentEdge[i]) !== String(previewEdge[i])) return true;
+            }
+        }
+        return false;
+    }, [hoverPreviewLayout, width, depth, propDepthLeft, propDepthRight, frontEdge, leftEdge, rightEdge, backEdge]);
 
     const padding = uiDensity === 'touch' ? 2000 : 1500;
     const activeCamera = useMemo(
@@ -500,15 +600,75 @@ export function SketchCanvas({
             const deltaX = (event.clientX - parasolDragRef.current.startX) * worldPerPixelX;
             const deltaY = (event.clientY - parasolDragRef.current.startY) * worldPerPixelY;
 
-            const nextX = parasolDragRef.current.initialX + deltaX;
-            const nextY = parasolDragRef.current.initialY + deltaY;
+            const rawX = parasolDragRef.current.initialX + deltaX;
+            const rawY = parasolDragRef.current.initialY + deltaY;
 
-            onMoveParasol(activeParasolDrag, nextX, nextY);
+            // CAD alignments smart snapping
+            const SNAP_THRESHOLD = 40; // 40 mm
+            let snappedX = rawX;
+            let snappedY = rawY;
+            let activeSnapX: number | null = null;
+            let activeSnapY: number | null = null;
+
+            const centerlineX = currentWidth / 2;
+            const centerlineY = currentMaxDepth / 2;
+
+            // Snap X centerline or other items
+            if (Math.abs(rawX - centerlineX) < SNAP_THRESHOLD) {
+                snappedX = centerlineX;
+                activeSnapX = centerlineX;
+            } else {
+                for (const other of parasols) {
+                    if (other.id === activeParasolDrag) continue;
+                    if (Math.abs(rawX - other.xMm) < SNAP_THRESHOLD) {
+                        snappedX = other.xMm;
+                        activeSnapX = other.xMm;
+                        break;
+                    }
+                }
+                if (activeSnapX === null) {
+                    for (const other of fiestaItems) {
+                        if (Math.abs(rawX - other.xMm) < SNAP_THRESHOLD) {
+                            snappedX = other.xMm;
+                            activeSnapX = other.xMm;
+                            break;
+                        }
+                    }
+                }
+            }
+
+            // Snap Y centerline or other items
+            if (Math.abs(rawY - centerlineY) < SNAP_THRESHOLD) {
+                snappedY = centerlineY;
+                activeSnapY = centerlineY;
+            } else {
+                for (const other of parasols) {
+                    if (other.id === activeParasolDrag) continue;
+                    if (Math.abs(rawY - other.yMm) < SNAP_THRESHOLD) {
+                        snappedY = other.yMm;
+                        activeSnapY = other.yMm;
+                        break;
+                    }
+                }
+                if (activeSnapY === null) {
+                    for (const other of fiestaItems) {
+                        if (Math.abs(rawY - other.yMm) < SNAP_THRESHOLD) {
+                            snappedY = other.yMm;
+                            activeSnapY = other.yMm;
+                            break;
+                        }
+                    }
+                }
+            }
+
+            setSnapLines(activeSnapX !== null || activeSnapY !== null ? { x: activeSnapX, y: activeSnapY } : null);
+            onMoveParasol(activeParasolDrag, snappedX, snappedY);
         };
 
         const handleUp = () => {
             setActiveParasolDrag(null);
             parasolDragRef.current = null;
+            setSnapLines(null);
         };
 
         window.addEventListener('mousemove', handleMove);
@@ -518,7 +678,7 @@ export function SketchCanvas({
             window.removeEventListener('mousemove', handleMove);
             window.removeEventListener('mouseup', handleUp);
         };
-    }, [activeParasolDrag, viewWidth, viewHeight, onMoveParasol]);
+    }, [activeParasolDrag, viewWidth, viewHeight, onMoveParasol, currentWidth, currentMaxDepth, parasols, fiestaItems]);
 
     const [activeFiestaDrag, setActiveFiestaDrag] = useState<string | null>(null);
     const fiestaDragRef = useRef<DraggedItemState | null>(null);
@@ -555,15 +715,75 @@ export function SketchCanvas({
             const deltaX = (event.clientX - fiestaDragRef.current.startX) * worldPerPixelX;
             const deltaY = (event.clientY - fiestaDragRef.current.startY) * worldPerPixelY;
 
-            const nextX = fiestaDragRef.current.initialX + deltaX;
-            const nextY = fiestaDragRef.current.initialY + deltaY;
+            const rawX = fiestaDragRef.current.initialX + deltaX;
+            const rawY = fiestaDragRef.current.initialY + deltaY;
 
-            onMoveFiesta(activeFiestaDrag, nextX, nextY);
+            // CAD alignments smart snapping
+            const SNAP_THRESHOLD = 40; // 40 mm
+            let snappedX = rawX;
+            let snappedY = rawY;
+            let activeSnapX: number | null = null;
+            let activeSnapY: number | null = null;
+
+            const centerlineX = currentWidth / 2;
+            const centerlineY = currentMaxDepth / 2;
+
+            // Snap X centerline or other items
+            if (Math.abs(rawX - centerlineX) < SNAP_THRESHOLD) {
+                snappedX = centerlineX;
+                activeSnapX = centerlineX;
+            } else {
+                for (const other of parasols) {
+                    if (Math.abs(rawX - other.xMm) < SNAP_THRESHOLD) {
+                        snappedX = other.xMm;
+                        activeSnapX = other.xMm;
+                        break;
+                    }
+                }
+                if (activeSnapX === null) {
+                    for (const other of fiestaItems) {
+                        if (other.id === activeFiestaDrag) continue;
+                        if (Math.abs(rawX - other.xMm) < SNAP_THRESHOLD) {
+                            snappedX = other.xMm;
+                            activeSnapX = other.xMm;
+                            break;
+                        }
+                    }
+                }
+            }
+
+            // Snap Y centerline or other items
+            if (Math.abs(rawY - centerlineY) < SNAP_THRESHOLD) {
+                snappedY = centerlineY;
+                activeSnapY = centerlineY;
+            } else {
+                for (const other of parasols) {
+                    if (Math.abs(rawY - other.yMm) < SNAP_THRESHOLD) {
+                        snappedY = other.yMm;
+                        activeSnapY = other.yMm;
+                        break;
+                    }
+                }
+                if (activeSnapY === null) {
+                    for (const other of fiestaItems) {
+                        if (other.id === activeFiestaDrag) continue;
+                        if (Math.abs(rawY - other.yMm) < SNAP_THRESHOLD) {
+                            snappedY = other.yMm;
+                            activeSnapY = other.yMm;
+                            break;
+                        }
+                    }
+                }
+            }
+
+            setSnapLines(activeSnapX !== null || activeSnapY !== null ? { x: activeSnapX, y: activeSnapY } : null);
+            onMoveFiesta(activeFiestaDrag, snappedX, snappedY);
         };
 
         const handleUp = () => {
             setActiveFiestaDrag(null);
             fiestaDragRef.current = null;
+            setSnapLines(null);
         };
 
         window.addEventListener('mousemove', handleMove);
@@ -573,7 +793,7 @@ export function SketchCanvas({
             window.removeEventListener('mousemove', handleMove);
             window.removeEventListener('mouseup', handleUp);
         };
-    }, [activeFiestaDrag, viewWidth, viewHeight, onMoveFiesta]);
+    }, [activeFiestaDrag, viewWidth, viewHeight, onMoveFiesta, currentWidth, currentMaxDepth, parasols, fiestaItems]);
 
     const startPan = useCallback(
         (event) => {
@@ -761,22 +981,73 @@ export function SketchCanvas({
         return lines;
     };
 
+    const renderPostAnchor = (key: string, cx: number, cy: number, isSelected: boolean, isInvalid: boolean, selectWholeEdge: (e: any) => void) => {
+        const radius = sectionThickness * 0.95;
+        return (
+            <g
+                key={key}
+                style={{ cursor: 'pointer' }}
+                onClick={selectWholeEdge}
+            >
+                {/* Outer Selection Glow underlay */}
+                {(isSelected || isInvalid) && (
+                    <circle
+                        cx={cx}
+                        cy={cy}
+                        r={radius + 40}
+                        fill="transparent"
+                        stroke={isInvalid ? '#ef4444' : '#3b82f6'}
+                        strokeWidth="30"
+                        opacity={isInvalid ? 0.8 : 0.65}
+                    />
+                )}
+                {/* Brushed Metal Base Circle */}
+                <circle
+                    cx={cx}
+                    cy={cy}
+                    r={radius}
+                    fill="url(#metalPostGrad)"
+                    stroke="#1e293b"
+                    strokeWidth="10"
+                />
+                {/* Concentric Polished Cap */}
+                <circle
+                    cx={cx}
+                    cy={cy}
+                    r={radius * 0.7}
+                    fill="url(#metalCapGrad)"
+                    stroke="#334155"
+                    strokeWidth="4"
+                />
+                {/* Inner Bolt / Center pin */}
+                <circle
+                    cx={cx}
+                    cy={cy}
+                    r={radius * 0.22}
+                    fill="#0f172a"
+                    stroke="#475569"
+                    strokeWidth="4"
+                />
+            </g>
+        );
+    };
+
     const renderSegment = (edgeKey, segment, geometry, isSelectedEdge, isSelectedSection) => {
         const fill = segment.isDoor
-            ? 'rgba(16,185,129,0.30)'
+            ? 'url(#doorGrad)'
             : isSelectedSection
-                ? 'rgba(245,158,11,0.40)'
+                ? 'url(#selectedSectionGrad)'
                 : isSelectedEdge
-                    ? 'rgba(59,130,246,0.30)'
-                    : 'rgba(56,189,248,0.20)';
+                    ? 'url(#selectedEdgeGrad)'
+                    : 'url(#glassGrad)';
 
         const stroke = segment.isDoor
-            ? 'rgba(16,185,129,0.9)'
+            ? 'rgba(16,185,129,0.95)'
             : isSelectedSection
                 ? 'rgba(245,158,11,0.95)'
                 : isSelectedEdge
                     ? 'rgba(59,130,246,0.95)'
-                    : 'rgba(148,163,184,0.65)';
+                    : 'rgba(148,163,184,0.7)';
 
         return (
             <g
@@ -788,6 +1059,20 @@ export function SketchCanvas({
                     onSelectSection?.(edgeKey, segment.index);
                 }}
             >
+                {/* Outer glowing border for selected section */}
+                {isSelectedSection && (
+                    <rect
+                        x={geometry.x - 20}
+                        y={geometry.y - 20}
+                        width={geometry.w + 40}
+                        height={geometry.h + 40}
+                        fill="transparent"
+                        stroke="rgba(245,158,11,0.3)"
+                        strokeWidth="30"
+                        rx="28"
+                    />
+                )}
+                {/* Translucent Glass Body */}
                 <rect
                     x={geometry.x}
                     y={geometry.y}
@@ -798,6 +1083,18 @@ export function SketchCanvas({
                     strokeWidth={isSelectedSection ? 36 : isSelectedEdge ? 28 : 20}
                     rx="18"
                 />
+                {/* Diagonal glass light reflection lines */}
+                {!segment.isDoor && geometry.w > 120 && (
+                    <line
+                        x1={geometry.x + 40}
+                        y1={geometry.y + 15}
+                        x2={geometry.x + Math.min(geometry.w - 40, 200)}
+                        y2={geometry.y + geometry.h - 15}
+                        stroke="rgba(255,255,255,0.12)"
+                        strokeWidth="12"
+                        strokeLinecap="round"
+                    />
+                )}
                 <text
                     x={geometry.tx}
                     y={geometry.ty}
@@ -812,6 +1109,106 @@ export function SketchCanvas({
                 </text>
             </g>
         );
+    };
+
+    const renderProposedSegment = (edgeKey, segment, geometry) => {
+        return (
+            <g key={`preview-${segment.key}`}>
+                <rect
+                    x={geometry.x}
+                    y={geometry.y}
+                    width={geometry.w}
+                    height={geometry.h}
+                    fill="transparent"
+                    stroke="#f97316"
+                    strokeWidth="15"
+                    strokeDasharray="25 15"
+                    filter="url(#orangeGlow)"
+                    rx="18"
+                />
+                <text
+                    x={geometry.tx}
+                    y={geometry.ty}
+                    fill="#fdba74"
+                    fontSize={labelFont}
+                    fontFamily="Inter, sans-serif"
+                    textAnchor="middle"
+                    dominantBaseline="middle"
+                    fontWeight="700"
+                >
+                    {segment.label}
+                </text>
+            </g>
+        );
+    };
+
+    const renderProposedEdge = (edgeKey, startX, startY, direction, previewLayout) => {
+        const summary = previewLayout.edgeSummaries[edgeKey];
+        if (!summary || summary.enabled === false) return null;
+        const segments = summary.segments || [];
+        const objects = [];
+
+        let cx = startX;
+        let cy = startY;
+
+        objects.push(
+            <circle
+                key={`preview-post-start-${edgeKey}`}
+                cx={cx}
+                cy={cy}
+                r={sectionThickness * 0.95}
+                fill="transparent"
+                stroke="#f97316"
+                strokeWidth="12"
+                strokeDasharray="15 10"
+                filter="url(#orangeGlow)"
+            />
+        );
+
+        segments.forEach((segment) => {
+            const len = Number(segment.length) || 0;
+            const geometry = direction === 'E'
+                ? {
+                    x: cx,
+                    y: cy - sectionThickness / 2,
+                    w: len,
+                    h: sectionThickness,
+                    tx: cx + len / 2,
+                    ty: cy + sectionThickness + 210
+                }
+                : {
+                    x: cx - sectionThickness / 2,
+                    y: cy,
+                    w: sectionThickness,
+                    h: len,
+                    tx: cx - sectionThickness - 260,
+                    ty: cy + len / 2
+                };
+
+            objects.push(renderProposedSegment(edgeKey, segment, geometry));
+
+            if (direction === 'E') {
+                cx += len;
+            } else {
+                cy += len;
+            }
+
+            objects.push(
+                <circle
+                    key={`preview-post-${edgeKey}-${segment.key}`}
+                    cx={cx}
+                    cy={cy}
+                    r={sectionThickness * 0.95}
+                    fill="transparent"
+                    stroke="#f97316"
+                    strokeWidth="12"
+                    strokeDasharray="15 10"
+                    filter="url(#orangeGlow)"
+                />
+            );
+        });
+
+        return objects;
     };
 
     const renderEdge = (edgeKey, startX, startY, direction) => {
@@ -834,17 +1231,7 @@ export function SketchCanvas({
         let cy = startY;
 
         objects.push(
-            <circle
-                key={`post-start-${edgeKey}`}
-                cx={cx}
-                cy={cy}
-                r={sectionThickness * 0.9}
-                fill={isInvalid ? 'rgba(239,68,68,0.35)' : 'rgba(15,23,42,0.9)'}
-                stroke={isSelected ? '#3b82f6' : 'rgba(148,163,184,0.4)'}
-                strokeWidth={isSelected ? 34 : 24}
-                style={{ cursor: 'pointer' }}
-                onClick={selectWholeEdge}
-            />
+            renderPostAnchor(`post-start-${edgeKey}`, cx, cy, isSelected, isInvalid, selectWholeEdge)
         );
 
         segments.forEach((segment) => {
@@ -878,17 +1265,7 @@ export function SketchCanvas({
             }
 
             objects.push(
-                <circle
-                    key={`post-${edgeKey}-${segment.key}`}
-                    cx={cx}
-                    cy={cy}
-                    r={sectionThickness * 0.9}
-                    fill={isInvalid ? 'rgba(239,68,68,0.35)' : 'rgba(15,23,42,0.9)'}
-                    stroke={isSelected ? '#3b82f6' : 'rgba(148,163,184,0.4)'}
-                    strokeWidth={isSelected ? 34 : 24}
-                    style={{ cursor: 'pointer' }}
-                    onClick={selectWholeEdge}
-                />
+                renderPostAnchor(`post-${edgeKey}-${segment.key}`, cx, cy, isSelected, isInvalid, selectWholeEdge)
             );
         });
 
@@ -1051,6 +1428,7 @@ export function SketchCanvas({
             const py = p.yMm - dims.depthMm / 2;
             const isRotatable = isParasolRotatable(p);
             const isRotated = getParasolRotationDeg(p) === 90;
+            const hasErr = hasCollision(p.id, 'parasol');
 
             return (
                 <g
@@ -1071,14 +1449,33 @@ export function SketchCanvas({
                     }}
                     style={{ cursor: activeMode === 'parasol' ? 'move' : 'default', pointerEvents: activeMode === 'parasol' ? 'all' : 'none' }}
                 >
+                    {/* Collision Alarm Pulsing ring */}
+                    {hasErr && (
+                        <rect
+                            x={px - 25}
+                            y={py - 25}
+                            width={dims.widthMm + 50}
+                            height={dims.depthMm + 50}
+                            fill="transparent"
+                            stroke="#ef4444"
+                            strokeWidth="30"
+                            strokeDasharray="40 20"
+                            filter="url(#warningGlow)"
+                            rx="10"
+                        >
+                            <animate attributeName="opacity" values="0.45;1.0;0.45" dur="1.8s" repeatCount="indefinite" />
+                        </rect>
+                    )}
+
                     <rect
                         x={px}
                         y={py}
                         width={dims.widthMm}
                         height={dims.depthMm}
                         fill={isSelected ? 'rgba(59,130,246,0.3)' : 'rgba(241,245,249,0.1)'}
-                        stroke={isSelected ? '#3b82f6' : 'rgba(203,213,225,0.4)'}
+                        stroke={hasErr ? '#ef4444' : isSelected ? '#3b82f6' : 'rgba(203,213,225,0.4)'}
                         strokeWidth={isSelected ? 30 : 20}
+                        filter={hasErr ? 'url(#warningGlow)' : undefined}
                     />
                     {isSelected && isRotatable && (
                         <line
@@ -1092,6 +1489,33 @@ export function SketchCanvas({
                             pointerEvents="none"
                         />
                     )}
+
+                    {/* Exclamation Warning Badge */}
+                    {hasErr && (
+                        <g>
+                            <circle
+                                cx={px + dims.widthMm}
+                                cy={py}
+                                r="100"
+                                fill="#ef4444"
+                                stroke="#ffffff"
+                                strokeWidth="18"
+                                filter="url(#warningGlow)"
+                            />
+                            <text
+                                x={px + dims.widthMm}
+                                y={py}
+                                fill="#ffffff"
+                                fontSize="150"
+                                fontWeight="900"
+                                textAnchor="middle"
+                                dominantBaseline="middle"
+                                fontFamily="Inter, sans-serif"
+                            >
+                                !
+                            </text>
+                        </g>
+                    )}
                 </g>
             );
         });
@@ -1103,6 +1527,7 @@ export function SketchCanvas({
             .map((fiesta) => {
                 const isSelected = fiesta.id === selectedFiestaId;
                 const radiusMm = getFiestaRadiusMm(fiesta);
+                const hasErr = hasCollision(fiesta.id, 'fiesta');
 
                 return (
                     <g
@@ -1123,6 +1548,22 @@ export function SketchCanvas({
                         }}
                         style={{ cursor: activeMode === 'fiesta' ? 'move' : 'default', pointerEvents: activeMode === 'fiesta' ? 'all' : 'none' }}
                     >
+                        {/* Collision Alarm Pulsing Ring */}
+                        {hasErr && (
+                            <circle
+                                cx={fiesta.xMm}
+                                cy={fiesta.yMm}
+                                r={radiusMm + 25}
+                                fill="transparent"
+                                stroke="#ef4444"
+                                strokeWidth="30"
+                                strokeDasharray="40 20"
+                                filter="url(#warningGlow)"
+                            >
+                                <animate attributeName="opacity" values="0.45;1.0;0.45" dur="1.8s" repeatCount="indefinite" />
+                            </circle>
+                        )}
+
                         <circle
                             cx={fiesta.xMm}
                             cy={fiesta.yMm}
@@ -1130,9 +1571,37 @@ export function SketchCanvas({
                             fill={zLayer === 'above'
                                 ? (isSelected ? 'rgba(251,191,36,0.30)' : 'rgba(250,204,21,0.18)')
                                 : (isSelected ? 'rgba(148,163,184,0.26)' : 'rgba(226,232,240,0.14)')}
-                            stroke={isSelected ? '#f59e0b' : 'rgba(226,232,240,0.55)'}
+                            stroke={hasErr ? '#ef4444' : isSelected ? '#f59e0b' : 'rgba(226,232,240,0.55)'}
                             strokeWidth={isSelected ? 30 : 20}
+                            filter={hasErr ? 'url(#warningGlow)' : undefined}
                         />
+
+                        {/* Exclamation Warning Badge */}
+                        {hasErr && (
+                            <g>
+                                <circle
+                                    cx={fiesta.xMm + radiusMm * 0.7}
+                                    cy={fiesta.yMm - radiusMm * 0.7}
+                                    r="100"
+                                    fill="#ef4444"
+                                    stroke="#ffffff"
+                                    strokeWidth="18"
+                                    filter="url(#warningGlow)"
+                                />
+                                <text
+                                    x={fiesta.xMm + radiusMm * 0.7}
+                                    y={fiesta.yMm - radiusMm * 0.7}
+                                    fill="#ffffff"
+                                    fontSize="150"
+                                    fontWeight="900"
+                                    textAnchor="middle"
+                                    dominantBaseline="middle"
+                                    fontFamily="Inter, sans-serif"
+                                >
+                                    !
+                                </text>
+                            </g>
+                        )}
                     </g>
                 );
             });
@@ -1212,86 +1681,221 @@ export function SketchCanvas({
                 <p className="m-0 px-0.5 text-xs text-text-secondary">{MODE_HELP_TEXT[activeMode]}</p>
             </div>
 
-            <svg
-                ref={svgRef}
-                viewBox={viewBox}
-                className="w-full h-auto border border-panel-border rounded-lg bg-[#0b1220]"
-                style={{ minHeight: '500px', maxHeight: '760px', touchAction: 'none' }}
-                onWheel={handleWheel}
-                onMouseDown={startPan}
-                onTouchStart={handleTouchStart}
-                onTouchMove={handleTouchMove}
-                onTouchEnd={handleTouchEnd}
-            >
-                {renderGrid()}
-                <line x1={-padding} y1={0} x2={currentWidth + padding} y2={0} stroke="rgba(30,64,175,0.4)" strokeWidth="18" />
-                <line x1={0} y1={-padding} x2={0} y2={currentMaxDepth + padding} stroke="rgba(30,64,175,0.4)" strokeWidth="18" />
+            <div className="relative">
+                <svg
+                    ref={svgRef}
+                    viewBox={viewBox}
+                    className="w-full h-auto border border-panel-border rounded-lg bg-[#0b1220]"
+                    style={{ minHeight: '500px', maxHeight: '760px', touchAction: 'none' }}
+                    onWheel={handleWheel}
+                    onMouseDown={startPan}
+                    onTouchStart={handleTouchStart}
+                    onTouchMove={handleTouchMove}
+                    onTouchEnd={handleTouchEnd}
+                >
+                    <defs>
+                        {/* Teal-cyan linear gradient for glass sections */}
+                        <linearGradient id="glassGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                            <stop offset="0%" stopColor="#0891b2" stopOpacity="0.45" />
+                            <stop offset="50%" stopColor="#06b6d4" stopOpacity="0.25" />
+                            <stop offset="100%" stopColor="#0891b2" stopOpacity="0.45" />
+                        </linearGradient>
 
-                <polygon
-                    points={`0,${currentMaxDepth} ${currentWidth},${currentMaxDepth} ${currentWidth},${currentMaxDepth - currentDepthRight} 0,${currentMaxDepth - currentDepthLeft}`}
-                    fill="rgba(15,23,42,0.22)"
-                    stroke="rgba(59,130,246,0.55)"
-                    strokeWidth="26"
-                    strokeDasharray="100 70"
-                    onMouseUp={handlePolygonClick}
-                    style={{ pointerEvents: activeMode === 'parasol' || activeMode === 'fiesta' ? 'all' : 'none' }}
-                />
+                        {/* Green-emerald linear gradient for doors */}
+                        <linearGradient id="doorGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                            <stop offset="0%" stopColor="#059669" stopOpacity="0.5" />
+                            <stop offset="50%" stopColor="#10b981" stopOpacity="0.3" />
+                            <stop offset="100%" stopColor="#059669" stopOpacity="0.5" />
+                        </linearGradient>
 
-                {renderEdge('front', 0, currentMaxDepth, 'E')}
-                {(summaryByEdge.left?.enabled ?? true) && renderEdge('left', 0, currentMaxDepth - currentDepthLeft, 'S')}
-                {(summaryByEdge.right?.enabled ?? true) && renderEdge('right', currentWidth, currentMaxDepth - currentDepthRight, 'S')}
+                        {/* Amber-orange linear gradient for selection */}
+                        <linearGradient id="selectedSectionGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                            <stop offset="0%" stopColor="#d97706" stopOpacity="0.6" />
+                            <stop offset="50%" stopColor="#fbbf24" stopOpacity="0.4" />
+                            <stop offset="100%" stopColor="#d97706" stopOpacity="0.6" />
+                        </linearGradient>
 
-                {(includeBack && (summaryByEdge.back?.enabled ?? true)) ? (
-                    renderEdge('back', 0, 0, 'E')
-                ) : (
-                    <g>
-                        <line
-                            x1={-500}
-                            y1={0}
-                            x2={currentWidth + 500}
-                            y2={0}
-                            stroke="rgba(203,213,225,0.55)"
-                            strokeWidth="40"
-                            strokeDasharray="180 120"
-                        />
-                        <text
-                            x={currentWidth / 2}
-                            y={-120}
-                            fill="rgba(148,163,184,0.9)"
-                            fontSize="190"
-                            fontFamily="Inter, sans-serif"
-                            textAnchor="middle"
-                            fontWeight="700"
-                        >
-                            Befintlig vägg / fasad
-                        </text>
+                        {/* Blue-indigo linear gradient for selected edges */}
+                        <linearGradient id="selectedEdgeGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                            <stop offset="0%" stopColor="#2563eb" stopOpacity="0.55" />
+                            <stop offset="50%" stopColor="#3b82f6" stopOpacity="0.35" />
+                            <stop offset="100%" stopColor="#2563eb" stopOpacity="0.55" />
+                        </linearGradient>
+
+                        {/* Brushed metal post post anchors (slate horizontal) */}
+                        <linearGradient id="metalPostGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+                            <stop offset="0%" stopColor="#475569" />
+                            <stop offset="25%" stopColor="#94a3b8" />
+                            <stop offset="50%" stopColor="#cbd5e1" />
+                            <stop offset="75%" stopColor="#94a3b8" />
+                            <stop offset="100%" stopColor="#475569" />
+                        </linearGradient>
+
+                        {/* Concentric polished caps (radial slate-light) */}
+                        <radialGradient id="metalCapGrad" cx="30%" cy="30%" r="70%">
+                            <stop offset="0%" stopColor="#f1f5f9" />
+                            <stop offset="50%" stopColor="#cbd5e1" />
+                            <stop offset="100%" stopColor="#475569" />
+                        </radialGradient>
+
+                        {/* Red warning glow filter */}
+                        <filter id="warningGlow" x="-30%" y="-30%" width="160%" height="160%">
+                            <feDropShadow dx="0" dy="0" stdDeviation="22" floodColor="#ef4444" floodOpacity="0.9" />
+                        </filter>
+
+                        {/* Orange preview glow filter */}
+                        <filter id="orangeGlow" x="-30%" y="-30%" width="160%" height="160%">
+                            <feDropShadow dx="0" dy="0" stdDeviation="22" floodColor="#f97316" floodOpacity="0.85" />
+                        </filter>
+                    </defs>
+
+                    {renderGrid()}
+                    <line x1={-padding} y1={0} x2={currentWidth + padding} y2={0} stroke="rgba(30,64,175,0.4)" strokeWidth="18" />
+                    <line x1={0} y1={-padding} x2={0} y2={currentMaxDepth + padding} stroke="rgba(30,64,175,0.4)" strokeWidth="18" />
+
+                    <polygon
+                        points={`0,${currentMaxDepth} ${currentWidth},${currentMaxDepth} ${currentWidth},${currentMaxDepth - currentDepthRight} 0,${currentMaxDepth - currentDepthLeft}`}
+                        fill="rgba(15,23,42,0.22)"
+                        stroke="rgba(59,130,246,0.55)"
+                        strokeWidth="26"
+                        strokeDasharray="100 70"
+                        onMouseUp={handlePolygonClick}
+                        style={{ pointerEvents: activeMode === 'parasol' || activeMode === 'fiesta' ? 'all' : 'none' }}
+                    />
+
+                    {/* standard drawing layer, dimmed if a recommendation preview is actively showing */}
+                    <g opacity={isShowingPreview ? 0.35 : 1.0}>
+                        {renderEdge('front', 0, currentMaxDepth, 'E')}
+                        {(summaryByEdge.left?.enabled ?? true) && renderEdge('left', 0, currentMaxDepth - currentDepthLeft, 'S')}
+                        {(summaryByEdge.right?.enabled ?? true) && renderEdge('right', currentWidth, currentMaxDepth - currentDepthRight, 'S')}
+
+                        {(includeBack && (summaryByEdge.back?.enabled ?? true)) ? (
+                            renderEdge('back', 0, 0, 'E')
+                        ) : (
+                            <g>
+                                <line
+                                    x1={-500}
+                                    y1={0}
+                                    x2={currentWidth + 500}
+                                    y2={0}
+                                    stroke="rgba(203,213,225,0.55)"
+                                    strokeWidth="40"
+                                    strokeDasharray="180 120"
+                                />
+                                <text
+                                    x={currentWidth / 2}
+                                    y={-120}
+                                    fill="rgba(148,163,184,0.9)"
+                                    fontSize="190"
+                                    fontFamily="Inter, sans-serif"
+                                    textAnchor="middle"
+                                    fontWeight="700"
+                                >
+                                    Befintlig vägg / fasad
+                                </text>
+                            </g>
+                        )}
+
+                        {renderFiestaItems('below')}
+                        {renderParasols()}
+                        {renderFiestaItems('above')}
                     </g>
-                )}
 
-                {renderFiestaItems('below')}
-                {renderParasols()}
-                {renderFiestaItems('above')}
-                {renderDimensions()}
+                    {/* Suggestion Preview Overlay layer */}
+                    {isShowingPreview && hoverPreviewLayout && (
+                        <>
+                            {/* Proposed boundary polygon overlay */}
+                            <polygon
+                                points={`0,${Math.max(hoverPreviewLayout.depthLeft, hoverPreviewLayout.depthRight)} ${hoverPreviewLayout.width},${Math.max(hoverPreviewLayout.depthLeft, hoverPreviewLayout.depthRight)} ${hoverPreviewLayout.width},${Math.max(hoverPreviewLayout.depthLeft, hoverPreviewLayout.depthRight) - hoverPreviewLayout.depthRight} 0,${Math.max(hoverPreviewLayout.depthLeft, hoverPreviewLayout.depthRight) - hoverPreviewLayout.depthLeft}`}
+                                fill="rgba(249,115,22,0.06)"
+                                stroke="#f97316"
+                                strokeWidth="20"
+                                strokeDasharray="50 35"
+                                filter="url(#orangeGlow)"
+                            />
 
-                {activeMode === 'clickitup' && (
-                    <>
-                        <DragHandle x={currentWidth / 2} y={currentMaxDepth} edgeId="front" cursor="ns-resize" />
-                        <DragHandle
-                            x={0}
-                            y={currentMaxDepth - currentDepthLeft + currentDepthLeft / 2}
-                            edgeId={equalDepth ? "left" : "depthLeft"}
-                            cursor={equalDepth ? "ew-resize" : "ns-resize"}
+                            {/* Proposed edges rendering */}
+                            {renderProposedEdge('front', 0, Math.max(hoverPreviewLayout.depthLeft, hoverPreviewLayout.depthRight), 'E', hoverPreviewLayout)}
+                            {(hoverPreviewLayout.edgeSummaries?.left?.enabled ?? true) && renderProposedEdge('left', 0, Math.max(hoverPreviewLayout.depthLeft, hoverPreviewLayout.depthRight) - hoverPreviewLayout.depthLeft, 'S', hoverPreviewLayout)}
+                            {(hoverPreviewLayout.edgeSummaries?.right?.enabled ?? true) && renderProposedEdge('right', hoverPreviewLayout.width, Math.max(hoverPreviewLayout.depthLeft, hoverPreviewLayout.depthRight) - hoverPreviewLayout.depthRight, 'S', hoverPreviewLayout)}
+                            {(hoverPreviewLayout.includeBack && (hoverPreviewLayout.edgeSummaries?.back?.enabled ?? true)) && renderProposedEdge('back', 0, 0, 'E', hoverPreviewLayout)}
+                        </>
+                    )}
+
+                    {renderDimensions()}
+
+                    {/* CAD Snap guidelines */}
+                    {snapLines && snapLines.x !== null && (
+                        <line
+                            x1={snapLines.x}
+                            y1={-padding}
+                            x2={snapLines.x}
+                            y2={currentMaxDepth + padding}
+                            stroke="#f97316"
+                            strokeWidth="15"
+                            strokeDasharray="40 25"
+                            filter="url(#orangeGlow)"
                         />
-                        <DragHandle
-                            x={currentWidth}
-                            y={currentMaxDepth - currentDepthRight + currentDepthRight / 2}
-                            edgeId={equalDepth ? "right" : "depthRight"}
-                            cursor={equalDepth ? "ew-resize" : "ns-resize"}
+                    )}
+                    {snapLines && snapLines.y !== null && (
+                        <line
+                            x1={-padding}
+                            y1={snapLines.y}
+                            x2={currentWidth + padding}
+                            y2={snapLines.y}
+                            stroke="#f97316"
+                            strokeWidth="15"
+                            strokeDasharray="40 25"
+                            filter="url(#orangeGlow)"
                         />
-                    </>
-                )}
-            </svg>
+                    )}
 
+                    {activeMode === 'clickitup' && (
+                        <>
+                            <DragHandle x={currentWidth / 2} y={currentMaxDepth} edgeId="front" cursor="ns-resize" />
+                            <DragHandle
+                                x={0}
+                                y={currentMaxDepth - currentDepthLeft + currentDepthLeft / 2}
+                                edgeId={equalDepth ? "left" : "depthLeft"}
+                                cursor={equalDepth ? "ew-resize" : "ns-resize"}
+                            />
+                            <DragHandle
+                                x={currentWidth}
+                                y={currentMaxDepth - currentDepthRight + currentDepthRight / 2}
+                                edgeId={equalDepth ? "right" : "depthRight"}
+                                cursor={equalDepth ? "ew-resize" : "ns-resize"}
+                            />
+                        </>
+                    )}
+                </svg>
+
+                {/* Floating Undo/Redo capsule */}
+                <div className="absolute bottom-4 left-4 flex items-center gap-1.5 bg-[#12121a]/85 backdrop-blur-md border border-panel-border/80 rounded-full p-1.5 shadow-[0_8px_32px_0_rgba(0,0,0,0.55)]">
+                    <button
+                        type="button"
+                        onClick={undo}
+                        disabled={!canUndo}
+                        className={`p-2 rounded-full transition-all duration-200 ${canUndo ? 'text-primary hover:bg-white/10 hover:text-white active:scale-95' : 'text-slate-600 cursor-not-allowed opacity-50'}`}
+                        title="Ångra (Ctrl+Z)"
+                    >
+                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M9 15L3 9m0 0l6-6M3 9h12a6 6 0 010 12h-3" />
+                        </svg>
+                    </button>
+                    <div className="w-[1px] h-5 bg-panel-border/60" />
+                    <button
+                        type="button"
+                        onClick={redo}
+                        disabled={!canRedo}
+                        className={`p-2 rounded-full transition-all duration-200 ${canRedo ? 'text-primary hover:bg-white/10 hover:text-white active:scale-95' : 'text-slate-600 cursor-not-allowed opacity-50'}`}
+                        title="Gör om (Ctrl+Y)"
+                    >
+                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l6-6m0 0l-6-6m6 6H9a6 6 0 000 12h3" />
+                        </svg>
+                    </button>
+                </div>
+            </div>
         </div>
     );
 }

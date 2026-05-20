@@ -440,7 +440,16 @@ export function SketchTool({ onBack, onExportToQuoteComplete }: SketchToolProps)
     const [dragPreview, setDragPreview] = useState<DragPreview | null>(null);
     const [activeSidebarTab, setActiveSidebarTab] = useState<'inspector' | 'review'>('inspector');
 
-    const updateConfig = useCallback((partial: Partial<SketchConfigState>) => {
+    // History stacks for undo/redo
+    const [past, setPast] = useState<SketchConfigState[]>([]);
+    const [future, setFuture] = useState<SketchConfigState[]>([]);
+    const preDragConfigRef = useRef<SketchConfigState | null>(null);
+    const isDraggingRef = useRef<boolean>(false);
+
+    // Hovered suggestion overlay states
+    const [hoveredSuggestion, setHoveredSuggestion] = useState<any | null>(null);
+
+    const updateConfig = useCallback((partial: Partial<SketchConfigState>, pushHistory = true) => {
         setConfig((prev) => {
             const merged = {
                 ...prev,
@@ -452,7 +461,78 @@ export function SketchTool({ onBack, onExportToQuoteComplete }: SketchToolProps)
                     ? partial.manualSectionsByEdge
                     : prev.manualSectionsByEdge
             };
-            return sanitizeConfig(merged);
+            const next = sanitizeConfig(merged);
+
+            if (pushHistory) {
+                setPast((p) => {
+                    const newPast = [...p, prev];
+                    if (newPast.length > 30) newPast.shift();
+                    return newPast;
+                });
+                setFuture([]);
+            } else {
+                if (!isDraggingRef.current) {
+                    isDraggingRef.current = true;
+                    preDragConfigRef.current = prev;
+                }
+            }
+            return next;
+        });
+    }, []);
+
+    const handleGlobalMouseUp = useCallback(() => {
+        if (isDraggingRef.current && preDragConfigRef.current) {
+            const currentConfig = preDragConfigRef.current;
+            setConfig((latest) => {
+                setPast((p) => {
+                    const newPast = [...p, currentConfig];
+                    if (newPast.length > 30) newPast.shift();
+                    return newPast;
+                });
+                setFuture([]);
+                return latest;
+            });
+            preDragConfigRef.current = null;
+            isDraggingRef.current = false;
+        }
+    }, []);
+
+    useEffect(() => {
+        window.addEventListener('mouseup', handleGlobalMouseUp);
+        return () => window.removeEventListener('mouseup', handleGlobalMouseUp);
+    }, [handleGlobalMouseUp]);
+
+    const undo = useCallback(() => {
+        setPast((prevPast) => {
+            if (prevPast.length === 0) return prevPast;
+            const previous = prevPast[prevPast.length - 1];
+            const newPast = prevPast.slice(0, prevPast.length - 1);
+            
+            setConfig((current) => {
+                setFuture((prevFuture) => [current, ...prevFuture]);
+                return previous;
+            });
+            
+            return newPast;
+        });
+    }, []);
+
+    const redo = useCallback(() => {
+        setFuture((prevFuture) => {
+            if (prevFuture.length === 0) return prevFuture;
+            const next = prevFuture[0];
+            const newFuture = prevFuture.slice(1);
+            
+            setConfig((current) => {
+                setPast((prevPast) => {
+                    const newPast = [...prevPast, current];
+                    if (newPast.length > 30) newPast.shift();
+                    return newPast;
+                });
+                return next;
+            });
+            
+            return newFuture;
         });
     }, []);
 
@@ -522,6 +602,76 @@ export function SketchTool({ onBack, onExportToQuoteComplete }: SketchToolProps)
     }, [config.doorSegmentsByEdge, updateConfig]);
 
     const layout = useMemo<ComputedLayoutResult>(() => computeLayout(config), [config]);
+
+    // Simulated suggestion preview configs and layouts
+    const hoverPreviewConfig = useMemo<SketchConfigState>(() => {
+        if (!hoveredSuggestion) return config;
+        
+        const sim = JSON.parse(JSON.stringify(config)) as SketchConfigState;
+        const suggestion = hoveredSuggestion;
+        
+        if (suggestion.type === 'setDoorSegmentSize') {
+            const nextDoors = { ...(sim.doorSegmentsByEdge || {}) };
+            const current = (nextDoors[suggestion.edge] || []).filter((segment: any) => segment.index !== suggestion.index);
+            current.push({ index: suggestion.index ?? 0, size: normalizeDoorSize(suggestion.value) });
+            current.sort((a: any, b: any) => a.index - b.index);
+            nextDoors[suggestion.edge] = current;
+
+            const nextPins = { ...(sim.manualSectionsByEdge || {}) };
+            const filteredPins = (nextPins[suggestion.edge] || []).filter((pin: any) => pin.index !== suggestion.index);
+            if (filteredPins.length > 0) {
+                nextPins[suggestion.edge] = filteredPins;
+            } else {
+                delete nextPins[suggestion.edge];
+            }
+            sim.doorSegmentsByEdge = nextDoors;
+            sim.manualSectionsByEdge = nextPins;
+        } else if (suggestion.type === 'removeDoorSegment') {
+            const nextDoors = { ...(sim.doorSegmentsByEdge || {}) };
+            const filteredDoors = (nextDoors[suggestion.edge] || []).filter((segment: any) => segment.index !== suggestion.index);
+            if (filteredDoors.length > 0) {
+                nextDoors[suggestion.edge] = filteredDoors;
+            } else {
+                delete nextDoors[suggestion.edge];
+            }
+            sim.doorSegmentsByEdge = nextDoors;
+        } else if (suggestion.type === 'setDimension') {
+            const val = suggestion.value;
+            if (suggestion.dimension === 'width') {
+                sim.width = normalizeDimension(val, sim.width);
+            } else if (suggestion.dimension === 'depth') {
+                const primaryDepth = normalizeDepth(val, sim.depth);
+                if (sim.equalDepth) {
+                    sim.depth = primaryDepth;
+                    sim.depthLeft = primaryDepth;
+                    sim.depthRight = primaryDepth;
+                } else if (suggestion.edge === 'left') {
+                    sim.depthLeft = primaryDepth;
+                } else if (suggestion.edge === 'right') {
+                    sim.depthRight = primaryDepth;
+                } else {
+                    sim.depth = primaryDepth;
+                }
+            }
+        } else if (suggestion.type === 'setSectionCount') {
+            sim.sectionCountByEdge = {
+                ...sim.sectionCountByEdge,
+                [suggestion.edge]: suggestion.value
+            };
+        } else if (suggestion.type === 'clearSectionCount') {
+            const next = { ...sim.sectionCountByEdge };
+            delete next[suggestion.edge];
+            sim.sectionCountByEdge = next;
+        }
+        
+        return sanitizeConfig(sim);
+    }, [config, hoveredSuggestion]);
+
+    const hoverPreviewLayout = useMemo<ComputedLayoutResult>(() => {
+        if (!hoveredSuggestion) return layout;
+        return computeLayout(hoverPreviewConfig);
+    }, [hoveredSuggestion, hoverPreviewConfig, layout]);
+
     const previewConfig = useMemo<SketchConfigState>(() => {
         if (!dragPreview) return config;
         return sanitizeConfig({
@@ -772,7 +922,7 @@ export function SketchTool({ onBack, onExportToQuoteComplete }: SketchToolProps)
             parasols: (config.parasols || []).map(p =>
                 p.id === id ? { ...p, xMm: snappedX, yMm: snappedY } : p
             )
-        });
+        }, false);
     }, [config.parasols, parasolAreaPolygon, updateConfig]);
 
     const handleRotateParasol = useCallback((id, rotationDeg) => {
@@ -840,7 +990,7 @@ export function SketchTool({ onBack, onExportToQuoteComplete }: SketchToolProps)
             fiestaItems: (config.fiestaItems || []).map((fiesta) =>
                 fiesta.id === id ? { ...fiesta, xMm: snappedX, yMm: snappedY } : fiesta
             )
-        });
+        }, false);
     }, [config.fiestaItems, parasolAreaPolygon, updateConfig]);
 
     const handleDeleteFiesta = useCallback((id) => {
@@ -861,6 +1011,44 @@ export function SketchTool({ onBack, onExportToQuoteComplete }: SketchToolProps)
             setActiveSidebarTab('inspector');
         }
     }, [config.selectedFiestaId, config.selectedParasolId, workspace.selection.edgeKey, workspace.selection.segmentIndex]);
+
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            // Do not intercept hotkeys if typing in inputs
+            const activeEl = document.activeElement;
+            if (activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA' || activeEl.tagName === 'SELECT')) {
+                return;
+            }
+
+            // Undo / Redo key bindings
+            if (e.ctrlKey && !e.shiftKey && e.key.toLowerCase() === 'z') {
+                e.preventDefault();
+                undo();
+            } else if (
+                (e.ctrlKey && e.key.toLowerCase() === 'y') ||
+                (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === 'z')
+            ) {
+                e.preventDefault();
+                redo();
+            }
+
+            // Deletion bindings
+            if (e.key === 'Delete' || e.key === 'Backspace') {
+                if (config.selectedParasolId) {
+                    e.preventDefault();
+                    handleDeleteParasol(config.selectedParasolId);
+                } else if (config.selectedFiestaId) {
+                    e.preventDefault();
+                    handleDeleteFiesta(config.selectedFiestaId);
+                }
+            }
+        };
+
+        window.addEventListener('keydown', handleKeyDown);
+        return () => {
+            window.removeEventListener('keydown', handleKeyDown);
+        };
+    }, [undo, redo, config.selectedParasolId, config.selectedFiestaId, handleDeleteParasol, handleDeleteFiesta]);
 
     const handleExportClick = () => {
         if (!canExportSketchToQuote) {
@@ -1230,6 +1418,12 @@ export function SketchTool({ onBack, onExportToQuoteComplete }: SketchToolProps)
                         onCameraChange={handleCameraChange}
                         onResizePreview={handleResizePreview}
                         onResizeCommit={handleResizeCommit}
+                        hoverPreviewLayout={hoverPreviewLayout}
+                        onHoverSuggestion={setHoveredSuggestion}
+                        undo={undo}
+                        redo={redo}
+                        canUndo={past.length > 0}
+                        canRedo={future.length > 0}
                     />
 
                     <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1 rounded-xl border border-panel-border bg-panel-bg/70 px-4 py-2 text-xs text-text-secondary">
@@ -1264,6 +1458,7 @@ export function SketchTool({ onBack, onExportToQuoteComplete }: SketchToolProps)
                         onSetDoorSegmentSize={setDoorSegmentSize}
                         onResetDoorSegment={resetDoorSegment}
                         onApplySuggestion={applySuggestion}
+                        onHoverSuggestion={setHoveredSuggestion}
                         onDeleteParasol={handleDeleteParasol}
                         onRotateParasol={handleRotateParasol}
                         onDeleteFiesta={handleDeleteFiesta}
@@ -1273,6 +1468,7 @@ export function SketchTool({ onBack, onExportToQuoteComplete }: SketchToolProps)
                         reviewState={sketchReviewState}
                         canExportToQuote={canExportSketchToQuote}
                         onApplySuggestion={applySuggestion}
+                        onHoverSuggestion={setHoveredSuggestion}
                         onExport={handleExportClick}
                         onExportImage={handleExportImage}
                     />
@@ -1317,6 +1513,7 @@ export function SketchTool({ onBack, onExportToQuoteComplete }: SketchToolProps)
                         onSetDoorSegmentSize={setDoorSegmentSize}
                         onResetDoorSegment={resetDoorSegment}
                         onApplySuggestion={applySuggestion}
+                        onHoverSuggestion={setHoveredSuggestion}
                         onDeleteParasol={handleDeleteParasol}
                         onRotateParasol={handleRotateParasol}
                         onDeleteFiesta={handleDeleteFiesta}
@@ -1326,6 +1523,7 @@ export function SketchTool({ onBack, onExportToQuoteComplete }: SketchToolProps)
                         reviewState={sketchReviewState}
                         canExportToQuote={canExportSketchToQuote}
                         onApplySuggestion={applySuggestion}
+                        onHoverSuggestion={setHoveredSuggestion}
                         onExport={handleExportClick}
                         onExportImage={handleExportImage}
                     />
