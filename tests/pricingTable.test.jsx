@@ -1,11 +1,11 @@
 import React from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { PricingTable } from '../src/components/features/PricingTable';
+import { PricingTable, clampPricingRowDiscount } from '../src/components/features/PricingTable';
 import { QuoteContext } from '../src/store/QuoteContext';
 import { AuthContext } from '../src/store/AuthContext';
 
-function renderPricingTable(stateOverrides = {}) {
+function renderPricingTable(stateOverrides = {}, authOverrides = {}) {
     const quoteValue = {
         state: {
             builderItems: [
@@ -24,6 +24,7 @@ function renderPricingTable(stateOverrides = {}) {
             gridSelections: {},
             customCosts: [],
             globalDiscountPct: 0,
+            selectedLines: ['BaHaMa'],
             exchangeRate: 12.2,
             includesVat: false,
             ...stateOverrides
@@ -43,7 +44,8 @@ function renderPricingTable(stateOverrides = {}) {
         login: vi.fn(),
         logout: vi.fn(),
         retailer: null,
-        isRetailer: false
+        isRetailer: false,
+        ...authOverrides
     };
 
     return renderToStaticMarkup(
@@ -100,5 +102,45 @@ describe('PricingTable name editing UX', () => {
         expect(addonHandles).toHaveLength(1);
         expect(html).not.toContain('aria-label="Flytta upp"');
         expect(html).not.toContain('aria-label="Flytta ner"');
+    });
+
+    it('renders editable retailer row discounts with the retailer discount as max', () => {
+        const html = renderPricingTable(
+            {
+                globalDiscountPct: 12
+            },
+            {
+                accessLevel: 'retailer',
+                canViewEverything: false,
+                canAccessSketch: false,
+                canExportSketchToQuote: false,
+                retailer: {
+                    id: 'retailer_1',
+                    name: 'Roslagen',
+                    email: 'retailer@example.com',
+                    productLines: {
+                        BaHaMa: { enabled: true, discountPct: 30 }
+                    }
+                },
+                isRetailer: true
+            }
+        );
+
+        const discountInputs = html.match(/<input type="number" step="1" min="0" max="30"[^>]*>/g) || [];
+
+        expect(discountInputs.length).toBeGreaterThan(0);
+        expect(discountInputs.every((input) => !input.includes('disabled=""'))).toBe(true);
+    });
+});
+
+describe('PricingTable retailer discount bounds', () => {
+    it('clamps retailer row discounts to the retailer maximum', () => {
+        expect(clampPricingRowDiscount('18', true, 30)).toBe(18);
+        expect(clampPricingRowDiscount('35', true, 30)).toBe(30);
+    });
+
+    it('keeps non-retailer row discounts on the normal 0-100 scale', () => {
+        expect(clampPricingRowDiscount('35', false, 30)).toBe(35);
+        expect(clampPricingRowDiscount('140', false, 30)).toBe(100);
     });
 });

@@ -115,20 +115,49 @@ describe('Retailer workspace', () => {
         expect(html).not.toContain('Senaste Händelser');
     });
 
-    it('renders retailer product line selection with active and restricted lines plus discount preview', () => {
+    it('renders retailer product line selection with only active lines and discount preview', () => {
         const html = renderWithProviders(<ProductLineSelection onNext={() => {}} />);
 
         expect(html).toContain('Retailer Scope');
         expect(html).toContain('BaHaMa');
-        expect(html).toContain('ClickitUp');
+        expect(html).not.toContain('ClickitUp');
         expect(html).toContain('12% rabatt');
-        expect(html).toContain('Ingår inte i ert retailer-avtal.');
+        expect(html).not.toContain('Ingår inte i ert retailer-avtal.');
+        expect(html).not.toContain('Ej tillgänglig');
         expect(html).toContain('Förhandsvisning: 12% retailer-rabatt');
-        expect((html.match(/type="radio"/g) || []).length).toBeGreaterThanOrEqual(2);
-        expect(html).toContain('disabled=""');
+        expect((html.match(/type="radio"/g) || []).length).toBe(1);
+        expect(html).not.toContain('disabled=""');
     });
 
-    it('renders retailer pricing guidance with locked discount copy and editable custom costs section', () => {
+    it('shows a retailer empty state when no product lines are enabled', () => {
+        const html = renderWithProviders(
+            <ProductLineSelection onNext={() => {}} />,
+            {
+                auth: {
+                    retailer: {
+                        id: 'retailer_1',
+                        name: 'Markishuset',
+                        email: 'retailer@example.com',
+                        notes: 'Priority partner',
+                        productLines: {
+                            BaHaMa: { enabled: false, discountPct: 0 },
+                            ClickitUp: { enabled: false, discountPct: 0 }
+                        }
+                    }
+                },
+                state: {
+                    selectedLines: []
+                }
+            }
+        );
+
+        expect(html).toContain('Inga produktlinjer är tillgängliga för ert retailer-konto ännu.');
+        expect(html).not.toContain('BaHaMa');
+        expect(html).not.toContain('ClickitUp');
+        expect(html).toContain('cursor-not-allowed');
+    });
+
+    it('renders retailer pricing guidance with global and row discounts capped by the retailer agreement', () => {
         const html = renderWithProviders(
             <Pricing onNext={() => {}} onPrev={() => {}} />,
             {
@@ -143,13 +172,16 @@ describe('Retailer workspace', () => {
         expect(html).toContain('Retailer-prissättning');
         expect(html).toContain('Vald produktlinje: BaHaMa');
         expect(html).toContain('Avtalad retailer-rabatt');
-        expect(html).toContain('LÅST');
+        expect(html).toContain('MAX 12%');
         expect(html).toContain('CustomCostsMock');
         expect(html).toContain('PricingTableMock');
+        expect(html).toContain('både övergripande och per rad');
+        expect(html).toContain('max="12"');
+        expect(html).not.toContain('disabled=""');
         expect(html).not.toContain('Växelkurs (EUR → SEK)');
     });
 
-    it('builds retailer line options with visible restrictions and a stable default selection', () => {
+    it('builds retailer line options using only enabled lines with a stable default selection', () => {
         const retailer = {
             name: 'Markishuset',
             productLines: {
@@ -160,13 +192,8 @@ describe('Retailer workspace', () => {
 
         const options = buildProductLineOptions(true, retailer);
 
-        expect(options.map((option) => option.id)).toContain('BaHaMa');
-        expect(options.map((option) => option.id)).toContain('ClickitUp');
+        expect(options.map((option) => option.id)).toEqual(['BaHaMa']);
         expect(options.find((option) => option.id === 'BaHaMa')).toMatchObject({ enabled: true, retailerDiscountPct: 12 });
-        expect(options.find((option) => option.id === 'ClickitUp')).toMatchObject({
-            enabled: false,
-            restrictionMessage: 'Ingår inte i ert retailer-avtal.'
-        });
         expect(getFirstEnabledProductLineId(options)).toBe('BaHaMa');
     });
 });

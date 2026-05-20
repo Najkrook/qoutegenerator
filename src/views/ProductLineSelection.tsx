@@ -10,7 +10,6 @@ export interface ProductLineOption {
     description: string;
     enabled: boolean;
     retailerDiscountPct: number | null;
-    restrictionMessage: string;
 }
 
 function getProductLineDescription(lineId: string): string {
@@ -33,17 +32,23 @@ export function buildProductLineOptions(
     isRetailer: boolean,
     retailer: RetailerRecord | null
 ): ProductLineOption[] {
-    return getCatalogLineIds().map((lineId) => {
+    const visibleLineIds = getCatalogLineIds().filter((lineId) => {
+        if (!isRetailer) {
+            return true;
+        }
+
+        return retailer?.productLines?.[lineId]?.enabled === true;
+    });
+
+    return visibleLineIds.map((lineId) => {
         const retailerConfig = retailer?.productLines?.[lineId];
-        const enabled = !isRetailer || retailerConfig?.enabled === true;
 
         return {
             id: lineId,
             name: getCatalogLineName(lineId) || lineId,
             description: getProductLineDescription(lineId),
-            enabled,
-            retailerDiscountPct: enabled && isRetailer ? (Number(retailerConfig?.discountPct) || 0) : null,
-            restrictionMessage: enabled ? '' : 'Ingår inte i ert retailer-avtal.'
+            enabled: true,
+            retailerDiscountPct: isRetailer ? (Number(retailerConfig?.discountPct) || 0) : null
         };
     });
 }
@@ -57,6 +62,7 @@ export function ProductLineSelection({ onNext }: ProductLineSelectionProps) {
     const { isRetailer, retailer } = useAuth();
     const { selectedLines } = state;
     const productLines = buildProductLineOptions(isRetailer, retailer);
+    const hasRetailerLines = !isRetailer || productLines.length > 0;
     const selectedLineId = selectedLines[0] || '';
     const selectedLine = productLines.find((line) => line.id === selectedLineId) || null;
     const nextRetailerDiscount = selectedLine?.retailerDiscountPct ?? 0;
@@ -140,8 +146,8 @@ export function ProductLineSelection({ onNext }: ProductLineSelectionProps) {
                                 {retailer?.name || 'Er retailerprofil'}
                             </h3>
                             <p className="mt-2 max-w-2xl text-sm leading-relaxed text-text-secondary">
-                                Du ser hela katalogen här, men kan bara välja de produktlinjer som ingår i ert avtal.
-                                När du fortsätter appliceras linjens avtalade standardrabatt automatiskt i prissteget.
+                                Här visas de produktlinjer som ingår i ert avtal. När du fortsätter appliceras
+                                linjens avtalade standardrabatt automatiskt i prissteget.
                             </p>
                         </div>
 
@@ -157,55 +163,48 @@ export function ProductLineSelection({ onNext }: ProductLineSelectionProps) {
                 </div>
             )}
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
-                {productLines.map((line) => {
-                    const isSelected = selectedLines.includes(line.id);
-                    const disabled = isRetailer && !line.enabled;
+            {isRetailer && !hasRetailerLines ? (
+                <div className="mb-8 rounded-xl border border-warning/30 bg-warning/10 p-5 text-sm text-text-secondary">
+                    Inga produktlinjer är tillgängliga för ert retailer-konto ännu. Kontakta Brixx om ni behöver
+                    tillgång till fler produktlinjer.
+                </div>
+            ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+                    {productLines.map((line) => {
+                        const isSelected = selectedLines.includes(line.id);
 
-                    return (
-                        <label
-                            key={line.id}
-                            className={`flex items-start gap-4 p-6 border rounded-lg bg-panel-bg transition-all ${
-                                disabled
-                                    ? 'cursor-not-allowed border-panel-border opacity-55'
-                                    : isSelected
+                        return (
+                            <label
+                                key={line.id}
+                                className={`flex items-start gap-4 p-6 border rounded-lg bg-panel-bg transition-all ${
+                                    isSelected
                                         ? 'cursor-pointer border-primary ring-1 ring-primary hover:-translate-y-0.5'
                                         : 'cursor-pointer border-panel-border hover:-translate-y-0.5 hover:border-primary'
-                            }`}
-                        >
-                            <input
-                                type={isRetailer ? 'radio' : 'checkbox'}
-                                name={isRetailer ? 'productLine' : line.id}
-                                checked={isSelected}
-                                disabled={disabled}
-                                onChange={() => toggleLine(line.id)}
-                                className={`mt-1 w-5 h-5 accent-primary ${disabled ? 'cursor-not-allowed' : 'cursor-pointer'}`}
-                            />
-                            <div className="min-w-0 flex-1">
-                                <div className="flex flex-wrap items-center gap-2">
-                                    <h3 className="text-lg font-semibold text-text-primary mb-0 mt-0">{line.name}</h3>
-                                    {line.retailerDiscountPct !== null && (
-                                        <span className="rounded-full border border-primary/30 bg-primary/10 px-2.5 py-0.5 text-[11px] font-bold text-primary">
-                                            {line.retailerDiscountPct}% rabatt
-                                        </span>
-                                    )}
-                                    {disabled && (
-                                        <span className="rounded-full border border-panel-border bg-black/15 px-2.5 py-0.5 text-[11px] font-bold text-text-secondary">
-                                            Ej tillgänglig
-                                        </span>
-                                    )}
+                                }`}
+                            >
+                                <input
+                                    type={isRetailer ? 'radio' : 'checkbox'}
+                                    name={isRetailer ? 'productLine' : line.id}
+                                    checked={isSelected}
+                                    onChange={() => toggleLine(line.id)}
+                                    className="mt-1 w-5 h-5 accent-primary cursor-pointer"
+                                />
+                                <div className="min-w-0 flex-1">
+                                    <div className="flex flex-wrap items-center gap-2">
+                                        <h3 className="text-lg font-semibold text-text-primary mb-0 mt-0">{line.name}</h3>
+                                        {line.retailerDiscountPct !== null && (
+                                            <span className="rounded-full border border-primary/30 bg-primary/10 px-2.5 py-0.5 text-[11px] font-bold text-primary">
+                                                {line.retailerDiscountPct}% rabatt
+                                            </span>
+                                        )}
+                                    </div>
+                                    <p className="text-sm text-text-secondary leading-relaxed mt-2 mb-0">{line.description}</p>
                                 </div>
-                                <p className="text-sm text-text-secondary leading-relaxed mt-2 mb-0">{line.description}</p>
-                                {disabled && (
-                                    <p className="mt-2 mb-0 text-xs font-medium text-text-secondary">
-                                        {line.restrictionMessage}
-                                    </p>
-                                )}
-                            </div>
-                        </label>
-                    );
-                })}
-            </div>
+                            </label>
+                        );
+                    })}
+                </div>
+            )}
 
             {isRetailer && selectedLine && (
                 <div className="mb-8 rounded-xl border border-panel-border bg-panel-bg p-5 text-sm text-text-secondary">

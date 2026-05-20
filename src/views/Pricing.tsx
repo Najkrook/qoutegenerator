@@ -13,7 +13,6 @@ import {
 import type {
     GridCatalogAddonOption,
     GridCatalogLineData,
-    PricingEffectiveGridAddonsMap,
     PricingGridAddonsMap,
     PricingGridItemsMap,
     PricingProps
@@ -23,6 +22,17 @@ function parseDiscount(value: string): number {
     const parsed = Number.parseFloat(value);
     if (!Number.isFinite(parsed)) return 0;
     return Math.max(0, Math.min(100, parsed));
+}
+
+export function clampRetailerDiscount(value: number, maxDiscount: number): number {
+    return Math.max(0, Math.min(maxDiscount, value));
+}
+
+export function getNextGlobalDiscount(value: string, isRetailer: boolean, retailerDiscountPct: number): number {
+    const parsedDiscount = parseDiscount(value);
+    return isRetailer
+        ? clampRetailerDiscount(parsedDiscount, retailerDiscountPct)
+        : parsedDiscount;
 }
 
 function nearlyEqual(left: number, right: number): boolean {
@@ -54,11 +64,12 @@ export function Pricing({ onNext, onPrev }: PricingProps) {
     const selectedLineId = selectedLines[0] || '';
     const selectedLineName = selectedLineId ? (getCatalogLineName(selectedLineId) || selectedLineId) : 'Ingen vald produktlinje';
     const retailerDiscountPct = isRetailer
-        ? (Number(retailer?.productLines?.[selectedLineId]?.discountPct) || globalDiscountPct || 0)
+        ? (Number(retailer?.productLines?.[selectedLineId]?.discountPct) || 0)
         : 0;
+    const globalDiscountMax = isRetailer ? retailerDiscountPct : 100;
 
     const handleGlobalDiscountChange = (event: ChangeEvent<HTMLInputElement>): void => {
-        const nextGlobalDiscount = parseDiscount(event.target.value);
+        const nextGlobalDiscount = getNextGlobalDiscount(event.target.value, isRetailer, retailerDiscountPct);
         const previousGlobalDiscount = Number.isFinite(prevGlobalDiscountPct)
             ? prevGlobalDiscountPct
             : 0;
@@ -167,8 +178,8 @@ export function Pricing({ onNext, onPrev }: PricingProps) {
                                 Vald produktlinje: {selectedLineName}
                             </h3>
                             <p className="mt-2 max-w-2xl text-sm leading-relaxed text-text-secondary">
-                                Den här prisbilden följer ert retailer-avtal. Global rabatt och radrabatter är låsta,
-                                medan extra poster under Övriga kostnader fortfarande kan läggas till vid behov.
+                                Den övergripande offertrabatten kan justeras mellan 0 och {retailerDiscountPct}%.
+                                Radrabatter kan också justeras inom samma spann, medan Övriga kostnader kan läggas till vid behov.
                             </p>
                         </div>
 
@@ -188,33 +199,35 @@ export function Pricing({ onNext, onPrev }: PricingProps) {
                 <div className={`bg-panel-bg border border-panel-border rounded-lg p-6 shadow-sm ${isRetailer ? 'opacity-90' : ''}`}>
                     <label className="flex items-center justify-between text-xs font-bold text-text-secondary uppercase mb-2">
                         <span>Övergripande offertrabatt (%)</span>
-                        {isRetailer && <span className="text-danger-color bg-danger-color/10 px-2 py-0.5 rounded text-[10px] tracking-wider">LÅST</span>}
+                        {isRetailer && (
+                            <span className="text-primary bg-primary/10 px-2 py-0.5 rounded text-[10px] tracking-wider">
+                                MAX {retailerDiscountPct}%
+                            </span>
+                        )}
                     </label>
                     <div className="flex items-center gap-3">
                         <input
                             type="range"
                             min="0"
-                            max="100"
+                            max={globalDiscountMax}
                             step="1"
                             value={globalDiscountPct}
                             onChange={handleGlobalDiscountChange}
-                            disabled={isRetailer}
-                            className={`flex-1 accent-primary ${isRetailer ? 'opacity-50 cursor-not-allowed grayscale' : ''}`}
+                            className="flex-1 accent-primary"
                         />
                         <input
                             type="number"
                             step="1"
                             min="0"
-                            max="100"
+                            max={globalDiscountMax}
                             value={globalDiscountPct}
                             onChange={handleGlobalDiscountChange}
-                            disabled={isRetailer}
-                            className={`w-20 bg-input-bg border border-panel-border text-text-primary p-2 rounded-md font-bold text-center outline-none focus:border-primary ${isRetailer ? 'opacity-50 cursor-not-allowed text-text-secondary' : ''}`}
+                            className="w-20 bg-input-bg border border-panel-border text-text-primary p-2 rounded-md font-bold text-center outline-none focus:border-primary"
                         />
                     </div>
                     <p className="text-[10px] text-text-secondary mt-2 italic">
                         {isRetailer
-                            ? `* Rabatt enligt retailer-avtal för ${selectedLineName}. Radrabatter i prislistan är också låsta.`
+                            ? `* Rabatt kan sättas mellan 0 och ${retailerDiscountPct}% för ${selectedLineName}, både övergripande och per rad.`
                             : '* Ändrar snabbt alla rader som följer standardrabatten. Manuellt justerade rader behåller sitt värde.'}
                     </p>
                 </div>

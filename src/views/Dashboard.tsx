@@ -102,9 +102,7 @@ export function Dashboard({
                                 Välkommen, {retailerName}
                             </h2>
                             <p className="mt-3 max-w-2xl text-sm leading-relaxed text-text-secondary">
-                                Här ser du vilka produktlinjer ni får sälja och vilken standardrabatt som gäller.
-                                Produktutbud och standardrabatt styrs av ert retailer-konto, så du slipper gissa vad
-                                som ingår.
+                                Här kan ni se och skapa offerter från de produktlinjer och sortiment ni har tillgång till hos BRIXX.
                             </p>
                         </div>
 

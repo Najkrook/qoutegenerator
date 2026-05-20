@@ -146,12 +146,23 @@ function getRowKey(row: QuoteTotalsRow, index: number): string {
     }
 }
 
+export function clampPricingRowDiscount(value: string, isRetailer: boolean, retailerDiscountPct: number): number {
+    const parsed = Number.parseFloat(value);
+    const normalized = Number.isFinite(parsed) ? parsed : 0;
+    const bounded = Math.max(0, Math.min(100, normalized));
+    return isRetailer ? Math.min(bounded, retailerDiscountPct) : bounded;
+}
+
 export function PricingTable() {
     const { state, dispatch } = useQuote();
-    const { isRetailer } = useAuth();
+    const { isRetailer, retailer } = useAuth();
     const [displayNameDrafts, setDisplayNameDrafts] = useState<Record<string, string>>({});
     const [dragState, setDragState] = useState<PricingTableDragState | null>(null);
     const [dropTarget, setDropTarget] = useState<PricingTableDropTarget | null>(null);
+    const selectedLineId = state.selectedLines?.[0] || '';
+    const retailerDiscountPct = isRetailer
+        ? (Number(retailer?.productLines?.[selectedLineId]?.discountPct) || 0)
+        : 0;
     const { totals, grossTotalSek, totalDiscountSek, finalTotalSek } = computeQuoteTotals({
         state,
         catalogData
@@ -421,7 +432,7 @@ export function PricingTable() {
     };
 
     const handleDiscountChange = (source: QuoteTotalsRowSource, value: string): void => {
-        const discountPct = Number.parseFloat(value) || 0;
+        const discountPct = clampPricingRowDiscount(value, isRetailer, retailerDiscountPct);
 
         if (source.type === 'builder') {
             const nextItems = state.builderItems.map((item) => (
@@ -623,10 +634,11 @@ export function PricingTable() {
                                     <input
                                         type="number"
                                         step="1"
+                                        min="0"
+                                        max={isRetailer ? retailerDiscountPct : 100}
                                         value={row.discountPct}
-                                        disabled={isRetailer}
                                         onChange={(event: ChangeEvent<HTMLInputElement>) => handleDiscountChange(row.source, event.target.value)}
-                                        className={`w-16 text-center bg-black/20 border border-panel-border rounded p-1 text-sm outline-none focus:border-primary ${row.discountPct > 0 ? 'text-primary' : ''} ${isRetailer ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                        className={`w-16 text-center bg-black/20 border border-panel-border rounded p-1 text-sm outline-none focus:border-primary ${row.discountPct > 0 ? 'text-primary' : ''}`}
                                     />
                                 </td>
                                 <td className={`p-4 text-sm text-right font-bold text-primary ${dropIndicatorClass}`}>
