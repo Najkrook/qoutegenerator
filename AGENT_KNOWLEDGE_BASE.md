@@ -2,7 +2,7 @@
 
 This file exists to help future agents understand the actual `QuoteGenerator` project shape before editing anything substantial.
 
-Last verified: `2026-04-21`
+Last verified: `2026-05-20`
 Active branch at verification: `main`
 
 `QuoteGenerator` is a React SPA repository. All active runtime logic lives under `src/`. `README.md` is useful for human onboarding; this file is the deeper agent map for implementation work.
@@ -16,7 +16,7 @@ Active branch at verification: `main`
 - In-progress quote state is persisted in localStorage under `offertverktyg_state` through `src/store/QuoteContext.tsx` and `src/store/quoteStatePersistence.ts`.
 - Persistent backend data lives in Firestore for quotes, revisions, templates, inventory, inventory logs, activity logs, planner projects, and retailers.
 - Access control is UID-based and resolved in `src/config/accessControl.shared.ts`, with retailer access detected from Firestore during auth bootstrap.
-- Retailer Workspace V1 is live: retailer users now see scope and discount guidance directly in dashboard, product-line selection, and pricing.
+- Retailer Workspace V1 is live: retailer users now see scope and discount guidance directly in dashboard, product-line selection, and pricing, with retailer-specific draft reset protection on "Starta Ny Offert".
 - Quote persistence and revisioning are centralized in `src/services/quoteRepository.ts`.
 - Shared runtime/domain contracts live in `src/types/contracts.ts`.
 - Shared runtime boundary helpers now live in `src/utils/runtime.ts`.
@@ -142,6 +142,7 @@ The following root files are **not** part of the active runtime and should be ig
 - Behavior notes:
   - retailer users see a dedicated workspace variant instead of the generic quote-only dashboard
   - retailer workspace surfaces enabled product lines, per-line default discounts, and CTA access to new quotes and quote history
+  - retailer "Starta Ny Offert" clears the current quote draft before entering the quote flow; if draft data already exists, the app asks for confirmation first
   - admin-only cards and the recent activity panel remain hidden from retailer users
 
 ### Product Line Selection
@@ -154,8 +155,8 @@ The following root files are **not** part of the active runtime and should be ig
 - Persistence:
   - localStorage via quote state
 - Behavior notes:
-  - retailer users see the full catalog, but only enabled product lines are selectable
-  - disabled retailer lines are shown with explanatory copy instead of being silently filtered out
+  - retailer users only see product lines that are enabled in their retailer profile
+  - if a retailer has no enabled product lines, the view shows a dedicated empty state and keeps the continue action disabled
   - retailer selection is single-line only, and the selected line's configured discount is applied to `globalDiscountPct` when continuing
 
 ### Configuration
@@ -185,7 +186,8 @@ The following root files are **not** part of the active runtime and should be ig
   - quote totals shown later in summary/export are derived from the calculation engine
   - grid auto-scale propagates quantity and discount behavior across grid add-ons
   - retailer users see a dedicated pricing info panel with selected line context and the configured default discount
-  - global discount controls and row-level discounts are locked for retailer users
+  - retailer users can adjust both the global discount and row-level discounts between `0` and the selected line's configured retailer discount
+  - retailer discount inputs clamp to the retailer profile's configured max discount for the selected product line
   - `CustomCosts` is still editable for retailer users in the current implementation
 
 ### Summary Export
@@ -355,7 +357,10 @@ Current retailer reality:
 - retailer users are identified by auth-email match against the `retailers` collection during auth bootstrap
 - retailer users have access to the quote flow and quote history
 - retailer users do not have access to admin views or the sketch tool
-- retailer users currently see locked global/rad-level discount controls, but `CustomCosts` remains editable
+- retailer users only see enabled product lines in step 1
+- retailer users can adjust global and row-level discounts up to their configured retailer discount for the selected line
+- retailer "Starta Ny Offert" resets the current draft and asks for confirmation first when draft data exists
+- `CustomCosts` remains editable for retailer users
 - retailer users can still save and export from step 4 in the current implementation
 
 ## State Model And Persistence

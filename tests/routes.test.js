@@ -9,6 +9,7 @@ import {
     getQuoteDraftGuardRedirect,
     getQuoteStepPath,
     getSketchReturnPath,
+    hasRetailerStartDraftData,
     parseSketchReturnTarget,
     resolveLoginRedirectTarget
 } from '../src/navigation/routes';
@@ -65,6 +66,43 @@ describe('navigation routes', () => {
         expect(getQuoteDraftGuardRedirect(APP_ROUTE_IDS.quoteConfiguration, emptyState)).toBe(APP_PATHS[APP_ROUTE_IDS.quoteProductLines]);
         expect(getQuoteDraftGuardRedirect(APP_ROUTE_IDS.quotePricing, selectedLinesOnly)).toBe(APP_PATHS[APP_ROUTE_IDS.quoteConfiguration]);
         expect(getQuoteDraftGuardRedirect(APP_ROUTE_IDS.quoteSummary, configuredState)).toBeNull();
+    });
+
+    it('detects whether retailer start should warn about draft data', () => {
+        const emptyState = createInitialQuoteState();
+        const selectedLinesState = {
+            ...createInitialQuoteState(),
+            selectedLines: ['BaHaMa']
+        };
+        const customCostsState = {
+            ...createInitialQuoteState(),
+            customCosts: [{ description: 'Transport', price: 1000, qty: 1, discountPct: 0 }]
+        };
+        const customerInfoState = {
+            ...createInitialQuoteState(),
+            customerInfo: {
+                ...createInitialQuoteState().customerInfo,
+                name: 'Ada'
+            }
+        };
+        const quoteIdentityState = {
+            ...createInitialQuoteState(),
+            activeQuoteId: 'quote-1'
+        };
+        const inventoryOnlyState = {
+            ...createInitialQuoteState(),
+            inventoryData: {
+                bahama: [{ model: 'Jumbrella' }],
+                clickitup: {}
+            }
+        };
+
+        expect(hasRetailerStartDraftData(emptyState)).toBe(false);
+        expect(hasRetailerStartDraftData(selectedLinesState)).toBe(true);
+        expect(hasRetailerStartDraftData(customCostsState)).toBe(true);
+        expect(hasRetailerStartDraftData(customerInfoState)).toBe(true);
+        expect(hasRetailerStartDraftData(quoteIdentityState)).toBe(true);
+        expect(hasRetailerStartDraftData(inventoryOnlyState)).toBe(false);
     });
 
     it('maps normalized paths back to route ids', () => {

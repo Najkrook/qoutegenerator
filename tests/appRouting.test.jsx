@@ -31,10 +31,21 @@ const firebaseMocks = vi.hoisted(() => ({
     getDoc: vi.fn(async () => ({ exists: () => false, data: () => ({}) }))
 }));
 
+const notificationMocks = vi.hoisted(() => ({
+    confirmAction: vi.fn(async () => true)
+}));
+
 vi.mock('../src/services/firebase', () => firebaseMocks);
+vi.mock('../src/services/notificationService', () => notificationMocks);
 
 vi.mock('../src/views/Dashboard', () => ({
-    Dashboard: () => <div>DashboardView</div>
+    Dashboard: ({ onStartQuote, onOpenHistory }) => (
+        <div>
+            <div>DashboardView</div>
+            <button type="button" onClick={() => onStartQuote?.()}>Starta Ny Offert</button>
+            <button type="button" onClick={() => onOpenHistory?.()}>Mina Offerter</button>
+        </div>
+    )
 }));
 
 vi.mock('../src/views/ProductLineSelection', () => ({
@@ -170,6 +181,7 @@ afterEach(() => {
         mounted.container.remove();
     }
     vi.clearAllMocks();
+    notificationMocks.confirmAction.mockResolvedValue(true);
 });
 
 describe('app routing', () => {
@@ -321,5 +333,122 @@ describe('app routing', () => {
 
         await clickButton(container, 'Export From Sketch');
         expect(router.state.location.pathname).toBe(APP_PATHS[APP_ROUTE_IDS.quoteConfiguration]);
+    });
+
+    it('starts a retailer quote immediately when there is no draft data to clear', async () => {
+        const dispatch = vi.fn();
+        const { container, router } = await renderApp({
+            initialEntries: [APP_PATHS[APP_ROUTE_IDS.dashboard]],
+            auth: {
+                accessLevel: 'retailer',
+                retailer: {
+                    id: 'retailer_1',
+                    name: 'Roslagen',
+                    email: 'retailer@example.com',
+                    productLines: {
+                        BaHaMa: { enabled: true, discountPct: 20 }
+                    }
+                },
+                isRetailer: true
+            },
+            quoteState: createInitialQuoteState(),
+            dispatch
+        });
+
+        await clickButton(container, 'Starta Ny Offert');
+
+        expect(notificationMocks.confirmAction).not.toHaveBeenCalled();
+        expect(dispatch).toHaveBeenCalledWith({ type: 'RESET_STATE' });
+        expect(router.state.location.pathname).toBe(APP_PATHS[APP_ROUTE_IDS.quoteProductLines]);
+    });
+
+    it('asks retailers to confirm before clearing an existing draft', async () => {
+        const dispatch = vi.fn();
+        const { container, router } = await renderApp({
+            initialEntries: [APP_PATHS[APP_ROUTE_IDS.dashboard]],
+            auth: {
+                accessLevel: 'retailer',
+                retailer: {
+                    id: 'retailer_1',
+                    name: 'Roslagen',
+                    email: 'retailer@example.com',
+                    productLines: {
+                        BaHaMa: { enabled: true, discountPct: 20 }
+                    }
+                },
+                isRetailer: true
+            },
+            quoteState: {
+                ...createInitialQuoteState(),
+                selectedLines: ['BaHaMa']
+            },
+            dispatch
+        });
+
+        await clickButton(container, 'Starta Ny Offert');
+
+        expect(notificationMocks.confirmAction).toHaveBeenCalledWith(expect.objectContaining({
+            title: 'Starta ny offert?',
+            confirmText: 'Starta ny offert',
+            cancelText: 'Avbryt'
+        }));
+        expect(dispatch).toHaveBeenCalledWith({ type: 'RESET_STATE' });
+        expect(router.state.location.pathname).toBe(APP_PATHS[APP_ROUTE_IDS.quoteProductLines]);
+    });
+
+    it('keeps retailer dashboard state unchanged when the reset confirmation is cancelled', async () => {
+        notificationMocks.confirmAction.mockResolvedValueOnce(false);
+        const dispatch = vi.fn();
+        const { container, router } = await renderApp({
+            initialEntries: [APP_PATHS[APP_ROUTE_IDS.dashboard]],
+            auth: {
+                accessLevel: 'retailer',
+                retailer: {
+                    id: 'retailer_1',
+                    name: 'Roslagen',
+                    email: 'retailer@example.com',
+                    productLines: {
+                        BaHaMa: { enabled: true, discountPct: 20 }
+                    }
+                },
+                isRetailer: true
+            },
+            quoteState: {
+                ...createInitialQuoteState(),
+                customerInfo: {
+                    ...createInitialQuoteState().customerInfo,
+                    name: 'Ada'
+                }
+            },
+            dispatch
+        });
+
+        await clickButton(container, 'Starta Ny Offert');
+
+        expect(notificationMocks.confirmAction).toHaveBeenCalledTimes(1);
+        expect(dispatch).not.toHaveBeenCalledWith({ type: 'RESET_STATE' });
+        expect(router.state.location.pathname).toBe(APP_PATHS[APP_ROUTE_IDS.dashboard]);
+    });
+
+    it('keeps non-retailer start behavior direct without reset confirmation', async () => {
+        const dispatch = vi.fn();
+        const { container, router } = await renderApp({
+            initialEntries: [APP_PATHS[APP_ROUTE_IDS.dashboard]],
+            auth: {
+                accessLevel: 'quote-only',
+                isRetailer: false
+            },
+            quoteState: {
+                ...createInitialQuoteState(),
+                selectedLines: ['BaHaMa']
+            },
+            dispatch
+        });
+
+        await clickButton(container, 'Starta Ny Offert');
+
+        expect(notificationMocks.confirmAction).not.toHaveBeenCalled();
+        expect(dispatch).not.toHaveBeenCalledWith({ type: 'RESET_STATE' });
+        expect(router.state.location.pathname).toBe(APP_PATHS[APP_ROUTE_IDS.quoteProductLines]);
     });
 });

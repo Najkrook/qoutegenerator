@@ -211,6 +211,30 @@ export function hasConfiguredQuoteSelections(
         ));
 }
 
+export function hasRetailerStartDraftData(
+    state: Pick<
+        QuoteState,
+        'selectedLines' | 'builderItems' | 'gridSelections' | 'customCosts' | 'activeQuoteId' | 'quoteNumber' | 'customerInfo'
+    >
+): boolean {
+    const hasSelectedLines = Array.isArray(state.selectedLines) && state.selectedLines.length > 0;
+    const hasSelections = hasConfiguredQuoteSelections(state);
+    const hasCustomCosts = Array.isArray(state.customCosts) && state.customCosts.length > 0;
+    const hasQuoteIdentity = Boolean(state.activeQuoteId || state.quoteNumber);
+    const customerInfo = state.customerInfo;
+    const hasCustomerInfo = [
+        customerInfo.name,
+        customerInfo.company,
+        customerInfo.email,
+        customerInfo.reference,
+        customerInfo.customerReference,
+        customerInfo.extraNotes,
+        customerInfo.date
+    ].some((value) => String(value || '').trim().length > 0);
+
+    return hasSelectedLines || hasSelections || hasCustomCosts || hasQuoteIdentity || hasCustomerInfo;
+}
+
 export function getQuoteDraftGuardRedirect(
     routeId: AppRouteId,
     state: Pick<QuoteState, 'selectedLines' | 'builderItems' | 'gridSelections'>

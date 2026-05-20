@@ -19,6 +19,7 @@ import { Login } from './views/Login';
 import { useQuote } from './store/QuoteContext';
 import { useAuth } from './store/AuthContext';
 import { db, doc, getDoc } from './services/firebase';
+import { confirmAction } from './services/notificationService';
 import { cloneInventoryData, createDefaultInventoryData, normalizeStoredInventoryData } from './views/inventoryData';
 import {
     APP_PATHS,
@@ -28,6 +29,7 @@ import {
     getAuthorizedRouteForAccess,
     getNextLoginRedirectTarget,
     getQuoteDraftGuardRedirect,
+    hasRetailerStartDraftData,
     parseSketchReturnTarget,
     resolveLoginRedirectTarget,
     type AppRouteId
@@ -205,10 +207,38 @@ function QuoteDraftBoundary({ children, routeId }: RouteAccessBoundaryProps) {
 
 function DashboardPage() {
     const navigation = useAppNavigation();
+    const { state, dispatch } = useQuote();
+    const { isRetailer } = useAuth();
+
+    const handleStartQuote = async (): Promise<void> => {
+        if (!isRetailer) {
+            navigation.goToQuoteStep('product-lines');
+            return;
+        }
+
+        if (hasRetailerStartDraftData(state)) {
+            const confirmed = await confirmAction({
+                title: 'Starta ny offert?',
+                message: 'Det finns redan uppgifter i den nuvarande offerten. Om du fortsätter rensas utkastet och du börjar om från början.',
+                confirmText: 'Starta ny offert',
+                cancelText: 'Avbryt',
+                tone: 'danger'
+            });
+
+            if (!confirmed) {
+                return;
+            }
+        }
+
+        dispatch({ type: 'RESET_STATE' });
+        navigation.goToQuoteStep('product-lines');
+    };
 
     return (
         <Dashboard
-            onStartQuote={() => navigation.goToQuoteStep('product-lines')}
+            onStartQuote={() => {
+                void handleStartQuote();
+            }}
             onOpenHistory={() => navigation.goToHistory()}
             onOpenInventory={() => navigation.goToInventory()}
             onOpenSketch={() => navigation.goToSketch('dashboard')}
