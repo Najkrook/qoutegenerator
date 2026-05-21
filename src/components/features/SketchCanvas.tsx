@@ -1704,10 +1704,12 @@ export function SketchCanvas({
                             y={py - (40 * inverseZoom * BASE_UI_SCALE)}
                             width={dims.widthMm}
                             height={40 * inverseZoom * BASE_UI_SCALE}
-                            style={{ overflow: 'visible', pointerEvents: 'none' }}
+                            style={{ overflow: 'visible', pointerEvents: 'all' }}
+                            onMouseDown={(e) => e.stopPropagation()}
+                            onPointerDown={(e) => e.stopPropagation()}
+                            onClick={(e) => e.stopPropagation()}
                         >
                             <div
-                                className="flex items-center gap-1 justify-center pointer-events-auto"
                                 style={{
                                     transform: `scale(${inverseZoom * BASE_UI_SCALE})`,
                                     transformOrigin: 'bottom center',
@@ -1715,10 +1717,8 @@ export function SketchCanvas({
                                     height: '100%',
                                     display: 'flex',
                                     alignItems: 'flex-end',
+                                    justifyContent: 'center',
                                     paddingBottom: '8px'
-                                }}
-                                onPointerDown={(e) => {
-                                    e.stopPropagation();
                                 }}
                             >
                                 <div className="bg-panel-bg border border-panel-border rounded-xl shadow-xl p-1.5 flex gap-1.5 items-center backdrop-blur-md">
@@ -1727,7 +1727,8 @@ export function SketchCanvas({
                                         onChange={(e) => {
                                             if (onChangeParasolPreset) onChangeParasolPreset(p.id, e.target.value);
                                         }}
-                                        className="bg-input-bg border border-panel-border rounded text-text-primary px-2 py-1 text-sm outline-none focus:border-primary"
+                                        onMouseDown={(e) => e.stopPropagation()}
+                                        className="bg-input-bg border border-panel-border rounded text-text-primary px-2 py-1 text-sm outline-none focus:border-primary cursor-pointer"
                                     >
                                         {groupParasolPresetsByCategory(PARASOL_PRESETS).map((group) => (
                                             <optgroup key={group.category} label={group.category}>
@@ -1743,21 +1744,23 @@ export function SketchCanvas({
                                     {isRotatable && (
                                         <button
                                             type="button"
+                                            onMouseDown={(e) => e.stopPropagation()}
                                             onClick={() => onRotateParasol && onRotateParasol(p.id, getParasolRotationDeg(p) === 90 ? 0 : 90)}
                                             className="px-2.5 py-1 text-sm font-semibold rounded bg-panel-bg text-text-secondary border border-panel-border hover:text-text-primary hover:bg-white/5 transition-colors"
                                             title="Rotera"
                                         >
-                                            Rotera
+                                            ↻ Rotera
                                         </button>
                                     )}
 
                                     <button
                                         type="button"
+                                        onMouseDown={(e) => e.stopPropagation()}
                                         onClick={() => onDeleteParasol && onDeleteParasol(p.id)}
                                         className="px-2.5 py-1 text-sm font-semibold rounded bg-red-500/10 text-red-400 border border-red-500/30 hover:bg-red-500/20 transition-colors"
                                         title="Ta bort"
                                     >
-                                        Ta bort
+                                        🗑 Ta bort
                                     </button>
                                 </div>
                             </div>
