@@ -11,12 +11,7 @@ const retailerDocumentMocks = vi.hoisted(() => ({
 }));
 
 const notificationMocks = vi.hoisted(() => ({
-    notifyError: vi.fn(),
-    notifySuccess: vi.fn()
-}));
-
-const fileUtilsMocks = vi.hoisted(() => ({
-    downloadBlob: vi.fn()
+    notifyError: vi.fn()
 }));
 
 vi.mock('../src/services/retailerDocumentService', () => ({
@@ -29,7 +24,6 @@ vi.mock('../src/services/retailerDocumentService', () => ({
 }));
 
 vi.mock('../src/services/notificationService', () => notificationMocks);
-vi.mock('../src/utils/fileUtils', () => fileUtilsMocks);
 
 import { RetailerDocuments } from '../src/views/RetailerDocuments';
 import { AuthContext } from '../src/store/AuthContext';
@@ -133,12 +127,6 @@ beforeEach(() => {
         }
     ]);
     notificationMocks.notifyError.mockReset();
-    notificationMocks.notifySuccess.mockReset();
-    fileUtilsMocks.downloadBlob.mockReset();
-    globalThis.fetch = vi.fn(async (url) => ({
-        ok: true,
-        blob: async () => new Blob([String(url)])
-    }));
     globalThis.open = vi.fn();
 });
 
@@ -166,7 +154,8 @@ describe('RetailerDocuments', () => {
         expect(container.textContent).toContain('Färgkarta Akryl');
         expect(container.textContent).toContain('Installationsguide Fiesta');
         expect(container.textContent).toContain('Visa PDF');
-        expect(container.textContent).toContain('Ladda ner PDF');
+        expect(container.textContent).toContain('Google Drive');
+        expect(container.textContent).not.toContain('Ladda ner PDF');
         expect(container.textContent).not.toContain('ClickitUp');
     });
 
@@ -197,25 +186,17 @@ describe('RetailerDocuments', () => {
         expect(container.textContent).toContain('Det finns inga publicerade PDF-dokument för era aktiva produktlinjer ännu.');
     });
 
-    it('opens documents in a new tab and downloads them as PDFs', async () => {
+    it('opens documents in a new tab', async () => {
         const { container } = await renderRetailerDocuments();
 
         await act(async () => {
             findButton(container, 'Visa PDF').click();
         });
+
         expect(globalThis.open).toHaveBeenCalledWith(
             'https://cdn.example.com/bahama/colors.pdf',
             '_blank',
             'noopener,noreferrer'
         );
-
-        await act(async () => {
-            findButton(container, 'Ladda ner PDF').click();
-            await Promise.resolve();
-        });
-
-        expect(globalThis.fetch).toHaveBeenCalledWith('https://cdn.example.com/bahama/colors.pdf');
-        expect(fileUtilsMocks.downloadBlob).toHaveBeenCalledWith(expect.any(Blob), 'bahama-colors.pdf');
-        expect(notificationMocks.notifySuccess).toHaveBeenCalled();
     });
 });

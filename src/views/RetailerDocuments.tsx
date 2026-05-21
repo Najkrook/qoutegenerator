@@ -4,12 +4,8 @@ import {
     getRetailerDocumentKindLabel,
     retailerDocumentService
 } from '../services/retailerDocumentService';
-import {
-    notifyError,
-    notifySuccess
-} from '../services/notificationService';
+import { notifyError } from '../services/notificationService';
 import { useAuth } from '../store/AuthContext';
-import { downloadBlob } from '../utils/fileUtils';
 import { getErrorMessage } from '../utils/runtime';
 import type {
     RetailerDocumentsProps,
@@ -21,26 +17,11 @@ function getActiveRetailerLineIds(productLines: Record<string, { enabled?: boole
     return getCatalogLineIds().filter((lineId) => Boolean(productLines?.[lineId]?.enabled));
 }
 
-function buildDownloadKey(lineId: string, documentId: string): string {
-    return `${lineId}:${documentId}`;
-}
-
-async function downloadRetailerDocument(lineId: string, document: RetailerLineDocument): Promise<void> {
-    const response = await fetch(document.url);
-    if (!response.ok) {
-        throw new Error(`Kunde inte hämta PDF (${response.status}).`);
-    }
-
-    const pdfBlob = await response.blob();
-    downloadBlob(pdfBlob, document.fileName || `${lineId}.pdf`);
-}
-
 export function RetailerDocuments({ onBack }: RetailerDocumentsProps) {
     const { retailer } = useAuth();
     const [documentsByLine, setDocumentsByLine] = useState<Record<string, RetailerLineDocumentsRecord>>({});
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
-    const [downloadingKey, setDownloadingKey] = useState('');
 
     const activeLineIds = useMemo(
         () => getActiveRetailerLineIds(retailer?.productLines),
@@ -82,20 +63,11 @@ export function RetailerDocuments({ onBack }: RetailerDocumentsProps) {
         .filter((record) => record.documents.length > 0);
 
     const handleOpenDocument = (document: RetailerLineDocument): void => {
-        window.open(document.url, '_blank', 'noopener,noreferrer');
-    };
-
-    const handleDownloadDocument = async (lineId: string, document: RetailerLineDocument): Promise<void> => {
-        const downloadKey = buildDownloadKey(lineId, document.id);
-        setDownloadingKey(downloadKey);
         try {
-            await downloadRetailerDocument(lineId, document);
-            notifySuccess(`PDF nedladdad: ${document.fileName}`);
-        } catch (downloadError) {
-            console.error('Failed to download retailer document:', downloadError);
-            notifyError(getErrorMessage(downloadError, 'Kunde inte ladda ner PDF.'));
-        } finally {
-            setDownloadingKey('');
+            window.open(document.url, '_blank', 'noopener,noreferrer');
+        } catch (openError) {
+            console.error('Failed to open retailer document:', openError);
+            notifyError(getErrorMessage(openError, 'Kunde inte öppna PDF-länken.'));
         }
     };
 
@@ -107,6 +79,9 @@ export function RetailerDocuments({ onBack }: RetailerDocumentsProps) {
                         <h2 className="m-0 text-3xl font-semibold tracking-tight text-text-primary">Produktdokument</h2>
                         <p className="mt-2 text-sm text-text-secondary">
                             Se färgkartor och installationsinstruktioner för de produktlinjer som är aktiva för ert retailer-konto.
+                        </p>
+                        <p className="mt-2 text-xs text-text-secondary">
+
                         </p>
                     </div>
                     <div className="flex items-center gap-3">
@@ -166,54 +141,39 @@ export function RetailerDocuments({ onBack }: RetailerDocumentsProps) {
                             </div>
 
                             <div className="mt-5 grid grid-cols-1 gap-4">
-                                {record.documents.map((document) => {
-                                    const downloadKey = buildDownloadKey(record.lineId, document.id);
-                                    const isDownloading = downloadingKey === downloadKey;
-
-                                    return (
-                                        <div
-                                            key={document.id}
-                                            className="rounded-xl border border-panel-border bg-black/10 p-5"
-                                        >
-                                            <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-                                                <div className="min-w-0">
-                                                    <div className="flex flex-wrap items-center gap-2">
-                                                        <h4 className="m-0 text-lg font-semibold text-text-primary">{document.title}</h4>
-                                                        <span className="rounded-full border border-primary/30 bg-primary/10 px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide text-primary">
-                                                            {getRetailerDocumentKindLabel(document.kind)}
-                                                        </span>
-                                                    </div>
-                                                    {document.description && (
-                                                        <p className="mt-2 text-sm leading-relaxed text-text-secondary">{document.description}</p>
-                                                    )}
-                                                    <div className="mt-3 text-xs text-text-secondary">
-                                                        Filnamn: {document.fileName}
-                                                    </div>
+                                {record.documents.map((document) => (
+                                    <div
+                                        key={document.id}
+                                        className="rounded-xl border border-panel-border bg-black/10 p-5"
+                                    >
+                                        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                                            <div className="min-w-0">
+                                                <div className="flex flex-wrap items-center gap-2">
+                                                    <h4 className="m-0 text-lg font-semibold text-text-primary">{document.title}</h4>
+                                                    <span className="rounded-full border border-primary/30 bg-primary/10 px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide text-primary">
+                                                        {getRetailerDocumentKindLabel(document.kind)}
+                                                    </span>
                                                 </div>
-
-                                                <div className="flex shrink-0 flex-wrap gap-3">
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => handleOpenDocument(document)}
-                                                        className="rounded-md border border-panel-border bg-panel-bg px-4 py-2 text-sm font-medium text-text-primary transition-colors hover:bg-white/5"
-                                                    >
-                                                        Visa PDF
-                                                    </button>
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => {
-                                                            void handleDownloadDocument(record.lineId, document);
-                                                        }}
-                                                        disabled={isDownloading}
-                                                        className="rounded-md bg-primary px-4 py-2 text-sm font-bold text-white transition-colors hover:bg-primary-hover disabled:cursor-not-allowed disabled:opacity-60"
-                                                    >
-                                                        {isDownloading ? 'Laddar ner...' : 'Ladda ner PDF'}
-                                                    </button>
+                                                {document.description && (
+                                                    <p className="mt-2 text-sm leading-relaxed text-text-secondary">{document.description}</p>
+                                                )}
+                                                <div className="mt-3 text-xs text-text-secondary">
+                                                    Filnamn: {document.fileName}
                                                 </div>
                                             </div>
+
+                                            <div className="flex shrink-0 flex-wrap gap-3">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handleOpenDocument(document)}
+                                                    className="rounded-md bg-primary px-4 py-2 text-sm font-bold text-white transition-colors hover:bg-primary-hover"
+                                                >
+                                                    Visa PDF
+                                                </button>
+                                            </div>
                                         </div>
-                                    );
-                                })}
+                                    </div>
+                                ))}
                             </div>
                         </section>
                     ))}
