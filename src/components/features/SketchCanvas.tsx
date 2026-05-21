@@ -1925,7 +1925,10 @@ export function SketchCanvas({
                 y={ty}
                 width={scaledWidth}
                 height={scaledHeight}
-                style={{ overflow: 'visible' }}
+                style={{ overflow: 'visible', pointerEvents: 'all' }}
+                onMouseDown={(e) => e.stopPropagation()}
+                onPointerDown={(e) => e.stopPropagation()}
+                onClick={(e) => e.stopPropagation()}
             >
                 <div
                     className="flex items-center justify-between p-4 bg-slate-900/95 backdrop-blur-md border border-slate-700/80 rounded-[32px] shadow-[0_16px_48px_rgba(0,0,0,0.7)] text-white select-none gap-4"
@@ -1992,6 +1995,7 @@ export function SketchCanvas({
                             value={segment.length}
                             onChange={handleSizeSelect}
                             className="w-full h-full bg-slate-800 text-white rounded-[24px] border border-slate-700/60 px-5 text-[28px] font-bold outline-none cursor-pointer hover:bg-slate-750 transition-colors appearance-none pr-12 focus:border-blue-500"
+                            onMouseDown={(e) => e.stopPropagation()}
                         >
                             {currentSizeList.map((sz) => (
                                 <option key={sz} value={sz}>
