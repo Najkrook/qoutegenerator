@@ -1931,71 +1931,74 @@ export function SketchCanvas({
                 onClick={(e) => e.stopPropagation()}
             >
                 <div
-                    className="flex items-center justify-between p-4 bg-slate-900/95 backdrop-blur-md border border-slate-700/80 rounded-[32px] shadow-[0_16px_48px_rgba(0,0,0,0.7)] text-white select-none gap-4"
-                    onClick={(e) => e.stopPropagation()}
-                    style={{ 
-                        width: '900px', 
+                    style={{
+                        width: '900px',
                         height: '220px',
                         transform: `scale(${currentScale})`,
-                        transformOrigin: 'top left'
+                        transformOrigin: 'top left',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center'
                     }}
                 >
-                    <button
-                        type="button"
-                        onClick={handleTogglePin}
-                        className={`flex items-center justify-center gap-2.5 h-[140px] px-5 rounded-[24px] border font-bold text-[28px] transition-all duration-200 active:scale-95 flex-1 ${
-                            isPinned
-                                ? 'bg-amber-600/40 text-amber-300 border-amber-500/80 shadow-[0_0_20px_rgba(245,158,11,0.2)]'
-                                : 'bg-slate-800 text-slate-300 border-slate-700/60 hover:bg-slate-700 hover:text-white'
-                        }`}
-                        title={isPinned ? 'Lås upp sektionsbredd' : 'Lås denna sektionsbredd'}
-                    >
-                        <span className="text-[36px]">{isPinned ? '🔒' : '🔓'}</span>
-                        <span>{isPinned ? 'Låst' : 'Lås'}</span>
-                    </button>
-
-                    <button
-                        type="button"
-                        onClick={handleToggleDoor}
-                        className={`flex items-center justify-center gap-2.5 h-[140px] px-5 rounded-[24px] border font-bold text-[28px] transition-all duration-200 active:scale-95 flex-1 ${
-                            segment.isDoor
-                                ? 'bg-emerald-600/40 text-emerald-300 border-emerald-500/80 shadow-[0_0_20px_rgba(16,185,129,0.2)]'
-                                : 'bg-slate-800 text-slate-300 border-slate-700/60 hover:bg-slate-700 hover:text-white'
-                        }`}
-                        title={segment.isDoor ? 'Gör till vanlig glassektion' : 'Gör till dörrsektion'}
-                    >
-                        <span className="text-[36px]">🚪</span>
-                        <span>{segment.isDoor ? 'Dörr' : 'Sektion'}</span>
-                    </button>
-
-                    <div className="flex items-center h-[140px] border border-slate-700/60 rounded-[24px] overflow-hidden bg-slate-900/60">
+                    <div className="bg-panel-bg border border-panel-border rounded-xl shadow-xl p-1.5 flex gap-1.5 items-center backdrop-blur-md">
                         <button
                             type="button"
-                            onClick={() => handleStepResize(-100)}
-                            className="flex items-center justify-center w-[85px] h-full bg-slate-800 hover:bg-slate-700 text-white font-bold text-[36px] border-r border-slate-700/60 active:bg-slate-600 transition-colors"
-                            title="Minska med 100 mm"
+                            onClick={handleTogglePin}
+                            onMouseDown={(e) => e.stopPropagation()}
+                            className={`px-2.5 py-1 text-sm font-semibold rounded border transition-colors ${
+                                isPinned
+                                    ? 'bg-amber-500/20 text-amber-300 border-amber-500/50'
+                                    : 'bg-panel-bg text-text-secondary border-panel-border hover:text-text-primary hover:bg-white/5'
+                            }`}
+                            title={isPinned ? 'Lås upp sektionsbredd' : 'Lås denna sektionsbredd'}
                         >
-                            -
+                            {isPinned ? '🔒 Låst' : '🔓 Lås'}
                         </button>
-                        <span className="flex items-center justify-center w-[120px] h-full text-center font-bold text-[28px] text-slate-200">
-                            100
-                        </span>
+
                         <button
                             type="button"
-                            onClick={() => handleStepResize(100)}
-                            className="flex items-center justify-center w-[85px] h-full bg-slate-800 hover:bg-slate-700 text-white font-bold text-[36px] border-l border-slate-700/60 active:bg-slate-600 transition-colors"
-                            title="Öka med 100 mm"
+                            onClick={handleToggleDoor}
+                            onMouseDown={(e) => e.stopPropagation()}
+                            className={`px-2.5 py-1 text-sm font-semibold rounded border transition-colors ${
+                                segment.isDoor
+                                    ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/50'
+                                    : 'bg-panel-bg text-text-secondary border-panel-border hover:text-text-primary hover:bg-white/5'
+                            }`}
+                            title={segment.isDoor ? 'Gör till vanlig glassektion' : 'Gör till dörrsektion'}
                         >
-                            +
+                            {segment.isDoor ? '🚪 Dörr' : '🚪 Sektion'}
                         </button>
-                    </div>
 
-                    <div className="relative h-[140px] flex-1">
+                        <div className="flex items-center border border-panel-border rounded overflow-hidden">
+                            <button
+                                type="button"
+                                onClick={() => handleStepResize(-100)}
+                                onMouseDown={(e) => e.stopPropagation()}
+                                className="px-2 py-1 text-sm font-bold bg-panel-bg text-text-secondary border-r border-panel-border hover:text-text-primary hover:bg-white/5 transition-colors"
+                                title="Minska med 100 mm"
+                            >
+                                −
+                            </button>
+                            <span className="px-2 py-1 text-sm font-semibold text-text-secondary">
+                                100
+                            </span>
+                            <button
+                                type="button"
+                                onClick={() => handleStepResize(100)}
+                                onMouseDown={(e) => e.stopPropagation()}
+                                className="px-2 py-1 text-sm font-bold bg-panel-bg text-text-secondary border-l border-panel-border hover:text-text-primary hover:bg-white/5 transition-colors"
+                                title="Öka med 100 mm"
+                            >
+                                +
+                            </button>
+                        </div>
+
                         <select
                             value={segment.length}
                             onChange={handleSizeSelect}
-                            className="w-full h-full bg-slate-800 text-white rounded-[24px] border border-slate-700/60 px-5 text-[28px] font-bold outline-none cursor-pointer hover:bg-slate-750 transition-colors appearance-none pr-12 focus:border-blue-500"
                             onMouseDown={(e) => e.stopPropagation()}
+                            className="bg-input-bg border border-panel-border rounded text-text-primary px-2 py-1 text-sm outline-none focus:border-primary cursor-pointer"
                         >
                             {currentSizeList.map((sz) => (
                                 <option key={sz} value={sz}>
@@ -2008,9 +2011,6 @@ export function SketchCanvas({
                                 </option>
                             )}
                         </select>
-                        <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-[28px] text-slate-400">
-                            ▾
-                        </div>
                     </div>
                 </div>
             </foreignObject>
