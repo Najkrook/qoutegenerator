@@ -75,7 +75,8 @@ export const ACTIVITY_EVENT_DEFINITIONS: Record<string, ActivityEventDefinition>
     sketch_export_image: { label: 'Ritningsbild nedladdad', icon: '🖼️', color: 'var(--color-success)' },
     retailer_created: { label: 'Återförsäljare skapad', icon: '🏪', color: 'var(--color-success)' },
     retailer_updated: { label: 'Återförsäljare uppdaterad', icon: '🏪', color: 'var(--color-primary)' },
-    retailer_deleted: { label: 'Återförsäljare borttagen', icon: '🗑️', color: 'var(--color-error, #e74c3c)' }
+    retailer_deleted: { label: 'Återförsäljare borttagen', icon: '🗑️', color: 'var(--color-error, #e74c3c)' },
+    retailer_documents_updated: { label: 'Retailer-dokument uppdaterade', icon: '📄', color: 'var(--color-primary)' }
 };
 
 function toActivityLogRaw(source: ActivityLogSource | null | undefined): UnknownRecord {

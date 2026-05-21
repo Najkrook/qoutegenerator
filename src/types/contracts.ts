@@ -4,6 +4,7 @@ import type { ReactNode } from 'react';
 export type QuoteStatus = 'draft' | 'sent' | 'won' | 'lost' | 'archived';
 
 export type OrderRequestStatus = 'new' | 'reviewing' | 'completed';
+export type RetailerDocumentKind = 'color-chart' | 'installation-instructions';
 
 export type ScriveStatus =
     | 'not_sent'
@@ -537,6 +538,42 @@ export interface OrderRequestRecord {
     statusUpdatedByEmail: string;
 }
 
+export interface RetailerLineDocument {
+    id: string;
+    title: string;
+    kind: RetailerDocumentKind;
+    url: string;
+    fileName: string;
+    description?: string;
+    sortOrder: number;
+}
+
+export interface RawRetailerLineDocument extends UnknownRecord {
+    id?: unknown;
+    title?: unknown;
+    kind?: unknown;
+    url?: unknown;
+    fileName?: unknown;
+    description?: unknown;
+    sortOrder?: unknown;
+}
+
+export interface RetailerLineDocumentsRecord {
+    lineId: string;
+    documents: RetailerLineDocument[];
+    updatedAt: number;
+    updatedBy: string;
+    updatedByUid: string;
+}
+
+export interface RawRetailerLineDocumentsDoc extends UnknownRecord {
+    lineId?: unknown;
+    documents?: unknown;
+    updatedAt?: unknown;
+    updatedBy?: unknown;
+    updatedByUid?: unknown;
+}
+
 export interface QuoteFilters {
     status?: string;
     search?: string;
@@ -699,6 +736,22 @@ export interface GetOrderRequestByQuoteVersionInput {
     quoteVersion: number;
 }
 
+export interface GetRetailerLineDocumentsInput {
+    lineId: string;
+}
+
+export interface GetRetailerDocumentsForLinesInput {
+    lineIds: string[];
+}
+
+export type RetailerLineDocumentWriteSource = Partial<RetailerLineDocument> | UnknownRecord;
+
+export interface SaveRetailerLineDocumentsInput {
+    lineId: string;
+    documents: RetailerLineDocumentWriteSource[];
+    user: AccessUser | null;
+}
+
 export interface ListOrderRequestsInput {
     limit?: number;
 }
@@ -781,6 +834,13 @@ export interface OrderRequestService {
     listRecentOrderRequests(input?: ListOrderRequestsInput): Promise<OrderRequestRecord[]>;
     listOrderRequests(input?: ListOrderRequestsInput): Promise<OrderRequestRecord[]>;
     updateOrderRequestStatus(input: UpdateOrderRequestStatusInput): Promise<OrderRequestRecord>;
+}
+
+export interface RetailerDocumentService {
+    getRetailerLineDocuments(input: GetRetailerLineDocumentsInput): Promise<RetailerLineDocumentsRecord>;
+    getRetailerDocumentsForLines(input: GetRetailerDocumentsForLinesInput): Promise<RetailerLineDocumentsRecord[]>;
+    listRetailerLineDocuments(): Promise<RetailerLineDocumentsRecord[]>;
+    saveRetailerLineDocuments(input: SaveRetailerLineDocumentsInput): Promise<RetailerLineDocumentsRecord>;
 }
 
 export interface FirestoreDocRef {
@@ -904,6 +964,7 @@ export interface DashboardProps {
     onOpenActivity?: () => void;
     onOpenRetailers?: () => void;
     onOpenRetailerOrders?: () => void;
+    onOpenRetailerDocuments?: () => void;
 }
 
 export interface ProductLineSelectionProps {
@@ -1047,6 +1108,10 @@ export interface RetailerManagerProps {
 }
 
 export interface RetailerOrderRequestsProps {
+    onBack?: () => void;
+}
+
+export interface RetailerDocumentsProps {
     onBack?: () => void;
 }
 

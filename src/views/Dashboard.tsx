@@ -73,7 +73,8 @@ export function Dashboard({
     onOpenPlanner,
     onOpenActivity,
     onOpenRetailers,
-    onOpenRetailerOrders
+    onOpenRetailerOrders,
+    onOpenRetailerDocuments
 }: DashboardProps) {
     const {
         canViewEverything,
@@ -202,6 +203,15 @@ export function Dashboard({
                                 className="rounded-md border border-panel-border bg-black/10 px-6 py-3 text-sm font-medium text-text-primary transition-colors hover:bg-white/5"
                             >
                                 Mina Offerter
+                            </button>
+                        )}
+                        {onOpenRetailerDocuments && (
+                            <button
+                                type="button"
+                                onClick={onOpenRetailerDocuments}
+                                className="rounded-md border border-panel-border bg-black/10 px-6 py-3 text-sm font-medium text-text-primary transition-colors hover:bg-white/5"
+                            >
+                                Produktdokument
                             </button>
                         )}
                     </div>

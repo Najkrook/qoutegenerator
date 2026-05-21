@@ -44,6 +44,7 @@ const Planner = lazy(() => import('./views/Planner').then((module) => ({ default
 const History = lazy(() => import('./views/History').then((module) => ({ default: module.History })));
 const RetailerManager = lazy(() => import('./views/RetailerManager').then((module) => ({ default: module.RetailerManager })));
 const RetailerOrderRequests = lazy(() => import('./views/RetailerOrderRequests').then((module) => ({ default: module.RetailerOrderRequests })));
+const RetailerDocuments = lazy(() => import('./views/RetailerDocuments').then((module) => ({ default: module.RetailerDocuments })));
 
 function ViewLoader() {
     return (
@@ -247,6 +248,7 @@ function DashboardPage() {
             onOpenActivity={() => navigation.goToActivity()}
             onOpenRetailers={() => navigation.goToRetailers()}
             onOpenRetailerOrders={() => navigation.goToRetailerOrders()}
+            onOpenRetailerDocuments={() => navigation.goToRetailerDocuments()}
         />
     );
 }
@@ -352,6 +354,11 @@ function RetailerManagerPage() {
 function RetailerOrderRequestsPage() {
     const navigation = useAppNavigation();
     return <RetailerOrderRequests onBack={() => navigation.goToDashboard()} />;
+}
+
+function RetailerDocumentsPage() {
+    const navigation = useAppNavigation();
+    return <RetailerDocuments onBack={() => navigation.goToDashboard()} />;
 }
 
 export const appRoutes: RouteObject[] = [
@@ -466,6 +473,14 @@ export const appRoutes: RouteObject[] = [
                 element: (
                     <RouteAccessBoundary routeId={APP_ROUTE_IDS.retailerOrders}>
                         <RetailerOrderRequestsPage />
+                    </RouteAccessBoundary>
+                )
+            },
+            {
+                path: APP_PATHS[APP_ROUTE_IDS.retailerDocuments].slice(1),
+                element: (
+                    <RouteAccessBoundary routeId={APP_ROUTE_IDS.retailerDocuments}>
+                        <RetailerDocumentsPage />
                     </RouteAccessBoundary>
                 )
             }

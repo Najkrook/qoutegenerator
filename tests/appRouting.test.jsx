@@ -39,12 +39,13 @@ vi.mock('../src/services/firebase', () => firebaseMocks);
 vi.mock('../src/services/notificationService', () => notificationMocks);
 
 vi.mock('../src/views/Dashboard', () => ({
-    Dashboard: ({ onStartQuote, onOpenHistory, onOpenRetailerOrders }) => (
+    Dashboard: ({ onStartQuote, onOpenHistory, onOpenRetailerOrders, onOpenRetailerDocuments }) => (
         <div>
             <div>DashboardView</div>
             <button type="button" onClick={() => onStartQuote?.()}>Starta Ny Offert</button>
             <button type="button" onClick={() => onOpenHistory?.()}>Mina Offerter</button>
             <button type="button" onClick={() => onOpenRetailerOrders?.()}>Orderförfrågningar</button>
+            <button type="button" onClick={() => onOpenRetailerDocuments?.()}>Produktdokument</button>
         </div>
     )
 }));
@@ -83,6 +84,10 @@ vi.mock('../src/views/RetailerManager', () => ({
 
 vi.mock('../src/views/RetailerOrderRequests', () => ({
     RetailerOrderRequests: () => <div>RetailerOrdersView</div>
+}));
+
+vi.mock('../src/views/RetailerDocuments', () => ({
+    RetailerDocuments: () => <div>RetailerDocumentsView</div>
 }));
 
 vi.mock('../src/views/History', () => ({
@@ -229,6 +234,36 @@ describe('app routing', () => {
 
         expect(router.state.location.pathname).toBe(APP_PATHS[APP_ROUTE_IDS.retailerOrders]);
         expect(container.textContent).toContain('RetailerOrdersView');
+    });
+
+    it('allows retailers to open the retailer documents route', async () => {
+        const { container, router } = await renderApp({
+            initialEntries: [APP_PATHS[APP_ROUTE_IDS.retailerDocuments]],
+            auth: {
+                accessLevel: 'retailer',
+                retailer: {
+                    id: 'retailer_1',
+                    name: 'Roslagen',
+                    email: 'retailer@example.com',
+                    productLines: {
+                        BaHaMa: { enabled: true, discountPct: 20 }
+                    }
+                },
+                isRetailer: true
+            }
+        });
+
+        expect(router.state.location.pathname).toBe(APP_PATHS[APP_ROUTE_IDS.retailerDocuments]);
+        expect(container.textContent).toContain('RetailerDocumentsView');
+    });
+
+    it('redirects quote-only users away from the retailer documents route', async () => {
+        const { container, router } = await renderApp({
+            initialEntries: [APP_PATHS[APP_ROUTE_IDS.retailerDocuments]]
+        });
+
+        expect(router.state.location.pathname).toBe(APP_PATHS[APP_ROUTE_IDS.dashboard]);
+        expect(container.textContent).toContain('DashboardView');
     });
 
     it('redirects quote configuration to product lines when no line is selected', async () => {

@@ -54,6 +54,7 @@ vi.mock('../src/services/firebase', () => ({
     startAfter: vi.fn(() => ({})),
     getDocs: vi.fn(async () => ({ docs: [], empty: true })),
     addDoc: vi.fn(async () => ({ id: 'planner-1' })),
+    setDoc: vi.fn(async () => ({})),
     updateDoc: vi.fn(async () => {}),
     deleteDoc: vi.fn(async () => {}),
     writeBatch: vi.fn(() => ({ set: vi.fn(), commit: vi.fn(async () => {}) }))
@@ -123,6 +124,16 @@ vi.mock('../src/services/quoteSaveService', () => ({
     saveQuoteToRepository: vi.fn()
 }));
 
+vi.mock('../src/services/retailerDocumentService', () => ({
+    getRetailerDocumentKindLabel: vi.fn((kind) => (
+        kind === 'installation-instructions' ? 'Installationsinstruktion' : 'Färgkarta'
+    )),
+    retailerDocumentService: {
+        getRetailerDocumentsForLines: vi.fn(async () => []),
+        listRetailerLineDocuments: vi.fn(async () => [])
+    }
+}));
+
 vi.mock('../src/services/activityLogService', () => ({
     ACTIVITY_EVENT_DEFINITIONS: {
         quote_created: { label: 'Offert skapad' }
@@ -156,6 +167,7 @@ import { Planner } from '../src/views/Planner';
 import { Header } from '../src/components/layout/Header';
 import { SketchBom } from '../src/components/features/SketchBom';
 import { SketchTool } from '../src/views/SketchTool';
+import { RetailerDocuments } from '../src/views/RetailerDocuments';
 import { SummaryExport, getPdfExportBlockReason } from '../src/views/SummaryExport';
 import { AuthContext } from '../src/store/AuthContext';
 import { QuoteContext } from '../src/store/QuoteContext';
@@ -382,6 +394,31 @@ describe('UI text smoke', () => {
 
         expect(html).toContain('Återförsäljare');
         expect(html).toContain('Laddar återförsäljare...');
+    });
+
+    it('renders retailer documents loading state copy', () => {
+        authState.value = {
+            canViewEverything: false,
+            canStartQuote: true,
+            canAccessSketch: false,
+            canAccessQuoteHistory: true,
+            canExportSketchToQuote: false,
+            user: { uid: 'retailer-1', email: 'retailer@example.com' },
+            retailer: {
+                id: 'retailer_1',
+                name: 'Markishuset',
+                email: 'retailer@example.com',
+                productLines: {
+                    BaHaMa: { enabled: true, discountPct: 12 }
+                }
+            },
+            isRetailer: true
+        };
+
+        const html = renderWithProviders(<RetailerDocuments onBack={() => {}} />);
+
+        expect(html).toContain('Produktdokument');
+        expect(html).toContain('Laddar dokument...');
     });
 
     it('returns a filter-specific empty state message for filtered activity views', () => {

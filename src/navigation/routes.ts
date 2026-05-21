@@ -1,4 +1,5 @@
 import {
+    canAccessRetailerDocumentsLevel,
     canAccessQuoteHistoryLevel,
     canAccessSketchLevel,
     canStartQuoteLevel,
@@ -20,7 +21,8 @@ export const APP_ROUTE_IDS = Object.freeze({
     activity: 'activity',
     planner: 'planner',
     retailers: 'retailers',
-    retailerOrders: 'retailer-orders'
+    retailerOrders: 'retailer-orders',
+    retailerDocuments: 'retailer-documents'
 } as const);
 
 export type AppRouteId = typeof APP_ROUTE_IDS[keyof typeof APP_ROUTE_IDS];
@@ -39,12 +41,13 @@ export const APP_PATHS: Record<AppRouteId, string> = Object.freeze({
     [APP_ROUTE_IDS.activity]: '/activity',
     [APP_ROUTE_IDS.planner]: '/planner',
     [APP_ROUTE_IDS.retailers]: '/retailers',
-    [APP_ROUTE_IDS.retailerOrders]: '/retailer-orders'
+    [APP_ROUTE_IDS.retailerOrders]: '/retailer-orders',
+    [APP_ROUTE_IDS.retailerDocuments]: '/retailer-documents'
 });
 
 export type QuoteRouteStepId = 'product-lines' | 'configuration' | 'pricing' | 'summary';
 export type SketchReturnTarget = 'dashboard' | 'quote-configuration' | 'quote-summary';
-export type AppRouteAccess = 'public' | 'authenticated' | 'quote' | 'history' | 'sketch' | 'admin';
+export type AppRouteAccess = 'public' | 'authenticated' | 'quote' | 'history' | 'sketch' | 'admin' | 'retailer';
 
 const QUOTE_STEP_TO_ROUTE_ID: Record<QuoteRouteStepId, AppRouteId> = {
     'product-lines': APP_ROUTE_IDS.quoteProductLines,
@@ -74,7 +77,8 @@ const ROUTE_ACCESS: Record<AppRouteId, AppRouteAccess> = {
     [APP_ROUTE_IDS.activity]: 'admin',
     [APP_ROUTE_IDS.planner]: 'admin',
     [APP_ROUTE_IDS.retailers]: 'admin',
-    [APP_ROUTE_IDS.retailerOrders]: 'admin'
+    [APP_ROUTE_IDS.retailerOrders]: 'admin',
+    [APP_ROUTE_IDS.retailerDocuments]: 'retailer'
 };
 
 const PATH_TO_ROUTE_ID = new Map<AppRouteId | string, AppRouteId>(
@@ -172,6 +176,10 @@ export function getAuthorizedRouteForAccess(routeId: AppRouteId, accessLevel: Ac
                 : APP_PATHS[APP_ROUTE_IDS.dashboard];
         case 'sketch':
             return canAccessSketchLevel(accessLevel)
+                ? getAppPath(routeId)
+                : APP_PATHS[APP_ROUTE_IDS.dashboard];
+        case 'retailer':
+            return canAccessRetailerDocumentsLevel(accessLevel)
                 ? getAppPath(routeId)
                 : APP_PATHS[APP_ROUTE_IDS.dashboard];
         case 'admin':

@@ -54,6 +54,10 @@ export function canAccessQuoteHistoryLevel(accessLevel: AccessLevel): boolean {
     return accessLevel === ACCESS_LEVELS.FULL || accessLevel === ACCESS_LEVELS.QUOTE_ONLY || accessLevel === ACCESS_LEVELS.RETAILER;
 }
 
+export function canAccessRetailerDocumentsLevel(accessLevel: AccessLevel): boolean {
+    return accessLevel === ACCESS_LEVELS.FULL || accessLevel === ACCESS_LEVELS.RETAILER;
+}
+
 export function canExportSketchToQuoteLevel(accessLevel: AccessLevel): boolean {
     return accessLevel === ACCESS_LEVELS.FULL;
 }

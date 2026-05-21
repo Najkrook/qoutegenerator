@@ -13,6 +13,10 @@ import { AuthContext } from '../src/store/AuthContext';
 
 vi.mock('../src/services/firebase', () => ({
     db: {},
+    doc: vi.fn(() => ({})),
+    getDoc: vi.fn(async () => ({ exists: () => false, data: () => ({}) })),
+    setDoc: vi.fn(async () => ({})),
+    updateDoc: vi.fn(async () => ({})),
     collection: vi.fn(() => ({})),
     query: vi.fn(() => ({})),
     orderBy: vi.fn(() => ({})),
@@ -102,6 +106,7 @@ describe('Retailer workspace', () => {
                 onOpenHistory={() => {}}
                 onOpenInventory={() => {}}
                 onOpenSketch={() => {}}
+                onOpenRetailerDocuments={() => {}}
             />
         );
 
@@ -111,6 +116,7 @@ describe('Retailer workspace', () => {
         expect(html).toContain('12% rabatt');
         expect(html).toContain('Starta Ny Offert');
         expect(html).toContain('Mina Offerter');
+        expect(html).toContain('Produktdokument');
         expect(html).not.toContain('Hantera Lagersaldo');
         expect(html).not.toContain('Senaste Händelser');
     });

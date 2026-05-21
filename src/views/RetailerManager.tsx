@@ -17,9 +17,17 @@ import {
     deleteRetailer,
     normalizeRetailerData
 } from '../services/retailerService';
+import {
+    getRetailerDocumentKindLabel,
+    retailerDocumentService
+} from '../services/retailerDocumentService';
+import { notifySuccess } from '../services/notificationService';
 import { getErrorMessage } from '../utils/runtime';
 import type {
     RetailerFormState,
+    RetailerDocumentKind,
+    RetailerLineDocument,
+    RetailerLineDocumentsRecord,
     RetailerManagerProps,
     RetailerProductLineDraftConfig,
     RetailerRecord
@@ -38,6 +46,8 @@ interface DeleteConfirmationProps {
     onCancel: () => void;
     deleting: boolean;
 }
+
+type RetailerLineDocumentsDraftMap = Record<string, RetailerLineDocument[]>;
 
 const PRODUCT_LINE_IDS = getCatalogLineIds();
 
@@ -65,6 +75,34 @@ function buildFormState(retailer: RetailerRecord | null = null): RetailerFormSta
             }, {})
             : buildEmptyProductLines()
     };
+}
+
+function buildEmptyRetailerLineDocumentDraft(sortOrder = 0): RetailerLineDocument {
+    const seed = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    return {
+        id: `document-${seed}`,
+        title: '',
+        kind: 'color-chart',
+        url: '',
+        fileName: '',
+        description: '',
+        sortOrder
+    };
+}
+
+function buildRetailerLineDocumentsDraftMap(records: RetailerLineDocumentsRecord[] = []): RetailerLineDocumentsDraftMap {
+    const recordsByLineId = records.reduce<Record<string, RetailerLineDocument[]>>((acc, record) => {
+        acc[record.lineId] = record.documents.map((document) => ({
+            ...document,
+            description: document.description || ''
+        }));
+        return acc;
+    }, {});
+
+    return PRODUCT_LINE_IDS.reduce<RetailerLineDocumentsDraftMap>((acc, lineId) => {
+        acc[lineId] = recordsByLineId[lineId] || [];
+        return acc;
+    }, {});
 }
 
 function RetailerForm({ initial, onSave, onCancel, saving }: RetailerFormProps) {
@@ -290,6 +328,10 @@ export function RetailerManager({ onBack }: RetailerManagerProps) {
     const [saving, setSaving] = useState(false);
     const [deleteTarget, setDeleteTarget] = useState<RetailerRecord | null>(null);
     const [deleting, setDeleting] = useState(false);
+    const [lineDocumentsById, setLineDocumentsById] = useState<RetailerLineDocumentsDraftMap>(() => buildRetailerLineDocumentsDraftMap());
+    const [documentsLoading, setDocumentsLoading] = useState(true);
+    const [documentsError, setDocumentsError] = useState('');
+    const [savingDocumentsLineId, setSavingDocumentsLineId] = useState('');
 
     const loadRetailers = useCallback(async () => {
         setLoading(true);
@@ -308,6 +350,25 @@ export function RetailerManager({ onBack }: RetailerManagerProps) {
     useEffect(() => {
         void loadRetailers();
     }, [loadRetailers]);
+
+    const loadRetailerDocuments = useCallback(async () => {
+        setDocumentsLoading(true);
+        setDocumentsError('');
+        try {
+            const records = await retailerDocumentService.listRetailerLineDocuments();
+            setLineDocumentsById(buildRetailerLineDocumentsDraftMap(records));
+        } catch (err) {
+            console.error('Failed to load retailer documents:', err);
+            setLineDocumentsById(buildRetailerLineDocumentsDraftMap());
+            setDocumentsError('Kunde inte ladda produktdokument.');
+        } finally {
+            setDocumentsLoading(false);
+        }
+    }, []);
+
+    useEffect(() => {
+        void loadRetailerDocuments();
+    }, [loadRetailerDocuments]);
 
     const handleSave = async (formData: RetailerFormState) => {
         setSaving(true);
@@ -375,6 +436,68 @@ export function RetailerManager({ onBack }: RetailerManagerProps) {
 
     const enabledLines = (retailer: RetailerRecord) =>
         PRODUCT_LINE_IDS.filter((id) => retailer.productLines?.[id]?.enabled);
+
+    const updateLineDocument = (
+        lineId: string,
+        documentId: string,
+        patch: Partial<RetailerLineDocument>
+    ) => {
+        setLineDocumentsById((current) => ({
+            ...current,
+            [lineId]: (current[lineId] || []).map((document) => (
+                document.id === documentId
+                    ? { ...document, ...patch }
+                    : document
+            ))
+        }));
+    };
+
+    const addLineDocument = (lineId: string) => {
+        setLineDocumentsById((current) => {
+            const existing = current[lineId] || [];
+            return {
+                ...current,
+                [lineId]: [...existing, buildEmptyRetailerLineDocumentDraft(existing.length)]
+            };
+        });
+    };
+
+    const removeLineDocument = (lineId: string, documentId: string) => {
+        setLineDocumentsById((current) => ({
+            ...current,
+            [lineId]: (current[lineId] || []).filter((document) => document.id !== documentId)
+        }));
+    };
+
+    const saveLineDocuments = async (lineId: string) => {
+        if (!user?.uid) {
+            setDocumentsError('Du måste vara inloggad för att spara produktdokument.');
+            return;
+        }
+
+        setSavingDocumentsLineId(lineId);
+        setDocumentsError('');
+        try {
+            const saved = await retailerDocumentService.saveRetailerLineDocuments({
+                lineId,
+                documents: lineDocumentsById[lineId] || [],
+                user
+            });
+            setLineDocumentsById((current) => ({
+                ...current,
+                [lineId]: saved.documents.map((document) => ({
+                    ...document,
+                    description: document.description || ''
+                }))
+            }));
+            notifySuccess(`Produktdokument sparade för ${getCatalogLineName(lineId) || lineId}.`);
+        } catch (err) {
+            console.error('Failed to save retailer documents:', err);
+            setDocumentsError(getErrorMessage(err, 'Kunde inte spara produktdokument.'));
+        } finally {
+            setSavingDocumentsLineId('');
+        }
+    };
 
     return (
         <div className="max-w-[1000px] mx-auto animate-slide-in">
@@ -495,6 +618,173 @@ export function RetailerManager({ onBack }: RetailerManagerProps) {
                     })}
                 </div>
             )}
+
+            <section className="mt-10 rounded-2xl border border-panel-border bg-panel-bg p-6 shadow-sm" data-testid="retailer-documents-admin">
+                <div className="flex flex-col gap-3 border-b border-panel-border pb-4 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                        <h3 className="m-0 text-lg font-semibold text-text-primary">Dokument per produktlinje</h3>
+                        <p className="mt-1 text-sm text-text-secondary">
+                            Hantera globala PDF-länkar för färgkartor och installationsinstruktioner som visas i retailer-vyn.
+                        </p>
+                    </div>
+                    <button
+                        type="button"
+                        onClick={() => {
+                            void loadRetailerDocuments();
+                        }}
+                        className="rounded-md border border-panel-border bg-black/10 px-4 py-2 text-sm font-medium text-text-primary transition-colors hover:bg-white/5"
+                    >
+                        Uppdatera dokument
+                    </button>
+                </div>
+
+                {documentsError && (
+                    <div className="mt-4 rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-400">
+                        {documentsError}
+                    </div>
+                )}
+
+                {documentsLoading ? (
+                    <p className="py-8 text-center text-sm italic text-text-secondary">Laddar produktdokument...</p>
+                ) : (
+                    <div className="mt-6 grid grid-cols-1 gap-6">
+                        {PRODUCT_LINE_IDS.map((lineId) => {
+                            const documents = lineDocumentsById[lineId] || [];
+                            const isSavingDocuments = savingDocumentsLineId === lineId;
+
+                            return (
+                                <section
+                                    key={lineId}
+                                    className="rounded-xl border border-panel-border bg-black/10 p-5"
+                                >
+                                    <div className="flex flex-col gap-3 border-b border-panel-border pb-4 sm:flex-row sm:items-center sm:justify-between">
+                                        <div>
+                                            <h4 className="m-0 text-base font-semibold text-text-primary">{getCatalogLineName(lineId) || lineId}</h4>
+                                            <p className="mt-1 text-xs text-text-secondary">
+                                                {documents.length === 0
+                                                    ? 'Inga dokument publicerade ännu.'
+                                                    : `${documents.length} dokument konfigurerade.`}
+                                            </p>
+                                        </div>
+                                        <div className="flex flex-wrap gap-3">
+                                            <button
+                                                type="button"
+                                                onClick={() => addLineDocument(lineId)}
+                                                className="rounded-md border border-panel-border bg-panel-bg px-3 py-2 text-xs font-medium text-text-primary transition-colors hover:bg-white/5"
+                                            >
+                                                + Lägg till dokument
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    void saveLineDocuments(lineId);
+                                                }}
+                                                disabled={isSavingDocuments}
+                                                className="rounded-md bg-primary px-3 py-2 text-xs font-bold text-white transition-colors hover:bg-primary-hover disabled:cursor-not-allowed disabled:opacity-60"
+                                            >
+                                                {isSavingDocuments ? 'Sparar...' : 'Spara dokument'}
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    {documents.length === 0 ? (
+                                        <div className="mt-4 rounded-lg border border-dashed border-panel-border p-4 text-sm text-text-secondary">
+                                            Lägg till de PDF-länkar som ska visas för retailers med denna produktlinje.
+                                        </div>
+                                    ) : (
+                                        <div className="mt-4 space-y-4">
+                                            {documents.map((document, index) => (
+                                                <div
+                                                    key={document.id}
+                                                    className="rounded-lg border border-panel-border bg-panel-bg/60 p-4"
+                                                >
+                                                    <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+                                                        <div>
+                                                            <label className="mb-1.5 block text-xs font-bold uppercase text-text-secondary">Titel</label>
+                                                            <input
+                                                                type="text"
+                                                                value={document.title}
+                                                                onChange={(event) => updateLineDocument(lineId, document.id, { title: event.target.value })}
+                                                                placeholder="T.ex. Färgkarta Markisväv"
+                                                                className="w-full rounded-md border border-panel-border bg-input-bg p-2.5 text-sm text-text-primary outline-none transition-colors focus:border-primary"
+                                                            />
+                                                        </div>
+                                                        <div>
+                                                            <label className="mb-1.5 block text-xs font-bold uppercase text-text-secondary">Typ</label>
+                                                            <select
+                                                                value={document.kind}
+                                                                onChange={(event) => updateLineDocument(lineId, document.id, { kind: event.target.value as RetailerDocumentKind })}
+                                                                className="w-full rounded-md border border-panel-border bg-input-bg p-2.5 text-sm text-text-primary outline-none transition-colors focus:border-primary"
+                                                            >
+                                                                <option value="color-chart">{getRetailerDocumentKindLabel('color-chart')}</option>
+                                                                <option value="installation-instructions">{getRetailerDocumentKindLabel('installation-instructions')}</option>
+                                                            </select>
+                                                        </div>
+                                                        <div className="lg:col-span-2">
+                                                            <label className="mb-1.5 block text-xs font-bold uppercase text-text-secondary">PDF-URL</label>
+                                                            <input
+                                                                type="url"
+                                                                value={document.url}
+                                                                onChange={(event) => updateLineDocument(lineId, document.id, { url: event.target.value })}
+                                                                placeholder="https://..."
+                                                                className="w-full rounded-md border border-panel-border bg-input-bg p-2.5 text-sm text-text-primary outline-none transition-colors focus:border-primary"
+                                                            />
+                                                        </div>
+                                                        <div>
+                                                            <label className="mb-1.5 block text-xs font-bold uppercase text-text-secondary">Filnamn</label>
+                                                            <input
+                                                                type="text"
+                                                                value={document.fileName}
+                                                                onChange={(event) => updateLineDocument(lineId, document.id, { fileName: event.target.value })}
+                                                                placeholder="fargkarta.pdf"
+                                                                className="w-full rounded-md border border-panel-border bg-input-bg p-2.5 text-sm text-text-primary outline-none transition-colors focus:border-primary"
+                                                            />
+                                                        </div>
+                                                        <div>
+                                                            <label className="mb-1.5 block text-xs font-bold uppercase text-text-secondary">Sortering</label>
+                                                            <input
+                                                                type="number"
+                                                                min="0"
+                                                                step="1"
+                                                                value={document.sortOrder}
+                                                                onChange={(event) => updateLineDocument(lineId, document.id, { sortOrder: Number(event.target.value) || 0 })}
+                                                                className="w-full rounded-md border border-panel-border bg-input-bg p-2.5 text-sm text-text-primary outline-none transition-colors focus:border-primary"
+                                                            />
+                                                        </div>
+                                                        <div className="lg:col-span-2">
+                                                            <label className="mb-1.5 block text-xs font-bold uppercase text-text-secondary">Beskrivning</label>
+                                                            <textarea
+                                                                value={document.description || ''}
+                                                                onChange={(event) => updateLineDocument(lineId, document.id, { description: event.target.value })}
+                                                                rows={2}
+                                                                placeholder="Kort hjälptext som visas i retailer-vyn."
+                                                                className="w-full resize-y rounded-md border border-panel-border bg-input-bg p-2.5 text-sm text-text-primary outline-none transition-colors focus:border-primary"
+                                                            />
+                                                        </div>
+                                                    </div>
+
+                                                    <div className="mt-4 flex items-center justify-between gap-3 border-t border-panel-border pt-3">
+                                                        <div className="text-xs text-text-secondary">
+                                                            Rad {index + 1} · {getRetailerDocumentKindLabel(document.kind)}
+                                                        </div>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => removeLineDocument(lineId, document.id)}
+                                                            className="rounded-md border border-red-500/30 bg-panel-bg px-3 py-1.5 text-xs font-medium text-red-400 transition-colors hover:bg-red-500/10"
+                                                        >
+                                                            Ta bort dokument
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </section>
+                            );
+                        })}
+                    </div>
+                )}
+            </section>
 
             {deleteTarget && (
                 <DeleteConfirmation
