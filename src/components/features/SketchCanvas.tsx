@@ -180,11 +180,45 @@ export function SketchCanvas({
     onPlaceFiesta,
     onSelectFiesta,
     onMoveFiesta,
+    manualSectionsByEdge = {},
+    doorSegmentsByEdge = {},
+    onSetManualPin,
+    onClearManualPins,
+    onSetDoorSegmentSize,
+    onResetDoorSegment,
 }: SketchCanvasProps) {
     const svgRef = useRef<SVGSVGElement | null>(null);
     const [activeDrag, setActiveDrag] = useState<ActiveDrag | null>(null);
     const dragRef = useRef<ResizeDragState>({ startX: 0, startY: 0, initialW: 0, initialD: 0, initialDLeft: 0, initialDRight: 0 });
     const [snapLines, setSnapLines] = useState<{ x: number | null, y: number | null } | null>(null);
+
+    const [activeEditingDim, setActiveEditingDim] = useState<'width' | 'depthLeft' | 'depthRight' | null>(null);
+    const [dimInputValue, setDimInputValue] = useState<string>('');
+
+    const handleCommitDim = useCallback((dimKey: 'width' | 'depthLeft' | 'depthRight', rawValue: string) => {
+        setActiveEditingDim(null);
+        const val = parseFloat(rawValue);
+        if (!isNaN(val) && val >= 0) {
+            const snapped = snapToGrid(val);
+            const clampedVal = dimKey === 'width' ? Math.max(MIN_DIMENSION_MM, snapped) : snapped;
+            
+            if (dimKey === 'width') {
+                onResizeCommit?.({ width: clampedVal });
+            } else if (dimKey === 'depthLeft') {
+                if (equalDepth) {
+                    onResizeCommit?.({ depth: clampedVal, depthLeft: clampedVal, depthRight: clampedVal });
+                } else {
+                    onResizeCommit?.({ depthLeft: clampedVal });
+                }
+            } else if (dimKey === 'depthRight') {
+                if (equalDepth) {
+                    onResizeCommit?.({ depth: clampedVal, depthLeft: clampedVal, depthRight: clampedVal });
+                } else {
+                    onResizeCommit?.({ depthRight: clampedVal });
+                }
+            }
+        }
+    }, [equalDepth, onResizeCommit]);
 
     const [dragWidth, setDragWidth] = useState<number | null>(null);
     const [dragDepth, setDragDepth] = useState<number | null>(null);
@@ -357,6 +391,88 @@ export function SketchCanvas({
         }
         return `${edgeLabel} · segment ${selection.segmentIndex + 1}`;
     }, [activeMode, selectedEdge, selectedFiestaId, selectedParasolId, selection?.segmentIndex]);
+
+    const selectedSegmentToolbarInfo = useMemo(() => {
+        if (!selectedEdge || selection?.segmentIndex === null || selection?.segmentIndex === undefined) {
+            return null;
+        }
+
+        const summary = summaryByEdge[selectedEdge];
+        if (!summary || summary.enabled === false) {
+            return null;
+        }
+
+        const segments = summary.segments || [];
+        const segmentIndex = selection.segmentIndex;
+        if (segmentIndex < 0 || segmentIndex >= segments.length) {
+            return null;
+        }
+
+        let startX = 0;
+        let startY = 0;
+        let direction: 'E' | 'S' = 'E';
+
+        if (selectedEdge === 'front') {
+            startX = 0;
+            startY = currentMaxDepth;
+            direction = 'E';
+        } else if (selectedEdge === 'left') {
+            startX = 0;
+            startY = currentMaxDepth - currentDepthLeft;
+            direction = 'S';
+        } else if (selectedEdge === 'right') {
+            startX = currentWidth;
+            startY = currentMaxDepth - currentDepthRight;
+            direction = 'S';
+        } else if (selectedEdge === 'back') {
+            startX = 0;
+            startY = 0;
+            direction = 'E';
+        }
+
+        let cx = startX;
+        let cy = startY;
+
+        for (let i = 0; i < segments.length; i++) {
+            const segment = segments[i];
+            const len = Number(segment.length) || 0;
+
+            if (i === segmentIndex) {
+                const geometry = direction === 'E'
+                    ? {
+                        x: cx,
+                        y: cy - sectionThickness / 2,
+                        w: len,
+                        h: sectionThickness,
+                        tx: cx + len / 2,
+                        ty: cy + sectionThickness + 210
+                    }
+                    : {
+                        x: cx - sectionThickness / 2,
+                        y: cy,
+                        w: sectionThickness,
+                        h: len,
+                        tx: cx - sectionThickness - 260,
+                        ty: cy + len / 2
+                    };
+
+                return {
+                    edgeKey: selectedEdge,
+                    segment,
+                    geometry,
+                    direction
+                };
+            }
+
+            if (direction === 'E') {
+                cx += len;
+            } else {
+                cy += len;
+            }
+        }
+
+        return null;
+    }, [selectedEdge, selection?.segmentIndex, summaryByEdge, currentMaxDepth, currentDepthLeft, currentDepthRight, currentWidth, sectionThickness]);
 
     const emitCamera = useCallback(
         (nextCamera) => {
@@ -1328,25 +1444,75 @@ export function SketchCanvas({
         const bottomLabelY = bottomDimY + (uiDensity === 'touch' ? 340 : 300);
         const dimFontSize = uiDensity === 'touch' ? 180 : 170;
 
-        const renderDimensionLabel = ({ x, y, text, rotate = 0 }) => {
+        const renderDimensionLabel = ({ x, y, text, rotate = 0, dimKey, currentValue }) => {
+            const isEditing = activeEditingDim === dimKey;
+
             return (
                 <g transform={rotate ? `rotate(${rotate} ${x} ${y})` : undefined}>
-                    <text
-                        x={x}
-                        y={y}
-                        fill="#e2e8f0"
-                        stroke="rgba(2,6,23,0.88)"
-                        strokeWidth={uiDensity === 'touch' ? 30 : 24}
-                        paintOrder="stroke"
-                        strokeLinejoin="round"
-                        fontSize={dimFontSize}
-                        textAnchor="middle"
-                        dominantBaseline="middle"
-                        fontWeight="700"
-                        fontFamily="Inter, sans-serif"
-                    >
-                        {text}
-                    </text>
+                    {isEditing ? (
+                        <foreignObject
+                            x={x - 400}
+                            y={y - 110}
+                            width="800"
+                            height="220"
+                            style={{ overflow: 'visible' }}
+                        >
+                            <div className="flex items-center justify-center w-full h-full" onClick={(e) => e.stopPropagation()}>
+                                <input
+                                    type="number"
+                                    autoFocus
+                                    value={dimInputValue}
+                                    onChange={(e) => setDimInputValue(e.target.value)}
+                                    onKeyDown={(e) => {
+                                        if (e.key === 'Enter') {
+                                            handleCommitDim(dimKey, dimInputValue);
+                                        } else if (e.key === 'Escape') {
+                                            setActiveEditingDim(null);
+                                        }
+                                    }}
+                                    onBlur={() => handleCommitDim(dimKey, dimInputValue)}
+                                    style={{
+                                        width: '600px',
+                                        height: '160px',
+                                        fontSize: '95px',
+                                        fontWeight: '700',
+                                        textAlign: 'center',
+                                        color: '#ffffff',
+                                        backgroundColor: 'rgba(15, 23, 42, 0.95)',
+                                        border: '8px solid #3b82f6',
+                                        borderRadius: '40px',
+                                        boxShadow: '0 0 40px rgba(59, 130, 246, 0.6)',
+                                        outline: 'none',
+                                        fontFamily: 'Inter, sans-serif'
+                                    }}
+                                />
+                            </div>
+                        </foreignObject>
+                    ) : (
+                        <text
+                            x={x}
+                            y={y}
+                            fill="#e2e8f0"
+                            stroke="rgba(2,6,23,0.88)"
+                            strokeWidth={uiDensity === 'touch' ? 30 : 24}
+                            paintOrder="stroke"
+                            strokeLinejoin="round"
+                            fontSize={dimFontSize}
+                            textAnchor="middle"
+                            dominantBaseline="middle"
+                            fontWeight="700"
+                            fontFamily="Inter, sans-serif"
+                            style={{ cursor: 'pointer' }}
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                setActiveEditingDim(dimKey);
+                                setDimInputValue(String(Math.round(currentValue)));
+                            }}
+                            title="Klicka för att ändra mått"
+                        >
+                            {text}
+                        </text>
+                    )}
                 </g>
             );
         };
@@ -1366,7 +1532,9 @@ export function SketchCanvas({
                 {renderDimensionLabel({
                     x: frontEffective / 2,
                     y: bottomLabelY,
-                    text: `${Math.round(frontEffective)} mm`
+                    text: `${Math.round(frontEffective)} mm`,
+                    dimKey: 'width',
+                    currentValue: frontEffective
                 })}
 
                 {/* ── Left depth dimension ── */}
@@ -1379,7 +1547,9 @@ export function SketchCanvas({
                             x: -(sideDimOffset + sideDimLabelOffset),
                             y: leftStartY + leftEffective / 2,
                             text: `${Math.round(leftEffective)} mm`,
-                            rotate: -90
+                            rotate: -90,
+                            dimKey: 'depthLeft',
+                            currentValue: leftEffective
                         })}
                     </>
                 )}
@@ -1394,7 +1564,9 @@ export function SketchCanvas({
                             x: currentWidth + sideDimOffset + sideDimLabelOffset,
                             y: rightStartY + rightEffective / 2,
                             text: `${Math.round(rightEffective)} mm`,
-                            rotate: 90
+                            rotate: 90,
+                            dimKey: 'depthRight',
+                            currentValue: rightEffective
                         })}
                     </>
                 )}
@@ -1605,6 +1777,166 @@ export function SketchCanvas({
                     </g>
                 );
             });
+    };
+
+    const renderSegmentToolbar = () => {
+        if (!selectedSegmentToolbarInfo) return null;
+
+        const { edgeKey, segment, geometry, direction } = selectedSegmentToolbarInfo;
+        const index = segment.index;
+
+        const toolbarWidth = 900;
+        const toolbarHeight = 220;
+
+        let tx = 0;
+        let ty = 0;
+
+        if (direction === 'E') {
+            tx = geometry.tx - toolbarWidth / 2;
+            if (edgeKey === 'front') {
+                ty = geometry.y - toolbarHeight - 80;
+            } else {
+                ty = geometry.y + sectionThickness + 80;
+            }
+        } else {
+            ty = geometry.ty - toolbarHeight / 2;
+            if (edgeKey === 'left') {
+                tx = geometry.x + sectionThickness + 80;
+            } else {
+                tx = geometry.x - sectionThickness - toolbarWidth - 80;
+            }
+        }
+
+        const isPinned = (manualSectionsByEdge[edgeKey] || []).some((pin) => pin.index === index);
+
+        const SECTION_SIZES = [2000, 1900, 1800, 1700, 1600, 1500, 1400, 1300, 1200, 1100, 1000, 700];
+        const DOOR_SIZES = [1100, 1000, 700];
+        const currentSizeList = segment.isDoor ? DOOR_SIZES : SECTION_SIZES;
+
+        const handleTogglePin = () => {
+            if (isPinned) {
+                onSetManualPin?.(edgeKey, index, null);
+            } else {
+                onSetManualPin?.(edgeKey, index, segment.length);
+            }
+        };
+
+        const handleToggleDoor = () => {
+            if (segment.isDoor) {
+                onResetDoorSegment?.(edgeKey, index);
+            } else {
+                onSetDoorSegmentSize?.(edgeKey, index, 1000);
+            }
+        };
+
+        const handleStepResize = (delta: number) => {
+            const nextSize = snapToGrid(segment.length + delta);
+            const minAllowed = 700;
+            const clamped = Math.max(minAllowed, nextSize);
+            if (segment.isDoor) {
+                onSetDoorSegmentSize?.(edgeKey, index, clamped);
+            } else {
+                onSetManualPin?.(edgeKey, index, clamped);
+            }
+        };
+
+        const handleSizeSelect = (e: any) => {
+            const val = parseInt(e.target.value, 10);
+            if (!isNaN(val)) {
+                if (segment.isDoor) {
+                    onSetDoorSegmentSize?.(edgeKey, index, val);
+                } else {
+                    onSetManualPin?.(edgeKey, index, val);
+                }
+            }
+        };
+
+        return (
+            <foreignObject
+                x={tx}
+                y={ty}
+                width={toolbarWidth}
+                height={toolbarHeight}
+                style={{ overflow: 'visible' }}
+            >
+                <div
+                    className="flex items-center justify-between w-[900px] h-[220px] p-4 bg-slate-900/95 backdrop-blur-md border border-slate-700/80 rounded-[32px] shadow-[0_16px_48px_rgba(0,0,0,0.7)] text-white select-none gap-4"
+                    onClick={(e) => e.stopPropagation()}
+                >
+                    <button
+                        type="button"
+                        onClick={handleTogglePin}
+                        className={`flex items-center justify-center gap-2.5 h-[140px] px-5 rounded-[24px] border font-bold text-[28px] transition-all duration-200 active:scale-95 flex-1 ${
+                            isPinned
+                                ? 'bg-amber-600/40 text-amber-300 border-amber-500/80 shadow-[0_0_20px_rgba(245,158,11,0.2)]'
+                                : 'bg-slate-800 text-slate-300 border-slate-700/60 hover:bg-slate-700 hover:text-white'
+                        }`}
+                        title={isPinned ? 'Lås upp sektionsbredd' : 'Lås denna sektionsbredd'}
+                    >
+                        <span className="text-[36px]">{isPinned ? '🔒' : '🔓'}</span>
+                        <span>{isPinned ? 'Låst' : 'Lås'}</span>
+                    </button>
+
+                    <button
+                        type="button"
+                        onClick={handleToggleDoor}
+                        className={`flex items-center justify-center gap-2.5 h-[140px] px-5 rounded-[24px] border font-bold text-[28px] transition-all duration-200 active:scale-95 flex-1 ${
+                            segment.isDoor
+                                ? 'bg-emerald-600/40 text-emerald-300 border-emerald-500/80 shadow-[0_0_20px_rgba(16,185,129,0.2)]'
+                                : 'bg-slate-800 text-slate-300 border-slate-700/60 hover:bg-slate-700 hover:text-white'
+                        }`}
+                        title={segment.isDoor ? 'Gör till vanlig glassektion' : 'Gör till dörrsektion'}
+                    >
+                        <span className="text-[36px]">🚪</span>
+                        <span>{segment.isDoor ? 'Dörr' : 'Sektion'}</span>
+                    </button>
+
+                    <div className="flex items-center h-[140px] border border-slate-700/60 rounded-[24px] overflow-hidden bg-slate-900/60">
+                        <button
+                            type="button"
+                            onClick={() => handleStepResize(-100)}
+                            className="flex items-center justify-center w-[85px] h-full bg-slate-800 hover:bg-slate-700 text-white font-bold text-[36px] border-r border-slate-700/60 active:bg-slate-600 transition-colors"
+                            title="Minska med 100 mm"
+                        >
+                            -
+                        </button>
+                        <span className="flex items-center justify-center w-[120px] h-full text-center font-bold text-[28px] text-slate-200">
+                            100
+                        </span>
+                        <button
+                            type="button"
+                            onClick={() => handleStepResize(100)}
+                            className="flex items-center justify-center w-[85px] h-full bg-slate-800 hover:bg-slate-700 text-white font-bold text-[36px] border-l border-slate-700/60 active:bg-slate-600 transition-colors"
+                            title="Öka med 100 mm"
+                        >
+                            +
+                        </button>
+                    </div>
+
+                    <div className="relative h-[140px] flex-1">
+                        <select
+                            value={segment.length}
+                            onChange={handleSizeSelect}
+                            className="w-full h-full bg-slate-800 text-white rounded-[24px] border border-slate-700/60 px-5 text-[28px] font-bold outline-none cursor-pointer hover:bg-slate-750 transition-colors appearance-none pr-12 focus:border-blue-500"
+                        >
+                            {currentSizeList.map((sz) => (
+                                <option key={sz} value={sz}>
+                                    {sz} mm
+                                </option>
+                            ))}
+                            {!currentSizeList.includes(segment.length) && (
+                                <option value={segment.length}>
+                                    {segment.length} mm*
+                                </option>
+                            )}
+                        </select>
+                        <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-[28px] text-slate-400">
+                            ▾
+                        </div>
+                    </div>
+                </div>
+            </foreignObject>
+        );
     };
 
     return (
@@ -1867,6 +2199,8 @@ export function SketchCanvas({
                             />
                         </>
                     )}
+
+                    {renderSegmentToolbar()}
                 </svg>
 
                 {/* Floating Undo/Redo capsule */}

@@ -139,7 +139,7 @@ describe('BuilderItem header add-on badge', () => {
             { id: 'jumb_hang_kv_4x4', name: 'Hängränna 4x4', price: 710 },
             { id: 'jumb_hang_kv_45x45', name: 'Hängränna 4,5x4,5', price: 810 },
             { id: 'jumb_hang_kv_5x5', name: 'Hängränna 5x5', price: 830 },
-            { id: 'jumb_hang_kv_6x6', name: 'Hängränna 6x6', price: 1060 }
+            { id: 'jumb_hang_kv_6x6', name: 'Hängränna 6x6', price: 940 }
         ]);
     });
 

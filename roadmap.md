@@ -38,8 +38,10 @@ Success signals:
 - No dev-only UI controls exist in production views.
 - No commented-out dead code remains in actively maintained files.
 
-### 4. Notifications Consistency
-Standardize toast, warning, and confirm behavior across save, export, delete, and error actions. Replace ad hoc messaging with consistent success, failure, and recovery patterns, and make sure admin and retailer flows follow the same rules. Destructive actions should become consistently confirmable and reversible where feasible so feedback feels predictable across the product.
+### [x] 4. Notifications Consistency
+Status: The app now uses a shared notification service for toast, loading, action, and confirm flows across the main quote, export, inventory, sketch, history, log, template, and planner surfaces.
+
+Toast, warning, and confirm behavior has been standardized behind a shared app API with `react-hot-toast` as the toast renderer and the existing custom confirm dialog as the confirm standard. The app no longer relies on mixed `alert(...)`, native `confirm(...)`, direct `react-hot-toast` usage in the main flows, or a separate Planner-only undo banner pattern.
 
 Success signals:
 - Similar actions produce similar feedback across the app.
@@ -61,7 +63,7 @@ Status: Retailer Workspace V1 is now live. The first delivery includes a retaile
 
 Turn retailer access from a hidden role variant into a clearer dedicated workspace experience. The current V1 now covers the core "understand my scope" path, but the initiative remains active until retailer workflows feel fully intentional across the whole quote flow. Keep retailer management and admin controls aligned with the same model so the admin-facing configuration stays easy to reason about.
 
-Remaining follow-up work includes: consistent notification and feedback behavior across retailer flows; continued review of retailer-specific edge cases; and an explicit product decision on whether `CustomCosts`, save/export behavior, or other pricing-adjacent actions should be further restricted for retailer users.
+Remaining follow-up work includes: continued review of retailer-specific edge cases; and an explicit product decision on whether `CustomCosts`, save/export behavior, or other pricing-adjacent actions should be further restricted for retailer users.
 
 Success signals:
 - Retailer users can now see their discount and product scope without guessing.
@@ -123,7 +125,7 @@ Success signals:
 
 ## Cross-Cutting Dependencies
 - Text cleanup should happen before export polish so branded and customer-facing output improves on a clean baseline.
-- Notification consistency should land before or alongside retailer, history, and planner work so new flows inherit one messaging model.
+- Retailer, history, and planner follow-up work should continue to use the shared notification model so new flows do not reintroduce special-case messaging patterns.
 - Quote duplication should land alongside the history-hub work so cloning and reopen flows share the same metadata and draft-creation rules.
 - Quote history and planner linking should share identifiers and reference conventions rather than inventing separate linking schemes.
 - Routing follow-up for quote duplication, global search, and history improvements should stay coordinated so navigation patterns are not redesigned twice.

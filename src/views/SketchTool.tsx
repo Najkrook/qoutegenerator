@@ -1407,13 +1407,19 @@ export function SketchTool({ onBack, onExportToQuoteComplete }: SketchToolProps)
                         camera={workspace.camera}
                         selection={workspace.selection}
                         uiDensity={workspace.uiDensity}
+                        manualSectionsByEdge={config.manualSectionsByEdge}
+                        doorSegmentsByEdge={config.doorSegmentsByEdge}
+                        onSetManualPin={setManualPin}
+                        onClearManualPins={clearManualPins}
+                        onSetDoorSegmentSize={setDoorSegmentSize}
+                        onResetDoorSegment={resetDoorSegment}
                         onSelectEdge={handleSelectEdge}
                         onSelectSection={(edgeKey, segmentIndex) => {
                             setActiveSidebarTab('inspector');
                             setWorkspace((prev) => ({
                                 ...prev,
                                 selection: { edgeKey, segmentIndex }
-                            }));
+                             }));
                         }}
                         onCameraChange={handleCameraChange}
                         onResizePreview={handleResizePreview}

@@ -1394,6 +1394,12 @@ export interface SketchCanvasProps {
     redo?: () => void;
     canUndo?: boolean;
     canRedo?: boolean;
+    manualSectionsByEdge?: ManualSectionsByEdge;
+    doorSegmentsByEdge?: DoorSegmentsByEdge;
+    onSetManualPin?: (edgeKey: SketchEdgeKey, segmentIndex: number, size: number | null) => void;
+    onClearManualPins?: (edgeKey: SketchEdgeKey) => void;
+    onSetDoorSegmentSize?: (edgeKey: SketchEdgeKey, segmentIndex: number, size: number) => void;
+    onResetDoorSegment?: (edgeKey: SketchEdgeKey, segmentIndex: number) => void;
     onResize?: (dims: Partial<Pick<SketchConfigState, 'width' | 'depth' | 'depthLeft' | 'depthRight'>>) => void;
     onResizePreview?: (dims: Partial<Pick<SketchConfigState, 'width' | 'depth' | 'depthLeft' | 'depthRight'>> | null) => void;
     onResizeCommit?: (dims: Partial<Pick<SketchConfigState, 'width' | 'depth' | 'depthLeft' | 'depthRight'>>) => void;
