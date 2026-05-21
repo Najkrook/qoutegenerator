@@ -1598,6 +1598,9 @@ export function SketchCanvas({
     );
 
     const renderParasols = () => {
+        const inverseZoom = 1 / Math.max(0.1, camera.zoom);
+        const BASE_UI_SCALE = 9.0;
+
         return parasols.map((p) => {
             const isSelected = p.id === selectedParasolId;
             const dims = getEffectiveParasolDimensions(p);
@@ -1690,6 +1693,7 @@ export function SketchCanvas({
                                 fontFamily="Inter, sans-serif"
                             >
                                 !
+                            </text>
                         </g>
                     )}
 
@@ -1697,9 +1701,9 @@ export function SketchCanvas({
                     {isSelected && (
                         <foreignObject
                             x={px}
-                            y={py - (80 * inverseZoom)}
+                            y={py - (40 * inverseZoom * BASE_UI_SCALE)}
                             width={dims.widthMm}
-                            height={80 * inverseZoom}
+                            height={40 * inverseZoom * BASE_UI_SCALE}
                             style={{ overflow: 'visible', pointerEvents: 'none' }}
                         >
                             <div
