@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { catalogData } from '../data/catalog';
 import { getCatalogLineName } from '../data/catalogLookup';
 import { computeQuoteTotals } from '../services/calculationEngine';
@@ -19,7 +19,31 @@ import { getErrorMessage } from '../utils/runtime';
 import { buildHistoryOpenQuotePayload } from './historyPayload';
 import { hydrateQuoteState } from '../store/quoteStateSchema';
 import { useAuth } from '../store/AuthContext';
-import type { OrderRequestRecord, OrderRequestStatus, RetailerOrderRequestsProps } from '../types/contracts';
+import type {
+    OrderRequestRecord,
+    OrderRequestStatus,
+    QuoteState,
+    QuoteTotalsResult,
+    RetailerOrderRequestsProps
+} from '../types/contracts';
+
+type OrderRequestItemOverviewStatus = 'idle' | 'loading' | 'ready' | 'missing' | 'error';
+
+interface OrderRequestItemOverviewRow {
+    id: string;
+    model: string;
+    size: string;
+    qty: number;
+    lineLabel: string;
+    net: number;
+    isAddon: boolean;
+    isCustom: boolean;
+}
+
+interface OrderRequestItemOverviewState {
+    status: OrderRequestItemOverviewStatus;
+    rows: OrderRequestItemOverviewRow[];
+}
 
 function formatCurrencySek(value: number): string {
     return new Intl.NumberFormat('sv-SE', {
@@ -49,6 +73,49 @@ function buildOrderRequestPdfFileName(request: OrderRequestRecord): string {
     return `${base || 'order-request'}-v${request.quoteVersion}.pdf`;
 }
 
+function buildOrderRequestItemsCacheKey(request: OrderRequestRecord): string {
+    return `${request.quoteId}__v${request.quoteVersion}`;
+}
+
+async function loadSubmittedQuoteData(
+    request: OrderRequestRecord
+): Promise<{ state: QuoteState; summaryData: QuoteTotalsResult } | null> {
+    const revision = await quoteRepository.getQuoteRevisionByVersion({
+        userId: request.quoteOwnerUid,
+        quoteId: request.quoteId,
+        version: request.quoteVersion
+    });
+
+    if (!revision) {
+        return null;
+    }
+
+    const payload = buildHistoryOpenQuotePayload(
+        revision.state,
+        request.quoteId,
+        request.quoteNumber,
+        request.quoteVersion,
+        'draft'
+    );
+    const state = hydrateQuoteState(payload);
+    const summaryData = computeQuoteTotals({ state, catalogData });
+
+    return { state, summaryData };
+}
+
+function buildOrderRequestItemOverviewRows(summaryData: QuoteTotalsResult): OrderRequestItemOverviewRow[] {
+    return summaryData.totals.map((row, index) => ({
+        id: `${row.source.type}-${index}`,
+        model: row.model || '-',
+        size: row.size || '-',
+        qty: row.qty,
+        lineLabel: getCatalogLineName(row.line) || row.line || '-',
+        net: row.net,
+        isAddon: Boolean(row.isAddon),
+        isCustom: Boolean(row.isCustom)
+    }));
+}
+
 function getStatusButtonClasses(currentStatus: string, buttonStatus: OrderRequestStatus): string {
     const isActive = currentStatus === buttonStatus;
 
@@ -67,6 +134,8 @@ export function RetailerOrderRequests({ onBack }: RetailerOrderRequestsProps) {
     const [selectedId, setSelectedId] = useState('');
     const [statusSaving, setStatusSaving] = useState<OrderRequestStatus | ''>('');
     const [exportingId, setExportingId] = useState('');
+    const [itemOverviewByKey, setItemOverviewByKey] = useState<Record<string, OrderRequestItemOverviewState>>({});
+    const itemOverviewCacheRef = useRef<Record<string, OrderRequestItemOverviewState>>({});
 
     const loadRequests = useCallback(async (): Promise<void> => {
         setLoading(true);
@@ -97,6 +166,91 @@ export function RetailerOrderRequests({ onBack }: RetailerOrderRequestsProps) {
         () => requests.find((request) => request.id === selectedId) || requests[0] || null,
         [requests, selectedId]
     );
+    const selectedRequestItemsKey = selectedRequest ? buildOrderRequestItemsCacheKey(selectedRequest) : '';
+    const selectedRequestItems = selectedRequestItemsKey
+        ? itemOverviewByKey[selectedRequestItemsKey] || { status: 'idle', rows: [] }
+        : { status: 'idle', rows: [] };
+
+    const loadOrderRequestItems = useCallback(async (request: OrderRequestRecord): Promise<void> => {
+        const cacheKey = buildOrderRequestItemsCacheKey(request);
+        const cachedState = itemOverviewCacheRef.current[cacheKey];
+
+        if (cachedState && cachedState.status !== 'idle') {
+            return;
+        }
+
+        const loadingState: OrderRequestItemOverviewState = {
+            status: 'loading',
+            rows: []
+        };
+
+        itemOverviewCacheRef.current = {
+            ...itemOverviewCacheRef.current,
+            [cacheKey]: loadingState
+        };
+        setItemOverviewByKey((current) => ({
+            ...current,
+            [cacheKey]: loadingState
+        }));
+
+        try {
+            const submittedQuoteData = await loadSubmittedQuoteData(request);
+
+            if (!submittedQuoteData) {
+                const missingState: OrderRequestItemOverviewState = {
+                    status: 'missing',
+                    rows: []
+                };
+
+                itemOverviewCacheRef.current = {
+                    ...itemOverviewCacheRef.current,
+                    [cacheKey]: missingState
+                };
+                setItemOverviewByKey((current) => ({
+                    ...current,
+                    [cacheKey]: missingState
+                }));
+                return;
+            }
+
+            const readyState: OrderRequestItemOverviewState = {
+                status: 'ready',
+                rows: buildOrderRequestItemOverviewRows(submittedQuoteData.summaryData)
+            };
+
+            itemOverviewCacheRef.current = {
+                ...itemOverviewCacheRef.current,
+                [cacheKey]: readyState
+            };
+            setItemOverviewByKey((current) => ({
+                ...current,
+                [cacheKey]: readyState
+            }));
+        } catch (loadError) {
+            console.error('Failed to derive order request item overview:', loadError);
+            const errorState: OrderRequestItemOverviewState = {
+                status: 'error',
+                rows: []
+            };
+
+            itemOverviewCacheRef.current = {
+                ...itemOverviewCacheRef.current,
+                [cacheKey]: errorState
+            };
+            setItemOverviewByKey((current) => ({
+                ...current,
+                [cacheKey]: errorState
+            }));
+        }
+    }, []);
+
+    useEffect(() => {
+        if (!selectedRequest) {
+            return;
+        }
+
+        void loadOrderRequestItems(selectedRequest);
+    }, [loadOrderRequestItems, selectedRequest]);
 
     const handleStatusChange = async (status: OrderRequestStatus): Promise<void> => {
         if (!selectedRequest || statusSaving || selectedRequest.status === status) {
@@ -129,27 +283,14 @@ export function RetailerOrderRequests({ onBack }: RetailerOrderRequestsProps) {
 
         setExportingId(selectedRequest.id);
         try {
-            const revision = await quoteRepository.getQuoteRevisionByVersion({
-                userId: selectedRequest.quoteOwnerUid,
-                quoteId: selectedRequest.quoteId,
-                version: selectedRequest.quoteVersion
-            });
+            const submittedQuoteData = await loadSubmittedQuoteData(selectedRequest);
 
-            if (!revision) {
+            if (!submittedQuoteData) {
                 notifyError('Kunde inte hitta den sparade offertversionen för orderförfrågan.');
                 return;
             }
 
-            const payload = buildHistoryOpenQuotePayload(
-                revision.state,
-                selectedRequest.quoteId,
-                selectedRequest.quoteNumber,
-                selectedRequest.quoteVersion,
-                'draft'
-            );
-            const state = hydrateQuoteState(payload);
-            const summaryData = computeQuoteTotals({ state, catalogData });
-            const pdfBlob = await createQuotePdfBlob(state, summaryData);
+            const pdfBlob = await createQuotePdfBlob(submittedQuoteData.state, submittedQuoteData.summaryData);
 
             if (!pdfBlob) {
                 notifyError('Kunde inte skapa PDF för den valda offertversionen.');
@@ -345,6 +486,59 @@ export function RetailerOrderRequests({ onBack }: RetailerOrderRequestsProps) {
                                         Snapshot från den inskickade offertversionen v{selectedRequest.quoteVersion}.
                                     </p>
                                 </div>
+                            </div>
+
+                            <div className="rounded-xl border border-panel-border bg-black/10 p-4" data-testid="order-request-items">
+                                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                                    <h4 className="m-0 text-sm font-bold uppercase tracking-wide text-text-secondary">Produkter i orderförfrågan</h4>
+                                    <span className="text-xs text-text-secondary">
+                                        Snabböversikt från offertversion v{selectedRequest.quoteVersion}.
+                                    </span>
+                                </div>
+
+                                {selectedRequestItems.status === 'loading' || selectedRequestItems.status === 'idle' ? (
+                                    <p className="mt-4 text-sm italic text-text-secondary">Laddar produkter från sparad offertversion...</p>
+                                ) : selectedRequestItems.status === 'missing' ? (
+                                    <div className="mt-4 rounded-lg border border-panel-border bg-panel-bg p-4 text-sm text-text-secondary">
+                                        Den sparade offertversionen kunde inte hittas för denna orderförfrågan. PDF-export finns fortfarande kvar som fallback vid behov.
+                                    </div>
+                                ) : selectedRequestItems.status === 'error' ? (
+                                    <div className="mt-4 rounded-lg border border-panel-border bg-panel-bg p-4 text-sm text-text-secondary">
+                                        Kunde inte bygga produktöversikten från den sparade offertversionen. PDF-export finns fortfarande tillgänglig.
+                                    </div>
+                                ) : selectedRequestItems.rows.length === 0 ? (
+                                    <p className="mt-4 text-sm italic text-text-secondary">Inga produkter kunde utläsas från den sparade offertversionen.</p>
+                                ) : (
+                                    <div className="mt-4 overflow-x-auto">
+                                        <table className="w-full min-w-[620px] border-collapse text-left">
+                                            <thead>
+                                                <tr className="border-b border-panel-border text-[11px] uppercase tracking-wider text-text-secondary">
+                                                    <th className="px-3 py-2 font-bold">Modell</th>
+                                                    <th className="px-3 py-2 font-bold">Storlek</th>
+                                                    <th className="px-3 py-2 text-center font-bold">Antal</th>
+                                                    <th className="px-3 py-2 font-bold">Produktlinje</th>
+                                                    <th className="px-3 py-2 text-right font-bold">Nettopris</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody className="divide-y divide-panel-border/50">
+                                                {selectedRequestItems.rows.map((row) => (
+                                                    <tr
+                                                        key={row.id}
+                                                        className={`${row.isAddon ? 'bg-black/5 text-text-secondary italic' : 'text-text-primary'} ${row.isCustom ? 'italic text-secondary/80' : ''}`}
+                                                    >
+                                                        <td className={`px-3 py-3 text-sm ${row.isAddon ? 'pl-8' : ''}`}>{row.model}</td>
+                                                        <td className="px-3 py-3 text-sm text-text-secondary">{row.size}</td>
+                                                        <td className="px-3 py-3 text-center text-sm">{row.qty}</td>
+                                                        <td className="px-3 py-3 text-sm text-text-secondary">{row.lineLabel}</td>
+                                                        <td className="px-3 py-3 text-right text-sm font-semibold text-primary whitespace-nowrap">
+                                                            {formatCurrencySek(row.net)}
+                                                        </td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                )}
                             </div>
 
                             <div className="rounded-xl border border-panel-border bg-black/10 p-4">

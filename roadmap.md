@@ -59,15 +59,24 @@ Success signals:
 - Common contract mistakes are caught earlier in local development.
 
 ### [~] 2. Retailer Workspace
-Status: Retailer Workspace V1 is now live. The first delivery includes a retailer-specific dashboard/workspace, visible enabled/disabled product lines with explanation, retailer discount preview during product-line selection, and retailer-specific pricing guidance with lock copy in the pricing step.
+Status: Retailer Workspace V1 is now live. The current delivery includes a retailer-specific dashboard/workspace, visible enabled/disabled product lines with explanation, retailer discount preview during product-line selection, retailer-specific pricing guidance with lock copy in the pricing step, and an app-first retailer order-request workflow from summary/export into an admin inbox.
 
-Turn retailer access from a hidden role variant into a clearer dedicated workspace experience. The current V1 now covers the core "understand my scope" path, but the initiative remains active until retailer workflows feel fully intentional across the whole quote flow. Keep retailer management and admin controls aligned with the same model so the admin-facing configuration stays easy to reason about.
+Turn retailer access from a hidden role variant into a clearer dedicated workspace experience. The current V1 now covers the core "understand my scope" path and the first retailer-to-admin handoff path, but the initiative remains active until retailer workflows feel fully intentional across the whole quote flow. Keep retailer management and admin controls aligned with the same model so the admin-facing configuration stays easy to reason about.
 
-Remaining follow-up work includes: continued review of retailer-specific edge cases; and an explicit product decision on whether `CustomCosts`, save/export behavior, or other pricing-adjacent actions should be further restricted for retailer users.
+Shipped in the current V1:
+- Retailer-specific dashboard/workspace and guarded quote-history access.
+- Visible product-line scope and retailer discount guidance in selection and pricing.
+- Retailer-specific draft reset protection on "Starta Ny Offert".
+- In-app order request submission from `SummaryExport` for saved quote versions.
+- Admin recent-order-request visibility on the dashboard.
+- Admin inbox/detail workflow at `/retailer-orders` with status handling and a compact derived product overview from the submitted quote revision.
+
+Remaining follow-up work includes: continued review of retailer-specific edge cases; an explicit product decision on whether `CustomCosts`, save/export behavior, or other pricing-adjacent actions should be further restricted for retailer users; and a later decision on whether retailer order requests should also gain history, notification, or email-backed follow-up.
 
 Success signals:
 - Retailer users can now see their discount and product scope without guessing.
 - Restricted product lines are now visibly explained instead of silently absent.
+- Retailer users can now hand off a saved quote into a clear admin workflow without needing a side-channel.
 - Remaining retailer-specific edge cases and permission inconsistencies continue to trend down as the follow-up work lands.
 
 ### 3. Quote Duplication
@@ -119,6 +128,8 @@ Success signals:
 ### 3. Dashboard Analytics
 Add at-a-glance operational visibility to the admin dashboard. The data already exists in Firestore - surface it as summary cards and simple charts covering quote pipeline by status (draft/sent/won/lost), total SEK in pipeline, quotes created this week/month, and retailer activity. The goal is to make the dashboard useful for daily decision-making rather than just a navigation hub.
 
+Note: a lightweight admin recent-order-requests panel is already live. This item now refers to broader pipeline and trend visibility beyond that operational inbox-style summary.
+
 Success signals:
 - Admins can see pipeline health without opening individual quotes.
 - Trends in quote activity and retailer usage are visible at a glance.
@@ -131,6 +142,7 @@ Success signals:
 - Routing follow-up for quote duplication, global search, and history improvements should stay coordinated so navigation patterns are not redesigned twice.
 - Type hardening should continue alongside quote-state-heavy workflow work to reduce regression risk, even though the main app-source TypeScript migration is complete.
 - Admin UID centralization (moving hardcoded UIDs in `firestore.rules` and `accessControl.shared.js` to a Firestore-based role model or shared constant) should be resolved before Phase 2 work adds more admin-gated features, to prevent synchronization drift.
+- Any future retailer email or notification phase should build on the existing `order_requests` workflow rather than replace it with a separate submission path.
 - Validation should be updated whenever quote state, export rendering, or business-critical admin flows are changed.
 
 ## Success Metrics

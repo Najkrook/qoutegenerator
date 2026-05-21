@@ -301,30 +301,6 @@ export function TermsAndPaymentPanel({ summaryData }: TermsAndPaymentPanelProps)
                     </div>
 
                     <div className="flex flex-wrap gap-5 mt-4">
-                        <label className="flex items-center gap-2 text-sm text-text-primary cursor-pointer">
-                            <input
-                                type="checkbox"
-                                checked={state.includePaymentBox === true}
-                                onChange={(event: ChangeEvent<HTMLInputElement>) => dispatch({
-                                    type: 'SET_INCLUDE_PAYMENT_BOX',
-                                    payload: event.target.checked
-                                })}
-                                className="w-4 h-4 accent-primary"
-                            />
-                            Visa betalningsruta i PDF
-                        </label>
-                        <label className="flex items-center gap-2 text-sm text-text-primary cursor-pointer">
-                            <input
-                                type="checkbox"
-                                checked={state.includeSignatureBlock === true}
-                                onChange={(event: ChangeEvent<HTMLInputElement>) => dispatch({
-                                    type: 'SET_INCLUDE_SIGNATURE_BLOCK',
-                                    payload: event.target.checked
-                                })}
-                                className="w-4 h-4 accent-primary"
-                            />
-                            Visa signeringsruta i PDF
-                        </label>
                         {canHideDiscountReferences && (
                             <label className="flex items-center gap-2 text-sm text-text-primary cursor-pointer">
                                 <input

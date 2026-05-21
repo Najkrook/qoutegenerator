@@ -2,7 +2,7 @@
 
 This file exists to help future agents understand the actual `QuoteGenerator` project shape before editing anything substantial.
 
-Last verified: `2026-05-20`
+Last verified: `2026-05-21`
 Active branch at verification: `main`
 
 `QuoteGenerator` is a React SPA repository. All active runtime logic lives under `src/`. `README.md` is useful for human onboarding; this file is the deeper agent map for implementation work.
@@ -10,22 +10,22 @@ Active branch at verification: `main`
 ## Executive Snapshot
 
 - Internal quote, inventory, sketch, planner, retailer-management, and activity-logging portal for BRIXX.
-- Main frontend stack is React 19 + Vite 5 + Tailwind 4 + Firebase Auth/Firestore.
+- Main frontend stack is React 19 + Vite 5 + Tailwind 4 + React Router 7 + Firebase Auth/Firestore.
 - App-source TypeScript migration for `src/` is complete.
-- Runtime architecture is a single React SPA with state-driven view switching, not React Router.
+- Runtime architecture is a single React SPA with React Router route entrypoints layered on top of the existing quote-state flow.
 - In-progress quote state is persisted in localStorage under `offertverktyg_state` through `src/store/QuoteContext.tsx` and `src/store/quoteStatePersistence.ts`.
-- Persistent backend data lives in Firestore for quotes, revisions, templates, inventory, inventory logs, activity logs, planner projects, and retailers.
+- Persistent backend data lives in Firestore for quotes, revisions, templates, inventory, inventory logs, activity logs, planner projects, retailers, and retailer order requests.
 - Access control is UID-based and resolved in `src/config/accessControl.shared.ts`, with retailer access detected from Firestore during auth bootstrap.
 - Retailer Workspace V1 is live: retailer users now see scope and discount guidance directly in dashboard, product-line selection, and pricing, with retailer-specific draft reset protection on "Starta Ny Offert".
+- Retailer Order Requests V1 is live: retailer users can submit an in-app order request from `SummaryExport`, and admins now have a dashboard recent-requests panel plus a dedicated inbox/detail view at `/retailer-orders`.
 - Quote persistence and revisioning are centralized in `src/services/quoteRepository.ts`.
 - Shared runtime/domain contracts live in `src/types/contracts.ts`.
 - Shared runtime boundary helpers now live in `src/utils/runtime.ts`.
 - CI in `.github/workflows/ci.yml` runs the safety script, clean-repo sanity check, `npm ci`, `npm run test:confidence`, `npm run typecheck`, and `npm run build`.
-- Verified on `main`:
-  - `npm run typecheck` passes
-  - `npm run test:confidence` passes
-  - full `vitest run` passes
-  - `npm run build` passes
+- Current repo reality at verification:
+  - targeted order-request and text-encoding tests pass
+  - `npm run typecheck` currently fails on pre-existing sketch typing mismatches in `SketchBom.tsx`, `SketchCanvas.tsx`, and `SketchTool.tsx`
+  - do not assume the older "all green on main" status still reflects the live branch without re-running the full suite
 
 ## Repo Topology
 
@@ -33,8 +33,9 @@ Active branch at verification: `main`
 Primary active React runtime.
 
 - `src/main.tsx` bootstraps the SPA and wraps `AuthProvider`, `QuoteProvider`, and the toast layer.
-- `src/App.tsx` switches views using `state.step` and lazy-loads heavier routes.
+- `src/App.tsx` owns the guarded Router shell and still coordinates the quote flow around `state.step` within route surfaces.
 - `src/store/` contains auth state, quote state, schema hydration, and localStorage persistence.
+- `src/navigation/` contains route definitions and URL helpers for the Router-based app shell.
 - `src/views/` contains the main feature surfaces.
 - `src/components/` contains shared UI pieces, organized into `features/` (domain-specific widgets), `layout/` (shell and error boundary), and `modals/` (currently empty).
 - `src/services/` contains Firebase/auth/repository/export/activity-log/template/retailer glue.
@@ -94,7 +95,7 @@ The following root files are **not** part of the active runtime and should be ig
 ### React shell
 
 - `src/main.tsx` wraps the app with `AuthProvider` and `QuoteProvider`.
-- `src/App.tsx` renders views by `state.step`, not route paths.
+- `src/App.tsx` renders the guarded route shell while the quote flow still relies on `state.step` within those routes.
 - Numeric steps `1` through `4` represent the quote flow.
 - String steps such as `inventory`, `inventory-logs`, `activity-logs`, `planner`, `retailers`, `sketch`, and `history` represent side branches.
 - Heavier views are lazy-loaded in `App.tsx`:
@@ -104,6 +105,7 @@ The following root files are **not** part of the active runtime and should be ig
   - `Planner`
   - `History`
   - `RetailerManager`
+  - `RetailerOrderRequests`
 
 ### Shared internal modules
 
@@ -139,11 +141,12 @@ The following root files are **not** part of the active runtime and should be ig
 - Persistence:
   - no dedicated dashboard document
   - admin dashboard reads recent `activity_logs`
+  - admin dashboard also reads recent `order_requests`
 - Behavior notes:
   - retailer users see a dedicated workspace variant instead of the generic quote-only dashboard
   - retailer workspace surfaces enabled product lines, per-line default discounts, and CTA access to new quotes and quote history
   - retailer "Starta Ny Offert" clears the current quote draft before entering the quote flow; if draft data already exists, the app asks for confirmation first
-  - admin-only cards and the recent activity panel remain hidden from retailer users
+  - admin-only cards, the recent activity panel, and the recent order-request panel remain hidden from retailer users
 
 ### Product Line Selection
 
@@ -209,6 +212,32 @@ The following root files are **not** part of the active runtime and should be ig
   - computes summary with the calculation engine
   - templates and payment options flow through `src/components/features/TermsAndPaymentPanel.tsx`
   - saves trigger activity logging through `src/services/activityLogService.ts`
+  - retailer users can submit one in-app order request per saved quote version through `src/services/orderRequestService.ts`
+  - retailer submission is locked per saved quote version and does not change the quote lifecycle status
+
+### Retailer Order Requests
+
+- Entry condition:
+  - retailer submission is available from the summary/export route for retailer users only
+  - admin inbox lives at `/retailer-orders`
+- Access gate:
+  - retailer submission requires retailer context plus a saved quote with `activeQuoteId`, `quoteNumber`, and `activeQuoteVersion`
+  - admin inbox/detail view requires `canViewEverything`
+- Main files:
+  - `src/views/SummaryExport.tsx`
+  - `src/views/RetailerOrderRequests.tsx`
+  - `src/views/Dashboard.tsx`
+  - `src/services/orderRequestService.ts`
+  - `src/services/quoteRepository.ts`
+  - `src/services/quotePdfService.ts`
+- Persistence:
+  - Firestore root collection `order_requests`
+- Behavior notes:
+  - document IDs are deterministic per `quoteId + version`, so one successful request exists per quote version
+  - order requests snapshot retailer/customer/commercial metadata but do not store a PDF artifact
+  - admin detail view resolves the exact saved quote revision for PDF export and compact product overview rendering
+  - compact product rows are derived live from the saved revision via `buildHistoryOpenQuotePayload(...)`, `hydrateQuoteState(...)`, and `computeQuoteTotals(...)`
+  - admins can move request status through `new`, `reviewing`, and `completed`
 
 ### Inventory Manager
 
@@ -276,6 +305,7 @@ The following root files are **not** part of the active runtime and should be ig
 - Behavior notes:
   - can open the latest revision or specific older revisions
   - admin users can browse across owners via collection-group-backed repository reads
+  - `quoteRepository.getQuoteRevisionByVersion(...)` is also used by the retailer-order-request admin workflow to resolve exact submitted versions
 
 ### Activity Logs
 
@@ -362,6 +392,8 @@ Current retailer reality:
 - retailer "Starta Ny Offert" resets the current draft and asks for confirmation first when draft data exists
 - `CustomCosts` remains editable for retailer users
 - retailer users can still save and export from step 4 in the current implementation
+- retailer users can submit an in-app order request from step 4 once the quote has been saved
+- admin-only retailer-order-request surfaces are route-gated and not visible to retailer users
 
 ## State Model And Persistence
 
@@ -411,6 +443,7 @@ The authoritative quote repository is `src/services/quoteRepository.ts`.
 - Quotes: `users/{uid}/quotes/{quoteId}`
 - Revisions: `users/{uid}/quotes/{quoteId}/revisions/{revisionId}`
 - Templates: `users/{uid}/templates/{templateId}`
+- Retailer order requests: `order_requests/{requestId}`
 
 ### Save flow
 
@@ -489,6 +522,7 @@ Scrive statuses:
 - `users/{userId}/templates/{templateId}` for the signed-in owner
 - `planner_projects/{projectId}` for admins
 - `retailers/{retailerId}` for admins, plus self-read by matching auth email
+- `order_requests/{requestId}` for retailer self-create/read and admin read/update
 - admin collection-group reads for `templates`
 - admin collection-group reads for `quotes`
 
@@ -496,6 +530,7 @@ Scrive statuses:
 
 - Any new feature that writes to a new collection must be reflected in Firestore rules.
 - Admin UIDs are hardcoded in both `firestore.rules` and `src/config/accessControl.shared.ts` and must stay synchronized.
+- Running the app on `localhost` still talks to the configured Firebase project unless emulators are explicitly wired up; editing `firestore.rules` locally is not enough until the rules are deployed.
 
 ## Tooling, Scripts, And CI
 
@@ -535,6 +570,7 @@ If `npm.ps1` is blocked by execution policy, use `cmd /c npm ...` or invoke Node
 
 ## Known Issues And Repo Traps
 
+- `npm run typecheck` is currently red because of pre-existing sketch typing mismatches in `src/components/features/SketchBom.tsx`, `src/components/features/SketchCanvas.tsx`, and `src/views/SketchTool.tsx`.
 - Vite still warns about large chunks in production builds, especially `export-tools`.
 - `vite.config.js` manually groups:
   - `export-tools`
@@ -698,6 +734,21 @@ Start with:
 - `src/services/authService.ts`
 - `src/store/AuthContext.tsx`
 - `src/config/accessControl.shared.ts`
+- `firestore.rules`
+
+### Change retailer order-request workflow
+
+Start with:
+
+- `src/views/SummaryExport.tsx`
+- `src/views/RetailerOrderRequests.tsx`
+- `src/views/Dashboard.tsx`
+- `src/services/orderRequestService.ts`
+- `src/services/quoteRepository.ts`
+- `src/services/quotePdfService.ts`
+- `src/views/historyPayload.ts`
+- `src/store/quoteStateSchema.ts`
+- `src/services/calculationEngine.ts`
 - `firestore.rules`
 
 ## Recommended First Read Order
