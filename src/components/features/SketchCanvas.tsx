@@ -4,7 +4,9 @@ import {
     getFiestaRadiusMm,
     getEffectiveParasolDimensions,
     getParasolRotationDeg,
-    isParasolRotatable
+    isParasolRotatable,
+    PARASOL_PRESETS,
+    groupParasolPresetsByCategory
 } from '../../utils/parasolGeometry';
 import type {
     EdgeSummary,
@@ -177,6 +179,9 @@ export function SketchCanvas({
     onPlaceParasol,
     onSelectParasol,
     onMoveParasol,
+    onRotateParasol,
+    onDeleteParasol,
+    onChangeParasolPreset,
     onPlaceFiesta,
     onSelectFiesta,
     onMoveFiesta,
@@ -1685,8 +1690,74 @@ export function SketchCanvas({
                                 fontFamily="Inter, sans-serif"
                             >
                                 !
-                            </text>
                         </g>
+                    )}
+
+                    {/* On-Canvas Toolbar for the selected parasol */}
+                    {isSelected && (
+                        <foreignObject
+                            x={px}
+                            y={py - (80 * inverseZoom)}
+                            width={dims.widthMm}
+                            height={80 * inverseZoom}
+                            style={{ overflow: 'visible', pointerEvents: 'none' }}
+                        >
+                            <div
+                                className="flex items-center gap-1 justify-center pointer-events-auto"
+                                style={{
+                                    transform: `scale(${inverseZoom * BASE_UI_SCALE})`,
+                                    transformOrigin: 'bottom center',
+                                    width: '100%',
+                                    height: '100%',
+                                    display: 'flex',
+                                    alignItems: 'flex-end',
+                                    paddingBottom: '8px'
+                                }}
+                                onPointerDown={(e) => {
+                                    e.stopPropagation();
+                                }}
+                            >
+                                <div className="bg-panel-bg border border-panel-border rounded-xl shadow-xl p-1.5 flex gap-1.5 items-center backdrop-blur-md">
+                                    <select
+                                        value={p.presetId || ''}
+                                        onChange={(e) => {
+                                            if (onChangeParasolPreset) onChangeParasolPreset(p.id, e.target.value);
+                                        }}
+                                        className="bg-input-bg border border-panel-border rounded text-text-primary px-2 py-1 text-sm outline-none focus:border-primary"
+                                    >
+                                        {groupParasolPresetsByCategory(PARASOL_PRESETS).map((group) => (
+                                            <optgroup key={group.category} label={group.category}>
+                                                {group.presets.map((preset) => (
+                                                    <option key={preset.id} value={preset.id}>
+                                                        {preset.label}
+                                                    </option>
+                                                ))}
+                                            </optgroup>
+                                        ))}
+                                    </select>
+
+                                    {isRotatable && (
+                                        <button
+                                            type="button"
+                                            onClick={() => onRotateParasol && onRotateParasol(p.id, getParasolRotationDeg(p) === 90 ? 0 : 90)}
+                                            className="px-2.5 py-1 text-sm font-semibold rounded bg-panel-bg text-text-secondary border border-panel-border hover:text-text-primary hover:bg-white/5 transition-colors"
+                                            title="Rotera"
+                                        >
+                                            Rotera
+                                        </button>
+                                    )}
+
+                                    <button
+                                        type="button"
+                                        onClick={() => onDeleteParasol && onDeleteParasol(p.id)}
+                                        className="px-2.5 py-1 text-sm font-semibold rounded bg-red-500/10 text-red-400 border border-red-500/30 hover:bg-red-500/20 transition-colors"
+                                        title="Ta bort"
+                                    >
+                                        Ta bort
+                                    </button>
+                                </div>
+                            </div>
+                        </foreignObject>
                     )}
                 </g>
             );

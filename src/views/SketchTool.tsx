@@ -945,6 +945,29 @@ export function SketchTool({ onBack, onExportToQuoteComplete }: SketchToolProps)
         });
     }, [config.parasols, config.selectedParasolId, updateConfig]);
 
+    const handleChangeParasolPreset = useCallback((id, presetId) => {
+        const preset = getParasolPresetById(presetId);
+        if (!preset) return;
+        
+        updateConfig({
+            parasols: (config.parasols || []).map((parasol) => {
+                if (parasol.id !== id) return parasol;
+                return {
+                    ...parasol,
+                    presetId: preset.id,
+                    label: preset.label,
+                    widthMm: preset.widthMm,
+                    depthMm: preset.depthMm,
+                    exportLine: preset.exportLine,
+                    exportModel: preset.exportModel,
+                    exportSize: preset.exportSize,
+                    // Rotation stays the same, unless the new preset doesn't support rotation (e.g. circle)
+                    rotationDeg: parasol.rotationDeg
+                };
+            })
+        });
+    }, [config.parasols, updateConfig]);
+
     const handlePlaceFiesta = useCallback((xMm, yMm) => {
         if (config.activeMode !== 'fiesta') return;
 
@@ -1380,6 +1403,9 @@ export function SketchTool({ onBack, onExportToQuoteComplete }: SketchToolProps)
                             onPlaceParasol={handlePlaceParasol}
                             onSelectParasol={handleSelectParasol}
                             onMoveParasol={handleMoveParasol}
+                            onRotateParasol={handleRotateParasol}
+                            onDeleteParasol={handleDeleteParasol}
+                            onChangeParasolPreset={handleChangeParasolPreset}
                             onPlaceFiesta={handlePlaceFiesta}
                             onSelectFiesta={handleSelectFiesta}
                             onMoveFiesta={handleMoveFiesta}
