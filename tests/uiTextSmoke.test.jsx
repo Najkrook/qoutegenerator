@@ -1,4 +1,4 @@
-﻿import React from 'react';
+import React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { MemoryRouter } from 'react-router-dom';
@@ -449,9 +449,10 @@ describe('UI text smoke', () => {
         expect(html).toContain('Till offert');
         expect(html).toContain('SketchSetupPanelMock');
         expect(html).toContain('SketchReviewPanelMock');
-        expect(html).toContain('xl:grid-cols-[308px_minmax(0,1fr)_340px]');
-        expect(html).toContain('hidden xl:flex xl:flex-col xl:gap-4 xl:self-start');
-        expect(html).toContain('space-y-3 xl:hidden');
+        expect(html).toContain('absolute inset-0 z-0');
+        expect(html).toContain('absolute top-4 inset-x-4 z-20 flex flex-col xl:flex-row');
+        expect(html).toContain('absolute top-[140px] left-4 bottom-4 z-10 w-[308px]');
+        expect(html).toContain('absolute top-[140px] right-4 bottom-4 z-10 w-[340px]');
     });
 
     it('renders SummaryExport labels for save, preview, and export actions', () => {

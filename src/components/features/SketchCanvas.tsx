@@ -1812,6 +1812,7 @@ export function SketchCanvas({
         const SECTION_SIZES = [2000, 1900, 1800, 1700, 1600, 1500, 1400, 1300, 1200, 1100, 1000, 700];
         const DOOR_SIZES = [1100, 1000, 700];
         const currentSizeList = segment.isDoor ? DOOR_SIZES : SECTION_SIZES;
+        const inverseZoom = 1 / activeCamera.zoom;
 
         const handleTogglePin = () => {
             if (isPinned) {
@@ -1860,8 +1861,14 @@ export function SketchCanvas({
                 style={{ overflow: 'visible' }}
             >
                 <div
-                    className="flex items-center justify-between w-[900px] h-[220px] p-4 bg-slate-900/95 backdrop-blur-md border border-slate-700/80 rounded-[32px] shadow-[0_16px_48px_rgba(0,0,0,0.7)] text-white select-none gap-4"
+                    className="flex items-center justify-between p-4 bg-slate-900/95 backdrop-blur-md border border-slate-700/80 rounded-[32px] shadow-[0_16px_48px_rgba(0,0,0,0.7)] text-white select-none gap-4"
                     onClick={(e) => e.stopPropagation()}
+                    style={{ 
+                        width: '900px', 
+                        height: '220px',
+                        transform: `scale(${inverseZoom})`,
+                        transformOrigin: direction === 'E' ? 'top center' : 'center left'
+                    }}
                 >
                     <button
                         type="button"
@@ -1940,10 +1947,11 @@ export function SketchCanvas({
     };
 
     return (
-        <div id="sketchCanvasContainer" className="bg-panel-bg border border-panel-border rounded-xl p-4 space-y-2 text-text-primary">
-            <div className="space-y-2" data-html2canvas-ignore="true">
-                <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
-                    <div className="flex flex-wrap items-center gap-1.5">
+        <div id="sketchCanvasContainer" className="relative w-full h-full bg-[#0b1220] overflow-hidden rounded-xl border border-panel-border shadow-2xl">
+            {/* Absolute floating toolbar for canvas modes and zoom */}
+            <div className="absolute top-4 left-1/2 -translate-x-1/2 z-20 pointer-events-none" data-html2canvas-ignore="true">
+                <div className="pointer-events-auto flex flex-wrap items-center justify-center gap-4 bg-panel-bg/80 backdrop-blur-md border border-panel-border rounded-[24px] px-5 py-3 shadow-[0_16px_48px_rgba(0,0,0,0.5)]">
+                    <div className="flex flex-wrap items-center gap-2">
                         <button
                             type="button"
                             aria-pressed={activeMode === 'clickitup'}
@@ -2009,16 +2017,13 @@ export function SketchCanvas({
                         </span>
                     </div>
                 </div>
-
-                <p className="m-0 px-0.5 text-xs text-text-secondary">{MODE_HELP_TEXT[activeMode]}</p>
             </div>
 
-            <div className="relative">
+            <div className="absolute inset-0 z-0">
                 <svg
                     ref={svgRef}
                     viewBox={viewBox}
-                    className="w-full h-auto border border-panel-border rounded-lg bg-[#0b1220]"
-                    style={{ minHeight: '500px', maxHeight: '760px', touchAction: 'none' }}
+                    className="w-full h-full touch-none"
                     onWheel={handleWheel}
                     onMouseDown={startPan}
                     onTouchStart={handleTouchStart}
