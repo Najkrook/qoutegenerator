@@ -326,6 +326,9 @@ export function SketchCanvas({
 
     const totalWidth = currentWidth + padding * 2;
     const totalHeight = currentMaxDepth + padding * 2;
+    const screenScale = useMemo(() => {
+        return (totalWidth / 11000) * (1 / Math.max(0.1, activeCamera.zoom));
+    }, [totalWidth, activeCamera.zoom]);
     const viewWidth = totalWidth / activeCamera.zoom;
     const viewHeight = totalHeight / activeCamera.zoom;
     const viewBox = `${activeCamera.panX} ${activeCamera.panY} ${viewWidth} ${viewHeight}`;
@@ -1580,9 +1583,6 @@ export function SketchCanvas({
     );
 
     const renderParasols = () => {
-        const inverseZoom = 1 / Math.max(0.1, camera.zoom);
-        const BASE_UI_SCALE = 9.0;
-
         return parasols.map((p) => {
             const isSelected = p.id === selectedParasolId;
             const dims = getEffectiveParasolDimensions(p);
@@ -1680,74 +1680,85 @@ export function SketchCanvas({
                     )}
 
                     {/* On-Canvas Toolbar for the selected parasol */}
-                    {isSelected && (
-                        <foreignObject
-                            x={px}
-                            y={py - (40 * inverseZoom * BASE_UI_SCALE)}
-                            width={dims.widthMm}
-                            height={40 * inverseZoom * BASE_UI_SCALE}
-                            style={{ overflow: 'visible', pointerEvents: 'all' }}
-                            onMouseDown={(e) => e.stopPropagation()}
-                            onPointerDown={(e) => e.stopPropagation()}
-                            onClick={(e) => e.stopPropagation()}
-                        >
-                            <div
-                                style={{
-                                    transform: `scale(${inverseZoom * BASE_UI_SCALE})`,
-                                    transformOrigin: 'bottom center',
-                                    width: '100%',
-                                    height: '100%',
-                                    display: 'flex',
-                                    alignItems: 'flex-end',
-                                    justifyContent: 'center',
-                                    paddingBottom: '8px'
-                                }}
-                            >
-                                <div className="bg-panel-bg border border-panel-border rounded-xl shadow-xl p-1.5 flex gap-1.5 items-center backdrop-blur-md">
-                                    <select
-                                        value={p.presetId || ''}
-                                        onChange={(e) => {
-                                            if (onChangeParasolPreset) onChangeParasolPreset(p.id, e.target.value);
-                                        }}
-                                        onMouseDown={(e) => e.stopPropagation()}
-                                        className="bg-input-bg border border-panel-border rounded text-text-primary px-2 py-1 text-sm outline-none focus:border-primary cursor-pointer"
-                                    >
-                                        {groupParasolPresetsByCategory(PARASOL_PRESETS).map((group) => (
-                                            <optgroup key={group.category} label={group.category}>
-                                                {group.presets.map((preset) => (
-                                                    <option key={preset.id} value={preset.id}>
-                                                        {preset.label}
-                                                    </option>
-                                                ))}
-                                            </optgroup>
-                                        ))}
-                                    </select>
+                    {isSelected && (() => {
+                        const parasolScale = 11.0 * screenScale;
+                        const toolbarWidth = isRotatable ? 800 : 600;
+                        const toolbarHeight = 140;
+                        const scaledWidth = toolbarWidth * parasolScale;
+                        const scaledHeight = toolbarHeight * parasolScale;
+                        const scaledGap = 80 * parasolScale;
 
-                                    {isRotatable && (
+                        const tx = px + dims.widthMm / 2 - scaledWidth / 2;
+                        const ty = py - scaledHeight - scaledGap;
+
+                        return (
+                            <foreignObject
+                                x={tx}
+                                y={ty}
+                                width={scaledWidth}
+                                height={scaledHeight}
+                                style={{ overflow: 'visible', pointerEvents: 'all' }}
+                                onMouseDown={(e) => e.stopPropagation()}
+                                onPointerDown={(e) => e.stopPropagation()}
+                                onClick={(e) => e.stopPropagation()}
+                            >
+                                <div
+                                    style={{
+                                        width: `${toolbarWidth}px`,
+                                        height: `${toolbarHeight}px`,
+                                        transform: `scale(${parasolScale})`,
+                                        transformOrigin: 'top left',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center'
+                                    }}
+                                >
+                                    <div className="w-full h-full bg-panel-bg/95 border-2 border-panel-border rounded-[20px] shadow-[0_16px_48px_rgba(0,0,0,0.5)] p-3 flex gap-3 items-center justify-between backdrop-blur-md">
+                                        <select
+                                            value={p.presetId || ''}
+                                            onChange={(e) => {
+                                                if (onChangeParasolPreset) onChangeParasolPreset(p.id, e.target.value);
+                                            }}
+                                            onMouseDown={(e) => e.stopPropagation()}
+                                            className="flex-grow bg-input-bg border-2 border-panel-border rounded-[12px] text-text-primary px-4 py-3 text-[24px] font-semibold outline-none focus:border-primary cursor-pointer transition-colors"
+                                        >
+                                            {groupParasolPresetsByCategory(PARASOL_PRESETS).map((group) => (
+                                                <optgroup key={group.category} label={group.category}>
+                                                    {group.presets.map((preset) => (
+                                                        <option key={preset.id} value={preset.id}>
+                                                            {preset.label}
+                                                        </option>
+                                                    ))}
+                                                </optgroup>
+                                            ))}
+                                        </select>
+
+                                        {isRotatable && (
+                                            <button
+                                                type="button"
+                                                onMouseDown={(e) => e.stopPropagation()}
+                                                onClick={() => onRotateParasol && onRotateParasol(p.id, getParasolRotationDeg(p) === 90 ? 0 : 90)}
+                                                className="px-5 py-3 text-[24px] font-semibold rounded-[12px] bg-panel-bg text-text-secondary border-2 border-panel-border hover:text-text-primary hover:bg-white/5 transition-colors whitespace-nowrap"
+                                                title="Rotera"
+                                            >
+                                                ↻ Rotera
+                                            </button>
+                                        )}
+
                                         <button
                                             type="button"
                                             onMouseDown={(e) => e.stopPropagation()}
-                                            onClick={() => onRotateParasol && onRotateParasol(p.id, getParasolRotationDeg(p) === 90 ? 0 : 90)}
-                                            className="px-2.5 py-1 text-sm font-semibold rounded bg-panel-bg text-text-secondary border border-panel-border hover:text-text-primary hover:bg-white/5 transition-colors"
-                                            title="Rotera"
+                                            onClick={() => onDeleteParasol && onDeleteParasol(p.id)}
+                                            className="px-5 py-3 text-[24px] font-semibold rounded-[12px] bg-red-500/10 text-red-400 border-2 border-red-500/20 hover:bg-red-500/20 transition-colors whitespace-nowrap"
+                                            title="Ta bort"
                                         >
-                                            ↻ Rotera
+                                            🗑 Ta bort
                                         </button>
-                                    )}
-
-                                    <button
-                                        type="button"
-                                        onMouseDown={(e) => e.stopPropagation()}
-                                        onClick={() => onDeleteParasol && onDeleteParasol(p.id)}
-                                        className="px-2.5 py-1 text-sm font-semibold rounded bg-red-500/10 text-red-400 border border-red-500/30 hover:bg-red-500/20 transition-colors"
-                                        title="Ta bort"
-                                    >
-                                        🗑 Ta bort
-                                    </button>
+                                    </div>
                                 </div>
-                            </div>
-                        </foreignObject>
-                    )}
+                            </foreignObject>
+                        );
+                    })()}
                 </g>
             );
         });
@@ -1845,20 +1856,18 @@ export function SketchCanvas({
         const { edgeKey, segment, geometry, direction } = selectedSegmentToolbarInfo;
         const index = segment.index;
 
-        const toolbarWidth = 900;
-        const toolbarHeight = 220;
+        const toolbarWidth = 920;
+        const toolbarHeight = 140;
 
         const SECTION_SIZES = [2000, 1900, 1800, 1700, 1600, 1500, 1400, 1300, 1200, 1100, 1000, 700];
         const DOOR_SIZES = [1100, 1000, 700];
         const currentSizeList = segment.isDoor ? DOOR_SIZES : SECTION_SIZES;
         
-        const inverseZoom = 1 / activeCamera.zoom;
-        const BASE_UI_SCALE = 4.5; 
-        const currentScale = inverseZoom * BASE_UI_SCALE;
+        const segmentScale = 11.0 * screenScale;
 
-        const scaledWidth = toolbarWidth * currentScale;
-        const scaledHeight = toolbarHeight * currentScale;
-        const scaledGap = 80 * currentScale;
+        const scaledWidth = toolbarWidth * segmentScale;
+        const scaledHeight = toolbarHeight * segmentScale;
+        const scaledGap = 80 * segmentScale;
 
         let tx = 0;
         let ty = 0;
@@ -1932,23 +1941,23 @@ export function SketchCanvas({
             >
                 <div
                     style={{
-                        width: '900px',
-                        height: '220px',
-                        transform: `scale(${currentScale})`,
+                        width: `${toolbarWidth}px`,
+                        height: `${toolbarHeight}px`,
+                        transform: `scale(${segmentScale})`,
                         transformOrigin: 'top left',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center'
                     }}
                 >
-                    <div className="bg-panel-bg border-2 border-panel-border rounded-[20px] shadow-xl p-3 flex gap-3 items-center backdrop-blur-md">
+                    <div className="w-full h-full bg-panel-bg/95 border-2 border-panel-border rounded-[20px] shadow-[0_16px_48px_rgba(0,0,0,0.5)] p-3 flex gap-3 items-center justify-between backdrop-blur-md">
                         <button
                             type="button"
                             onClick={handleTogglePin}
                             onMouseDown={(e) => e.stopPropagation()}
                             className={`px-5 py-3 text-[24px] font-semibold rounded-[12px] border-2 transition-colors whitespace-nowrap ${
                                 isPinned
-                                    ? 'bg-amber-500/20 text-amber-300 border-amber-500/50'
+                                    ? 'bg-amber-500/20 text-amber-300 border-amber-500/50 hover:bg-amber-500/30'
                                     : 'bg-panel-bg text-text-secondary border-panel-border hover:text-text-primary hover:bg-white/5'
                             }`}
                             title={isPinned ? 'Lås upp sektionsbredd' : 'Lås denna sektionsbredd'}
@@ -1962,7 +1971,7 @@ export function SketchCanvas({
                             onMouseDown={(e) => e.stopPropagation()}
                             className={`px-5 py-3 text-[24px] font-semibold rounded-[12px] border-2 transition-colors whitespace-nowrap ${
                                 segment.isDoor
-                                    ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/50'
+                                    ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/50 hover:bg-emerald-500/30'
                                     : 'bg-panel-bg text-text-secondary border-panel-border hover:text-text-primary hover:bg-white/5'
                             }`}
                             title={segment.isDoor ? 'Gör till vanlig glassektion' : 'Gör till dörrsektion'}
@@ -1980,7 +1989,7 @@ export function SketchCanvas({
                             >
                                 −
                             </button>
-                            <span className="px-4 py-3 text-[22px] font-semibold text-text-secondary">
+                            <span className="px-4 py-3 text-[22px] font-semibold text-text-secondary bg-panel-bg/40">
                                 100
                             </span>
                             <button
@@ -1998,7 +2007,7 @@ export function SketchCanvas({
                             value={segment.length}
                             onChange={handleSizeSelect}
                             onMouseDown={(e) => e.stopPropagation()}
-                            className="bg-input-bg border-2 border-panel-border rounded-[12px] text-text-primary px-4 py-3 text-[24px] font-semibold outline-none focus:border-primary cursor-pointer"
+                            className="bg-input-bg border-2 border-panel-border rounded-[12px] text-text-primary px-4 py-3 text-[24px] font-semibold outline-none focus:border-primary cursor-pointer transition-colors"
                         >
                             {currentSizeList.map((sz) => (
                                 <option key={sz} value={sz}>
