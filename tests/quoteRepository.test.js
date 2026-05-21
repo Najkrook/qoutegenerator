@@ -418,6 +418,62 @@ describe('quoteRepository', () => {
         expect(latest?.revision?.state?.customerInfo?.reference).toBe('FB-2');
     });
 
+    it('getQuoteRevisionByVersion returns the exact requested saved version', async () => {
+        const { repo } = buildRepo();
+        const created = await repo.createQuote({
+            user,
+            state: baseState,
+            summary: baseSummary,
+            customerInfo: baseState.customerInfo,
+            status: 'draft'
+        });
+
+        await repo.saveQuoteRevision({
+            user,
+            quoteId: created.quoteId,
+            state: {
+                ...baseState,
+                customerInfo: {
+                    ...baseState.customerInfo,
+                    reference: 'REV-2'
+                }
+            },
+            summary: { ...baseSummary, finalTotalSek: 20000 },
+            customerInfo: {
+                ...baseState.customerInfo,
+                reference: 'REV-2'
+            },
+            status: 'draft'
+        });
+
+        await repo.saveQuoteRevision({
+            user,
+            quoteId: created.quoteId,
+            state: {
+                ...baseState,
+                customerInfo: {
+                    ...baseState.customerInfo,
+                    reference: 'REV-3'
+                }
+            },
+            summary: { ...baseSummary, finalTotalSek: 30000 },
+            customerInfo: {
+                ...baseState.customerInfo,
+                reference: 'REV-3'
+            },
+            status: 'sent'
+        });
+
+        const revision = await repo.getQuoteRevisionByVersion({
+            userId: user.uid,
+            quoteId: created.quoteId,
+            version: 2
+        });
+
+        expect(revision?.version).toBe(2);
+        expect(revision?.state?.customerInfo?.reference).toBe('REV-2');
+    });
+
     it('updateQuoteScrive preserves undefined fields and clears explicit nulls', async () => {
         const { repo } = buildRepo();
         const created = await repo.createQuote({

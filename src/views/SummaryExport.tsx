@@ -7,10 +7,15 @@ import { CustomerInfoForm } from '../components/features/CustomerInfoForm';
 import { FinalSummaryTable } from '../components/features/FinalSummaryTable';
 import { TermsAndPaymentPanel } from '../components/features/TermsAndPaymentPanel';
 import { downloadBlob, saveBlobWithPicker } from '../utils/fileUtils';
+import { createQuotePdfBlob } from '../services/quotePdfService';
 import { quoteRepository } from '../services/quoteRepositoryClient';
 import { saveQuoteToRepository } from '../services/quoteSaveService';
 import { safeLogActivity } from '../services/activityLogService';
 import { hasZeroDiscountSummary } from '../services/exportDataBuilders';
+import {
+    getOrderRequestStatusLabel,
+    orderRequestService
+} from '../services/orderRequestService';
 import {
     notifyError,
     notifyInfo,
@@ -20,7 +25,7 @@ import {
 import { getErrorMessage } from '../utils/runtime';
 import type {
     ExcelExportModule,
-    PdfExportModule,
+    OrderRequestRecord,
     QuoteState,
     QuoteTotalsResult,
     SavedQuoteStatePatch,
@@ -58,6 +63,18 @@ function getActivityCustomerLabel(customerInfo: QuoteState['customerInfo']): str
     return customerInfo.company || customerInfo.name || '';
 }
 
+function getOrderRequestStatusClasses(status: string): string {
+    switch (status) {
+        case 'completed':
+            return 'border-success/35 bg-success/10 text-success';
+        case 'reviewing':
+            return 'border-primary/35 bg-primary/10 text-primary';
+        case 'new':
+        default:
+            return 'border-warning/35 bg-warning/10 text-warning';
+    }
+}
+
 export function getPdfExportBlockReason(quoteNumber: QuoteState['quoteNumber'] | null | undefined): string | null {
     if (quoteNumber) {
         return null;
@@ -67,23 +84,6 @@ export function getPdfExportBlockReason(quoteNumber: QuoteState['quoteNumber'] |
     return quoteNumber
         ? null
         : 'Spara offerten först för att tilldela ett offertnummer innan PDF-export.';
-}
-
-async function createPdfBlob(state: QuoteState, summaryData: QuoteTotalsResult): Promise<Blob | null> {
-    try {
-        const pdfModule: PdfExportModule = await import('../features/pdfExport');
-        const { generatePDF } = pdfModule;
-
-        if (typeof generatePDF !== 'function') {
-            return null;
-        }
-
-        const result = await generatePDF(state, summaryData, true);
-        return result ?? null;
-    } catch (error) {
-        console.error('Failed to load PDF export module:', error);
-        return null;
-    }
 }
 
 async function exportExcelWorkbook(state: QuoteState, summaryData: QuoteTotalsResult): Promise<void> {
@@ -134,7 +134,7 @@ function logPdfExportActivity({
 
 export function SummaryExport({ onPrev, onBackToSketch }: SummaryExportProps) {
     const { state, dispatch } = useQuote();
-    const { user, retailer } = useAuth();
+    const { user, retailer, isRetailer } = useAuth();
     const summaryData = useMemo(
         () => computeQuoteTotals({ state, catalogData }),
         [state]
@@ -142,8 +142,17 @@ export function SummaryExport({ onPrev, onBackToSketch }: SummaryExportProps) {
     const [previewUrl, setPreviewUrl] = useState('');
     const [previewError, setPreviewError] = useState('');
     const [isSavingQuote, setIsSavingQuote] = useState(false);
+    const [orderRequest, setOrderRequest] = useState<OrderRequestRecord | null>(null);
+    const [isLoadingOrderRequest, setIsLoadingOrderRequest] = useState(false);
+    const [isSubmittingOrderRequest, setIsSubmittingOrderRequest] = useState(false);
     const previewUrlRef = useRef<string>('');
     const exportBlockReason = getPdfExportBlockReason(state.quoteNumber);
+    const canSubmitOrderRequest = Boolean(
+        isRetailer
+        && state.activeQuoteId
+        && state.quoteNumber
+        && Number(state.activeQuoteVersion) > 0
+    );
 
     useEffect(() => {
         if (hasZeroDiscountSummary(summaryData) || state.hideZeroDiscountReferencesInPdf !== true) {
@@ -160,7 +169,7 @@ export function SummaryExport({ onPrev, onBackToSketch }: SummaryExportProps) {
         let cancelled = false;
 
         void (async () => {
-            const pdfBlob = await createPdfBlob(state, summaryData);
+            const pdfBlob = await createQuotePdfBlob(state, summaryData);
             if (cancelled) return;
 
             if (!pdfBlob) {
@@ -189,6 +198,36 @@ export function SummaryExport({ onPrev, onBackToSketch }: SummaryExportProps) {
     }, [state, summaryData]);
 
     useEffect(() => {
+        if (!canSubmitOrderRequest || !state.activeQuoteId) {
+            setOrderRequest(null);
+            setIsLoadingOrderRequest(false);
+            return;
+        }
+
+        let cancelled = false;
+        setIsLoadingOrderRequest(true);
+
+        void orderRequestService.getOrderRequestByQuoteVersion({
+            quoteId: state.activeQuoteId,
+            quoteVersion: state.activeQuoteVersion
+        }).then((record) => {
+            if (cancelled) return;
+            setOrderRequest(record);
+        }).catch((error) => {
+            if (cancelled) return;
+            console.error('Failed to load current order request:', error);
+            setOrderRequest(null);
+        }).finally(() => {
+            if (cancelled) return;
+            setIsLoadingOrderRequest(false);
+        });
+
+        return () => {
+            cancelled = true;
+        };
+    }, [canSubmitOrderRequest, state.activeQuoteId, state.activeQuoteVersion]);
+
+    useEffect(() => {
         return () => {
             if (previewUrlRef.current) {
                 URL.revokeObjectURL(previewUrlRef.current);
@@ -210,7 +249,7 @@ export function SummaryExport({ onPrev, onBackToSketch }: SummaryExportProps) {
         }
 
         const fileName = buildPdfFileName(state.customerInfo);
-        const pdfBlob = await createPdfBlob(state, summaryData);
+        const pdfBlob = await createQuotePdfBlob(state, summaryData);
         if (!pdfBlob) {
             notifyError('Kunde inte skapa PDF.');
             return;
@@ -322,6 +361,29 @@ export function SummaryExport({ onPrev, onBackToSketch }: SummaryExportProps) {
         }
     };
 
+    const handleSubmitOrderRequest = async (): Promise<void> => {
+        if (!canSubmitOrderRequest || isSubmittingOrderRequest || !retailer) {
+            return;
+        }
+
+        setIsSubmittingOrderRequest(true);
+        try {
+            const createdRequest = await orderRequestService.createOrderRequest({
+                user,
+                retailer,
+                state,
+                summary: summaryData
+            });
+            setOrderRequest(createdRequest);
+            notifySuccess('Orderförfrågan skickades till BRIXX för vidare hantering.');
+        } catch (error) {
+            console.error('Failed to submit order request:', error);
+            notifyError(`Kunde inte skicka orderförfrågan: ${getErrorMessage(error, 'okänt fel')}`);
+        } finally {
+            setIsSubmittingOrderRequest(false);
+        }
+    };
+
     return (
         <div className="max-w-[1760px] mx-auto pb-20">
             <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_620px] gap-8 items-start">
@@ -369,6 +431,57 @@ export function SummaryExport({ onPrev, onBackToSketch }: SummaryExportProps) {
                             </h3>
                             <FinalSummaryTable />
                         </section>
+
+                        {isRetailer && (
+                            <section className="rounded-xl border border-panel-border bg-panel-bg p-6 shadow-sm">
+                                <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                                    <div className="max-w-3xl">
+                                        <h3 className="m-0 text-lg font-bold text-text-primary">Skicka orderförfrågan till BRIXX</h3>
+                                        <p className="mt-2 text-sm text-text-secondary">
+                                            När offerten är sparad kan den skickas in som en orderförfrågan för intern hantering hos BRIXX.
+                                        </p>
+                                        {!canSubmitOrderRequest && (
+                                            <p className="mt-3 text-sm text-amber-200">
+                                                Spara offerten först för att kunna skicka en orderförfrågan.
+                                            </p>
+                                        )}
+                                        {orderRequest && (
+                                            <div className="mt-4 flex flex-wrap items-center gap-3 text-sm">
+                                                <span className={`rounded-full border px-3 py-1 font-semibold ${getOrderRequestStatusClasses(orderRequest.status)}`}>
+                                                    {getOrderRequestStatusLabel(orderRequest.status)}
+                                                </span>
+                                                <span className="text-text-secondary">
+                                                    Registrerad för version v{orderRequest.quoteVersion}.
+                                                </span>
+                                            </div>
+                                        )}
+                                        {isLoadingOrderRequest && (
+                                            <p className="mt-3 text-sm text-text-secondary">Kontrollerar aktuell orderförfrågan...</p>
+                                        )}
+                                    </div>
+
+                                    <div className="flex w-full flex-col gap-3 lg:w-auto lg:min-w-[280px]">
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                void handleSubmitOrderRequest();
+                                            }}
+                                            disabled={!canSubmitOrderRequest || Boolean(orderRequest) || isSubmittingOrderRequest || isLoadingOrderRequest}
+                                            className="rounded-lg bg-primary px-6 py-3 text-sm font-bold text-white shadow-lg shadow-primary/20 transition-all hover:bg-primary-hover disabled:cursor-not-allowed disabled:opacity-50"
+                                        >
+                                            {isSubmittingOrderRequest
+                                                ? 'Skickar orderförfrågan...'
+                                                : orderRequest
+                                                    ? `Orderförfrågan registrerad för v${orderRequest.quoteVersion}`
+                                                    : 'Skicka orderförfrågan'}
+                                        </button>
+                                        <p className="m-0 text-xs text-text-secondary">
+                                            Det här påverkar inte offertens vanliga status utan skapar ett separat adminärende.
+                                        </p>
+                                    </div>
+                                </div>
+                            </section>
+                        )}
 
                         <section className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mt-4 p-6 bg-black/40 border border-panel-border rounded-xl">
                             <button

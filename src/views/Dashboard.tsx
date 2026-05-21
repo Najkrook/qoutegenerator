@@ -7,9 +7,38 @@ import {
     getActivityLogVisual,
     normalizeActivityLog
 } from '../services/activityLogService';
-import type { DashboardProps, RetailerRecord } from '../types/contracts';
+import {
+    getOrderRequestStatusLabel,
+    orderRequestService
+} from '../services/orderRequestService';
+import type { DashboardProps, OrderRequestRecord, RetailerRecord } from '../types/contracts';
 
 type ActivityLogEntry = ReturnType<typeof normalizeActivityLog>;
+
+function formatCurrencySek(value: number): string {
+    return new Intl.NumberFormat('sv-SE', {
+        style: 'currency',
+        currency: 'SEK',
+        maximumFractionDigits: 0
+    }).format(Number(value) || 0);
+}
+
+function formatOrderRequestDateTime(value: number): string {
+    const date = new Date(value || Date.now());
+    return `${date.toLocaleDateString('sv-SE', { month: 'short', day: 'numeric' })} ${date.toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit' })}`;
+}
+
+function getOrderRequestStatusClasses(status: string): string {
+    switch (status) {
+        case 'completed':
+            return 'border border-success/40 bg-success/10 text-success';
+        case 'reviewing':
+            return 'border border-primary/40 bg-primary/10 text-primary';
+        case 'new':
+        default:
+            return 'border border-warning/40 bg-warning/10 text-warning';
+    }
+}
 
 interface RetailerLineSummary {
     id: string;
@@ -43,7 +72,8 @@ export function Dashboard({
     onOpenSketch,
     onOpenPlanner,
     onOpenActivity,
-    onOpenRetailers
+    onOpenRetailers,
+    onOpenRetailerOrders
 }: DashboardProps) {
     const {
         canViewEverything,
@@ -56,6 +86,9 @@ export function Dashboard({
     const [logs, setLogs] = useState<ActivityLogEntry[]>([]);
     const [logsLoading, setLogsLoading] = useState(false);
     const [logsError, setLogsError] = useState(false);
+    const [recentOrderRequests, setRecentOrderRequests] = useState<OrderRequestRecord[]>([]);
+    const [orderRequestsLoading, setOrderRequestsLoading] = useState(false);
+    const [orderRequestsError, setOrderRequestsError] = useState(false);
 
     const fetchLogs = useCallback(async (): Promise<void> => {
         if (!canViewEverything) {
@@ -85,6 +118,32 @@ export function Dashboard({
     useEffect(() => {
         void fetchLogs();
     }, [fetchLogs]);
+
+    const fetchRecentOrderRequests = useCallback(async (): Promise<void> => {
+        if (!canViewEverything) {
+            setRecentOrderRequests([]);
+            setOrderRequestsLoading(false);
+            setOrderRequestsError(false);
+            return;
+        }
+
+        setOrderRequestsLoading(true);
+        setOrderRequestsError(false);
+        try {
+            const nextRequests = await orderRequestService.listRecentOrderRequests({ limit: 5 });
+            setRecentOrderRequests(nextRequests);
+        } catch (error) {
+            console.error('Failed to fetch recent order requests:', error);
+            setRecentOrderRequests([]);
+            setOrderRequestsError(true);
+        } finally {
+            setOrderRequestsLoading(false);
+        }
+    }, [canViewEverything]);
+
+    useEffect(() => {
+        void fetchRecentOrderRequests();
+    }, [fetchRecentOrderRequests]);
 
     const retailerLineSummaries = getRetailerLineSummaries(retailer);
     const retailerName = retailer?.name || 'Er retailerprofil';
@@ -287,6 +346,67 @@ export function Dashboard({
                     <p className="m-0 text-text-secondary">
                         Ditt konto har för närvarande ingen tilldelad arbetsyta. Kontakta administratör.
                     </p>
+                </div>
+            )}
+
+            {canViewEverything && (
+                <div className="mt-16 w-full max-w-[980px]">
+                    <div className="mb-6 flex items-center justify-between gap-4 border-b border-panel-border pb-4">
+                        <div>
+                            <h3 className="m-0 text-xl font-semibold text-text-primary">Inkomna orderförfrågningar</h3>
+                            <p className="mt-1 text-sm text-text-secondary">
+                                Senaste retailerförfrågningarna som väntar på hantering i BRIXX.
+                            </p>
+                        </div>
+                        {onOpenRetailerOrders && (
+                            <button
+                                type="button"
+                                onClick={onOpenRetailerOrders}
+                                className="rounded-md border border-panel-border bg-panel-bg px-4 py-2 text-sm font-medium text-text-primary transition-colors hover:bg-panel-border"
+                            >
+                                Öppna inbox
+                            </button>
+                        )}
+                    </div>
+                    <div className="flex flex-col gap-3">
+                        {orderRequestsLoading ? (
+                            <p className="text-text-secondary text-center italic">Laddar orderförfrågningar...</p>
+                        ) : orderRequestsError ? (
+                            <p className="text-text-secondary text-center italic">Kunde inte ladda orderförfrågningar just nu.</p>
+                        ) : recentOrderRequests.length === 0 ? (
+                            <p className="text-text-secondary text-center italic">Inga orderförfrågningar har registrerats ännu.</p>
+                        ) : (
+                            recentOrderRequests.map((request) => (
+                                <button
+                                    key={request.id}
+                                    type="button"
+                                    onClick={() => onOpenRetailerOrders?.()}
+                                    className="grid w-full grid-cols-1 gap-3 rounded-xl border border-panel-border bg-panel-bg/70 p-4 text-left transition-colors hover:bg-white/5 lg:grid-cols-[minmax(0,1.6fr)_auto_auto]"
+                                >
+                                    <div className="min-w-0">
+                                        <div className="flex flex-wrap items-center gap-2">
+                                            <span className="text-sm font-semibold text-text-primary">{request.quoteNumber}</span>
+                                            <span className={`rounded-full px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide ${getOrderRequestStatusClasses(request.status)}`}>
+                                                {getOrderRequestStatusLabel(request.status)}
+                                            </span>
+                                        </div>
+                                        <div className="mt-2 text-sm text-text-secondary">
+                                            {request.retailerName} · {request.company || request.customerName || 'Okänd kund'}
+                                        </div>
+                                        <div className="mt-1 text-xs text-text-secondary">
+                                            {request.reference ? `Ref: ${request.reference}` : 'Ingen referens'} · v{request.quoteVersion}
+                                        </div>
+                                    </div>
+                                    <div className="text-sm font-semibold text-text-primary lg:text-right">
+                                        {formatCurrencySek(request.totalSek)}
+                                    </div>
+                                    <div className="text-xs text-text-secondary lg:text-right">
+                                        {formatOrderRequestDateTime(request.createdAtMs)}
+                                    </div>
+                                </button>
+                            ))
+                        )}
+                    </div>
                 </div>
             )}
 

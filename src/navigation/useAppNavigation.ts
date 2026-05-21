@@ -42,6 +42,9 @@ export function useAppNavigation() {
         goToRetailers(options?: NavigateOptions) {
             navigate(APP_PATHS[APP_ROUTE_IDS.retailers], options);
         },
+        goToRetailerOrders(options?: NavigateOptions) {
+            navigate(APP_PATHS[APP_ROUTE_IDS.retailerOrders], options);
+        },
         goToSketch(returnTo?: SketchReturnTarget | null, options?: NavigateOptions) {
             if (returnTo) {
                 navigate(`${APP_PATHS[APP_ROUTE_IDS.sketch]}?return=${returnTo}`, options);

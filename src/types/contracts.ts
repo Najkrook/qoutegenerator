@@ -3,6 +3,8 @@ import type { ReactNode } from 'react';
 
 export type QuoteStatus = 'draft' | 'sent' | 'won' | 'lost' | 'archived';
 
+export type OrderRequestStatus = 'new' | 'reviewing' | 'completed';
+
 export type ScriveStatus =
     | 'not_sent'
     | 'preparation'
@@ -511,6 +513,30 @@ export interface QuoteRevision {
     changeNote: string;
 }
 
+export interface OrderRequestRecord {
+    id: string;
+    quoteOwnerUid: string;
+    quoteId: string;
+    quoteNumber: string;
+    quoteVersion: number;
+    retailerId: string;
+    retailerName: string;
+    retailerEmail: string;
+    customerName: string;
+    company: string;
+    reference: string;
+    customerReference: string;
+    selectedLines: string[];
+    totalSek: number;
+    status: OrderRequestStatus;
+    createdAtMs: number;
+    updatedAtMs: number;
+    createdByUid: string;
+    createdByEmail: string;
+    statusUpdatedByUid: string;
+    statusUpdatedByEmail: string;
+}
+
 export interface QuoteFilters {
     status?: string;
     search?: string;
@@ -557,6 +583,12 @@ export interface GetQuoteRevisionsInput {
 export interface GetQuoteLatestRevisionInput {
     userId: string;
     quoteId: string;
+}
+
+export interface GetQuoteRevisionByVersionInput {
+    userId: string;
+    quoteId: string;
+    version: number;
 }
 
 export interface DeleteQuoteInput {
@@ -655,6 +687,51 @@ export interface SaveQuoteToRepositoryParams {
     summary: QuoteSummary | QuoteTotalsResult;
 }
 
+export interface CreateOrderRequestInput {
+    user: AccessUser | null;
+    retailer: RetailerRecord | null;
+    state: QuoteState;
+    summary: QuoteSummary | QuoteTotalsResult;
+}
+
+export interface GetOrderRequestByQuoteVersionInput {
+    quoteId: string;
+    quoteVersion: number;
+}
+
+export interface ListOrderRequestsInput {
+    limit?: number;
+}
+
+export interface UpdateOrderRequestStatusInput {
+    id: string;
+    status: OrderRequestStatus | string;
+    user: AccessUser | null;
+}
+
+export interface RawOrderRequestDoc extends UnknownRecord {
+    quoteOwnerUid?: unknown;
+    quoteId?: unknown;
+    quoteNumber?: unknown;
+    quoteVersion?: unknown;
+    retailerId?: unknown;
+    retailerName?: unknown;
+    retailerEmail?: unknown;
+    customerName?: unknown;
+    company?: unknown;
+    reference?: unknown;
+    customerReference?: unknown;
+    selectedLines?: unknown;
+    totalSek?: unknown;
+    status?: unknown;
+    createdAtMs?: unknown;
+    updatedAtMs?: unknown;
+    createdByUid?: unknown;
+    createdByEmail?: unknown;
+    statusUpdatedByUid?: unknown;
+    statusUpdatedByEmail?: unknown;
+}
+
 export type ExportSummaryState = Partial<Pick<
     QuoteState,
     'customerInfo' | 'includesVat' | 'globalDiscountPct' | 'hideZeroDiscountReferencesInPdf'
@@ -690,11 +767,20 @@ export interface QuoteRepository {
     saveQuoteRevision(input: QuoteRevisionSaveInput): Promise<{ metadata: QuoteMetadata; revision: QuoteRevision }>;
     getUserQuotes(input: GetUserQuotesInput): Promise<Array<QuoteMetadata>>;
     getQuoteLatestRevision(input: GetQuoteLatestRevisionInput): Promise<QuoteLatestRevisionResult | null>;
+    getQuoteRevisionByVersion(input: GetQuoteRevisionByVersionInput): Promise<QuoteRevision | null>;
     getQuoteRevisions(input: GetQuoteRevisionsInput): Promise<Array<QuoteRevision>>;
     deleteQuote(input: DeleteQuoteInput): Promise<void>;
     updateQuoteStatus(input: UpdateQuoteStatusInput): Promise<QuoteMetadata>;
     updateQuoteScrive(input: UpdateQuoteScriveInput): Promise<QuoteMetadata>;
     getAllUsersQuotes(input?: GetAllUsersQuotesInput): Promise<Array<QuoteMetadata & { ownerUid: string }>>;
+}
+
+export interface OrderRequestService {
+    createOrderRequest(input: CreateOrderRequestInput): Promise<OrderRequestRecord>;
+    getOrderRequestByQuoteVersion(input: GetOrderRequestByQuoteVersionInput): Promise<OrderRequestRecord | null>;
+    listRecentOrderRequests(input?: ListOrderRequestsInput): Promise<OrderRequestRecord[]>;
+    listOrderRequests(input?: ListOrderRequestsInput): Promise<OrderRequestRecord[]>;
+    updateOrderRequestStatus(input: UpdateOrderRequestStatusInput): Promise<OrderRequestRecord>;
 }
 
 export interface FirestoreDocRef {
@@ -817,6 +903,7 @@ export interface DashboardProps {
     onOpenPlanner?: () => void;
     onOpenActivity?: () => void;
     onOpenRetailers?: () => void;
+    onOpenRetailerOrders?: () => void;
 }
 
 export interface ProductLineSelectionProps {
@@ -956,6 +1043,10 @@ export interface ClickitupStockGridProps {
 }
 
 export interface RetailerManagerProps {
+    onBack?: () => void;
+}
+
+export interface RetailerOrderRequestsProps {
     onBack?: () => void;
 }
 

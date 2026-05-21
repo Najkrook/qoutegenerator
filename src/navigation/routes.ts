@@ -19,7 +19,8 @@ export const APP_ROUTE_IDS = Object.freeze({
     inventoryLogs: 'inventory-logs',
     activity: 'activity',
     planner: 'planner',
-    retailers: 'retailers'
+    retailers: 'retailers',
+    retailerOrders: 'retailer-orders'
 } as const);
 
 export type AppRouteId = typeof APP_ROUTE_IDS[keyof typeof APP_ROUTE_IDS];
@@ -37,7 +38,8 @@ export const APP_PATHS: Record<AppRouteId, string> = Object.freeze({
     [APP_ROUTE_IDS.inventoryLogs]: '/inventory/logs',
     [APP_ROUTE_IDS.activity]: '/activity',
     [APP_ROUTE_IDS.planner]: '/planner',
-    [APP_ROUTE_IDS.retailers]: '/retailers'
+    [APP_ROUTE_IDS.retailers]: '/retailers',
+    [APP_ROUTE_IDS.retailerOrders]: '/retailer-orders'
 });
 
 export type QuoteRouteStepId = 'product-lines' | 'configuration' | 'pricing' | 'summary';
@@ -71,7 +73,8 @@ const ROUTE_ACCESS: Record<AppRouteId, AppRouteAccess> = {
     [APP_ROUTE_IDS.inventoryLogs]: 'admin',
     [APP_ROUTE_IDS.activity]: 'admin',
     [APP_ROUTE_IDS.planner]: 'admin',
-    [APP_ROUTE_IDS.retailers]: 'admin'
+    [APP_ROUTE_IDS.retailers]: 'admin',
+    [APP_ROUTE_IDS.retailerOrders]: 'admin'
 };
 
 const PATH_TO_ROUTE_ID = new Map<AppRouteId | string, AppRouteId>(

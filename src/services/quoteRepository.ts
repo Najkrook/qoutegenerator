@@ -2,6 +2,7 @@ import type {
     AccessUser,
     CustomerInfo,
     FirestoreDocRef,
+    GetQuoteRevisionByVersionInput,
     GetAllUsersQuotesInput,
     GetQuoteLatestRevisionInput,
     GetQuoteRevisionsInput,
@@ -799,6 +800,34 @@ export function createQuoteRepository(deps: QuoteRepositoryDeps = {} as QuoteRep
         return { metadata, revision: null };
     }
 
+    async function getQuoteRevisionByVersion({
+        userId,
+        quoteId,
+        version
+    }: GetQuoteRevisionByVersionInput): Promise<QuoteRevision | null> {
+        if (!userId || !quoteId) return null;
+
+        const revisionsRef = revisionsCollectionRef(userId, quoteId);
+        let snap;
+
+        try {
+            snap = await getDocs(query(revisionsRef, orderBy('version', 'desc')));
+        } catch {
+            snap = await getDocs(query(revisionsRef, orderBy('savedAtMs', 'desc')));
+        }
+
+        const match = snap.docs.find((docSnap) => {
+            const raw = toRecord<RawQuoteRevisionDoc>(docSnap.data() || {});
+            return Math.max(1, toNumber(raw.version, 0) || 0) === Math.max(1, toNumber(version, 1) || 1);
+        });
+
+        if (!match) {
+            return null;
+        }
+
+        return normalizeQuoteRevision(quoteId, match.id || '', match.data() || {});
+    }
+
     async function updateQuoteStatus({ userId, quoteId, status }: UpdateQuoteStatusInput): Promise<QuoteMetadata> {
         if (!userId || !quoteId) throw new Error('userId and quoteId are required.');
         const quoteRef = quoteDocRef(userId, quoteId);
@@ -922,6 +951,7 @@ export function createQuoteRepository(deps: QuoteRepositoryDeps = {} as QuoteRep
         saveQuoteRevision,
         getUserQuotes,
         getQuoteLatestRevision,
+        getQuoteRevisionByVersion,
         getQuoteRevisions,
         deleteQuote,
         updateQuoteStatus,

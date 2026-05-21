@@ -87,6 +87,20 @@ export function Header() {
                     {canViewEverything && (
                         <button
                             type="button"
+                            onClick={() => navigation.goToRetailerOrders()}
+                            className={`text-text-primary no-underline font-medium text-sm px-3 py-1.5 rounded-md border transition-colors cursor-pointer ${
+                                routeId === APP_ROUTE_IDS.retailerOrders
+                                    ? 'bg-panel-border border-panel-border'
+                                    : 'bg-panel-bg border-panel-border hover:bg-panel-border'
+                            }`}
+                        >
+                            Orderförfrågningar
+                        </button>
+                    )}
+
+                    {canViewEverything && (
+                        <button
+                            type="button"
                             onClick={() => navigation.goToActivity()}
                             className={`text-text-primary no-underline font-medium text-sm px-3 py-1.5 rounded-md border transition-colors cursor-pointer ${
                                 routeId === APP_ROUTE_IDS.activity

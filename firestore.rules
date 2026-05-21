@@ -27,6 +27,34 @@ service cloud.firestore {
         && request.resource.data.metadata is map;
     }
 
+    function isOwnOrderRequestRead() {
+      return isSignedIn() && resource.data.createdByUid == request.auth.uid;
+    }
+
+    function isOwnOrderRequestCreate() {
+      return isSignedIn()
+        && request.resource.data.createdByUid == request.auth.uid
+        && request.resource.data.createdByEmail is string
+        && request.resource.data.quoteOwnerUid == request.auth.uid
+        && request.resource.data.quoteId is string
+        && request.resource.data.quoteNumber is string
+        && request.resource.data.quoteVersion is int
+        && request.resource.data.retailerId is string
+        && request.resource.data.retailerName is string
+        && request.resource.data.retailerEmail is string
+        && request.resource.data.customerName is string
+        && request.resource.data.company is string
+        && request.resource.data.reference is string
+        && request.resource.data.customerReference is string
+        && request.resource.data.selectedLines is list
+        && (request.resource.data.totalSek is int || request.resource.data.totalSek is float)
+        && request.resource.data.status in ['new', 'reviewing', 'completed']
+        && request.resource.data.createdAtMs is int
+        && request.resource.data.updatedAtMs is int
+        && request.resource.data.statusUpdatedByUid == request.auth.uid
+        && request.resource.data.statusUpdatedByEmail is string;
+    }
+
     match /users/{userId}/quotes/{quoteId} {
       allow read, create, update, delete: if isSignedIn() && (request.auth.uid == userId || isAdmin());
     }
@@ -65,6 +93,12 @@ service cloud.firestore {
       allow read: if isSignedIn()
         && request.auth.token.email != null
         && request.auth.token.email == resource.data.email;
+    }
+
+    match /order_requests/{requestId} {
+      allow create: if isOwnOrderRequestCreate();
+      allow read: if isAdmin() || isOwnOrderRequestRead();
+      allow update: if isAdmin();
     }
 
     // Allow admins to read all templates via collectionGroup queries

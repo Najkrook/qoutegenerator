@@ -39,11 +39,12 @@ vi.mock('../src/services/firebase', () => firebaseMocks);
 vi.mock('../src/services/notificationService', () => notificationMocks);
 
 vi.mock('../src/views/Dashboard', () => ({
-    Dashboard: ({ onStartQuote, onOpenHistory }) => (
+    Dashboard: ({ onStartQuote, onOpenHistory, onOpenRetailerOrders }) => (
         <div>
             <div>DashboardView</div>
             <button type="button" onClick={() => onStartQuote?.()}>Starta Ny Offert</button>
             <button type="button" onClick={() => onOpenHistory?.()}>Mina Offerter</button>
+            <button type="button" onClick={() => onOpenRetailerOrders?.()}>Orderförfrågningar</button>
         </div>
     )
 }));
@@ -78,6 +79,10 @@ vi.mock('../src/views/Planner', () => ({
 
 vi.mock('../src/views/RetailerManager', () => ({
     RetailerManager: () => <div>RetailersView</div>
+}));
+
+vi.mock('../src/views/RetailerOrderRequests', () => ({
+    RetailerOrderRequests: () => <div>RetailerOrdersView</div>
 }));
 
 vi.mock('../src/views/History', () => ({
@@ -209,6 +214,21 @@ describe('app routing', () => {
 
         expect(router.state.location.pathname).toBe(APP_PATHS[APP_ROUTE_IDS.dashboard]);
         expect(container.textContent).toContain('DashboardView');
+    });
+
+    it('allows admins to open the retailer order request inbox route', async () => {
+        const { container, router } = await renderApp({
+            initialEntries: [APP_PATHS[APP_ROUTE_IDS.retailerOrders]],
+            auth: {
+                accessLevel: 'full',
+                canViewEverything: true,
+                canAccessSketch: true,
+                canExportSketchToQuote: true
+            }
+        });
+
+        expect(router.state.location.pathname).toBe(APP_PATHS[APP_ROUTE_IDS.retailerOrders]);
+        expect(container.textContent).toContain('RetailerOrdersView');
     });
 
     it('redirects quote configuration to product lines when no line is selected', async () => {

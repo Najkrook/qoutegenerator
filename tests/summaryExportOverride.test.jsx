@@ -22,6 +22,33 @@ const activityState = vi.hoisted(() => ({
     safeLogActivity: vi.fn(async () => ({ ok: true }))
 }));
 
+const orderRequestState = vi.hoisted(() => ({
+    getOrderRequestByQuoteVersion: vi.fn(async () => null),
+    createOrderRequest: vi.fn(async () => ({
+        id: 'quote-1__v2',
+        quoteId: 'quote-1',
+        quoteNumber: 'BRIXX - 260423-101',
+        quoteVersion: 2,
+        retailerName: 'Nordvind',
+        retailerEmail: 'retailer@example.com',
+        retailerId: 'retailer-1',
+        customerName: 'Ada',
+        company: 'Brixx',
+        reference: 'REF-1',
+        customerReference: 'ER-1',
+        selectedLines: ['BaHaMa'],
+        totalSek: 0,
+        status: 'new',
+        createdAtMs: 1,
+        updatedAtMs: 1,
+        createdByUid: 'user-1',
+        createdByEmail: 'sales@example.com',
+        statusUpdatedByUid: 'user-1',
+        statusUpdatedByEmail: 'sales@example.com',
+        quoteOwnerUid: 'user-1'
+    }))
+}));
+
 vi.mock('react-hot-toast', () => ({
     default: toastState
 }));
@@ -52,6 +79,10 @@ vi.mock('../src/utils/fileUtils', () => ({
     saveBlobWithPicker: fileUtilsState.saveBlobWithPicker
 }));
 
+vi.mock('../src/services/quotePdfService', () => ({
+    createQuotePdfBlob: vi.fn(async () => new Blob(['pdf']))
+}));
+
 vi.mock('../src/services/quoteRepositoryClient', () => ({
     quoteRepository: {}
 }));
@@ -64,8 +95,16 @@ vi.mock('../src/services/activityLogService', () => ({
     safeLogActivity: activityState.safeLogActivity
 }));
 
-vi.mock('../src/features/pdfExport', () => ({
-    generatePDF: vi.fn(async () => new Blob(['pdf']))
+vi.mock('../src/services/orderRequestService', () => ({
+    getOrderRequestStatusLabel: (status) => ({
+        new: 'Ny',
+        reviewing: 'Under behandling',
+        completed: 'Slutförd'
+    }[status] || 'Ny'),
+    orderRequestService: {
+        getOrderRequestByQuoteVersion: orderRequestState.getOrderRequestByQuoteVersion,
+        createOrderRequest: orderRequestState.createOrderRequest
+    }
 }));
 
 import { SummaryExport } from '../src/views/SummaryExport';
@@ -157,6 +196,32 @@ beforeEach(() => {
     fileUtilsState.saveBlobWithPicker.mockResolvedValue('saved');
     activityState.safeLogActivity.mockReset();
     activityState.safeLogActivity.mockResolvedValue({ ok: true });
+    orderRequestState.getOrderRequestByQuoteVersion.mockReset();
+    orderRequestState.getOrderRequestByQuoteVersion.mockResolvedValue(null);
+    orderRequestState.createOrderRequest.mockReset();
+    orderRequestState.createOrderRequest.mockResolvedValue({
+        id: 'quote-1__v2',
+        quoteId: 'quote-1',
+        quoteNumber: 'BRIXX - 260423-101',
+        quoteVersion: 2,
+        retailerName: 'Nordvind',
+        retailerEmail: 'retailer@example.com',
+        retailerId: 'retailer-1',
+        customerName: 'Ada',
+        company: 'Brixx',
+        reference: 'REF-1',
+        customerReference: 'ER-1',
+        selectedLines: ['BaHaMa'],
+        totalSek: 0,
+        status: 'new',
+        createdAtMs: 1,
+        updatedAtMs: 1,
+        createdByUid: 'user-1',
+        createdByEmail: 'sales@example.com',
+        statusUpdatedByUid: 'user-1',
+        statusUpdatedByEmail: 'sales@example.com',
+        quoteOwnerUid: 'user-1'
+    });
     toastState.error.mockReset();
     toastState.success.mockReset();
     toastState.loading.mockReset();
@@ -224,5 +289,76 @@ describe('SummaryExport PDF override', () => {
                 missingQuoteNumber: false
             })
         }));
+    });
+
+    it('shows the retailer order request CTA only for retailer users', async () => {
+        const { container: retailerContainer } = await renderSummaryExport({
+            authOverrides: {
+                accessLevel: 'retailer',
+                retailer: {
+                    id: 'retailer-1',
+                    name: 'Nordvind',
+                    email: 'retailer@example.com'
+                },
+                isRetailer: true
+            },
+            stateOverrides: {
+                activeQuoteId: 'quote-1',
+                quoteNumber: 'BRIXX - 260423-101',
+                activeQuoteVersion: 2
+            }
+        });
+
+        expect(retailerContainer.textContent).toContain('Skicka orderförfrågan');
+
+        const { container: nonRetailerContainer } = await renderSummaryExport();
+        expect(nonRetailerContainer.textContent).not.toContain('Skicka orderförfrågan');
+    });
+
+    it('disables retailer order requests until the quote has been saved', async () => {
+        const { container } = await renderSummaryExport({
+            authOverrides: {
+                accessLevel: 'retailer',
+                retailer: {
+                    id: 'retailer-1',
+                    name: 'Nordvind',
+                    email: 'retailer@example.com'
+                },
+                isRetailer: true
+            },
+            stateOverrides: {
+                activeQuoteId: null,
+                quoteNumber: null,
+                activeQuoteVersion: 0
+            }
+        });
+
+        expect(findButton(container, 'Skicka orderförfrågan').disabled).toBe(true);
+        expect(container.textContent).toContain('Spara offerten först för att kunna skicka en orderförfrågan.');
+    });
+
+    it('creates an order request and locks the current saved quote version afterwards', async () => {
+        const { container } = await renderSummaryExport({
+            authOverrides: {
+                accessLevel: 'retailer',
+                retailer: {
+                    id: 'retailer-1',
+                    name: 'Nordvind',
+                    email: 'retailer@example.com'
+                },
+                isRetailer: true
+            },
+            stateOverrides: {
+                activeQuoteId: 'quote-1',
+                quoteNumber: 'BRIXX - 260423-101',
+                activeQuoteVersion: 2
+            }
+        });
+
+        await clickButton(container, 'Skicka orderförfrågan');
+
+        expect(orderRequestState.createOrderRequest).toHaveBeenCalledTimes(1);
+        expect(findButton(container, 'Orderförfrågan registrerad för v2').disabled).toBe(true);
+        expect(container.textContent).toContain('Registrerad för version v2.');
     });
 });

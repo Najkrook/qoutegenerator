@@ -43,6 +43,7 @@ const SketchTool = lazy(() => import('./views/SketchTool').then((module) => ({ d
 const Planner = lazy(() => import('./views/Planner').then((module) => ({ default: module.Planner })));
 const History = lazy(() => import('./views/History').then((module) => ({ default: module.History })));
 const RetailerManager = lazy(() => import('./views/RetailerManager').then((module) => ({ default: module.RetailerManager })));
+const RetailerOrderRequests = lazy(() => import('./views/RetailerOrderRequests').then((module) => ({ default: module.RetailerOrderRequests })));
 
 function ViewLoader() {
     return (
@@ -245,6 +246,7 @@ function DashboardPage() {
             onOpenPlanner={() => navigation.goToPlanner()}
             onOpenActivity={() => navigation.goToActivity()}
             onOpenRetailers={() => navigation.goToRetailers()}
+            onOpenRetailerOrders={() => navigation.goToRetailerOrders()}
         />
     );
 }
@@ -345,6 +347,11 @@ function InventoryLogsPage() {
 function RetailerManagerPage() {
     const navigation = useAppNavigation();
     return <RetailerManager onBack={() => navigation.goToDashboard()} />;
+}
+
+function RetailerOrderRequestsPage() {
+    const navigation = useAppNavigation();
+    return <RetailerOrderRequests onBack={() => navigation.goToDashboard()} />;
 }
 
 export const appRoutes: RouteObject[] = [
@@ -451,6 +458,14 @@ export const appRoutes: RouteObject[] = [
                 element: (
                     <RouteAccessBoundary routeId={APP_ROUTE_IDS.retailers}>
                         <RetailerManagerPage />
+                    </RouteAccessBoundary>
+                )
+            },
+            {
+                path: APP_PATHS[APP_ROUTE_IDS.retailerOrders].slice(1),
+                element: (
+                    <RouteAccessBoundary routeId={APP_ROUTE_IDS.retailerOrders}>
+                        <RetailerOrderRequestsPage />
                     </RouteAccessBoundary>
                 )
             }
