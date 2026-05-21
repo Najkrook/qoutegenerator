@@ -270,16 +270,6 @@ export function SketchCanvas({
         );
     }, [isPointInBoundary]);
 
-    const checkOverlapParasolFiesta = useCallback((px: number, py: number, pw: number, pd: number, fx: number, fy: number, fr: number) => {
-        const halfW = pw / 2;
-        const halfD = pd / 2;
-        const closestX = clamp(fx, px - halfW, px + halfW);
-        const closestY = clamp(fy, py - halfD, py + halfD);
-        const dx = fx - closestX;
-        const dy = fy - closestY;
-        return (dx * dx + dy * dy) < (fr * fr);
-    }, []);
-
     const hasCollision = useCallback((itemId: string, type: 'parasol' | 'fiesta') => {
         if (type === 'parasol') {
             const p = parasols.find(item => item.id === itemId);
@@ -294,10 +284,6 @@ export function SketchCanvas({
                 const overlap = !(rect1.right < rect2.left || rect1.left > rect2.right || rect1.bottom < rect2.top || rect1.top > rect2.bottom);
                 if (overlap) return true;
             }
-            for (const fiesta of fiestaItems) {
-                const fr = getFiestaRadiusMm(fiesta);
-                if (checkOverlapParasolFiesta(p.xMm, p.yMm, dims.widthMm, dims.depthMm, fiesta.xMm, fiesta.yMm, fr)) return true;
-            }
         } else {
             const f = fiestaItems.find(item => item.id === itemId);
             if (!f) return false;
@@ -310,13 +296,9 @@ export function SketchCanvas({
                 const dy = f.yMm - other.yMm;
                 if ((dx * dx + dy * dy) < (r + or) * (r + or)) return true;
             }
-            for (const p of parasols) {
-                const dims = getEffectiveParasolDimensions(p);
-                if (checkOverlapParasolFiesta(p.xMm, p.yMm, dims.widthMm, dims.depthMm, f.xMm, f.yMm, r)) return true;
-            }
         }
         return false;
-    }, [parasols, fiestaItems, isParasolInBoundary, isFiestaInBoundary, checkOverlapParasolFiesta]);
+    }, [parasols, fiestaItems, isParasolInBoundary, isFiestaInBoundary]);
 
     const isShowingPreview = useMemo(() => {
         if (!hoverPreviewLayout) return false;
