@@ -1788,31 +1788,38 @@ export function SketchCanvas({
         const toolbarWidth = 900;
         const toolbarHeight = 220;
 
+        const SECTION_SIZES = [2000, 1900, 1800, 1700, 1600, 1500, 1400, 1300, 1200, 1100, 1000, 700];
+        const DOOR_SIZES = [1100, 1000, 700];
+        const currentSizeList = segment.isDoor ? DOOR_SIZES : SECTION_SIZES;
+        
+        const inverseZoom = 1 / activeCamera.zoom;
+        const BASE_UI_SCALE = 4.5; 
+        const currentScale = inverseZoom * BASE_UI_SCALE;
+
+        const scaledWidth = toolbarWidth * currentScale;
+        const scaledHeight = toolbarHeight * currentScale;
+        const scaledGap = 80 * currentScale;
+
         let tx = 0;
         let ty = 0;
 
         if (direction === 'E') {
-            tx = geometry.tx - toolbarWidth / 2;
+            tx = geometry.tx - scaledWidth / 2;
             if (edgeKey === 'front') {
-                ty = geometry.y - toolbarHeight - 80;
+                ty = geometry.y - scaledHeight - scaledGap;
             } else {
-                ty = geometry.y + sectionThickness + 80;
+                ty = geometry.y + sectionThickness + scaledGap;
             }
         } else {
-            ty = geometry.ty - toolbarHeight / 2;
+            ty = geometry.ty - scaledHeight / 2;
             if (edgeKey === 'left') {
-                tx = geometry.x + sectionThickness + 80;
+                tx = geometry.x + sectionThickness + scaledGap;
             } else {
-                tx = geometry.x - sectionThickness - toolbarWidth - 80;
+                tx = geometry.x - sectionThickness - scaledWidth - scaledGap;
             }
         }
 
         const isPinned = (manualSectionsByEdge[edgeKey] || []).some((pin) => pin.index === index);
-
-        const SECTION_SIZES = [2000, 1900, 1800, 1700, 1600, 1500, 1400, 1300, 1200, 1100, 1000, 700];
-        const DOOR_SIZES = [1100, 1000, 700];
-        const currentSizeList = segment.isDoor ? DOOR_SIZES : SECTION_SIZES;
-        const inverseZoom = 1 / activeCamera.zoom;
 
         const handleTogglePin = () => {
             if (isPinned) {
@@ -1856,8 +1863,8 @@ export function SketchCanvas({
             <foreignObject
                 x={tx}
                 y={ty}
-                width={toolbarWidth}
-                height={toolbarHeight}
+                width={scaledWidth}
+                height={scaledHeight}
                 style={{ overflow: 'visible' }}
             >
                 <div
@@ -1866,8 +1873,8 @@ export function SketchCanvas({
                     style={{ 
                         width: '900px', 
                         height: '220px',
-                        transform: `scale(${inverseZoom})`,
-                        transformOrigin: direction === 'E' ? 'top center' : 'center left'
+                        transform: `scale(${currentScale})`,
+                        transformOrigin: 'top left'
                     }}
                 >
                     <button

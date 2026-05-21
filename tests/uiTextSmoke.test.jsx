@@ -449,10 +449,10 @@ describe('UI text smoke', () => {
         expect(html).toContain('Till offert');
         expect(html).toContain('SketchSetupPanelMock');
         expect(html).toContain('SketchReviewPanelMock');
-        expect(html).toContain('absolute inset-0 z-0');
-        expect(html).toContain('absolute top-4 inset-x-4 z-20 flex flex-col xl:flex-row');
-        expect(html).toContain('absolute top-[140px] left-4 bottom-4 z-10 w-[308px]');
-        expect(html).toContain('absolute top-[140px] right-4 bottom-4 z-10 w-[340px]');
+        expect(html).toContain('animate-slide-in flex flex-col w-full');
+        expect(html).toContain('flex-1 flex overflow-hidden relative bg-panel-bg');
+        expect(html).toContain('hidden xl:flex w-[320px] flex-none');
+        expect(html).toContain('hidden xl:flex w-[350px] flex-none');
     });
 
     it('renders SummaryExport labels for save, preview, and export actions', () => {

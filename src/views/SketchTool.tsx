@@ -1301,89 +1301,18 @@ export function SketchTool({ onBack, onExportToQuoteComplete }: SketchToolProps)
     }, [config, dispatch, onBack, workspace]);
 
     return (
-        <div className="animate-slide-in relative flex w-full h-[calc(100vh-100px)] min-h-[700px] bg-[#0b1220] rounded-xl overflow-hidden border border-panel-border shadow-2xl">
+        <div className="animate-slide-in flex flex-col w-full h-[calc(100vh-100px)] min-h-[700px] bg-panel-bg rounded-xl overflow-hidden border border-panel-border shadow-2xl">
             
-            {/* Absolute Background Canvas */}
-            <div className="absolute inset-0 z-0">
-                <SketchCanvas
-                    activeMode={config.activeMode}
-                    parasols={config.parasols}
-                    selectedParasolId={config.selectedParasolId}
-                    fiestaItems={config.fiestaItems}
-                    selectedFiestaId={config.selectedFiestaId}
-                    onPlaceParasol={handlePlaceParasol}
-                    onSelectParasol={handleSelectParasol}
-                    onMoveParasol={handleMoveParasol}
-                    onPlaceFiesta={handlePlaceFiesta}
-                    onSelectFiesta={handleSelectFiesta}
-                    onMoveFiesta={handleMoveFiesta}
-                    onChangeMode={handleChangeMode}
-                    width={previewConfig.width}
-                    depth={previewConfig.depth}
-                    depthLeft={previewConfig.depthLeft}
-                    depthRight={previewConfig.depthRight}
-                    equalDepth={previewConfig.equalDepth}
-                    includeBack={previewConfig.includeBack}
-                    leftEdge={previewLayout.leftEdge}
-                    rightEdge={previewLayout.rightEdge}
-                    frontEdge={previewLayout.frontEdge}
-                    backEdge={previewLayout.backEdge}
-                    edgeDiagnostics={previewLayout.edgeDiagnostics}
-                    edgeSummaries={previewLayout.edgeSummaries}
-                    layoutWarnings={previewLayout.layoutWarnings}
-                    suggestions={previewLayout.suggestions}
-                    camera={workspace.camera}
-                    selection={workspace.selection}
-                    uiDensity={workspace.uiDensity}
-                    manualSectionsByEdge={config.manualSectionsByEdge}
-                    doorSegmentsByEdge={config.doorSegmentsByEdge}
-                    onSetManualPin={setManualPin}
-                    onClearManualPins={clearManualPins}
-                    onSetDoorSegmentSize={setDoorSegmentSize}
-                    onResetDoorSegment={resetDoorSegment}
-                    onSelectEdge={handleSelectEdge}
-                    onSelectSection={(edgeKey, segmentIndex) => {
-                        setActiveSidebarTab('inspector');
-                        setWorkspace((prev) => ({
-                            ...prev,
-                            selection: { edgeKey, segmentIndex }
-                        }));
-                    }}
-                    onCameraChange={handleCameraChange}
-                    onResizePreview={handleResizePreview}
-                    onResizeCommit={handleResizeCommit}
-                    hoverPreviewLayout={hoverPreviewLayout}
-                    onHoverSuggestion={setHoveredSuggestion}
-                    undo={undo}
-                    redo={redo}
-                    canUndo={past.length > 0}
-                    canRedo={future.length > 0}
-                />
-            </div>
-
-            {/* Top Bar (Floating Header + Actions) */}
-            <div className="absolute top-4 inset-x-4 z-20 flex flex-col xl:flex-row xl:items-start justify-between gap-4 pointer-events-none">
-                <div className="pointer-events-auto flex flex-col gap-2">
-                    <div className="rounded-2xl border border-panel-border bg-panel-bg/85 p-3 md:p-4 shadow-lg backdrop-blur-md">
-                        <h2 className="text-xl md:text-3xl font-semibold text-text-primary m-0">Rita Uteservering</h2>
-                        <p className="text-text-secondary text-xs md:text-sm m-0">
-                            Skissa en rektangel och beräkna optimala ClickitUp-sektioner.
-                        </p>
-                    </div>
-
-                    {criticalWarnings.length > 0 && (
-                        <div className="rounded-2xl border border-danger/40 bg-danger/10 px-4 py-3 text-danger text-sm shadow-lg backdrop-blur-md">
-                            <p className="font-semibold m-0 mb-1">Blockerande problem ({criticalWarnings.length})</p>
-                            <ul className="m-0 pl-5 space-y-1">
-                                {criticalWarnings.map((warning) => (
-                                    <li key={warning.id}>{warning.text}</li>
-                                ))}
-                            </ul>
-                        </div>
-                    )}
+            {/* Top Header Bar */}
+            <header className="flex-none flex flex-wrap items-center justify-between px-6 py-3 border-b border-panel-border bg-panel-bg/95 backdrop-blur-sm z-20">
+                <div className="flex flex-col gap-0.5">
+                    <h2 className="text-xl md:text-2xl font-semibold text-text-primary m-0 tracking-tight">Rita Uteservering</h2>
+                    <p className="text-text-secondary text-xs m-0">
+                        Skissa en rektangel och beräkna optimala ClickitUp-sektioner.
+                    </p>
                 </div>
 
-                <div className="pointer-events-auto flex flex-wrap items-center gap-2 rounded-2xl border border-panel-border bg-panel-bg/85 p-2 shadow-lg backdrop-blur-md">
+                <div className="flex items-center gap-3">
                     <span
                         className={`rounded-full border px-3 py-1 text-xs font-semibold ${sketchReviewState.health === 'blocked'
                             ? 'border-danger/50 text-danger bg-danger/10'
@@ -1396,124 +1325,145 @@ export function SketchTool({ onBack, onExportToQuoteComplete }: SketchToolProps)
                     </span>
                     <button
                         onClick={handleBackClick}
-                        className="h-10 px-4 border border-panel-border bg-panel-bg text-text-primary rounded-lg cursor-pointer hover:bg-white/5 transition-colors"
+                        className="h-9 px-4 border border-panel-border bg-panel-bg text-text-primary text-sm font-medium rounded-lg cursor-pointer hover:bg-white/5 transition-colors"
                     >
                         Till offert
                     </button>
                     <button
                         onClick={handleExportImage}
                         disabled={!canExport}
-                        className="h-10 px-4 border border-panel-border bg-panel-bg text-text-primary rounded-lg cursor-pointer hover:bg-white/5 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                        className="h-9 px-4 border border-panel-border bg-panel-bg text-text-primary text-sm font-medium rounded-lg cursor-pointer hover:bg-white/5 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                     >
                         Ladda ner bild
                     </button>
                     <button
                         onClick={resetSketch}
-                        className="h-10 px-4 border border-red-900/50 bg-red-950/20 text-red-300 rounded-lg cursor-pointer hover:text-white hover:border-red-500/60 hover:bg-red-800/40 transition-colors"
+                        className="h-9 px-4 border border-red-900/50 bg-red-950/20 text-red-300 text-sm font-medium rounded-lg cursor-pointer hover:text-white hover:border-red-500/60 hover:bg-red-800/40 transition-colors"
                     >
                         Återställ
                     </button>
                     <button
                         onClick={handleExportClick}
                         disabled={!canExport || !canExportSketchToQuote}
-                        className="h-10 px-4 bg-primary text-white border-none rounded-lg cursor-pointer font-semibold hover:brightness-110 disabled:opacity-40 disabled:cursor-not-allowed transition-all shadow-[0_0_15px_rgba(37,99,235,0.4)]"
+                        className="h-9 px-4 bg-primary text-white border-none rounded-lg cursor-pointer text-sm font-semibold hover:brightness-110 disabled:opacity-40 disabled:cursor-not-allowed transition-all shadow-md"
                     >
                         Exportera till offert
                     </button>
                 </div>
-            </div>
+            </header>
 
-            {/* Floating Left Sidebar (Setup Panel) */}
-            <div className="absolute top-[140px] left-4 bottom-4 z-10 w-[308px] overflow-y-auto pointer-events-none hidden xl:block custom-scrollbar">
-                <div className="pointer-events-auto pb-4">
-                    <SketchSetupPanel
-                        config={config}
-                        onChange={updateConfig}
-                        edgeSummaries={layout.edgeSummaries}
-                        onSetSectionCount={setSectionCount}
-                        onClearSectionCount={clearSectionCount}
-                    />
-                </div>
-            </div>
+            {/* Main Workspace (Sidebars + Canvas) */}
+            <div className="flex-1 flex overflow-hidden relative bg-panel-bg">
+                
+                {/* Left Sidebar */}
+                <aside className="hidden xl:flex w-[320px] flex-none border-r border-panel-border bg-panel-bg/60 flex-col h-full z-10 overflow-hidden backdrop-blur-md">
+                    <div className="p-5 flex-1 overflow-y-auto custom-scrollbar">
+                        <SketchSetupPanel
+                            config={config}
+                            onChange={updateConfig}
+                            edgeSummaries={layout.edgeSummaries}
+                            onSetSectionCount={setSectionCount}
+                            onClearSectionCount={clearSectionCount}
+                        />
+                    </div>
+                </aside>
 
-            {/* Floating Right Sidebar (Inspector + Review) */}
-            <div className="absolute top-[140px] right-4 bottom-4 z-10 w-[340px] overflow-y-auto pointer-events-none hidden xl:flex xl:flex-col gap-4 custom-scrollbar">
-                <div className="pointer-events-auto flex flex-col gap-4 pb-4">
-                    <SketchInspectorPanel
-                        config={config}
-                        onChange={updateConfig}
-                        selectedEdge={workspace.selection.edgeKey}
-                        selectedSegmentIndex={workspace.selection.segmentIndex}
-                        edgeSummaries={layout.edgeSummaries}
-                        suggestions={layout.suggestions}
-                        onSetManualPin={setManualPin}
-                        onClearManualPins={clearManualPins}
-                        onConvertSegmentToDoor={setDoorSegmentSize}
-                        onSetDoorSegmentSize={setDoorSegmentSize}
-                        onResetDoorSegment={resetDoorSegment}
-                        onApplySuggestion={applySuggestion}
-                        onHoverSuggestion={setHoveredSuggestion}
-                        onDeleteParasol={handleDeleteParasol}
-                        onRotateParasol={handleRotateParasol}
-                        onDeleteFiesta={handleDeleteFiesta}
-                    />
-                    <SketchReviewPanel
-                        reviewState={sketchReviewState}
-                        canExportToQuote={canExportSketchToQuote}
-                        onApplySuggestion={applySuggestion}
-                        onHoverSuggestion={setHoveredSuggestion}
-                        onExport={handleExportClick}
-                        onExportImage={handleExportImage}
-                    />
-                </div>
-            </div>
-
-            {/* Floating Bottom Center (Summary) */}
-            <div className="absolute bottom-6 inset-x-0 z-10 flex justify-center pointer-events-none hidden xl:flex">
-                <div className="pointer-events-auto flex items-center gap-x-6 gap-y-1 rounded-full border border-panel-border bg-panel-bg/90 px-8 py-3 text-sm text-text-secondary shadow-2xl backdrop-blur-md">
-                    <span>
-                        Bredd: <b className="text-text-primary text-base">{layout.edgeSummaries?.front?.effectiveLength ?? config.width} mm</b>
-                    </span>
-                    {config.equalDepth ? (
-                        <span>Djup: <b className="text-text-primary text-base">{layout.edgeSummaries?.left?.effectiveLength ?? config.depth} mm</b></span>
-                    ) : (
-                        <>
-                            <span>Vänster: <b className="text-text-primary text-base">{layout.edgeSummaries?.left?.effectiveLength ?? config.depthLeft} mm</b></span>
-                            <span>Höger: <b className="text-text-primary text-base">{layout.edgeSummaries?.right?.effectiveLength ?? config.depthRight} mm</b></span>
-                        </>
+                {/* Center Canvas Area */}
+                <main className="flex-1 relative bg-[#0b1220] h-full overflow-hidden flex flex-col">
+                    {/* Blocking Warnings Overlay */}
+                    {criticalWarnings.length > 0 && (
+                        <div className="absolute top-4 inset-x-4 z-30 rounded-xl border border-danger/40 bg-danger/10 px-4 py-3 text-danger text-sm shadow-lg backdrop-blur-md">
+                            <p className="font-semibold m-0 mb-1">Blockerande problem ({criticalWarnings.length})</p>
+                            <ul className="m-0 pl-5 space-y-1">
+                                {criticalWarnings.map((warning) => (
+                                    <li key={warning.id}>{warning.text}</li>
+                                ))}
+                            </ul>
+                        </div>
                     )}
-                    <span>
-                        Sektioner: <b className="text-text-primary text-base">{layout.allSections.length} st</b>
-                    </span>
-                </div>
-            </div>
 
-            {/* Mobile / Tablet floating sidebars */}
-            <div className="absolute bottom-4 inset-x-4 z-10 pointer-events-none flex flex-col gap-3 xl:hidden">
-                <div className="pointer-events-auto flex items-center justify-center gap-2">
-                    <button
-                        type="button"
-                        onClick={() => setActiveSidebarTab('inspector')}
-                        className={`px-6 py-2 rounded-full border text-sm font-semibold transition-colors shadow-lg ${activeSidebarTab === 'inspector'
-                            ? 'border-blue-200/60 bg-primary text-white'
-                            : 'border-panel-border bg-panel-bg text-text-primary hover:bg-white/5'
-                            }`}
-                    >
-                        Inspektör
-                    </button>
-                    <button
-                        type="button"
-                        onClick={() => setActiveSidebarTab('review')}
-                        className={`px-6 py-2 rounded-full border text-sm font-semibold transition-colors shadow-lg ${activeSidebarTab === 'review'
-                            ? 'border-blue-200/60 bg-primary text-white'
-                            : 'border-panel-border bg-panel-bg text-text-primary hover:bg-white/5'
-                            }`}
-                    >
-                        Granska & Exportera
-                    </button>
-                </div>
-                <div className="pointer-events-auto bg-panel-bg/95 backdrop-blur-md rounded-2xl p-4 shadow-2xl border border-panel-border max-h-[400px] overflow-y-auto custom-scrollbar">
-                    {activeSidebarTab === 'inspector' ? (
+                    {/* The SVG Canvas */}
+                    <div className="flex-1 w-full h-full">
+                        <SketchCanvas
+                            activeMode={config.activeMode}
+                            parasols={config.parasols}
+                            selectedParasolId={config.selectedParasolId}
+                            fiestaItems={config.fiestaItems}
+                            selectedFiestaId={config.selectedFiestaId}
+                            onPlaceParasol={handlePlaceParasol}
+                            onSelectParasol={handleSelectParasol}
+                            onMoveParasol={handleMoveParasol}
+                            onPlaceFiesta={handlePlaceFiesta}
+                            onSelectFiesta={handleSelectFiesta}
+                            onMoveFiesta={handleMoveFiesta}
+                            onChangeMode={handleChangeMode}
+                            width={previewConfig.width}
+                            depth={previewConfig.depth}
+                            depthLeft={previewConfig.depthLeft}
+                            depthRight={previewConfig.depthRight}
+                            equalDepth={previewConfig.equalDepth}
+                            includeBack={previewConfig.includeBack}
+                            leftEdge={previewLayout.leftEdge}
+                            rightEdge={previewLayout.rightEdge}
+                            frontEdge={previewLayout.frontEdge}
+                            backEdge={previewLayout.backEdge}
+                            edgeDiagnostics={previewLayout.edgeDiagnostics}
+                            edgeSummaries={previewLayout.edgeSummaries}
+                            layoutWarnings={previewLayout.layoutWarnings}
+                            suggestions={previewLayout.suggestions}
+                            camera={workspace.camera}
+                            selection={workspace.selection}
+                            uiDensity={workspace.uiDensity}
+                            manualSectionsByEdge={config.manualSectionsByEdge}
+                            doorSegmentsByEdge={config.doorSegmentsByEdge}
+                            onSetManualPin={setManualPin}
+                            onClearManualPins={clearManualPins}
+                            onSetDoorSegmentSize={setDoorSegmentSize}
+                            onResetDoorSegment={resetDoorSegment}
+                            onSelectEdge={handleSelectEdge}
+                            onSelectSection={(edgeKey, segmentIndex) => {
+                                setActiveSidebarTab('inspector');
+                                setWorkspace((prev) => ({
+                                    ...prev,
+                                    selection: { edgeKey, segmentIndex }
+                                }));
+                            }}
+                            onCameraChange={handleCameraChange}
+                            onResizePreview={handleResizePreview}
+                            onResizeCommit={handleResizeCommit}
+                            hoverPreviewLayout={hoverPreviewLayout}
+                            onHoverSuggestion={setHoveredSuggestion}
+                            undo={undo}
+                            redo={redo}
+                            canUndo={past.length > 0}
+                            canRedo={future.length > 0}
+                        />
+                    </div>
+
+                    {/* Bottom Summary Bar */}
+                    <div className="absolute bottom-6 inset-x-0 z-20 flex justify-center pointer-events-none hidden xl:flex">
+                        <div className="pointer-events-auto flex items-center gap-x-6 gap-y-1 rounded-full border border-panel-border bg-panel-bg/95 px-8 py-3 text-sm text-text-secondary shadow-xl backdrop-blur-md">
+                            <span>
+                                Bredd: <b className="text-text-primary text-base">{layout.edgeSummaries?.front?.effectiveLength ?? config.width} mm</b>
+                            </span>
+                            {config.equalDepth ? (
+                                <span>Djup: <b className="text-text-primary text-base">{layout.edgeSummaries?.left?.effectiveLength ?? config.depth} mm</b></span>
+                            ) : (
+                                <>
+                                    <span>Vänster: <b className="text-text-primary text-base">{layout.edgeSummaries?.left?.effectiveLength ?? config.depthLeft} mm</b></span>
+                                    <span>Höger: <b className="text-text-primary text-base">{layout.edgeSummaries?.right?.effectiveLength ?? config.depthRight} mm</b></span>
+                                </>
+                            )}
+                            <span>
+                                Sektioner: <b className="text-text-primary text-base">{layout.allSections.length} st</b>
+                            </span>
+                        </div>
+                    </div>
+                </main>
+
+                {/* Right Sidebar */}
+                <aside className="hidden xl:flex w-[350px] flex-none border-l border-panel-border bg-panel-bg/60 flex-col h-full z-10 overflow-hidden backdrop-blur-md">
+                    <div className="p-5 flex-1 overflow-y-auto custom-scrollbar flex flex-col gap-6">
                         <SketchInspectorPanel
                             config={config}
                             onChange={updateConfig}
@@ -1532,7 +1482,7 @@ export function SketchTool({ onBack, onExportToQuoteComplete }: SketchToolProps)
                             onRotateParasol={handleRotateParasol}
                             onDeleteFiesta={handleDeleteFiesta}
                         />
-                    ) : (
+                        <hr className="border-panel-border/60 border-t m-0" />
                         <SketchReviewPanel
                             reviewState={sketchReviewState}
                             canExportToQuote={canExportSketchToQuote}
@@ -1541,7 +1491,64 @@ export function SketchTool({ onBack, onExportToQuoteComplete }: SketchToolProps)
                             onExport={handleExportClick}
                             onExportImage={handleExportImage}
                         />
-                    )}
+                    </div>
+                </aside>
+
+                {/* Mobile / Tablet floating sidebars */}
+                <div className="absolute bottom-4 inset-x-4 z-30 pointer-events-none flex flex-col gap-3 xl:hidden">
+                    <div className="pointer-events-auto flex items-center justify-center gap-2">
+                        <button
+                            type="button"
+                            onClick={() => setActiveSidebarTab('inspector')}
+                            className={`px-6 py-2 rounded-full border text-sm font-semibold transition-colors shadow-lg ${activeSidebarTab === 'inspector'
+                                ? 'border-blue-200/60 bg-primary text-white'
+                                : 'border-panel-border bg-panel-bg text-text-primary hover:bg-white/5'
+                                }`}
+                        >
+                            Inspektör
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => setActiveSidebarTab('review')}
+                            className={`px-6 py-2 rounded-full border text-sm font-semibold transition-colors shadow-lg ${activeSidebarTab === 'review'
+                                ? 'border-blue-200/60 bg-primary text-white'
+                                : 'border-panel-border bg-panel-bg text-text-primary hover:bg-white/5'
+                                }`}
+                        >
+                            Granska & Exportera
+                        </button>
+                    </div>
+                    <div className="pointer-events-auto bg-panel-bg/95 backdrop-blur-md rounded-2xl p-4 shadow-2xl border border-panel-border max-h-[400px] overflow-y-auto custom-scrollbar">
+                        {activeSidebarTab === 'inspector' ? (
+                            <SketchInspectorPanel
+                                config={config}
+                                onChange={updateConfig}
+                                selectedEdge={workspace.selection.edgeKey}
+                                selectedSegmentIndex={workspace.selection.segmentIndex}
+                                edgeSummaries={layout.edgeSummaries}
+                                suggestions={layout.suggestions}
+                                onSetManualPin={setManualPin}
+                                onClearManualPins={clearManualPins}
+                                onConvertSegmentToDoor={setDoorSegmentSize}
+                                onSetDoorSegmentSize={setDoorSegmentSize}
+                                onResetDoorSegment={resetDoorSegment}
+                                onApplySuggestion={applySuggestion}
+                                onHoverSuggestion={setHoveredSuggestion}
+                                onDeleteParasol={handleDeleteParasol}
+                                onRotateParasol={handleRotateParasol}
+                                onDeleteFiesta={handleDeleteFiesta}
+                            />
+                        ) : (
+                            <SketchReviewPanel
+                                reviewState={sketchReviewState}
+                                canExportToQuote={canExportSketchToQuote}
+                                onApplySuggestion={applySuggestion}
+                                onHoverSuggestion={setHoveredSuggestion}
+                                onExport={handleExportClick}
+                                onExportImage={handleExportImage}
+                            />
+                        )}
+                    </div>
                 </div>
             </div>
 
