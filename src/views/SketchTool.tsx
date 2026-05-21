@@ -667,10 +667,10 @@ export function SketchTool({ onBack, onExportToQuoteComplete }: SketchToolProps)
         return sanitizeConfig(sim);
     }, [config, hoveredSuggestion]);
 
-    const hoverPreviewLayout = useMemo<ComputedLayoutResult>(() => {
-        if (!hoveredSuggestion) return layout;
+    const hoverPreviewLayout = useMemo<ComputedLayoutResult | null>(() => {
+        if (!hoveredSuggestion) return null;
         return computeLayout(hoverPreviewConfig);
-    }, [hoveredSuggestion, hoverPreviewConfig, layout]);
+    }, [hoveredSuggestion, hoverPreviewConfig]);
 
     const previewConfig = useMemo<SketchConfigState>(() => {
         if (!dragPreview) return config;

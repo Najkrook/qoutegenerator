@@ -30,6 +30,8 @@ interface ResizeDragState {
     initialD: number;
     initialDLeft: number;
     initialDRight: number;
+    initialPanX: number;
+    initialPanY: number;
 }
 
 interface DraggedItemState {
@@ -318,14 +320,17 @@ export function SketchCanvas({
         return false;
     }, [hoverPreviewLayout, width, depth, propDepthLeft, propDepthRight, frontEdge, leftEdge, rightEdge, backEdge]);
 
+    const cameraBaseWidth = activeDrag && dragRef.current ? dragRef.current.initialW : currentWidth;
+    const cameraBaseDepth = activeDrag && dragRef.current ? Math.max(dragRef.current.initialDLeft, dragRef.current.initialDRight) : currentMaxDepth;
+
     const padding = uiDensity === 'touch' ? 2000 : 1500;
     const activeCamera = useMemo(
-        () => normalizeCamera(camera, currentWidth, currentMaxDepth, padding),
-        [camera, currentWidth, currentMaxDepth, padding]
+        () => normalizeCamera(camera, cameraBaseWidth, cameraBaseDepth, padding),
+        [camera, cameraBaseWidth, cameraBaseDepth, padding]
     );
 
-    const totalWidth = currentWidth + padding * 2;
-    const totalHeight = currentMaxDepth + padding * 2;
+    const totalWidth = cameraBaseWidth + padding * 2;
+    const totalHeight = cameraBaseDepth + padding * 2;
     const screenScale = useMemo(() => {
         return (totalWidth / 11000) * (1 / Math.max(0.1, activeCamera.zoom));
     }, [totalWidth, activeCamera.zoom]);
@@ -465,8 +470,9 @@ export function SketchCanvas({
     }, [selectedEdge, selection?.segmentIndex, summaryByEdge, currentMaxDepth, currentDepthLeft, currentDepthRight, currentWidth, sectionThickness]);
 
     const emitCamera = useCallback(
-        (nextCamera) => {
-            const normalized = normalizeCamera(nextCamera, currentWidth, currentMaxDepth, padding);
+        (nextCamera, overrideWidth?: number) => {
+            const w = overrideWidth ?? currentWidth;
+            const normalized = normalizeCamera(nextCamera, w, currentMaxDepth, padding);
             onCameraChange?.(normalized);
         },
         [onCameraChange, currentWidth, currentMaxDepth, padding]
@@ -538,11 +544,13 @@ export function SketchCanvas({
                 initialW: width,
                 initialD: depth, // This is the original shared depth prop
                 initialDLeft: propDepthLeft ?? depth,
-                initialDRight: propDepthRight ?? depth
+                initialDRight: propDepthRight ?? depth,
+                initialPanX: activeCamera.panX,
+                initialPanY: activeCamera.panY
             };
             setActiveDrag(edgeId);
         },
-        [depth, width, propDepthLeft, propDepthRight]
+        [depth, width, propDepthLeft, propDepthRight, activeCamera.panX, activeCamera.panY]
     );
 
     useEffect(() => {
@@ -586,6 +594,7 @@ export function SketchCanvas({
                 onResizePreview?.({ width: newWidth });
             } else if (activeDrag === 'left') {
                 const newWidth = Math.max(MIN_DIMENSION_MM, snapToGrid(dragRef.current.initialW - deltaX));
+                const diffX = newWidth - dragRef.current.initialW;
                 dragWidthRef.current = newWidth;
                 setDragWidth(newWidth);
                 onResizePreview?.({ width: newWidth });
@@ -2128,7 +2137,12 @@ export function SketchCanvas({
                     <line x1={-padding} y1={0} x2={currentWidth + padding} y2={0} stroke="rgba(30,64,175,0.4)" strokeWidth="18" />
                     <line x1={0} y1={-padding} x2={0} y2={currentMaxDepth + padding} stroke="rgba(30,64,175,0.4)" strokeWidth="18" />
 
-                    <polygon
+                    {/* Translating group that allows the left handle to visually follow the mouse by shifting the canvas */}
+                    <g 
+                        transform={(activeDrag === 'left' && dragWidth !== null) ? `translate(${-(dragWidth - dragRef.current.initialW)}, 0)` : undefined}
+                        style={{ transition: activeDrag ? 'none' : 'transform 0.15s ease-out' }}
+                    >
+                        <polygon
                         points={`0,${currentMaxDepth} ${currentWidth},${currentMaxDepth} ${currentWidth},${currentMaxDepth - currentDepthRight} 0,${currentMaxDepth - currentDepthLeft}`}
                         fill="rgba(15,23,42,0.22)"
                         stroke="rgba(59,130,246,0.55)"
@@ -2242,6 +2256,7 @@ export function SketchCanvas({
                             />
                         </>
                     )}
+                    </g>
                 </svg>
 
                 {/* Floating Undo/Redo capsule */}
