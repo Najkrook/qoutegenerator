@@ -1941,12 +1941,12 @@ export function SketchCanvas({
                         justifyContent: 'center'
                     }}
                 >
-                    <div className="bg-panel-bg border border-panel-border rounded-xl shadow-xl p-1.5 flex gap-1.5 items-center backdrop-blur-md">
+                    <div className="bg-panel-bg border-2 border-panel-border rounded-[20px] shadow-xl p-3 flex gap-3 items-center backdrop-blur-md">
                         <button
                             type="button"
                             onClick={handleTogglePin}
                             onMouseDown={(e) => e.stopPropagation()}
-                            className={`px-2.5 py-1 text-sm font-semibold rounded border transition-colors ${
+                            className={`px-5 py-3 text-[24px] font-semibold rounded-[12px] border-2 transition-colors whitespace-nowrap ${
                                 isPinned
                                     ? 'bg-amber-500/20 text-amber-300 border-amber-500/50'
                                     : 'bg-panel-bg text-text-secondary border-panel-border hover:text-text-primary hover:bg-white/5'
@@ -1960,7 +1960,7 @@ export function SketchCanvas({
                             type="button"
                             onClick={handleToggleDoor}
                             onMouseDown={(e) => e.stopPropagation()}
-                            className={`px-2.5 py-1 text-sm font-semibold rounded border transition-colors ${
+                            className={`px-5 py-3 text-[24px] font-semibold rounded-[12px] border-2 transition-colors whitespace-nowrap ${
                                 segment.isDoor
                                     ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/50'
                                     : 'bg-panel-bg text-text-secondary border-panel-border hover:text-text-primary hover:bg-white/5'
@@ -1970,24 +1970,24 @@ export function SketchCanvas({
                             {segment.isDoor ? '🚪 Dörr' : '🚪 Sektion'}
                         </button>
 
-                        <div className="flex items-center border border-panel-border rounded overflow-hidden">
+                        <div className="flex items-center border-2 border-panel-border rounded-[12px] overflow-hidden">
                             <button
                                 type="button"
                                 onClick={() => handleStepResize(-100)}
                                 onMouseDown={(e) => e.stopPropagation()}
-                                className="px-2 py-1 text-sm font-bold bg-panel-bg text-text-secondary border-r border-panel-border hover:text-text-primary hover:bg-white/5 transition-colors"
+                                className="px-4 py-3 text-[24px] font-bold bg-panel-bg text-text-secondary border-r-2 border-panel-border hover:text-text-primary hover:bg-white/5 transition-colors"
                                 title="Minska med 100 mm"
                             >
                                 −
                             </button>
-                            <span className="px-2 py-1 text-sm font-semibold text-text-secondary">
+                            <span className="px-4 py-3 text-[22px] font-semibold text-text-secondary">
                                 100
                             </span>
                             <button
                                 type="button"
                                 onClick={() => handleStepResize(100)}
                                 onMouseDown={(e) => e.stopPropagation()}
-                                className="px-2 py-1 text-sm font-bold bg-panel-bg text-text-secondary border-l border-panel-border hover:text-text-primary hover:bg-white/5 transition-colors"
+                                className="px-4 py-3 text-[24px] font-bold bg-panel-bg text-text-secondary border-l-2 border-panel-border hover:text-text-primary hover:bg-white/5 transition-colors"
                                 title="Öka med 100 mm"
                             >
                                 +
@@ -1998,7 +1998,7 @@ export function SketchCanvas({
                             value={segment.length}
                             onChange={handleSizeSelect}
                             onMouseDown={(e) => e.stopPropagation()}
-                            className="bg-input-bg border border-panel-border rounded text-text-primary px-2 py-1 text-sm outline-none focus:border-primary cursor-pointer"
+                            className="bg-input-bg border-2 border-panel-border rounded-[12px] text-text-primary px-4 py-3 text-[24px] font-semibold outline-none focus:border-primary cursor-pointer"
                         >
                             {currentSizeList.map((sz) => (
                                 <option key={sz} value={sz}>
