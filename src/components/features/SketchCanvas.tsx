@@ -1681,46 +1681,46 @@ export function SketchCanvas({
 
                     {/* On-Canvas Toolbar for the selected parasol */}
                     {isSelected && (() => {
-                        const parasolScale = 11.0 * screenScale;
-                        const toolbarWidth = isRotatable ? 800 : 600;
-                        const toolbarHeight = 140;
-                        const scaledWidth = toolbarWidth * parasolScale;
-                        const scaledHeight = toolbarHeight * parasolScale;
-                        const scaledGap = 80 * parasolScale;
-
-                        const tx = px + dims.widthMm / 2 - scaledWidth / 2;
-                        const ty = py - scaledHeight - scaledGap;
+                        const parasolScale = 9.0 * screenScale;
+                        const gap = 24; // unscaled pixels
+                        
+                        const anchorX = px + dims.widthMm / 2;
+                        const anchorY = py;
+                        const foSize = 20000; // Giant safe bounding box for Safari
 
                         return (
                             <foreignObject
-                                x={tx}
-                                y={ty}
-                                width={scaledWidth}
-                                height={scaledHeight}
-                                style={{ overflow: 'visible', pointerEvents: 'all' }}
-                                onMouseDown={(e) => e.stopPropagation()}
-                                onPointerDown={(e) => e.stopPropagation()}
-                                onClick={(e) => e.stopPropagation()}
+                                x={anchorX - foSize / 2}
+                                y={anchorY - foSize / 2}
+                                width={foSize}
+                                height={foSize}
+                                style={{ overflow: 'visible', pointerEvents: 'none' }}
                             >
                                 <div
                                     style={{
-                                        width: `${toolbarWidth}px`,
-                                        height: `${toolbarHeight}px`,
-                                        transform: `scale(${parasolScale})`,
-                                        transformOrigin: 'top left',
+                                        position: 'absolute',
+                                        left: '50%',
+                                        top: '50%',
+                                        transform: `scale(${parasolScale}) translate(-50%, calc(-100% - ${gap}px))`,
+                                        transformOrigin: '0 0',
+                                        pointerEvents: 'all',
                                         display: 'flex',
                                         alignItems: 'center',
-                                        justifyContent: 'center'
+                                        justifyContent: 'center',
+                                        width: 'max-content'
                                     }}
+                                    onMouseDown={(e) => e.stopPropagation()}
+                                    onPointerDown={(e) => e.stopPropagation()}
+                                    onClick={(e) => e.stopPropagation()}
                                 >
-                                    <div className="w-full h-full bg-panel-bg/95 border-2 border-panel-border rounded-[20px] shadow-[0_16px_48px_rgba(0,0,0,0.5)] p-3 flex gap-3 items-center justify-between backdrop-blur-md">
+                                    <div className="bg-panel-bg/95 border-2 border-panel-border rounded-[20px] shadow-[0_16px_48px_rgba(0,0,0,0.5)] p-3 flex gap-3 items-center backdrop-blur-md">
                                         <select
                                             value={p.presetId || ''}
                                             onChange={(e) => {
                                                 if (onChangeParasolPreset) onChangeParasolPreset(p.id, e.target.value);
                                             }}
                                             onMouseDown={(e) => e.stopPropagation()}
-                                            className="flex-grow bg-input-bg border-2 border-panel-border rounded-[12px] text-text-primary px-4 py-3 text-[24px] font-semibold outline-none focus:border-primary cursor-pointer transition-colors"
+                                            className="bg-input-bg border-2 border-panel-border rounded-[12px] text-text-primary px-4 py-3 text-[24px] font-semibold outline-none focus:border-primary cursor-pointer transition-colors"
                                         >
                                             {groupParasolPresetsByCategory(PARASOL_PRESETS).map((group) => (
                                                 <optgroup key={group.category} label={group.category}>
@@ -1856,38 +1856,10 @@ export function SketchCanvas({
         const { edgeKey, segment, geometry, direction } = selectedSegmentToolbarInfo;
         const index = segment.index;
 
-        const toolbarWidth = 920;
-        const toolbarHeight = 140;
-
         const SECTION_SIZES = [2000, 1900, 1800, 1700, 1600, 1500, 1400, 1300, 1200, 1100, 1000, 700];
         const DOOR_SIZES = [1100, 1000, 700];
         const currentSizeList = segment.isDoor ? DOOR_SIZES : SECTION_SIZES;
         
-        const segmentScale = 11.0 * screenScale;
-
-        const scaledWidth = toolbarWidth * segmentScale;
-        const scaledHeight = toolbarHeight * segmentScale;
-        const scaledGap = 80 * segmentScale;
-
-        let tx = 0;
-        let ty = 0;
-
-        if (direction === 'E') {
-            tx = geometry.tx - scaledWidth / 2;
-            if (edgeKey === 'front') {
-                ty = geometry.y - scaledHeight - scaledGap;
-            } else {
-                ty = geometry.y + sectionThickness + scaledGap;
-            }
-        } else {
-            ty = geometry.ty - scaledHeight / 2;
-            if (edgeKey === 'left') {
-                tx = geometry.x + sectionThickness + scaledGap;
-            } else {
-                tx = geometry.x - sectionThickness - scaledWidth - scaledGap;
-            }
-        }
-
         const isPinned = (manualSectionsByEdge[edgeKey] || []).some((pin) => pin.index === index);
 
         const handleTogglePin = () => {
@@ -1929,29 +1901,14 @@ export function SketchCanvas({
         };
 
         return (
-            <foreignObject
-                x={tx}
-                y={ty}
-                width={scaledWidth}
-                height={scaledHeight}
-                style={{ overflow: 'visible', pointerEvents: 'all' }}
+            <div
+                className="pointer-events-auto transition-all duration-300 ease-out"
                 onMouseDown={(e) => e.stopPropagation()}
                 onPointerDown={(e) => e.stopPropagation()}
                 onClick={(e) => e.stopPropagation()}
             >
-                <div
-                    style={{
-                        width: `${toolbarWidth}px`,
-                        height: `${toolbarHeight}px`,
-                        transform: `scale(${segmentScale})`,
-                        transformOrigin: 'top left',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center'
-                    }}
-                >
-                    <div className="w-full h-full bg-panel-bg/95 border-2 border-panel-border rounded-[20px] shadow-[0_16px_48px_rgba(0,0,0,0.5)] p-3 flex gap-3 items-center justify-between backdrop-blur-md">
-                        <button
+                <div className="bg-panel-bg/95 border-2 border-panel-border rounded-[20px] shadow-[0_16px_48px_rgba(0,0,0,0.5)] p-3 flex gap-3 items-center backdrop-blur-md">
+                    <button
                             type="button"
                             onClick={handleTogglePin}
                             onMouseDown={(e) => e.stopPropagation()}
@@ -2021,15 +1978,14 @@ export function SketchCanvas({
                             )}
                         </select>
                     </div>
-                </div>
-            </foreignObject>
+            </div>
         );
     };
 
     return (
         <div id="sketchCanvasContainer" className="relative w-full h-full bg-[#0b1220] overflow-hidden rounded-xl border border-panel-border shadow-2xl">
-            {/* Absolute floating toolbar for canvas modes and zoom */}
-            <div className="absolute top-4 left-1/2 -translate-x-1/2 z-20 pointer-events-none" data-html2canvas-ignore="true">
+            {/* Absolute floating toolbar container for modes, zoom, and contextual sub-toolbars */}
+            <div className="absolute top-4 left-1/2 -translate-x-1/2 z-20 pointer-events-none flex flex-col items-center gap-4 w-full max-w-[95%]" data-html2canvas-ignore="true">
                 <div className="pointer-events-auto flex flex-wrap items-center justify-center gap-4 bg-panel-bg/80 backdrop-blur-md border border-panel-border rounded-[24px] px-5 py-3 shadow-[0_16px_48px_rgba(0,0,0,0.5)]">
                     <div className="flex flex-wrap items-center gap-2">
                         <button
@@ -2097,6 +2053,8 @@ export function SketchCanvas({
                         </span>
                     </div>
                 </div>
+
+                {renderSegmentToolbar()}
             </div>
 
             <div className="absolute inset-0 z-0">
@@ -2284,8 +2242,6 @@ export function SketchCanvas({
                             />
                         </>
                     )}
-
-                    {renderSegmentToolbar()}
                 </svg>
 
                 {/* Floating Undo/Redo capsule */}

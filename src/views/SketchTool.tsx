@@ -438,7 +438,7 @@ export function SketchTool({ onBack, onExportToQuoteComplete }: SketchToolProps)
 
     const [showStockModal, setShowStockModal] = useState(false);
     const [dragPreview, setDragPreview] = useState<DragPreview | null>(null);
-    const [activeSidebarTab, setActiveSidebarTab] = useState<'setup' | 'inspector' | 'review'>('setup');
+    const [activeSidebarTab, setActiveSidebarTab] = useState<'setup' | 'inspector' | 'review' | 'none'>('none');
 
     // History stacks for undo/redo
     const [past, setPast] = useState<SketchConfigState[]>([]);
@@ -1516,7 +1516,7 @@ export function SketchTool({ onBack, onExportToQuoteComplete }: SketchToolProps)
                     <div className="pointer-events-auto flex items-center justify-center gap-2 flex-wrap">
                         <button
                             type="button"
-                            onClick={() => setActiveSidebarTab('setup')}
+                            onClick={() => setActiveSidebarTab(activeSidebarTab === 'setup' ? 'none' : 'setup')}
                             className={`px-4 py-2 rounded-full border text-sm font-semibold transition-colors shadow-lg ${activeSidebarTab === 'setup'
                                 ? 'border-blue-200/60 bg-primary text-white'
                                 : 'border-panel-border bg-panel-bg text-text-primary hover:bg-white/5'
@@ -1526,7 +1526,7 @@ export function SketchTool({ onBack, onExportToQuoteComplete }: SketchToolProps)
                         </button>
                         <button
                             type="button"
-                            onClick={() => setActiveSidebarTab('inspector')}
+                            onClick={() => setActiveSidebarTab(activeSidebarTab === 'inspector' ? 'none' : 'inspector')}
                             className={`px-4 py-2 rounded-full border text-sm font-semibold transition-colors shadow-lg ${activeSidebarTab === 'inspector'
                                 ? 'border-blue-200/60 bg-primary text-white'
                                 : 'border-panel-border bg-panel-bg text-text-primary hover:bg-white/5'
@@ -1536,7 +1536,7 @@ export function SketchTool({ onBack, onExportToQuoteComplete }: SketchToolProps)
                         </button>
                         <button
                             type="button"
-                            onClick={() => setActiveSidebarTab('review')}
+                            onClick={() => setActiveSidebarTab(activeSidebarTab === 'review' ? 'none' : 'review')}
                             className={`px-4 py-2 rounded-full border text-sm font-semibold transition-colors shadow-lg ${activeSidebarTab === 'review'
                                 ? 'border-blue-200/60 bg-primary text-white'
                                 : 'border-panel-border bg-panel-bg text-text-primary hover:bg-white/5'
@@ -1545,39 +1545,52 @@ export function SketchTool({ onBack, onExportToQuoteComplete }: SketchToolProps)
                             Granska
                         </button>
                     </div>
-                    <div className="pointer-events-auto bg-panel-bg/95 backdrop-blur-md rounded-2xl p-4 shadow-2xl border border-panel-border max-h-[400px] overflow-y-auto custom-scrollbar">
-                        {activeSidebarTab === 'setup' ? (
-                            <SketchSetupPanel config={config} onChange={updateConfig} />
-                        ) : activeSidebarTab === 'inspector' ? (
-                            <SketchInspectorPanel
-                                config={config}
-                                onChange={updateConfig}
-                                selectedEdge={workspace.selection.edgeKey}
-                                selectedSegmentIndex={workspace.selection.segmentIndex}
-                                edgeSummaries={layout.edgeSummaries}
-                                suggestions={layout.suggestions}
-                                onSetManualPin={setManualPin}
-                                onClearManualPins={clearManualPins}
-                                onConvertSegmentToDoor={setDoorSegmentSize}
-                                onSetDoorSegmentSize={setDoorSegmentSize}
-                                onResetDoorSegment={resetDoorSegment}
-                                onApplySuggestion={applySuggestion}
-                                onHoverSuggestion={setHoveredSuggestion}
-                                onDeleteParasol={handleDeleteParasol}
-                                onRotateParasol={handleRotateParasol}
-                                onDeleteFiesta={handleDeleteFiesta}
-                            />
-                        ) : (
-                            <SketchReviewPanel
-                                reviewState={sketchReviewState}
-                                canExportToQuote={canExportSketchToQuote}
-                                onApplySuggestion={applySuggestion}
-                                onHoverSuggestion={setHoveredSuggestion}
-                                onExport={handleExportClick}
-                                onExportImage={handleExportImage}
-                            />
-                        )}
-                    </div>
+                    {activeSidebarTab !== 'none' && (
+                        <div className="relative pointer-events-auto mt-2">
+                            <button
+                                type="button"
+                                onClick={() => setActiveSidebarTab('none')}
+                                className="absolute -top-3.5 left-1/2 -translate-x-1/2 bg-panel-bg border border-panel-border text-text-secondary hover:text-white hover:bg-white/10 rounded-full p-1 shadow-[0_4px_12px_rgba(0,0,0,0.5)] transition-all z-10"
+                                title="Minimera panelen"
+                            >
+                                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                                </svg>
+                            </button>
+                            <div className="bg-panel-bg/95 backdrop-blur-md rounded-2xl p-4 shadow-2xl border border-panel-border max-h-[400px] overflow-y-auto custom-scrollbar">
+                            {activeSidebarTab === 'setup' ? (
+                                <SketchSetupPanel config={config} onChange={updateConfig} />
+                            ) : activeSidebarTab === 'inspector' ? (
+                                <SketchInspectorPanel
+                                    config={config}
+                                    onChange={updateConfig}
+                                    selectedEdge={workspace.selection.edgeKey}
+                                    selectedSegmentIndex={workspace.selection.segmentIndex}
+                                    edgeSummaries={layout.edgeSummaries}
+                                    suggestions={layout.suggestions}
+                                    onSetManualPin={setManualPin}
+                                    onClearManualPins={clearManualPins}
+                                    onConvertSegmentToDoor={setDoorSegmentSize}
+                                    onSetDoorSegmentSize={setDoorSegmentSize}
+                                    onResetDoorSegment={resetDoorSegment}
+                                    onApplySuggestion={applySuggestion}
+                                    onHoverSuggestion={setHoveredSuggestion}
+                                    onDeleteParasol={handleDeleteParasol}
+                                    onRotateParasol={handleRotateParasol}
+                                    onDeleteFiesta={handleDeleteFiesta}
+                                />
+                            ) : (
+                                <SketchReviewPanel
+                                    reviewState={sketchReviewState}
+                                    canExportToQuote={canExportSketchToQuote}
+                                    onApplySuggestion={applySuggestion}
+                                    onHoverSuggestion={setHoveredSuggestion}
+                                    onExport={handleExportClick}
+                                />
+                            )}
+                        </div>
+                        </div>
+                    )}
                 </div>
             </div>
 
