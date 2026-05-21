@@ -438,7 +438,7 @@ export function SketchTool({ onBack, onExportToQuoteComplete }: SketchToolProps)
 
     const [showStockModal, setShowStockModal] = useState(false);
     const [dragPreview, setDragPreview] = useState<DragPreview | null>(null);
-    const [activeSidebarTab, setActiveSidebarTab] = useState<'inspector' | 'review'>('inspector');
+    const [activeSidebarTab, setActiveSidebarTab] = useState<'setup' | 'inspector' | 'review'>('setup');
 
     // History stacks for undo/redo
     const [past, setPast] = useState<SketchConfigState[]>([]);
@@ -1352,24 +1352,11 @@ export function SketchTool({ onBack, onExportToQuoteComplete }: SketchToolProps)
                 </div>
             </header>
 
-            {/* Main Workspace (Sidebars + Canvas) */}
+            {/* Main Workspace (Canvas + Sidebar) */}
             <div className="flex-1 flex overflow-hidden relative bg-panel-bg">
                 
-                {/* Left Sidebar */}
-                <aside className="hidden xl:flex w-[320px] flex-none border-r border-panel-border bg-panel-bg/60 flex-col h-full z-10 overflow-hidden backdrop-blur-md">
-                    <div className="p-5 flex-1 overflow-y-auto custom-scrollbar">
-                        <SketchSetupPanel
-                            config={config}
-                            onChange={updateConfig}
-                            edgeSummaries={layout.edgeSummaries}
-                            onSetSectionCount={setSectionCount}
-                            onClearSectionCount={clearSectionCount}
-                        />
-                    </div>
-                </aside>
-
                 {/* Center Canvas Area */}
-                <main className="flex-1 relative bg-[#0b1220] h-full overflow-hidden flex flex-col">
+                <main className="flex-1 relative bg-[#0b1220] h-full overflow-hidden flex flex-col" id="sketch-canvas-container">
                     {/* Blocking Warnings Overlay */}
                     {criticalWarnings.length > 0 && (
                         <div className="absolute top-4 inset-x-4 z-30 rounded-xl border border-danger/40 bg-danger/10 px-4 py-3 text-danger text-sm shadow-lg backdrop-blur-md">
@@ -1461,9 +1448,13 @@ export function SketchTool({ onBack, onExportToQuoteComplete }: SketchToolProps)
                     </div>
                 </main>
 
-                {/* Right Sidebar */}
+                {/* Right Sidebar (Properties & Export) */}
                 <aside className="hidden xl:flex w-[350px] flex-none border-l border-panel-border bg-panel-bg/60 flex-col h-full z-10 overflow-hidden backdrop-blur-md">
                     <div className="p-5 flex-1 overflow-y-auto custom-scrollbar flex flex-col gap-6">
+                        <SketchSetupPanel config={config} onChange={updateConfig} />
+                        
+                        <hr className="border-panel-border/60 border-t m-0" />
+
                         <SketchInspectorPanel
                             config={config}
                             onChange={updateConfig}
@@ -1496,11 +1487,21 @@ export function SketchTool({ onBack, onExportToQuoteComplete }: SketchToolProps)
 
                 {/* Mobile / Tablet floating sidebars */}
                 <div className="absolute bottom-4 inset-x-4 z-30 pointer-events-none flex flex-col gap-3 xl:hidden">
-                    <div className="pointer-events-auto flex items-center justify-center gap-2">
+                    <div className="pointer-events-auto flex items-center justify-center gap-2 flex-wrap">
+                        <button
+                            type="button"
+                            onClick={() => setActiveSidebarTab('setup')}
+                            className={`px-4 py-2 rounded-full border text-sm font-semibold transition-colors shadow-lg ${activeSidebarTab === 'setup'
+                                ? 'border-blue-200/60 bg-primary text-white'
+                                : 'border-panel-border bg-panel-bg text-text-primary hover:bg-white/5'
+                                }`}
+                        >
+                            Inställningar
+                        </button>
                         <button
                             type="button"
                             onClick={() => setActiveSidebarTab('inspector')}
-                            className={`px-6 py-2 rounded-full border text-sm font-semibold transition-colors shadow-lg ${activeSidebarTab === 'inspector'
+                            className={`px-4 py-2 rounded-full border text-sm font-semibold transition-colors shadow-lg ${activeSidebarTab === 'inspector'
                                 ? 'border-blue-200/60 bg-primary text-white'
                                 : 'border-panel-border bg-panel-bg text-text-primary hover:bg-white/5'
                                 }`}
@@ -1510,16 +1511,18 @@ export function SketchTool({ onBack, onExportToQuoteComplete }: SketchToolProps)
                         <button
                             type="button"
                             onClick={() => setActiveSidebarTab('review')}
-                            className={`px-6 py-2 rounded-full border text-sm font-semibold transition-colors shadow-lg ${activeSidebarTab === 'review'
+                            className={`px-4 py-2 rounded-full border text-sm font-semibold transition-colors shadow-lg ${activeSidebarTab === 'review'
                                 ? 'border-blue-200/60 bg-primary text-white'
                                 : 'border-panel-border bg-panel-bg text-text-primary hover:bg-white/5'
                                 }`}
                         >
-                            Granska & Exportera
+                            Granska
                         </button>
                     </div>
                     <div className="pointer-events-auto bg-panel-bg/95 backdrop-blur-md rounded-2xl p-4 shadow-2xl border border-panel-border max-h-[400px] overflow-y-auto custom-scrollbar">
-                        {activeSidebarTab === 'inspector' ? (
+                        {activeSidebarTab === 'setup' ? (
+                            <SketchSetupPanel config={config} onChange={updateConfig} />
+                        ) : activeSidebarTab === 'inspector' ? (
                             <SketchInspectorPanel
                                 config={config}
                                 onChange={updateConfig}

@@ -451,7 +451,6 @@ describe('UI text smoke', () => {
         expect(html).toContain('SketchReviewPanelMock');
         expect(html).toContain('animate-slide-in flex flex-col w-full');
         expect(html).toContain('flex-1 flex overflow-hidden relative bg-panel-bg');
-        expect(html).toContain('hidden xl:flex w-[320px] flex-none');
         expect(html).toContain('hidden xl:flex w-[350px] flex-none');
     });
 
