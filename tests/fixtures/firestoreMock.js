@@ -28,11 +28,27 @@ function createDocSnap(path, data) {
 
 export function createFirestoreMock(initialDocs = {}) {
     const docs = new Map();
+    const listeners = new Set();
     Object.entries(initialDocs).forEach(([path, data]) => {
         docs.set(path, clone(data));
     });
 
     const db = { __mock: true };
+
+    async function resolveSnapshot(refOrQuery) {
+        if (refOrQuery?.kind === 'query' || refOrQuery?.kind === 'collection' || refOrQuery?.kind === 'collectionGroup') {
+            return api.getDocs(refOrQuery);
+        }
+
+        return api.getDoc(refOrQuery);
+    }
+
+    async function notifyListeners() {
+        for (const listener of listeners) {
+            const snapshot = await resolveSnapshot(listener.refOrQuery);
+            listener.onNext(snapshot);
+        }
+    }
 
     const api = {
         db,
@@ -40,7 +56,9 @@ export function createFirestoreMock(initialDocs = {}) {
         collection: (_db, ...segments) => ({ path: segments.join('/'), kind: 'collection' }),
         collectionGroup: (_db, collectionId) => ({ path: collectionId, kind: 'collectionGroup', collectionId }),
         orderBy: (field, direction = 'asc') => ({ kind: 'orderBy', field, direction }),
+        where: (field, op, value) => ({ kind: 'where', field, op, value }),
         limit: (size) => ({ kind: 'limit', size }),
+        startAfter: (...values) => ({ kind: 'startAfter', values }),
         query: (collectionRef, ...constraints) => ({
             path: collectionRef.path,
             kind: 'query',
@@ -59,16 +77,20 @@ export function createFirestoreMock(initialDocs = {}) {
             const prev = docs.get(ref.path);
             if (options.merge && prev && typeof prev === 'object' && typeof payload === 'object') {
                 docs.set(ref.path, { ...clone(prev), ...clone(payload) });
+                await notifyListeners();
                 return;
             }
             docs.set(ref.path, clone(payload));
+            await notifyListeners();
         },
         async updateDoc(ref, payload) {
             const prev = docs.get(ref.path) || {};
             docs.set(ref.path, { ...clone(prev), ...clone(payload) });
+            await notifyListeners();
         },
         async deleteDoc(ref) {
             docs.delete(ref.path);
+            await notifyListeners();
         },
         writeBatch: () => {
             const ops = [];
@@ -142,6 +164,16 @@ export function createFirestoreMock(initialDocs = {}) {
                         return av > bv ? dir : -dir;
                     });
                 }
+                if (constraint.kind === 'where') {
+                    const { field, op, value } = constraint;
+                    if (op === '==') {
+                        for (let index = rows.length - 1; index >= 0; index -= 1) {
+                            if (rows[index].data()?.[field] !== value) {
+                                rows.splice(index, 1);
+                            }
+                        }
+                    }
+                }
                 if (constraint.kind === 'limit') {
                     rows.splice(constraint.size);
                 }
@@ -151,6 +183,19 @@ export function createFirestoreMock(initialDocs = {}) {
                 docs: rows,
                 empty: rows.length === 0,
                 forEach: (fn) => rows.forEach(fn)
+            };
+        },
+        onSnapshot(refOrQuery, onNext, onError) {
+            const listener = { refOrQuery, onNext, onError };
+            listeners.add(listener);
+            resolveSnapshot(refOrQuery).then(onNext).catch((error) => {
+                if (typeof onError === 'function') {
+                    onError(error);
+                }
+            });
+
+            return () => {
+                listeners.delete(listener);
             };
         }
     };

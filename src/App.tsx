@@ -44,6 +44,7 @@ const Planner = lazy(() => import('./views/Planner').then((module) => ({ default
 const History = lazy(() => import('./views/History').then((module) => ({ default: module.History })));
 const RetailerManager = lazy(() => import('./views/RetailerManager').then((module) => ({ default: module.RetailerManager })));
 const RetailerOrderRequests = lazy(() => import('./views/RetailerOrderRequests').then((module) => ({ default: module.RetailerOrderRequests })));
+const RetailerOrderHistory = lazy(() => import('./views/RetailerOrderHistory').then((module) => ({ default: module.RetailerOrderHistory })));
 const RetailerDocuments = lazy(() => import('./views/RetailerDocuments').then((module) => ({ default: module.RetailerDocuments })));
 
 function ViewLoader() {
@@ -248,6 +249,7 @@ function DashboardPage() {
             onOpenActivity={() => navigation.goToActivity()}
             onOpenRetailers={() => navigation.goToRetailers()}
             onOpenRetailerOrders={() => navigation.goToRetailerOrders()}
+            onOpenRetailerOrderHistory={() => navigation.goToRetailerOrderHistory()}
             onOpenRetailerDocuments={() => navigation.goToRetailerDocuments()}
         />
     );
@@ -291,6 +293,7 @@ function SummaryExportPage() {
         <SummaryExport
             onPrev={() => navigation.goToQuoteStep('pricing')}
             onBackToSketch={canAccessSketch ? () => navigation.goToSketch('quote-summary') : undefined}
+            onOpenRetailerOrderHistory={() => navigation.goToRetailerOrderHistory()}
         />
     );
 }
@@ -354,6 +357,11 @@ function RetailerManagerPage() {
 function RetailerOrderRequestsPage() {
     const navigation = useAppNavigation();
     return <RetailerOrderRequests onBack={() => navigation.goToDashboard()} />;
+}
+
+function RetailerOrderHistoryPage() {
+    const navigation = useAppNavigation();
+    return <RetailerOrderHistory onBack={() => navigation.goToDashboard()} />;
 }
 
 function RetailerDocumentsPage() {
@@ -473,6 +481,14 @@ export const appRoutes: RouteObject[] = [
                 element: (
                     <RouteAccessBoundary routeId={APP_ROUTE_IDS.retailerOrders}>
                         <RetailerOrderRequestsPage />
+                    </RouteAccessBoundary>
+                )
+            },
+            {
+                path: APP_PATHS[APP_ROUTE_IDS.retailerOrderHistory].slice(1),
+                element: (
+                    <RouteAccessBoundary routeId={APP_ROUTE_IDS.retailerOrderHistory}>
+                        <RetailerOrderHistoryPage />
                     </RouteAccessBoundary>
                 )
             },

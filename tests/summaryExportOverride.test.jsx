@@ -101,6 +101,11 @@ vi.mock('../src/services/orderRequestService', () => ({
         reviewing: 'Under behandling',
         completed: 'Slutförd'
     }[status] || 'Ny'),
+    getRetailerOrderRequestStatusLabel: (status) => ({
+        new: 'Skickad',
+        reviewing: 'I väntar',
+        completed: 'Accepterad'
+    }[status] || 'Skickad'),
     orderRequestService: {
         getOrderRequestByQuoteVersion: orderRequestState.getOrderRequestByQuoteVersion,
         createOrderRequest: orderRequestState.createOrderRequest
@@ -149,7 +154,7 @@ function createQuoteState(overrides = {}) {
     };
 }
 
-async function renderSummaryExport({ stateOverrides = {}, authOverrides = {} } = {}) {
+async function renderSummaryExport({ stateOverrides = {}, authOverrides = {}, props = {} } = {}) {
     const container = document.createElement('div');
     document.body.appendChild(container);
     const root = createRoot(container);
@@ -159,7 +164,7 @@ async function renderSummaryExport({ stateOverrides = {}, authOverrides = {} } =
         root.render(
             <AuthContext.Provider value={createAuthValue(authOverrides)}>
                 <QuoteContext.Provider value={{ state: createQuoteState(stateOverrides), dispatch }}>
-                    <SummaryExport onPrev={() => {}} />
+                    <SummaryExport onPrev={() => {}} {...props} />
                 </QuoteContext.Provider>
             </AuthContext.Provider>
         );
@@ -337,7 +342,8 @@ describe('SummaryExport PDF override', () => {
         expect(container.textContent).toContain('Spara offerten först för att kunna skicka en orderförfrågan.');
     });
 
-    it('creates an order request and locks the current saved quote version afterwards', async () => {
+    it('creates an order request, shows a thank-you panel, and links to sent orders afterwards', async () => {
+        const onOpenRetailerOrderHistory = vi.fn();
         const { container } = await renderSummaryExport({
             authOverrides: {
                 accessLevel: 'retailer',
@@ -352,6 +358,9 @@ describe('SummaryExport PDF override', () => {
                 activeQuoteId: 'quote-1',
                 quoteNumber: 'BRIXX - 260423-101',
                 activeQuoteVersion: 2
+            },
+            props: {
+                onOpenRetailerOrderHistory
             }
         });
 
@@ -360,5 +369,10 @@ describe('SummaryExport PDF override', () => {
         expect(orderRequestState.createOrderRequest).toHaveBeenCalledTimes(1);
         expect(findButton(container, 'Orderförfrågan registrerad för v2').disabled).toBe(true);
         expect(container.textContent).toContain('Registrerad för version v2.');
+        expect(container.textContent).toContain('Tack för din order!');
+        expect(container.textContent).toContain('Skickad');
+
+        await clickButton(container, 'Se skickade ordrar');
+        expect(onOpenRetailerOrderHistory).toHaveBeenCalledTimes(1);
     });
 });

@@ -74,6 +74,7 @@ export function Dashboard({
     onOpenActivity,
     onOpenRetailers,
     onOpenRetailerOrders,
+    onOpenRetailerOrderHistory,
     onOpenRetailerDocuments
 }: DashboardProps) {
     const {
@@ -203,6 +204,15 @@ export function Dashboard({
                                 className="rounded-md border border-panel-border bg-black/10 px-6 py-3 text-sm font-medium text-text-primary transition-colors hover:bg-white/5"
                             >
                                 Mina Offerter
+                            </button>
+                        )}
+                        {onOpenRetailerOrderHistory && (
+                            <button
+                                type="button"
+                                onClick={onOpenRetailerOrderHistory}
+                                className="rounded-md border border-panel-border bg-black/10 px-6 py-3 text-sm font-medium text-text-primary transition-colors hover:bg-white/5"
+                            >
+                                Skickade Ordrar
                             </button>
                         )}
                         {onOpenRetailerDocuments && (

@@ -5,6 +5,7 @@ import { computeQuoteTotals } from '../services/calculationEngine';
 import { quoteRepository } from '../services/quoteRepositoryClient';
 import {
     getOrderRequestStatusLabel,
+    getRetailerOrderRequestStatusLabel,
     orderRequestService
 } from '../services/orderRequestService';
 import { createQuotePdfBlob } from '../services/quotePdfService';
@@ -546,6 +547,16 @@ export function RetailerOrderRequests({ onBack }: RetailerOrderRequestsProps) {
                                 <p className="mt-2 text-sm text-text-secondary">
                                     Uppdaterad senast {formatDateTime(selectedRequest.updatedAtMs)} av {selectedRequest.statusUpdatedByEmail || '-'}.
                                 </p>
+                                <div className="mt-3 rounded-lg border border-panel-border bg-panel-bg p-3 text-xs text-text-secondary">
+                                    Retailern ser statusarna som:
+                                    {' '}
+                                    <span className="font-semibold text-text-primary">Skickad</span>
+                                    {' / '}
+                                    <span className="font-semibold text-text-primary">{getRetailerOrderRequestStatusLabel('reviewing')}</span>
+                                    {' / '}
+                                    <span className="font-semibold text-text-primary">{getRetailerOrderRequestStatusLabel('completed')}</span>
+                                    .
+                                </div>
                                 <div className="mt-4 flex flex-wrap gap-3">
                                     {(['new', 'reviewing', 'completed'] as OrderRequestStatus[]).map((status) => (
                                         <button

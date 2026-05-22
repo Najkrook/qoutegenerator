@@ -11,6 +11,8 @@ import type {
     QuoteTotalsResult,
     RawOrderRequestDoc,
     RetailerRecord,
+    SubscribeOrderRequestByIdInput,
+    SubscribeOwnOrderRequestsInput,
     UpdateOrderRequestStatusInput,
     UnknownRecord
 } from '../types/contracts';
@@ -21,10 +23,12 @@ import {
     getDoc,
     getDocs,
     limit,
+    onSnapshot,
     orderBy,
     query,
     setDoc,
-    updateDoc
+    updateDoc,
+    where
 } from './firebase';
 import { safeLogActivity } from './activityLogService';
 import { readSnapshotData } from '../utils/runtime';
@@ -42,7 +46,19 @@ interface OrderRequestServiceDeps {
     getDocs?: (ref: unknown) => Promise<{ docs: Array<{ id?: string; data(): RawOrderRequestDoc | undefined }> }>;
     query?: (collectionRef: unknown, ...constraints: unknown[]) => unknown;
     orderBy?: (field: string, direction?: 'asc' | 'desc') => unknown;
+    where?: (field: string, op: string, value: unknown) => unknown;
     limit?: (size: number) => unknown;
+    onSnapshot?: (
+        ref: unknown,
+        onNext: (snap: {
+            exists?: () => boolean;
+            empty?: boolean;
+            id?: string;
+            data?: () => RawOrderRequestDoc | undefined;
+            docs?: Array<{ id?: string; data(): RawOrderRequestDoc | undefined }>;
+        }) => void,
+        onError?: (error: unknown) => void
+    ) => () => void;
 }
 
 function isObject(value: unknown): value is UnknownRecord {
@@ -72,6 +88,18 @@ export function getOrderRequestStatusLabel(status: OrderRequestStatus | string):
         case 'new':
         default:
             return 'Ny';
+    }
+}
+
+export function getRetailerOrderRequestStatusLabel(status: OrderRequestStatus | string): string {
+    switch (normalizeOrderRequestStatus(status)) {
+        case 'reviewing':
+            return 'I väntar';
+        case 'completed':
+            return 'Accepterad';
+        case 'new':
+        default:
+            return 'Skickad';
     }
 }
 
@@ -208,7 +236,9 @@ export function createOrderRequestService(deps: OrderRequestServiceDeps = {}): O
         getDocs: readDocs,
         query: makeQuery,
         orderBy: makeOrderBy,
-        limit: makeLimit
+        where: makeWhere,
+        limit: makeLimit,
+        onSnapshot: subscribeToSnapshot
     } = deps;
 
     function assertDeps(names: string[]): void {
@@ -232,8 +262,12 @@ export function createOrderRequestService(deps: OrderRequestServiceDeps = {}): O
                     return typeof makeQuery !== 'function';
                 case 'orderBy':
                     return typeof makeOrderBy !== 'function';
+                case 'where':
+                    return typeof makeWhere !== 'function';
                 case 'limit':
                     return typeof makeLimit !== 'function';
+                case 'onSnapshot':
+                    return typeof subscribeToSnapshot !== 'function';
                 default:
                     return true;
             }
@@ -308,6 +342,65 @@ export function createOrderRequestService(deps: OrderRequestServiceDeps = {}): O
         return listWithLimit(input.limit ?? 100);
     }
 
+    function subscribeOwnOrderRequests(
+        {
+            user,
+            limit: maxRows = 25
+        }: SubscribeOwnOrderRequestsInput,
+        onChange: (records: OrderRequestRecord[]) => void,
+        onError?: (error: unknown) => void
+    ): () => void {
+        assertDeps(['db', 'collection', 'query', 'where', 'orderBy', 'limit', 'onSnapshot']);
+        if (!user?.uid) {
+            onChange([]);
+            return () => {};
+        }
+
+        const rows = Math.max(1, Math.min(200, toNumber(maxRows, 25)));
+        const ref = makeCollection(dbRef, ORDER_REQUEST_COLLECTION);
+        const liveQuery = makeQuery(
+            ref,
+            makeWhere('createdByUid', '==', String(user.uid)),
+            makeOrderBy('createdAtMs', 'desc'),
+            makeLimit(rows)
+        );
+
+        return subscribeToSnapshot(
+            liveQuery,
+            (snap) => {
+                const docs = Array.isArray(snap?.docs) ? snap.docs : [];
+                onChange(docs.map((docSnap) => normalizeOrderRequestRecord(docSnap, String(docSnap.id || ''))));
+            },
+            onError
+        );
+    }
+
+    function subscribeOrderRequestById(
+        { id }: SubscribeOrderRequestByIdInput,
+        onChange: (record: OrderRequestRecord | null) => void,
+        onError?: (error: unknown) => void
+    ): () => void {
+        assertDeps(['db', 'doc', 'onSnapshot']);
+        if (!id) {
+            onChange(null);
+            return () => {};
+        }
+
+        const ref = makeDoc(dbRef, ORDER_REQUEST_COLLECTION, id);
+        return subscribeToSnapshot(
+            ref,
+            (snap) => {
+                if (typeof snap?.exists === 'function' && !snap.exists()) {
+                    onChange(null);
+                    return;
+                }
+
+                onChange(normalizeOrderRequestRecord({ id, data: () => snap?.data?.() }, id));
+            },
+            onError
+        );
+    }
+
     async function updateOrderRequestStatus({
         id,
         status,
@@ -357,7 +450,9 @@ export function createOrderRequestService(deps: OrderRequestServiceDeps = {}): O
         getOrderRequestByQuoteVersion,
         listRecentOrderRequests,
         listOrderRequests,
-        updateOrderRequestStatus
+        updateOrderRequestStatus,
+        subscribeOwnOrderRequests,
+        subscribeOrderRequestById
     };
 }
 
@@ -371,5 +466,7 @@ export const orderRequestService = createOrderRequestService({
     getDocs,
     query,
     orderBy,
-    limit
+    where,
+    limit,
+    onSnapshot
 });

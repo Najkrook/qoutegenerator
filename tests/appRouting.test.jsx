@@ -28,7 +28,8 @@ if (typeof window !== 'undefined') {
 const firebaseMocks = vi.hoisted(() => ({
     db: {},
     doc: vi.fn(() => ({})),
-    getDoc: vi.fn(async () => ({ exists: () => false, data: () => ({}) }))
+    getDoc: vi.fn(async () => ({ exists: () => false, data: () => ({}) })),
+    onSnapshot: vi.fn(() => () => {})
 }));
 
 const notificationMocks = vi.hoisted(() => ({
@@ -39,12 +40,13 @@ vi.mock('../src/services/firebase', () => firebaseMocks);
 vi.mock('../src/services/notificationService', () => notificationMocks);
 
 vi.mock('../src/views/Dashboard', () => ({
-    Dashboard: ({ onStartQuote, onOpenHistory, onOpenRetailerOrders, onOpenRetailerDocuments }) => (
+    Dashboard: ({ onStartQuote, onOpenHistory, onOpenRetailerOrders, onOpenRetailerOrderHistory, onOpenRetailerDocuments }) => (
         <div>
             <div>DashboardView</div>
             <button type="button" onClick={() => onStartQuote?.()}>Starta Ny Offert</button>
             <button type="button" onClick={() => onOpenHistory?.()}>Mina Offerter</button>
             <button type="button" onClick={() => onOpenRetailerOrders?.()}>Orderförfrågningar</button>
+            <button type="button" onClick={() => onOpenRetailerOrderHistory?.()}>Skickade Ordrar</button>
             <button type="button" onClick={() => onOpenRetailerDocuments?.()}>Produktdokument</button>
         </div>
     )
@@ -84,6 +86,10 @@ vi.mock('../src/views/RetailerManager', () => ({
 
 vi.mock('../src/views/RetailerOrderRequests', () => ({
     RetailerOrderRequests: () => <div>RetailerOrdersView</div>
+}));
+
+vi.mock('../src/views/RetailerOrderHistory', () => ({
+    RetailerOrderHistory: () => <div>RetailerOrderHistoryView</div>
 }));
 
 vi.mock('../src/views/RetailerDocuments', () => ({
@@ -257,9 +263,39 @@ describe('app routing', () => {
         expect(container.textContent).toContain('RetailerDocumentsView');
     });
 
+    it('allows retailers to open the retailer order history route', async () => {
+        const { container, router } = await renderApp({
+            initialEntries: [APP_PATHS[APP_ROUTE_IDS.retailerOrderHistory]],
+            auth: {
+                accessLevel: 'retailer',
+                retailer: {
+                    id: 'retailer_1',
+                    name: 'Roslagen',
+                    email: 'retailer@example.com',
+                    productLines: {
+                        BaHaMa: { enabled: true, discountPct: 20 }
+                    }
+                },
+                isRetailer: true
+            }
+        });
+
+        expect(router.state.location.pathname).toBe(APP_PATHS[APP_ROUTE_IDS.retailerOrderHistory]);
+        expect(container.textContent).toContain('RetailerOrderHistoryView');
+    });
+
     it('redirects quote-only users away from the retailer documents route', async () => {
         const { container, router } = await renderApp({
             initialEntries: [APP_PATHS[APP_ROUTE_IDS.retailerDocuments]]
+        });
+
+        expect(router.state.location.pathname).toBe(APP_PATHS[APP_ROUTE_IDS.dashboard]);
+        expect(container.textContent).toContain('DashboardView');
+    });
+
+    it('redirects quote-only users away from the retailer order history route', async () => {
+        const { container, router } = await renderApp({
+            initialEntries: [APP_PATHS[APP_ROUTE_IDS.retailerOrderHistory]]
         });
 
         expect(router.state.location.pathname).toBe(APP_PATHS[APP_ROUTE_IDS.dashboard]);

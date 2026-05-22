@@ -53,6 +53,7 @@ vi.mock('../src/services/firebase', () => ({
     limit: vi.fn(() => ({})),
     startAfter: vi.fn(() => ({})),
     getDocs: vi.fn(async () => ({ docs: [], empty: true })),
+    onSnapshot: vi.fn(() => () => {}),
     addDoc: vi.fn(async () => ({ id: 'planner-1' })),
     setDoc: vi.fn(async () => ({})),
     updateDoc: vi.fn(async () => {}),

@@ -12,7 +12,7 @@ import { useAppNavigation } from '../../navigation/useAppNavigation';
 
 export function Header() {
     const { dispatch } = useQuote();
-    const { user, logout, canViewEverything, canAccessQuoteHistory } = useAuth();
+    const { user, logout, canViewEverything, canAccessQuoteHistory, isRetailer } = useAuth();
     const location = useLocation();
     const navigation = useAppNavigation();
     const routeId = getAppRouteIdFromPath(location.pathname);
@@ -81,6 +81,20 @@ export function Header() {
                             }`}
                         >
                             Mina Offerter
+                        </button>
+                    )}
+
+                    {isRetailer && (
+                        <button
+                            type="button"
+                            onClick={() => navigation.goToRetailerOrderHistory()}
+                            className={`text-text-primary no-underline font-medium text-sm px-3 py-1.5 rounded-md border transition-colors cursor-pointer ${
+                                routeId === APP_ROUTE_IDS.retailerOrderHistory
+                                    ? 'bg-panel-border border-panel-border'
+                                    : 'bg-panel-bg border-panel-border hover:bg-panel-border'
+                            }`}
+                        >
+                            Mina Ordrar
                         </button>
                     )}
 

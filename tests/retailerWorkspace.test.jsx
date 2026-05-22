@@ -20,8 +20,10 @@ vi.mock('../src/services/firebase', () => ({
     collection: vi.fn(() => ({})),
     query: vi.fn(() => ({})),
     orderBy: vi.fn(() => ({})),
+    where: vi.fn(() => ({})),
     limit: vi.fn(() => ({})),
-    getDocs: vi.fn(async () => ({ docs: [], empty: true }))
+    getDocs: vi.fn(async () => ({ docs: [], empty: true })),
+    onSnapshot: vi.fn(() => () => {})
 }));
 
 vi.mock('../src/components/features/PricingTable', () => ({
@@ -106,6 +108,7 @@ describe('Retailer workspace', () => {
                 onOpenHistory={() => {}}
                 onOpenInventory={() => {}}
                 onOpenSketch={() => {}}
+                onOpenRetailerOrderHistory={() => {}}
                 onOpenRetailerDocuments={() => {}}
             />
         );
@@ -116,6 +119,7 @@ describe('Retailer workspace', () => {
         expect(html).toContain('12% rabatt');
         expect(html).toContain('Starta Ny Offert');
         expect(html).toContain('Mina Offerter');
+        expect(html).toContain('Skickade Ordrar');
         expect(html).toContain('Produktdokument');
         expect(html).not.toContain('Hantera Lagersaldo');
         expect(html).not.toContain('Senaste Händelser');

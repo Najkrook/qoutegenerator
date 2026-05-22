@@ -60,6 +60,11 @@ vi.mock('../src/services/orderRequestService', () => ({
         reviewing: 'Under behandling',
         completed: 'Slutförd'
     }[status] || 'Ny'),
+    getRetailerOrderRequestStatusLabel: (status) => ({
+        new: 'Skickad',
+        reviewing: 'I väntar',
+        completed: 'Accepterad'
+    }[status] || 'Skickad'),
     orderRequestService: {
         listOrderRequests: orderRequestMocks.listOrderRequests,
         updateOrderRequestStatus: orderRequestMocks.updateOrderRequestStatus

@@ -22,6 +22,7 @@ export const APP_ROUTE_IDS = Object.freeze({
     planner: 'planner',
     retailers: 'retailers',
     retailerOrders: 'retailer-orders',
+    retailerOrderHistory: 'retailer-order-history',
     retailerDocuments: 'retailer-documents'
 } as const);
 
@@ -42,6 +43,7 @@ export const APP_PATHS: Record<AppRouteId, string> = Object.freeze({
     [APP_ROUTE_IDS.planner]: '/planner',
     [APP_ROUTE_IDS.retailers]: '/retailers',
     [APP_ROUTE_IDS.retailerOrders]: '/retailer-orders',
+    [APP_ROUTE_IDS.retailerOrderHistory]: '/retailer-order-requests',
     [APP_ROUTE_IDS.retailerDocuments]: '/retailer-documents'
 });
 
@@ -78,6 +80,7 @@ const ROUTE_ACCESS: Record<AppRouteId, AppRouteAccess> = {
     [APP_ROUTE_IDS.planner]: 'admin',
     [APP_ROUTE_IDS.retailers]: 'admin',
     [APP_ROUTE_IDS.retailerOrders]: 'admin',
+    [APP_ROUTE_IDS.retailerOrderHistory]: 'retailer',
     [APP_ROUTE_IDS.retailerDocuments]: 'retailer'
 };
 

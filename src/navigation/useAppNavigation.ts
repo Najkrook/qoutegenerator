@@ -45,6 +45,9 @@ export function useAppNavigation() {
         goToRetailerOrders(options?: NavigateOptions) {
             navigate(APP_PATHS[APP_ROUTE_IDS.retailerOrders], options);
         },
+        goToRetailerOrderHistory(options?: NavigateOptions) {
+            navigate(APP_PATHS[APP_ROUTE_IDS.retailerOrderHistory], options);
+        },
         goToRetailerDocuments(options?: NavigateOptions) {
             navigate(APP_PATHS[APP_ROUTE_IDS.retailerDocuments], options);
         },

@@ -676,6 +676,15 @@ export interface GetOrderRequestByQuoteVersionInput {
     quoteVersion: number;
 }
 
+export interface SubscribeOwnOrderRequestsInput {
+    user: AccessUser | null;
+    limit?: number;
+}
+
+export interface SubscribeOrderRequestByIdInput {
+    id: string;
+}
+
 export interface GetRetailerLineDocumentsInput {
     lineId: string;
 }
@@ -773,6 +782,16 @@ export interface OrderRequestService {
     listRecentOrderRequests(input?: ListOrderRequestsInput): Promise<OrderRequestRecord[]>;
     listOrderRequests(input?: ListOrderRequestsInput): Promise<OrderRequestRecord[]>;
     updateOrderRequestStatus(input: UpdateOrderRequestStatusInput): Promise<OrderRequestRecord>;
+    subscribeOwnOrderRequests(
+        input: SubscribeOwnOrderRequestsInput,
+        onChange: (records: OrderRequestRecord[]) => void,
+        onError?: (error: unknown) => void
+    ): () => void;
+    subscribeOrderRequestById(
+        input: SubscribeOrderRequestByIdInput,
+        onChange: (record: OrderRequestRecord | null) => void,
+        onError?: (error: unknown) => void
+    ): () => void;
 }
 
 export interface RetailerDocumentService {
@@ -903,6 +922,7 @@ export interface DashboardProps {
     onOpenActivity?: () => void;
     onOpenRetailers?: () => void;
     onOpenRetailerOrders?: () => void;
+    onOpenRetailerOrderHistory?: () => void;
     onOpenRetailerDocuments?: () => void;
 }
 
@@ -936,6 +956,7 @@ export interface PricingProps {
 export interface SummaryExportProps {
     onPrev?: () => void;
     onBackToSketch?: () => void;
+    onOpenRetailerOrderHistory?: () => void;
 }
 
 export interface HistoryProps {
@@ -1047,6 +1068,10 @@ export interface RetailerManagerProps {
 }
 
 export interface RetailerOrderRequestsProps {
+    onBack?: () => void;
+}
+
+export interface RetailerOrderHistoryProps {
     onBack?: () => void;
 }
 

@@ -14,6 +14,7 @@ import { safeLogActivity } from '../services/activityLogService';
 import { hasZeroDiscountSummary } from '../services/exportDataBuilders';
 import {
     getOrderRequestStatusLabel,
+    getRetailerOrderRequestStatusLabel,
     orderRequestService
 } from '../services/orderRequestService';
 import {
@@ -75,6 +76,18 @@ function getOrderRequestStatusClasses(status: string): string {
     }
 }
 
+function getRetailerOrderRequestStatusClasses(status: string): string {
+    switch (status) {
+        case 'completed':
+            return 'border-success/35 bg-success/10 text-success';
+        case 'reviewing':
+            return 'border-warning/35 bg-warning/10 text-warning';
+        case 'new':
+        default:
+            return 'border-primary/35 bg-primary/10 text-primary';
+    }
+}
+
 export function getPdfExportBlockReason(quoteNumber: QuoteState['quoteNumber'] | null | undefined): string | null {
     if (quoteNumber) {
         return null;
@@ -132,7 +145,7 @@ function logPdfExportActivity({
     }).then((result) => warnIfActivityLogFailed(result, 'PDF-exporten lyckades, men aktivitetsloggen kunde inte uppdateras.'));
 }
 
-export function SummaryExport({ onPrev, onBackToSketch }: SummaryExportProps) {
+export function SummaryExport({ onPrev, onBackToSketch, onOpenRetailerOrderHistory }: SummaryExportProps) {
     const { state, dispatch } = useQuote();
     const { user, retailer, isRetailer } = useAuth();
     const summaryData = useMemo(
@@ -145,6 +158,7 @@ export function SummaryExport({ onPrev, onBackToSketch }: SummaryExportProps) {
     const [orderRequest, setOrderRequest] = useState<OrderRequestRecord | null>(null);
     const [isLoadingOrderRequest, setIsLoadingOrderRequest] = useState(false);
     const [isSubmittingOrderRequest, setIsSubmittingOrderRequest] = useState(false);
+    const [hasJustSubmittedOrderRequest, setHasJustSubmittedOrderRequest] = useState(false);
     const previewUrlRef = useRef<string>('');
     const exportBlockReason = getPdfExportBlockReason(state.quoteNumber);
     const canSubmitOrderRequest = Boolean(
@@ -201,6 +215,7 @@ export function SummaryExport({ onPrev, onBackToSketch }: SummaryExportProps) {
         if (!canSubmitOrderRequest || !state.activeQuoteId) {
             setOrderRequest(null);
             setIsLoadingOrderRequest(false);
+            setHasJustSubmittedOrderRequest(false);
             return;
         }
 
@@ -213,10 +228,14 @@ export function SummaryExport({ onPrev, onBackToSketch }: SummaryExportProps) {
         }).then((record) => {
             if (cancelled) return;
             setOrderRequest(record);
+            if (!record) {
+                setHasJustSubmittedOrderRequest(false);
+            }
         }).catch((error) => {
             if (cancelled) return;
             console.error('Failed to load current order request:', error);
             setOrderRequest(null);
+            setHasJustSubmittedOrderRequest(false);
         }).finally(() => {
             if (cancelled) return;
             setIsLoadingOrderRequest(false);
@@ -375,7 +394,8 @@ export function SummaryExport({ onPrev, onBackToSketch }: SummaryExportProps) {
                 summary: summaryData
             });
             setOrderRequest(createdRequest);
-            notifySuccess('Orderförfrågan skickades till BRIXX för vidare hantering.');
+            setHasJustSubmittedOrderRequest(true);
+            notifySuccess('Tack för din order! Den är nu skickad till BRIXX för vidare hantering.');
         } catch (error) {
             console.error('Failed to submit order request:', error);
             notifyError(`Kunde inte skicka orderförfrågan: ${getErrorMessage(error, 'okänt fel')}`);
@@ -447,8 +467,8 @@ export function SummaryExport({ onPrev, onBackToSketch }: SummaryExportProps) {
                                         )}
                                         {orderRequest && (
                                             <div className="mt-4 flex flex-wrap items-center gap-3 text-sm">
-                                                <span className={`rounded-full border px-3 py-1 font-semibold ${getOrderRequestStatusClasses(orderRequest.status)}`}>
-                                                    {getOrderRequestStatusLabel(orderRequest.status)}
+                                                <span className={`rounded-full border px-3 py-1 font-semibold ${getRetailerOrderRequestStatusClasses(orderRequest.status)}`}>
+                                                    {getRetailerOrderRequestStatusLabel(orderRequest.status)}
                                                 </span>
                                                 <span className="text-text-secondary">
                                                     Registrerad för version v{orderRequest.quoteVersion}.
@@ -457,6 +477,27 @@ export function SummaryExport({ onPrev, onBackToSketch }: SummaryExportProps) {
                                         )}
                                         {isLoadingOrderRequest && (
                                             <p className="mt-3 text-sm text-text-secondary">Kontrollerar aktuell orderförfrågan...</p>
+                                        )}
+                                        {orderRequest && (
+                                            <div className="mt-4 rounded-xl border border-success/25 bg-success/10 p-4">
+                                                <h4 className="m-0 text-base font-semibold text-text-primary">
+                                                    {hasJustSubmittedOrderRequest ? 'Tack för din order!' : 'Orderförfrågan registrerad'}
+                                                </h4>
+                                                <p className="mt-2 text-sm text-text-secondary">
+                                                    {hasJustSubmittedOrderRequest
+                                                        ? 'Du kan följa statusen live under Skickade ordrar. Där ser du när BRIXX börjar hantera ärendet.'
+                                                        : 'Följ statusen för era skickade ordrar under Skickade ordrar.'}
+                                                </p>
+                                                {onOpenRetailerOrderHistory && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={onOpenRetailerOrderHistory}
+                                                        className="mt-4 rounded-md border border-panel-border bg-black/10 px-4 py-2 text-sm font-medium text-text-primary transition-colors hover:bg-white/5"
+                                                    >
+                                                        Se skickade ordrar
+                                                    </button>
+                                                )}
+                                            </div>
                                         )}
                                     </div>
 

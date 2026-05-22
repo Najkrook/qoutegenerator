@@ -4,7 +4,12 @@ vi.mock('../src/services/activityLogService', () => ({
     safeLogActivity: vi.fn(async () => ({ ok: true }))
 }));
 
-import { createOrderRequestService, buildOrderRequestId, normalizeOrderRequestStatus } from '../src/services/orderRequestService';
+import {
+    createOrderRequestService,
+    buildOrderRequestId,
+    getRetailerOrderRequestStatusLabel,
+    normalizeOrderRequestStatus
+} from '../src/services/orderRequestService';
 import { createFirestoreMock } from './fixtures/firestoreMock';
 import { createInitialQuoteState } from '../src/store/quoteStateSchema';
 
@@ -157,9 +162,75 @@ describe('orderRequestService', () => {
         expect(updated.statusUpdatedByEmail).toBe('admin@example.com');
     });
 
+    it('subscribes to a retailer user own order requests and specific request by id', async () => {
+        const requestId = buildOrderRequestId('quote_1', 2);
+        const initialDocs = {
+            [`order_requests/${requestId}`]: {
+                quoteOwnerUid: user.uid,
+                quoteId: 'quote_1',
+                quoteNumber: 'BRIXX - 260521-101',
+                quoteVersion: 2,
+                retailerId: retailer.id,
+                retailerName: retailer.name,
+                retailerEmail: retailer.email,
+                customerName: 'Ada',
+                company: 'Ada Bistro',
+                reference: 'REF-77',
+                customerReference: 'ER-88',
+                selectedLines: ['BaHaMa'],
+                totalSek: 12345,
+                status: 'reviewing',
+                createdAtMs: 100,
+                updatedAtMs: 100,
+                createdByUid: user.uid,
+                createdByEmail: user.email,
+                statusUpdatedByUid: user.uid,
+                statusUpdatedByEmail: user.email
+            }
+        };
+        const mock = createFirestoreMock(initialDocs);
+        const service = createOrderRequestService({
+            ...mock,
+            onSnapshot: (refOrQuery, onNext) => {
+                if (refOrQuery?.kind === 'query') {
+                    onNext({
+                        docs: [{
+                            id: requestId,
+                            data: () => mock.__docs.get(`order_requests/${requestId}`)
+                        }]
+                    });
+                    return () => {};
+                }
+
+                onNext({
+                    exists: () => true,
+                    data: () => mock.__docs.get(`order_requests/${requestId}`)
+                });
+                return () => {};
+            }
+        });
+
+        const ownChange = vi.fn();
+        const detailChange = vi.fn();
+
+        const unsubscribeOwn = service.subscribeOwnOrderRequests({ user, limit: 25 }, ownChange);
+        const unsubscribeDetail = service.subscribeOrderRequestById({ id: requestId }, detailChange);
+
+        expect(ownChange).toHaveBeenCalledWith([
+            expect.objectContaining({ id: requestId, status: 'reviewing' })
+        ]);
+        expect(detailChange).toHaveBeenCalledWith(expect.objectContaining({ id: requestId, status: 'reviewing' }));
+
+        unsubscribeOwn();
+        unsubscribeDetail();
+    });
+
     it('normalizes unknown statuses back to new', () => {
         expect(normalizeOrderRequestStatus('reviewing')).toBe('reviewing');
         expect(normalizeOrderRequestStatus('COMPLETED')).toBe('completed');
         expect(normalizeOrderRequestStatus('bad-status')).toBe('new');
+        expect(getRetailerOrderRequestStatusLabel('new')).toBe('Skickad');
+        expect(getRetailerOrderRequestStatusLabel('reviewing')).toBe('I väntar');
+        expect(getRetailerOrderRequestStatusLabel('completed')).toBe('Accepterad');
     });
 });

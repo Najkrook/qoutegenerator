@@ -15,6 +15,7 @@ import {
     limit,
     startAfter,
     getDocs,
+    onSnapshot,
     addDoc,
     deleteDoc,
     runTransaction
@@ -54,6 +55,7 @@ export {
     limit,
     startAfter,
     getDocs,
+    onSnapshot,
     addDoc,
     deleteDoc,
     runTransaction
