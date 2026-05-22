@@ -1446,6 +1446,7 @@ export interface ComputedLayoutResult {
     layoutWarnings: LayoutWarning[];
     suggestions: LayoutSuggestion[];
     hasInvalidEdges: boolean;
+    includeBack: boolean;
 }
 
 export interface SketchToolProps {
@@ -1499,6 +1500,9 @@ export interface SketchCanvasProps {
     onPlaceParasol?: (xMm: number, yMm: number) => void;
     onSelectParasol?: (id: string | null) => void;
     onMoveParasol?: (id: string, xMm: number, yMm: number) => void;
+    onRotateParasol?: (id: string, rotationDeg: 0 | 90) => void;
+    onDeleteParasol?: (id: string) => void;
+    onChangeParasolPreset?: (id: string, presetId: string) => void;
     onPlaceFiesta?: (xMm: number, yMm: number) => void;
     onSelectFiesta?: (id: string | null) => void;
     onMoveFiesta?: (id: string, xMm: number, yMm: number) => void;
@@ -1595,6 +1599,8 @@ export interface SketchBomProps {
     parasols?: PlacedParasol[];
     fiestaItems?: PlacedFiesta[];
     parasolWarnings?: Array<{ id: string; text: string }>;
+    slimlineCount: number;
+    stodbenCount: number;
     canExportToQuote?: boolean;
     onExport?: () => void;
     onExportImage?: () => void;

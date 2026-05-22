@@ -73,13 +73,15 @@ Shipped in the current V1:
 
 Remaining follow-up work includes: continued review of retailer-specific edge cases; an explicit product decision on whether `CustomCosts`, save/export behavior, or other pricing-adjacent actions should be further restricted for retailer users; and a later decision on whether retailer order requests should also gain history, notification, or email-backed follow-up.
 
+
+
 Success signals:
 - Retailer users can now see their discount and product scope without guessing.
 - Restricted product lines are now visibly explained instead of silently absent.
 - Retailer users can now hand off a saved quote into a clear admin workflow without needing a side-channel.
 - Remaining retailer-specific edge cases and permission inconsistencies continue to trend down as the follow-up work lands.
 
-### 3. Quote Duplication
+### [x] 3. Quote Duplication
 Add a first-class way to duplicate an existing quote into a new draft so users can reuse similar customer configurations without starting from scratch. The initial workflow should live in History, where a `Duplicera` action clones a quote's saved state into a new draft quote with a new ID and fresh save lineage. This should preserve the original quote as history while making the duplicate immediately editable as a separate working copy.
 
 Success signals:

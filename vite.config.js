@@ -24,13 +24,14 @@ export default defineConfig({
                 manualChunks(id) {
                     if (!id.includes('node_modules')) return undefined;
 
-                    if (
-                        id.includes('jspdf')
-                        || id.includes('jspdf-autotable')
-                        || id.includes('xlsx')
-                        || id.includes('html2canvas')
-                    ) {
-                        return 'export-tools';
+                    if (id.includes('jspdf') || id.includes('jspdf-autotable')) {
+                        return 'jspdf-vendor';
+                    }
+                    if (id.includes('xlsx')) {
+                        return 'xlsx-vendor';
+                    }
+                    if (id.includes('html2canvas')) {
+                        return 'html2canvas-vendor';
                     }
 
                     if (id.includes('firebase')) {

@@ -18,7 +18,7 @@ const SKETCH_ONLY_UIDS = [
 
 async function migrateRoles() {
     if (!fs.existsSync(serviceAccountPath)) {
-        console.error(\`Service account key not found at \${serviceAccountPath}\`);
+        console.error(`Service account key not found at ${serviceAccountPath}`);
         console.error('Please download your Firebase Admin service account key and place it at the root as "serviceAccountKey.json".');
         process.exit(1);
     }
@@ -36,14 +36,14 @@ async function migrateRoles() {
     for (const uid of ADMIN_UIDS) {
         const docRef = db.collection('user_roles').doc(uid);
         batch.set(docRef, { role: 'admin' }, { merge: true });
-        console.log(\`Prepared admin role for UID: \${uid}\`);
+        console.log(`Prepared admin role for UID: ${uid}`);
     }
 
     console.log('Seeding SKETCH_ONLY roles...');
     for (const uid of SKETCH_ONLY_UIDS) {
         const docRef = db.collection('user_roles').doc(uid);
         batch.set(docRef, { role: 'sketch_only' }, { merge: true });
-        console.log(\`Prepared sketch_only role for UID: \${uid}\`);
+        console.log(`Prepared sketch_only role for UID: ${uid}`);
     }
 
     try {

@@ -1163,6 +1163,7 @@ export function computeLayout(config: SketchConfigInput = {}): ComputedLayoutRes
         edgeSummaries,
         layoutWarnings,
         suggestions,
-        hasInvalidEdges
+        hasInvalidEdges,
+        includeBack
     };
 }

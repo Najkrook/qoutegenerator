@@ -24,7 +24,7 @@ Active branch at verification: `main`
 - CI in `.github/workflows/ci.yml` runs the safety script, clean-repo sanity check, `npm ci`, `npm run test:confidence`, `npm run typecheck`, and `npm run build`.
 - Current repo reality at verification:
   - targeted order-request and text-encoding tests pass
-  - `npm run typecheck` currently fails on pre-existing sketch typing mismatches in `SketchBom.tsx`, `SketchCanvas.tsx`, and `SketchTool.tsx`
+  - `npm run typecheck` currently passes on main without any sketch typing mismatches
   - do not assume the older "all green on main" status still reflects the live branch without re-running the full suite
 
 ## Repo Topology
@@ -555,10 +555,9 @@ If `npm.ps1` is blocked by execution policy, use `cmd /c npm ...` or invoke Node
 
 ## Known Issues And Repo Traps
 
-- `npm run typecheck` is currently red because of pre-existing sketch typing mismatches in `src/components/features/SketchBom.tsx`, `src/components/features/SketchCanvas.tsx`, and `src/views/SketchTool.tsx`.
-- Vite still warns about large chunks in production builds, especially `export-tools`.
+- Vite still warns about large chunks in production builds, especially `export-tools` (Note: split into smaller chunks to resolve).
 - `vite.config.js` manually groups:
-  - `export-tools`
+  - `export-tools` (now split into `jspdf-vendor`, `xlsx-vendor`, `html2canvas-vendor`)
   - `firebase`
   - `react-vendor`
 - Quote-state schema changes are high-risk because they affect local persistence, saved revisions, and history rehydration together.

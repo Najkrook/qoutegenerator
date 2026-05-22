@@ -196,7 +196,7 @@ export function SketchCanvas({
 }: SketchCanvasProps) {
     const svgRef = useRef<SVGSVGElement | null>(null);
     const [activeDrag, setActiveDrag] = useState<ActiveDrag | null>(null);
-    const dragRef = useRef<ResizeDragState>({ startX: 0, startY: 0, initialW: 0, initialD: 0, initialDLeft: 0, initialDRight: 0 });
+    const dragRef = useRef<ResizeDragState>({ startX: 0, startY: 0, initialW: 0, initialD: 0, initialDLeft: 0, initialDRight: 0, initialPanX: 0, initialPanY: 0 });
     const [snapLines, setSnapLines] = useState<{ x: number | null, y: number | null } | null>(null);
 
     const [activeEditingDim, setActiveEditingDim] = useState<'width' | 'depthLeft' | 'depthRight' | null>(null);
@@ -1507,8 +1507,8 @@ export function SketchCanvas({
                                 setActiveEditingDim(dimKey);
                                 setDimInputValue(String(Math.round(currentValue)));
                             }}
-                            title="Klicka för att ändra mått"
                         >
+                            <title>Klicka för att ändra mått</title>
                             {text}
                         </text>
                     )}
