@@ -28,13 +28,17 @@ export function AuthProvider({ children }: PropsWithChildren) {
                     const roleSnap = await getDoc(roleRef);
                     
                     if (roleSnap.exists()) {
-                        roleDocFetched = true;
                         const data = roleSnap.data();
-                        
                         if (data.role === 'admin') {
                             resolvedLevel = ACCESS_LEVELS.FULL;
+                            roleDocFetched = true;
                         } else if (data.role === 'sketch_only') {
                             resolvedLevel = ACCESS_LEVELS.SKETCH_ONLY;
+                            roleDocFetched = true;
+                        } else if (data.role === 'quote_only') {
+                            // Explicit quote_only means they don't fall back to hardcoded,
+                            // but we leave resolvedLevel as GUEST here so they can still hit retailer check later.
+                            roleDocFetched = true;
                         }
                     }
                 } catch (err) {

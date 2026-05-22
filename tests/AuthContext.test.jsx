@@ -120,6 +120,19 @@ describe('AuthContext Role Precedence', () => {
         expect(screen.getByTestId('can-view-everything').textContent).toBe('true');
     });
 
+    it('falls back to hardcoded admin if user_roles doc exists but contains invalid role', async () => {
+        firebase.getDoc.mockResolvedValueOnce({
+            exists: () => true,
+            data: () => ({ role: 'bogus' })
+        });
+
+        // Use a known admin UID from hardcoded list
+        await triggerAuth({ uid: 'ZPxZusAiyfY6cf2LSn1ynP5A7rG3', email: 'admin@test.com' });
+        
+        expect(screen.getByTestId('level').textContent).toBe(ACCESS_LEVELS.FULL);
+        expect(screen.getByTestId('can-view-everything').textContent).toBe('true');
+    });
+
     it('falls back to retailer if explicit quote_only is found (or doc missing) and user is in retailers collection', async () => {
         firebase.getDoc.mockResolvedValueOnce({
             exists: () => true,
