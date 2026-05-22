@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useState, type ChangeEvent } from 'react';
 import { useAuth } from '../store/AuthContext';
 import { quoteRepository } from '../services/quoteRepositoryClient';
-import { normalizeQuoteStatus } from '../services/quoteRepository';
+import { normalizeQuoteStatus, applyQuoteFilters, sortQuotes } from '../services/quoteRepository';
 import { notifyError, notifyInfo, notifySuccess, confirmAction } from '../services/notificationService';
 import { db, collection, getDocs } from '../services/firebase';
 import { getErrorMessage } from '../utils/runtime';
@@ -31,6 +31,9 @@ export function History({ onBack, onOpenQuote }: HistoryProps) {
     const [error, setError] = useState<string | null>(null);
     const [statusFilter, setStatusFilter] = useState('');
     const [searchFilter, setSearchFilter] = useState('');
+    const [dateFilter, setDateFilter] = useState('');
+    const [originFilter, setOriginFilter] = useState('');
+    const [sortBy, setSortBy] = useState('newest');
     const [revisionCache, setRevisionCache] = useState<Record<string, QuoteRevision[]>>({});
     const [visibleRevisions, setVisibleRevisions] = useState<Record<string, boolean>>({});
     const [allUsersQuotes, setAllUsersQuotes] = useState<Array<HistoryQuoteRow & { ownerUid: string }>>([]);
@@ -112,7 +115,7 @@ export function History({ onBack, onOpenQuote }: HistoryProps) {
         };
     }, [canViewEverything, user?.uid]);
 
-    const loadQuotes = useCallback(async (status: string, search: string): Promise<void> => {
+    const loadQuotes = useCallback(async (status: string, search: string, date: string, origin: string, sort: string): Promise<void> => {
         if (!user?.uid) return;
 
         setLoading(true);
@@ -124,25 +127,28 @@ export function History({ onBack, onOpenQuote }: HistoryProps) {
                 data = await quoteRepository.getUserQuotes({
                     userId: user.uid,
                     status,
-                    search
+                    search,
+                    dateFilter: date,
+                    originFilter: origin,
+                    sortBy: sort
                 });
             } else if (selectedOwnerUid === '__all__') {
                 const allQuotes = allUsersQuotes.length > 0
                     ? allUsersQuotes
                     : await quoteRepository.getAllUsersQuotes({ status: '', search: '' });
 
-                data = allQuotes.filter((quote) => {
-                    if (status && quote.status !== status) return false;
-                    if (!search) return true;
-
-                    const haystack = `${quote.searchText || ''} ${quote.customerName || ''} ${quote.reference || ''} ${quote.customerReference || ''}`.toLowerCase();
-                    return haystack.includes(search.toLowerCase());
-                });
+                data = sortQuotes(
+                    applyQuoteFilters(allQuotes, { status, search, dateFilter: date, originFilter: origin }),
+                    sort
+                );
             } else {
                 data = await quoteRepository.getUserQuotes({
                     userId: selectedOwnerUid,
                     status,
-                    search
+                    search,
+                    dateFilter: date,
+                    originFilter: origin,
+                    sortBy: sort
                 });
             }
 
@@ -161,11 +167,11 @@ export function History({ onBack, onOpenQuote }: HistoryProps) {
         if (!user?.uid || !canAccessQuoteHistory) return;
 
         const timer = setTimeout(() => {
-            void loadQuotes(statusFilter, searchFilter);
+            void loadQuotes(statusFilter, searchFilter, dateFilter, originFilter, sortBy);
         }, 220);
 
         return () => clearTimeout(timer);
-    }, [canAccessQuoteHistory, loadQuotes, searchFilter, statusFilter, user?.uid]);
+    }, [canAccessQuoteHistory, loadQuotes, searchFilter, statusFilter, dateFilter, originFilter, sortBy, user?.uid]);
 
     const formatDateTime = (value: number): string => {
         const dateObj = new Date(Number(value) || Date.now());
@@ -207,7 +213,7 @@ export function History({ onBack, onOpenQuote }: HistoryProps) {
         } catch (updateError) {
             console.error('Failed to update quote status:', updateError);
             notifyError('Kunde inte uppdatera status.');
-            void loadQuotes(statusFilter, searchFilter);
+            void loadQuotes(statusFilter, searchFilter, dateFilter, originFilter, sortBy);
         }
     };
 
@@ -339,7 +345,7 @@ export function History({ onBack, onOpenQuote }: HistoryProps) {
         try {
             await quoteRepository.deleteQuote({ userId: ownerUid, quoteId: quote.quoteId });
             notifySuccess('Offerten togs bort.');
-            void loadQuotes(statusFilter, searchFilter);
+            void loadQuotes(statusFilter, searchFilter, dateFilter, originFilter, sortBy);
         } catch (deleteError) {
             console.error('Failed to delete quote:', deleteError);
             notifyError(`Kunde inte ta bort offerten: ${getErrorMessage(deleteError, 'okänt fel')}`);
@@ -378,7 +384,7 @@ export function History({ onBack, onOpenQuote }: HistoryProps) {
                     <select
                         value={statusFilter}
                         onChange={(event: ChangeEvent<HTMLSelectElement>) => setStatusFilter(event.target.value)}
-                        className="px-3 py-2 rounded-md border border-panel-border bg-panel-bg text-text-primary min-w-[180px]"
+                        className="px-3 py-2 rounded-md border border-panel-border bg-panel-bg text-text-primary min-w-[140px]"
                     >
                         <option value="">Alla statusar</option>
                         <option value="draft">Utkast</option>
@@ -386,6 +392,37 @@ export function History({ onBack, onOpenQuote }: HistoryProps) {
                         <option value="won">Vunnen</option>
                         <option value="lost">Förlorad</option>
                         <option value="archived">Arkiverad</option>
+                    </select>
+                    <select
+                        value={dateFilter}
+                        onChange={(event: ChangeEvent<HTMLSelectElement>) => setDateFilter(event.target.value)}
+                        className="px-3 py-2 rounded-md border border-panel-border bg-panel-bg text-text-primary min-w-[140px]"
+                    >
+                        <option value="">Alla datum</option>
+                        <option value="7days">Senaste 7 dagarna</option>
+                        <option value="30days">Senaste 30 dagarna</option>
+                        <option value="thisyear">I år</option>
+                    </select>
+                    {isAdminBrowsing && (
+                        <select
+                            value={originFilter}
+                            onChange={(event: ChangeEvent<HTMLSelectElement>) => setOriginFilter(event.target.value)}
+                            className="px-3 py-2 rounded-md border border-panel-border bg-panel-bg text-text-primary min-w-[140px]"
+                        >
+                            <option value="">Alla källor</option>
+                            <option value="retailer">Endast Återförsäljare</option>
+                            <option value="internal">Endast Interna</option>
+                        </select>
+                    )}
+                    <select
+                        value={sortBy}
+                        onChange={(event: ChangeEvent<HTMLSelectElement>) => setSortBy(event.target.value)}
+                        className="px-3 py-2 rounded-md border border-panel-border bg-panel-bg text-text-primary min-w-[140px]"
+                    >
+                        <option value="newest">Senast uppdaterad</option>
+                        <option value="oldest">Äldst först</option>
+                        <option value="highest-value">Högst värde</option>
+                        <option value="lowest-value">Lägst värde</option>
                     </select>
                     <input
                         type="text"
@@ -440,6 +477,11 @@ export function History({ onBack, onOpenQuote }: HistoryProps) {
                                     {showOwnerBadge && (
                                         <p className="m-0 text-text-secondary text-xs leading-relaxed mt-1 opacity-70">
                                             <strong>Användare:</strong> {quote.retailerName ? `[ÅF] ${quote.retailerName}` : (quote.savedBy || quote.ownerUid)}
+                                        </p>
+                                    )}
+                                    {quote.latestChangeNote && (
+                                        <p className="m-0 text-text-primary text-sm leading-relaxed mt-2 p-2 bg-black/20 rounded border border-white/5 italic">
+                                            "{quote.latestChangeNote}"
                                         </p>
                                     )}
                                     <div className="mt-2 text-success-color font-semibold">Totalt: {formatSek(quote.totalSek || 0)} SEK</div>

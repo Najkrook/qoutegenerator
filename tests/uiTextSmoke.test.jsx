@@ -569,6 +569,8 @@ describe('UI text smoke', () => {
         const html = renderWithProviders(<History onBack={() => {}} onOpenQuote={() => {}} />);
 
         expect(html).toContain('Alla statusar');
+        expect(html).toContain('Alla datum');
+        expect(html).toContain('Senast uppdaterad');
         expect(html).toContain('Sök företag eller referens');
         expect(html).toContain('Laddar offerter...');
     });

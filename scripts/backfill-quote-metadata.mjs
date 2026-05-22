@@ -98,6 +98,23 @@ async function run() {
                 }
             }
 
+            if (!current.latestChangeNote) {
+                if (current.latestRevisionId) {
+                    const revDoc = await quoteDoc.ref.collection('revisions').doc(current.latestRevisionId).get();
+                    if (revDoc.exists && revDoc.data().changeNote) {
+                        patch.latestChangeNote = revDoc.data().changeNote;
+                    } else {
+                        patch.latestChangeNote = 'Initial save';
+                    }
+                } else {
+                    patch.latestChangeNote = 'Initial save';
+                }
+            }
+
+            if (!current.originType) {
+                patch.originType = current.retailerName ? 'retailer' : 'internal';
+            }
+
             if (Object.keys(patch).length === 0) continue;
             await quoteDoc.ref.set(patch, { merge: true });
             updatedDocs += 1;

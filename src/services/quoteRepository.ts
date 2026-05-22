@@ -2,6 +2,7 @@ import type {
     AccessUser,
     CustomerInfo,
     FirestoreDocRef,
+    CreateQuoteInput,
     GetQuoteRevisionByVersionInput,
     GetAllUsersQuotesInput,
     GetQuoteLatestRevisionInput,
@@ -159,6 +160,8 @@ export function normalizeQuoteMetadata(quoteId: string, raw: RawQuoteMetadataDoc
     const latestVersion = Math.max(1, toNumber(safeRaw.latestVersion, safeRaw.state ? 1 : 0) || 0);
     const status = normalizeQuoteStatus(safeRaw.status);
     const latestRevisionId = String(safeRaw.latestRevisionId || '');
+    const latestChangeNote = String(safeRaw.latestChangeNote || fallbackState.changeNote || '');
+    const originType = String(safeRaw.originType || fallbackState.originType || 'internal') as 'retailer' | 'internal';
 
     return {
         quoteId,
@@ -176,6 +179,8 @@ export function normalizeQuoteMetadata(quoteId: string, raw: RawQuoteMetadataDoc
         savedByUid: String(safeRaw.savedByUid || ''),
         latestVersion,
         latestRevisionId,
+        latestChangeNote,
+        originType,
         totalSek,
         retailerName: safeRaw.retailerName != null ? String(safeRaw.retailerName) : null,
         searchText: String(
@@ -227,8 +232,10 @@ function buildQuoteMetadata({
     retailerName = null,
     quoteNumber,
     quoteDateKey,
-    quoteSequence
-}: BuildQuoteMetadataInput): QuoteMetadata {
+    quoteSequence,
+    latestChangeNote = '',
+    originType = 'internal'
+}: BuildQuoteMetadataInput & { latestChangeNote?: string; originType?: string }): QuoteMetadata {
     const safeCustomerInfo = toRecord<RawPersistedCustomerInfo>(customerInfo);
     const safeSummary = toRecord<RawQuoteSummary>(summary);
     const existingMetadata = toRecord<Partial<QuoteMetadata>>(existing);
@@ -263,6 +270,8 @@ function buildQuoteMetadata({
         savedByUid: String(user?.uid || existingMetadata.savedByUid || ''),
         latestVersion: Math.max(1, toNumber(latestVersion, 1) || 1),
         latestRevisionId: String(latestRevisionId || existingMetadata.latestRevisionId || ''),
+        latestChangeNote: String(latestChangeNote || existingMetadata.latestChangeNote || ''),
+        originType: String(originType || existingMetadata.originType || 'internal') as 'retailer' | 'internal',
         totalSek: toNumber(safeSummary.finalTotalSek, existingMetadata.totalSek || 0) || 0,
         retailerName: retailerName != null ? String(retailerName) : (existingMetadata.retailerName || null),
         searchText: buildQuoteSearchText({
@@ -336,18 +345,44 @@ function normalizeQuoteRevision(
     };
 }
 
-type QuoteFilterableRow = Pick<QuoteMetadata, 'status' | 'searchText' | 'customerName' | 'reference' | 'customerReference'>;
+type QuoteFilterableRow = Pick<QuoteMetadata, 'status' | 'searchText' | 'customerName' | 'reference' | 'customerReference'> & Partial<Pick<QuoteMetadata, 'updatedAtMs' | 'originType'>>;
 
-export function applyQuoteFilters<T extends QuoteFilterableRow>(quotes: T[] = [], { status = '', search = '' }: QuoteFilters = {}): T[] {
+export function applyQuoteFilters<T extends QuoteFilterableRow>(quotes: T[] = [], { status = '', search = '', dateFilter = '', originFilter = '' }: QuoteFilters = {}): T[] {
     const normalizedStatus = String(status || '').trim().toLowerCase();
     const normalizedSearch = String(search || '').trim().toLowerCase();
+    const now = Date.now();
 
     return quotes.filter((quote) => {
         if (normalizedStatus && quote.status !== normalizedStatus) return false;
+        
+        if (dateFilter) {
+            const updatedAt = quote.updatedAtMs || 0;
+            const diffMs = now - updatedAt;
+            const diffDays = diffMs / (1000 * 60 * 60 * 24);
+            if (dateFilter === '7days' && diffDays > 7) return false;
+            if (dateFilter === '30days' && diffDays > 30) return false;
+        }
+
+        if (originFilter && quote.originType !== originFilter) {
+            return false;
+        }
+
         if (!normalizedSearch) return true;
         const haystack = `${quote.searchText || ''} ${quote.customerName || ''} ${quote.reference || ''} ${quote.customerReference || ''}`.toLowerCase();
         return haystack.includes(normalizedSearch);
     });
+}
+
+export function sortQuotes<T extends Pick<QuoteMetadata, 'updatedAtMs' | 'totalSek'>>(quotes: T[], sortBy?: string): T[] {
+    const sorted = [...quotes];
+    sorted.sort((a, b) => {
+        if (sortBy === 'oldest') return (a.updatedAtMs || 0) - (b.updatedAtMs || 0);
+        if (sortBy === 'highest-value') return (b.totalSek || 0) - (a.totalSek || 0);
+        if (sortBy === 'lowest-value') return (a.totalSek || 0) - (b.totalSek || 0);
+        // default to newest
+        return (b.updatedAtMs || 0) - (a.updatedAtMs || 0);
+    });
+    return sorted;
 }
 
 export function createQuoteRepository(deps: QuoteRepositoryDeps = {} as QuoteRepositoryDeps): QuoteRepository {
@@ -383,8 +418,9 @@ export function createQuoteRepository(deps: QuoteRepositoryDeps = {} as QuoteRep
         summary,
         customerInfo = {},
         status = 'draft',
-            changeNote,
-        retailerName = null
+        changeNote,
+        retailerName = null,
+        originType
     }: RevisionSaveContext): Promise<{ metadata: QuoteMetadata; revision: QuoteRevision }> => {
         const quoteRef = quoteDocRef(String(user.uid), quoteId);
         const nowMs = Date.now();
@@ -415,7 +451,9 @@ export function createQuoteRepository(deps: QuoteRepositoryDeps = {} as QuoteRep
             latestVersion: version,
             latestRevisionId: revisionId,
             existing,
-            retailerName
+            retailerName,
+            latestChangeNote: changeNote,
+            originType: originType || existing?.originType
         });
         const revisionWriteDoc = buildRevisionWriteDoc(revisionData);
         const metadataWriteDoc = buildMetadataWriteDoc(metadata);
@@ -433,8 +471,9 @@ export function createQuoteRepository(deps: QuoteRepositoryDeps = {} as QuoteRep
         summary,
         customerInfo = {},
         status = 'draft',
-            changeNote = '',
-        retailerName = null
+        changeNote = '',
+        retailerName = null,
+        originType
     }: QuoteRevisionSaveInput): Promise<{ metadata: QuoteMetadata; revision: QuoteRevision }> {
         if (!user?.uid) throw new Error('Missing authenticated user.');
         if (!quoteId) throw new Error('quoteId is required.');
@@ -447,7 +486,8 @@ export function createQuoteRepository(deps: QuoteRepositoryDeps = {} as QuoteRep
             customerInfo,
             status,
             changeNote,
-            retailerName
+            retailerName,
+            originType
         };
 
         if (typeof runTransaction !== 'function') {
@@ -481,12 +521,14 @@ export function createQuoteRepository(deps: QuoteRepositoryDeps = {} as QuoteRep
                 customerInfo,
                 summary,
                 status,
-                    nowMs,
+                nowMs,
                 user,
                 latestVersion: version,
                 latestRevisionId: revisionId,
                 existing,
-                retailerName
+                retailerName,
+                latestChangeNote: changeNote,
+                originType: originType || existing?.originType
             });
             const revisionWriteDoc = buildRevisionWriteDoc(revisionData);
             const metadataWriteDoc = buildMetadataWriteDoc(metadata);
@@ -504,9 +546,10 @@ export function createQuoteRepository(deps: QuoteRepositoryDeps = {} as QuoteRep
         summary,
         customerInfo = {},
         status = 'draft',
-            changeNote = 'Initial save',
-        retailerName = null
-    }: QuoteRevisionSaveInput): Promise<{ quoteId: string; metadata: QuoteMetadata; revision: QuoteRevision }> {
+        changeNote = 'Initial save',
+        retailerName = null,
+        originType
+    }: CreateQuoteInput): Promise<{ quoteId: string; metadata: QuoteMetadata; revision: QuoteRevision }> {
         if (!user?.uid) throw new Error('Missing authenticated user.');
         const quoteId = `quote_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
         const quoteRef = quoteDocRef(String(user.uid), quoteId);
@@ -532,14 +575,16 @@ export function createQuoteRepository(deps: QuoteRepositoryDeps = {} as QuoteRep
                 customerInfo,
                 summary,
                 status,
-                    nowMs,
+                nowMs,
                 user,
                 latestVersion: 1,
                 latestRevisionId: revisionId,
-                retailerName,
                 quoteNumber,
                 quoteDateKey: dateKey,
-                quoteSequence
+                quoteSequence,
+                retailerName,
+                latestChangeNote: changeNote,
+                originType
             });
 
             return {

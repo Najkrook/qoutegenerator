@@ -38,7 +38,8 @@ export async function saveQuoteToRepository({
         summary,
         customerInfo: state.customerInfo || {},
         status: state.quoteStatus || 'draft',
-        retailerName: retailer?.name || null
+        retailerName: retailer?.name || null,
+        originType: retailer ? 'retailer' : 'internal'
     };
 
     const isNewQuote = !state.activeQuoteId;

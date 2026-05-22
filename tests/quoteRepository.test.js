@@ -3,7 +3,7 @@ import {
     applyQuoteFilters,
     createQuoteRepository,
     normalizeQuoteMetadata,
-    normalizeScriveStatus
+    sortQuotes
 } from '../src/services/quoteRepository';
 import { createFirestoreMock } from './fixtures/firestoreMock';
 
@@ -321,34 +321,6 @@ describe('quoteRepository', () => {
         expect(latest?.metadata?.status).toBe('sent');
     });
 
-    it('updateQuoteScrive stores scrive metadata on quote document', async () => {
-        const { repo } = buildRepo();
-        const created = await repo.createQuote({
-            user,
-            state: baseState,
-            summary: baseSummary,
-            customerInfo: baseState.customerInfo,
-            status: 'draft'
-        });
-
-        const updated = await repo.updateQuoteScrive({
-            userId: user.uid,
-            quoteId: created.quoteId,
-            scrive: {
-                enabled: true,
-                status: 'pending',
-                documentId: 'doc_123',
-                signerEmail: 'customer@example.com',
-                signerName: 'Testkund'
-            }
-        });
-
-        expect(updated.scriveEnabled).toBe(true);
-        expect(updated.scriveStatus).toBe('pending');
-        expect(updated.scriveDocumentId).toBe('doc_123');
-        expect(updated.scriveSignerEmail).toBe('customer@example.com');
-    });
-
     it('saveQuoteRevision falls back cleanly when runTransaction is unavailable', async () => {
         vi.useFakeTimers();
         vi.setSystemTime(new Date('2026-04-22T12:00:00.000Z'));
@@ -473,44 +445,6 @@ describe('quoteRepository', () => {
         expect(revision?.version).toBe(2);
         expect(revision?.state?.customerInfo?.reference).toBe('REV-2');
     });
-
-    it('updateQuoteScrive preserves undefined fields and clears explicit nulls', async () => {
-        const { repo } = buildRepo();
-        const created = await repo.createQuote({
-            user,
-            state: baseState,
-            summary: baseSummary,
-            customerInfo: baseState.customerInfo,
-            status: 'draft'
-        });
-
-        await repo.updateQuoteScrive({
-            userId: user.uid,
-            quoteId: created.quoteId,
-            scrive: {
-                enabled: true,
-                status: 'pending',
-                documentId: 'doc_keep',
-                sentAtMs: 1700000000000,
-                lastEventAtMs: 1700000000100
-            }
-        });
-
-        const updated = await repo.updateQuoteScrive({
-            userId: user.uid,
-            quoteId: created.quoteId,
-            scrive: {
-                documentId: null,
-                sentAtMs: null,
-                lastEventAtMs: undefined
-            }
-        });
-
-        expect(updated.scriveDocumentId).toBe(null);
-        expect(updated.scriveSentAtMs).toBe(null);
-        expect(updated.scriveLastEventAtMs).toBe(1700000000100);
-        expect(updated.scriveEnabled).toBe(true);
-    });
 });
 
 describe('quoteRepository pure helpers', () => {
@@ -530,27 +464,33 @@ describe('quoteRepository pure helpers', () => {
         expect(normalized.quoteNumber).toBe('BRIXX - 260422-101');
         expect(normalized.quoteDateKey).toBe('260422');
         expect(normalized.quoteSequence).toBe(101);
-        expect(normalized.scriveEnabled).toBe(false);
-        expect(normalized.scriveStatus).toBe('not_sent');
         expect(normalized.customerReference).toBe('ER-7');
         expect(normalized.searchText).toContain('draft');
     });
 
-    it('applyQuoteFilters filters by status and search text', () => {
+    it('applyQuoteFilters filters by status, search text, date and origin', () => {
         const rows = [
-            { status: 'draft', searchText: 'acme draft er-1', customerName: 'Acme', reference: 'A1', customerReference: 'ER-1' },
-            { status: 'won', searchText: 'beta won er-2', customerName: 'Beta', reference: 'B1', customerReference: 'ER-2' }
+            { status: 'draft', searchText: 'acme draft er-1', customerName: 'Acme', reference: 'A1', customerReference: 'ER-1', updatedAtMs: Date.now(), originType: 'internal' },
+            { status: 'won', searchText: 'beta won er-2', customerName: 'Beta', reference: 'B1', customerReference: 'ER-2', updatedAtMs: Date.now() - 10 * 86400000, originType: 'retailer' }
         ];
 
         expect(applyQuoteFilters(rows, { status: 'won', search: '' })).toHaveLength(1);
         expect(applyQuoteFilters(rows, { status: '', search: 'acme' })).toHaveLength(1);
         expect(applyQuoteFilters(rows, { status: '', search: 'er-2' })).toHaveLength(1);
         expect(applyQuoteFilters(rows, { status: 'lost', search: '' })).toHaveLength(0);
+        expect(applyQuoteFilters(rows, { dateFilter: '7days' })).toHaveLength(1);
+        expect(applyQuoteFilters(rows, { originFilter: 'retailer' })).toHaveLength(1);
     });
 
-    it('normalizeScriveStatus falls back to not_sent for invalid values', () => {
-        expect(normalizeScriveStatus('closed')).toBe('closed');
-        expect(normalizeScriveStatus('PENDING')).toBe('pending');
-        expect(normalizeScriveStatus('bad-status')).toBe('not_sent');
+    it('sortQuotes sorts correctly', () => {
+        const rows = [
+            { quoteId: '1', totalSek: 100, updatedAtMs: 1000 },
+            { quoteId: '2', totalSek: 200, updatedAtMs: 2000 }
+        ];
+
+        expect(sortQuotes([...rows], 'newest')[0].quoteId).toBe('2');
+        expect(sortQuotes([...rows], 'oldest')[0].quoteId).toBe('1');
+        expect(sortQuotes([...rows], 'highest-value')[0].quoteId).toBe('2');
+        expect(sortQuotes([...rows], 'lowest-value')[0].quoteId).toBe('1');
     });
 });

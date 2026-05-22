@@ -460,6 +460,8 @@ export interface QuoteMetadata {
     searchText: string;
     state?: RepositoryQuoteStatePayload | null;
     summary?: RepositoryQuoteSummaryPayload | null;
+    latestChangeNote?: string;
+    originType?: 'retailer' | 'internal';
 }
 
 export interface QuoteRevision {
@@ -537,6 +539,9 @@ export interface RawRetailerLineDocumentsDoc extends UnknownRecord {
 export interface QuoteFilters {
     status?: string;
     search?: string;
+    sortBy?: string;
+    dateFilter?: string;
+    originFilter?: string;
 }
 
 export interface QuoteRevisionSaveInput {
@@ -548,6 +553,7 @@ export interface QuoteRevisionSaveInput {
     status?: QuoteStatus | string;
     changeNote?: string;
     retailerName?: string | null;
+    originType?: 'retailer' | 'internal';
 }
 
 export interface CreateQuoteInput extends Omit<QuoteRevisionSaveInput, 'quoteId'> {}
@@ -622,6 +628,8 @@ export interface RawQuoteMetadataDoc extends UnknownRecord {
     searchText?: unknown;
     state?: RepositoryQuoteStatePayload | null;
     summary?: RepositoryQuoteSummaryPayload | null;
+    latestChangeNote?: unknown;
+    originType?: unknown;
 }
 
 export interface RawQuoteRevisionDoc extends UnknownRecord {
