@@ -498,7 +498,7 @@ export function resolveEdgeWithPins(
     }).sections;
 }
 
-function parseSection(section: SketchSectionEntry): { kind: 'door' | 'section'; length: number; raw: SketchSectionEntry } {
+export function parseSection(section: SketchSectionEntry): { kind: 'door' | 'section'; length: number; raw: SketchSectionEntry } {
     const doorMatch = new RegExp(`${DOOR_LABEL}\\s+(\\d+)`, 'i').exec(String(section));
     if (doorMatch) {
         return {

@@ -354,6 +354,15 @@ export interface QuoteState {
     hideZeroDiscountReferencesInPdf: boolean;
     paymentTermsDays: number;
     quoteValidityDays: number;
+    scriveEnabled?: boolean;
+    scriveStatus?: string;
+    scriveDocumentId?: string | null;
+    scriveSignerName?: string | null;
+    scriveSignerEmail?: string | null;
+    scriveLastError?: string | null;
+    scriveSentAtMs?: number | null;
+    scriveLastEventAtMs?: number | null;
+    scriveCompletedAtMs?: number | null;
 }
 
 export interface RawPersistedGridLineSelection extends UnknownRecord {
@@ -376,6 +385,15 @@ export interface QuoteIdentityPatch {
 }
 
 export interface SavedQuoteStatePatch extends QuoteIdentityPatch {
+    scriveEnabled?: boolean;
+    scriveStatus?: string;
+    scriveDocumentId?: string | null;
+    scriveSignerName?: string | null;
+    scriveSignerEmail?: string | null;
+    scriveLastError?: string | null;
+    scriveSentAtMs?: number | null;
+    scriveLastEventAtMs?: number | null;
+    scriveCompletedAtMs?: number | null;
 }
 
 export interface HistoryOpenQuotePayload extends QuoteIdentityPatch {
@@ -464,6 +482,15 @@ export interface QuoteMetadata {
     summary?: RepositoryQuoteSummaryPayload | null;
     latestChangeNote?: string;
     originType?: 'retailer' | 'internal';
+    scriveEnabled?: boolean;
+    scriveStatus?: string;
+    scriveDocumentId?: string | null;
+    scriveSignerName?: string | null;
+    scriveSignerEmail?: string | null;
+    scriveLastError?: string | null;
+    scriveSentAtMs?: number | null;
+    scriveLastEventAtMs?: number | null;
+    scriveCompletedAtMs?: number | null;
 }
 
 export interface QuoteRevision {
@@ -1350,6 +1377,10 @@ export interface AdvancedEdge {
     id: string;
     startNodeId: string;
     endNodeId: string;
+    hasDoor?: boolean;
+    doorSize?: number;
+    prioMode?: 'convenient' | 'symmetrical' | 'target';
+    targetLength?: number;
     // products: PlacedProduct[]; // Add more as needed later
 }
 

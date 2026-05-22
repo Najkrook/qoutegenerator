@@ -30,7 +30,7 @@ export function buildHistoryOpenQuotePayload(
         customerInfo: toCustomerInfoPatch(safeRevisionState.customerInfo),
         activeQuoteId: quoteId,
         quoteNumber: quoteNumber ? String(quoteNumber) : null,
-        activeQuoteVersion: Number.isFinite(parsedVersion) && parsedVersion >= 0 ? parsedVersion : 1,
+        activeQuoteVersion: Number.isFinite(parsedVersion) && parsedVersion > 0 ? parsedVersion : 1,
         quoteStatus: normalizeQuoteStatus(status || 'draft')
     };
 }
