@@ -9,12 +9,13 @@
     "preview": "vite preview",
     "test": "vitest",
     "test:watch": "vitest --watch",
-    "test:confidence": "vitest run --reporter=basic tests/accessControl.shared.test.js tests/quoteStateSchema.test.js tests/quoteStatePersistence.test.js tests/sketchExportState.test.js tests/parasolGeometry.test.js tests/sketchConfig.test.jsx tests/exportDataBuilders.test.js tests/pdfExport.test.js tests/textEncodingGuard.test.js tests/uiTextSmoke.test.jsx tests/routes.test.js tests/appRouting.test.jsx",
+    "test:confidence": "vitest run --reporter=basic tests/accessControl.shared.test.js tests/quoteStateSchema.test.js tests/quoteStatePersistence.test.js tests/sketchExportState.test.js tests/parasolGeometry.test.js tests/sketchConfig.test.jsx tests/exportDataBuilders.test.js tests/pdfExport.test.js tests/textEncodingGuard.test.js tests/uiTextSmoke.test.jsx tests/routes.test.js tests/appRouting.test.jsx tests/AuthContext.test.jsx",
     "test:run": "vitest run --reporter=basic",
     "typecheck": "tsc --noEmit"
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.2.1",
+    "@testing-library/react": "^16.3.2",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^5.1.4",

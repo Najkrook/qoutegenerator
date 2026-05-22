@@ -122,25 +122,29 @@ powershell -ExecutionPolicy Bypass -File .\scripts\verify-git-safety.ps1
 ```
 
 ## Access Roles
-Access control is maintained in `config/accessControl.shared.js` using Firebase Auth UID allowlists.
+Access control is maintained primarily via the `user_roles` collection in Firestore, with fallback logic to legacy hardcoded UID lists in `config/accessControl.shared.ts`.
 
 - `full`: admin-level access, including inventory management and inventory logs.
 - `quote-only`: quote flow plus quote history.
 - `sketch-only`: dashboard plus the sketch tool only.
+- `retailer`: retailer-specific views and order requests.
 - `guest`: not signed in / no UID.
 
 Role precedence:
 
 1. No UID -> `guest`
-2. UID in `ADMIN_UIDS` -> `full`
-3. UID in `SKETCH_ONLY_UIDS` -> `sketch-only`
-4. Otherwise -> `quote-only`
+2. `user_roles` doc has `role: 'admin'` -> `full`
+3. `user_roles` doc has `role: 'sketch_only'` -> `sketch-only`
+4. (Fallback) UID in hardcoded `ADMIN_UIDS` -> `full`
+5. (Fallback) UID in hardcoded `SKETCH_ONLY_UIDS` -> `sketch-only`
+6. User email matches a document in `retailers` collection -> `retailer`
+7. Otherwise -> `quote-only`
 
 Notes:
 - `sketch-only` users cannot enter the quote flow.
 - `quote-only` users can access `Mina Offerter`.
 - Quote-history permissions should remain aligned with the shared access-control helpers used by both auth state and step gating.
-- Keep UID allowlists minimal and review them when access changes.
+- User roles should be managed via Firestore documents in the `user_roles` collection.
 
 ## Firestore Rules and Deploy Notes
 The checked-in `firestore.rules` file currently allows:

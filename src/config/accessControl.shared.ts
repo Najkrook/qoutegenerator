@@ -85,6 +85,14 @@ export function getAccessCapabilities(level: AccessLevel): AccessCapabilities {
                 canAccessQuoteHistory: true,
                 canExportSketchToQuote: false
             };
+        case ACCESS_LEVELS.SKETCH_ONLY:
+            return {
+                canViewEverything: false,
+                canStartQuote: false,
+                canAccessSketch: true,
+                canAccessQuoteHistory: false,
+                canExportSketchToQuote: false
+            };
         case ACCESS_LEVELS.GUEST:
         default:
             return {

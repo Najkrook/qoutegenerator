@@ -375,7 +375,7 @@ If you change roles or access expectations:
 - review `src/store/AuthContext.tsx`
 - review `src/App.tsx`, `src/components/layout/Header.tsx`, and `src/views/History.tsx`
 - if the change involves retailers, also review `src/services/retailerService.ts` and `src/views/RetailerManager.tsx`
-- keep `ADMIN_UIDS` synchronized with `firestore.rules`
+- Role resolution occurs async in `AuthContext` with a precedence of `admin` > `sketch_only` > `retailer` > `quote_only` > `guest`. The `user_roles` Firestore collection is the source of truth, with hardcoded lists serving only as a Phase 1 fallback.
 
 Current retailer reality:
 

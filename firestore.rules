@@ -6,11 +6,14 @@ service cloud.firestore {
     }
 
     function isAdmin() {
-      return isSignedIn() && request.auth.uid in [
-        "ZPxZusAiyfY6cf2LSn1ynP5A7rG3",
-        "XolYJ2aOCdZPgiTg4WKVSOcRPmO2",
-        "cNXpQsFClscsPGURl0gedehYcFo2"
-      ];
+      return isSignedIn() && (
+        request.auth.uid in [
+          "ZPxZusAiyfY6cf2LSn1ynP5A7rG3",
+          "XolYJ2aOCdZPgiTg4WKVSOcRPmO2",
+          "cNXpQsFClscsPGURl0gedehYcFo2"
+        ] || 
+        (exists(/databases/$(database)/documents/user_roles/$(request.auth.uid)) && get(/databases/$(database)/documents/user_roles/$(request.auth.uid)).data.role == 'admin')
+      );
     }
 
     function isOwnActivityLogCreate() {
@@ -53,6 +56,11 @@ service cloud.firestore {
         && request.resource.data.updatedAtMs is int
         && request.resource.data.statusUpdatedByUid == request.auth.uid
         && request.resource.data.statusUpdatedByEmail is string;
+    }
+
+    match /user_roles/{userId} {
+      allow read: if isSignedIn() && request.auth.uid == userId;
+      allow write: if isAdmin() && request.resource.data.role in ['admin', 'sketch_only', 'quote_only'];
     }
 
     match /users/{userId}/quotes/{quoteId} {
