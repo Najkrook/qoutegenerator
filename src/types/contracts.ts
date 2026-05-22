@@ -6,16 +6,6 @@ export type QuoteStatus = 'draft' | 'sent' | 'won' | 'lost' | 'archived';
 export type OrderRequestStatus = 'new' | 'reviewing' | 'completed';
 export type RetailerDocumentKind = 'color-chart' | 'installation-instructions';
 
-export type ScriveStatus =
-    | 'not_sent'
-    | 'preparation'
-    | 'pending'
-    | 'closed'
-    | 'rejected'
-    | 'canceled'
-    | 'timedout'
-    | 'failed';
-
 export type AccessLevel = 'guest' | 'full' | 'quote-only' | 'sketch-only' | 'retailer';
 
 export type QuoteStep =
@@ -363,15 +353,6 @@ export interface QuoteState {
     hideZeroDiscountReferencesInPdf: boolean;
     paymentTermsDays: number;
     quoteValidityDays: number;
-    scriveEnabled: boolean;
-    scriveStatus: ScriveStatus;
-    scriveDocumentId: string | null;
-    scriveSignerName: string;
-    scriveSignerEmail: string;
-    scriveLastError: string | null;
-    scriveSentAtMs: number | null;
-    scriveLastEventAtMs: number | null;
-    scriveCompletedAtMs: number | null;
 }
 
 export interface RawPersistedGridLineSelection extends UnknownRecord {
@@ -394,15 +375,6 @@ export interface QuoteIdentityPatch {
 }
 
 export interface SavedQuoteStatePatch extends QuoteIdentityPatch {
-    scriveEnabled?: boolean;
-    scriveStatus: ScriveStatus;
-    scriveDocumentId: string | null;
-    scriveSignerName: string;
-    scriveSignerEmail: string;
-    scriveLastError: string | null;
-    scriveSentAtMs: number | null;
-    scriveLastEventAtMs: number | null;
-    scriveCompletedAtMs: number | null;
 }
 
 export interface HistoryOpenQuotePayload extends QuoteIdentityPatch {
@@ -467,19 +439,7 @@ export interface QuoteTotalsResult extends QuoteSummary {
     globalDiscountAmt: number;
 }
 
-export interface ScriveMetadata {
-    scriveEnabled: boolean;
-    scriveStatus: ScriveStatus;
-    scriveDocumentId: string | null;
-    scriveSignerName: string;
-    scriveSignerEmail: string;
-    scriveLastError: string | null;
-    scriveSentAtMs: number | null;
-    scriveLastEventAtMs: number | null;
-    scriveCompletedAtMs: number | null;
-}
-
-export interface QuoteMetadata extends ScriveMetadata {
+export interface QuoteMetadata {
     quoteId: string;
     quoteNumber: string | null;
     quoteDateKey: string | null;
@@ -586,7 +546,6 @@ export interface QuoteRevisionSaveInput {
     summary: Partial<QuoteSummary> | RawQuoteSummary;
     customerInfo?: Partial<CustomerInfo>;
     status?: QuoteStatus | string;
-    scrive?: ScrivePatchInput;
     changeNote?: string;
     retailerName?: string | null;
 }
@@ -597,12 +556,6 @@ export interface UpdateQuoteStatusInput {
     userId: string;
     quoteId: string;
     status: QuoteStatus | string;
-}
-
-export interface UpdateQuoteScriveInput {
-    userId: string;
-    quoteId: string;
-    scrive?: ScrivePatchInput;
 }
 
 export interface GetUserQuotesInput extends QuoteFilters {
@@ -669,15 +622,6 @@ export interface RawQuoteMetadataDoc extends UnknownRecord {
     searchText?: unknown;
     state?: RepositoryQuoteStatePayload | null;
     summary?: RepositoryQuoteSummaryPayload | null;
-    scriveEnabled?: unknown;
-    scriveStatus?: unknown;
-    scriveDocumentId?: unknown;
-    scriveSignerName?: unknown;
-    scriveSignerEmail?: unknown;
-    scriveLastError?: unknown;
-    scriveSentAtMs?: unknown;
-    scriveLastEventAtMs?: unknown;
-    scriveCompletedAtMs?: unknown;
 }
 
 export interface RawQuoteRevisionDoc extends UnknownRecord {
@@ -690,18 +634,6 @@ export interface RawQuoteRevisionDoc extends UnknownRecord {
     state?: RepositoryQuoteStatePayload;
     summary?: RepositoryQuoteSummaryPayload;
     changeNote?: unknown;
-}
-
-export interface ScrivePatchInput extends UnknownRecord {
-    enabled?: boolean;
-    status?: ScriveStatus | string;
-    documentId?: string | null;
-    signerName?: string;
-    signerEmail?: string;
-    lastError?: string | null;
-    sentAtMs?: number | null;
-    lastEventAtMs?: number | null;
-    completedAtMs?: number | null;
 }
 
 export interface SavedQuoteLike {
@@ -824,7 +756,6 @@ export interface QuoteRepository {
     getQuoteRevisions(input: GetQuoteRevisionsInput): Promise<Array<QuoteRevision>>;
     deleteQuote(input: DeleteQuoteInput): Promise<void>;
     updateQuoteStatus(input: UpdateQuoteStatusInput): Promise<QuoteMetadata>;
-    updateQuoteScrive(input: UpdateQuoteScriveInput): Promise<QuoteMetadata>;
     getAllUsersQuotes(input?: GetAllUsersQuotesInput): Promise<Array<QuoteMetadata & { ownerUid: string }>>;
 }
 

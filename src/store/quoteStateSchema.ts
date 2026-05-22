@@ -13,7 +13,6 @@ import type {
     RawPersistedGridLineSelection,
     RawPersistedInventoryData,
     RawPersistedSketchMeta,
-    ScriveStatus,
     StepInput,
     UnknownRecord
 } from '../types/contracts';
@@ -23,7 +22,6 @@ export const QUOTE_STATE_STORAGE_KEY = 'offertverktyg_state';
 export const CURRENT_STATE_VERSION = 1;
 
 const VALID_QUOTE_STATUSES: QuoteStatus[] = ['draft', 'sent', 'won', 'lost', 'archived'];
-const VALID_SCRIVE_STATUSES: ScriveStatus[] = ['not_sent', 'preparation', 'pending', 'closed', 'rejected', 'canceled', 'timedout', 'failed'];
 
 function clone<T>(value: T): T {
     if (value === undefined) {
@@ -145,11 +143,6 @@ function formatValidityLabel(days: number): string {
 function normalizeQuoteStatus(status: unknown): QuoteStatus {
     const normalized = String(status || '').toLowerCase();
     return VALID_QUOTE_STATUSES.includes(normalized as QuoteStatus) ? (normalized as QuoteStatus) : 'draft';
-}
-
-function normalizeScriveStatus(status: unknown): ScriveStatus {
-    const normalized = String(status || '').toLowerCase();
-    return VALID_SCRIVE_STATUSES.includes(normalized as ScriveStatus) ? (normalized as ScriveStatus) : 'not_sent';
 }
 
 function normalizeStep(step: unknown, fallback: StepInput = 0): StepInput {
@@ -299,16 +292,7 @@ function createBaseInitialState(): QuoteState {
         includePaymentBox: false,
         hideZeroDiscountReferencesInPdf: false,
         paymentTermsDays: 30,
-        quoteValidityDays: 30,
-        scriveEnabled: false,
-        scriveStatus: 'not_sent',
-        scriveDocumentId: null,
-        scriveSignerName: '',
-        scriveSignerEmail: '',
-        scriveLastError: null,
-        scriveSentAtMs: null,
-        scriveLastEventAtMs: null,
-        scriveCompletedAtMs: null
+        quoteValidityDays: 30
     };
 }
 
@@ -373,16 +357,7 @@ function migrateV0ToV1(rawState: UnknownRecord = {}): UnknownRecord {
         includePaymentBox: next.includePaymentBox === true,
         hideZeroDiscountReferencesInPdf: next.hideZeroDiscountReferencesInPdf === true,
         paymentTermsDays: normalizePositiveInt(next.paymentTermsDays, 30),
-        quoteValidityDays: normalizePositiveInt(next.quoteValidityDays, validityFromCustomer || 30),
-        scriveEnabled: Boolean(next.scriveEnabled),
-        scriveStatus: normalizeScriveStatus(next.scriveStatus),
-        scriveDocumentId: next.scriveDocumentId ? String(next.scriveDocumentId) : null,
-        scriveSignerName: String(next.scriveSignerName || customerInfo.name || ''),
-        scriveSignerEmail: String(next.scriveSignerEmail || customerInfo.email || ''),
-        scriveLastError: next.scriveLastError ? String(next.scriveLastError) : null,
-        scriveSentAtMs: next.scriveSentAtMs == null ? null : toNumber(next.scriveSentAtMs, null),
-        scriveLastEventAtMs: next.scriveLastEventAtMs == null ? null : toNumber(next.scriveLastEventAtMs, null),
-        scriveCompletedAtMs: next.scriveCompletedAtMs == null ? null : toNumber(next.scriveCompletedAtMs, null)
+        quoteValidityDays: normalizePositiveInt(next.quoteValidityDays, validityFromCustomer || 30)
     };
 }
 
@@ -494,15 +469,6 @@ export function hydrateQuoteState(input: HydratedQuoteStatePayload): QuoteState 
         includePaymentBox: mergedState.includePaymentBox === true,
         hideZeroDiscountReferencesInPdf: mergedState.hideZeroDiscountReferencesInPdf === true,
         paymentTermsDays: normalizePositiveInt(mergedState.paymentTermsDays, initialState.paymentTermsDays),
-        quoteValidityDays: normalizedValidityDays,
-        scriveEnabled: Boolean(mergedState.scriveEnabled),
-        scriveStatus: normalizeScriveStatus(mergedState.scriveStatus),
-        scriveDocumentId: mergedState.scriveDocumentId ? String(mergedState.scriveDocumentId) : null,
-        scriveSignerName: String(mergedState.scriveSignerName || customerInfoSource.name || ''),
-        scriveSignerEmail: String(mergedState.scriveSignerEmail || customerInfoSource.email || ''),
-        scriveLastError: mergedState.scriveLastError ? String(mergedState.scriveLastError) : null,
-        scriveSentAtMs: mergedState.scriveSentAtMs == null ? null : toNumber(mergedState.scriveSentAtMs, null),
-        scriveLastEventAtMs: mergedState.scriveLastEventAtMs == null ? null : toNumber(mergedState.scriveLastEventAtMs, null),
-        scriveCompletedAtMs: mergedState.scriveCompletedAtMs == null ? null : toNumber(mergedState.scriveCompletedAtMs, null)
+        quoteValidityDays: normalizedValidityDays
     };
 }

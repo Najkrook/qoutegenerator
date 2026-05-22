@@ -21,16 +21,11 @@ import type {
     RawQuoteSummary,
     RepositoryQuoteStatePayload,
     RepositoryQuoteSummaryPayload,
-    ScriveMetadata,
-    ScrivePatchInput,
-    ScriveStatus,
     UnknownRecord,
-    UpdateQuoteScriveInput,
     UpdateQuoteStatusInput
 } from '../types/contracts';
 
 export const QUOTE_STATUS_VALUES: QuoteStatus[] = ['draft', 'sent', 'won', 'lost', 'archived'];
-export const SCRIVE_STATUS_VALUES: ScriveStatus[] = ['not_sent', 'preparation', 'pending', 'closed', 'rejected', 'canceled', 'timedout', 'failed'];
 
 const EMPTY_SUMMARY: RawQuoteSummary = {
     finalTotalSek: 0,
@@ -59,7 +54,6 @@ interface BuildQuoteMetadataInput {
     customerInfo?: Partial<CustomerInfo> | unknown;
     summary?: Partial<RawQuoteSummary> | unknown;
     status?: QuoteStatus | string;
-    scrive?: ScrivePatchInput | unknown;
     nowMs: number;
     user?: AccessUser | null;
     latestVersion: number;
@@ -134,31 +128,6 @@ export function normalizeQuoteStatus(status: unknown): QuoteStatus {
     return QUOTE_STATUS_VALUES.includes(normalized as QuoteStatus) ? (normalized as QuoteStatus) : 'draft';
 }
 
-export function normalizeScriveStatus(status: unknown): ScriveStatus {
-    const normalized = String(status || '').toLowerCase();
-    return SCRIVE_STATUS_VALUES.includes(normalized as ScriveStatus) ? (normalized as ScriveStatus) : 'not_sent';
-}
-
-function normalizeScriveMetadata(
-    raw: RawQuoteMetadataDoc | unknown = {},
-    fallbackCustomer: Partial<CustomerInfo> | RawPersistedCustomerInfo | UnknownRecord = {}
-): ScriveMetadata {
-    const safeRaw = toRecord<RawQuoteMetadataDoc>(raw);
-    const safeFallbackCustomer = toRecord<RawPersistedCustomerInfo>(fallbackCustomer);
-
-    return {
-        scriveEnabled: Boolean(safeRaw.scriveEnabled),
-        scriveStatus: normalizeScriveStatus(safeRaw.scriveStatus),
-        scriveDocumentId: safeRaw.scriveDocumentId ? String(safeRaw.scriveDocumentId) : null,
-        scriveSignerName: String(safeRaw.scriveSignerName || safeFallbackCustomer.name || ''),
-        scriveSignerEmail: String(safeRaw.scriveSignerEmail || safeFallbackCustomer.email || ''),
-        scriveLastError: safeRaw.scriveLastError ? String(safeRaw.scriveLastError) : null,
-        scriveSentAtMs: safeRaw.scriveSentAtMs == null ? null : toNumber(safeRaw.scriveSentAtMs, null),
-        scriveLastEventAtMs: safeRaw.scriveLastEventAtMs == null ? null : toNumber(safeRaw.scriveLastEventAtMs, null),
-        scriveCompletedAtMs: safeRaw.scriveCompletedAtMs == null ? null : toNumber(safeRaw.scriveCompletedAtMs, null)
-    };
-}
-
 export function buildQuoteSearchText({
     customerName = '',
     company = '',
@@ -190,7 +159,6 @@ export function normalizeQuoteMetadata(quoteId: string, raw: RawQuoteMetadataDoc
     const latestVersion = Math.max(1, toNumber(safeRaw.latestVersion, safeRaw.state ? 1 : 0) || 0);
     const status = normalizeQuoteStatus(safeRaw.status);
     const latestRevisionId = String(safeRaw.latestRevisionId || '');
-    const scrive = normalizeScriveMetadata(safeRaw, fallbackCustomer);
 
     return {
         quoteId,
@@ -210,7 +178,6 @@ export function normalizeQuoteMetadata(quoteId: string, raw: RawQuoteMetadataDoc
         latestRevisionId,
         totalSek,
         retailerName: safeRaw.retailerName != null ? String(safeRaw.retailerName) : null,
-        ...scrive,
         searchText: String(
             safeRaw.searchText ||
             buildQuoteSearchText({ customerName, company, reference, customerReference, status })
@@ -252,7 +219,6 @@ function buildQuoteMetadata({
     customerInfo = {},
     summary = {},
     status = 'draft',
-    scrive = {},
     nowMs,
     user,
     latestVersion,
@@ -266,7 +232,6 @@ function buildQuoteMetadata({
     const safeCustomerInfo = toRecord<RawPersistedCustomerInfo>(customerInfo);
     const safeSummary = toRecord<RawQuoteSummary>(summary);
     const existingMetadata = toRecord<Partial<QuoteMetadata>>(existing);
-    const safeScrive = toRecord<ScrivePatchInput>(scrive);
     const normalizedStatus = normalizeQuoteStatus(status || existingMetadata.status);
     const company = String(safeCustomerInfo.company || existingMetadata.company || '');
     const customerName = String(company || safeCustomerInfo.name || existingMetadata.customerName || existingMetadata.company || 'Okand kund');
@@ -281,38 +246,6 @@ function buildQuoteMetadata({
         : normalizeQuoteSequence(existingMetadata.quoteSequence);
     const reference = String(safeCustomerInfo.reference || existingMetadata.reference || '-');
     const customerReference = String(safeCustomerInfo.customerReference || existingMetadata.customerReference || '');
-    const existingScrive = normalizeScriveMetadata(existingMetadata, safeCustomerInfo);
-    const normalizedScriveStatus = normalizeScriveStatus(safeScrive.status || existingScrive.scriveStatus || 'not_sent');
-    const scriveDocumentId = safeScrive.documentId !== undefined
-        ? (safeScrive.documentId ? String(safeScrive.documentId) : null)
-        : existingScrive.scriveDocumentId;
-    const scriveEnabled = typeof safeScrive.enabled === 'boolean'
-        ? safeScrive.enabled
-        : existingScrive.scriveEnabled;
-    const scriveSignerName = String(
-        safeScrive.signerName ||
-        safeCustomerInfo.name ||
-        existingScrive.scriveSignerName ||
-        customerName
-    );
-    const scriveSignerEmail = String(
-        safeScrive.signerEmail ||
-        safeCustomerInfo.email ||
-        existingScrive.scriveSignerEmail ||
-        ''
-    );
-    const scriveLastError = safeScrive.lastError !== undefined
-        ? (safeScrive.lastError ? String(safeScrive.lastError) : null)
-        : (existingScrive.scriveLastError || null);
-    const scriveSentAtMs = safeScrive.sentAtMs !== undefined
-        ? (safeScrive.sentAtMs == null ? null : toNumber(safeScrive.sentAtMs, existingScrive.scriveSentAtMs || null))
-        : existingScrive.scriveSentAtMs;
-    const scriveLastEventAtMs = safeScrive.lastEventAtMs !== undefined
-        ? (safeScrive.lastEventAtMs == null ? null : toNumber(safeScrive.lastEventAtMs, existingScrive.scriveLastEventAtMs || null))
-        : existingScrive.scriveLastEventAtMs;
-    const scriveCompletedAtMs = safeScrive.completedAtMs !== undefined
-        ? (safeScrive.completedAtMs == null ? null : toNumber(safeScrive.completedAtMs, existingScrive.scriveCompletedAtMs || null))
-        : existingScrive.scriveCompletedAtMs;
 
     return {
         quoteId,
@@ -332,15 +265,6 @@ function buildQuoteMetadata({
         latestRevisionId: String(latestRevisionId || existingMetadata.latestRevisionId || ''),
         totalSek: toNumber(safeSummary.finalTotalSek, existingMetadata.totalSek || 0) || 0,
         retailerName: retailerName != null ? String(retailerName) : (existingMetadata.retailerName || null),
-        scriveEnabled,
-        scriveStatus: normalizedScriveStatus,
-        scriveDocumentId,
-        scriveSignerName,
-        scriveSignerEmail,
-        scriveLastError,
-        scriveSentAtMs,
-        scriveLastEventAtMs,
-        scriveCompletedAtMs,
         searchText: buildQuoteSearchText({
             customerName,
             company,
@@ -383,15 +307,6 @@ function buildMetadataWriteDoc(metadata: QuoteMetadata): RawQuoteMetadataDoc {
         totalSek: metadata.totalSek,
         retailerName: metadata.retailerName,
         searchText: metadata.searchText,
-        scriveEnabled: metadata.scriveEnabled,
-        scriveStatus: metadata.scriveStatus,
-        scriveDocumentId: metadata.scriveDocumentId,
-        scriveSignerName: metadata.scriveSignerName,
-        scriveSignerEmail: metadata.scriveSignerEmail,
-        scriveLastError: metadata.scriveLastError,
-        scriveSentAtMs: metadata.scriveSentAtMs,
-        scriveLastEventAtMs: metadata.scriveLastEventAtMs,
-        scriveCompletedAtMs: metadata.scriveCompletedAtMs
     };
 }
 
@@ -468,8 +383,7 @@ export function createQuoteRepository(deps: QuoteRepositoryDeps = {} as QuoteRep
         summary,
         customerInfo = {},
         status = 'draft',
-        scrive = {},
-        changeNote,
+            changeNote,
         retailerName = null
     }: RevisionSaveContext): Promise<{ metadata: QuoteMetadata; revision: QuoteRevision }> => {
         const quoteRef = quoteDocRef(String(user.uid), quoteId);
@@ -496,7 +410,6 @@ export function createQuoteRepository(deps: QuoteRepositoryDeps = {} as QuoteRep
             customerInfo,
             summary,
             status,
-            scrive,
             nowMs,
             user,
             latestVersion: version,
@@ -520,8 +433,7 @@ export function createQuoteRepository(deps: QuoteRepositoryDeps = {} as QuoteRep
         summary,
         customerInfo = {},
         status = 'draft',
-        scrive = {},
-        changeNote = '',
+            changeNote = '',
         retailerName = null
     }: QuoteRevisionSaveInput): Promise<{ metadata: QuoteMetadata; revision: QuoteRevision }> {
         if (!user?.uid) throw new Error('Missing authenticated user.');
@@ -534,7 +446,6 @@ export function createQuoteRepository(deps: QuoteRepositoryDeps = {} as QuoteRep
             summary,
             customerInfo,
             status,
-            scrive,
             changeNote,
             retailerName
         };
@@ -570,8 +481,7 @@ export function createQuoteRepository(deps: QuoteRepositoryDeps = {} as QuoteRep
                 customerInfo,
                 summary,
                 status,
-                scrive,
-                nowMs,
+                    nowMs,
                 user,
                 latestVersion: version,
                 latestRevisionId: revisionId,
@@ -594,8 +504,7 @@ export function createQuoteRepository(deps: QuoteRepositoryDeps = {} as QuoteRep
         summary,
         customerInfo = {},
         status = 'draft',
-        scrive = {},
-        changeNote = 'Initial save',
+            changeNote = 'Initial save',
         retailerName = null
     }: QuoteRevisionSaveInput): Promise<{ quoteId: string; metadata: QuoteMetadata; revision: QuoteRevision }> {
         if (!user?.uid) throw new Error('Missing authenticated user.');
@@ -623,8 +532,7 @@ export function createQuoteRepository(deps: QuoteRepositoryDeps = {} as QuoteRep
                 customerInfo,
                 summary,
                 status,
-                scrive,
-                nowMs,
+                    nowMs,
                 user,
                 latestVersion: 1,
                 latestRevisionId: revisionId,
@@ -871,50 +779,6 @@ export function createQuoteRepository(deps: QuoteRepositoryDeps = {} as QuoteRep
         };
     }
 
-    async function updateQuoteScrive({ userId, quoteId, scrive = {} }: UpdateQuoteScriveInput): Promise<QuoteMetadata> {
-        if (!userId || !quoteId) throw new Error('userId and quoteId are required.');
-        const quoteRef = quoteDocRef(userId, quoteId);
-        const snap = await getDoc(quoteRef);
-        if (!snap.exists()) throw new Error('Quote not found.');
-
-        const existing = normalizeQuoteMetadata(quoteId, snap.data() || {});
-        const updatedAtMs = Date.now();
-        const scriveInput = toRecord<ScrivePatchInput>(scrive);
-        const scrivePatch = {
-            scriveEnabled: typeof scriveInput.enabled === 'boolean' ? scriveInput.enabled : existing.scriveEnabled,
-            scriveStatus: normalizeScriveStatus(scriveInput.status || existing.scriveStatus),
-            scriveDocumentId: scriveInput.documentId !== undefined
-                ? (scriveInput.documentId ? String(scriveInput.documentId) : null)
-                : existing.scriveDocumentId,
-            scriveSignerName: String(scriveInput.signerName || existing.scriveSignerName || existing.customerName || ''),
-            scriveSignerEmail: String(scriveInput.signerEmail || existing.scriveSignerEmail || ''),
-            scriveLastError: scriveInput.lastError !== undefined
-                ? (scriveInput.lastError ? String(scriveInput.lastError) : null)
-                : existing.scriveLastError,
-            scriveSentAtMs: scriveInput.sentAtMs !== undefined
-                ? (scriveInput.sentAtMs == null ? null : toNumber(scriveInput.sentAtMs, existing.scriveSentAtMs || null))
-                : existing.scriveSentAtMs,
-            scriveLastEventAtMs: scriveInput.lastEventAtMs !== undefined
-                ? (scriveInput.lastEventAtMs == null ? null : toNumber(scriveInput.lastEventAtMs, existing.scriveLastEventAtMs || null))
-                : existing.scriveLastEventAtMs,
-            scriveCompletedAtMs: scriveInput.completedAtMs !== undefined
-                ? (scriveInput.completedAtMs == null ? null : toNumber(scriveInput.completedAtMs, existing.scriveCompletedAtMs || null))
-                : existing.scriveCompletedAtMs,
-            updatedAtMs
-        };
-
-        if (typeof updateDoc === 'function') {
-            await updateDoc(quoteRef, scrivePatch);
-        } else {
-            await setDoc(quoteRef, scrivePatch, { merge: true });
-        }
-
-        return {
-            ...existing,
-            ...scrivePatch
-        };
-    }
-
     async function deleteQuote({ userId, quoteId }: { userId: string; quoteId: string }): Promise<void> {
         if (!userId || !quoteId) throw new Error('userId and quoteId are required.');
         const quoteRef = quoteDocRef(userId, quoteId);
@@ -955,7 +819,6 @@ export function createQuoteRepository(deps: QuoteRepositoryDeps = {} as QuoteRep
         getQuoteRevisions,
         deleteQuote,
         updateQuoteStatus,
-        updateQuoteScrive,
         getAllUsersQuotes
     };
 }

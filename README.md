@@ -80,7 +80,7 @@ Current active directories:
 - `src/`: React app entrypoint, views, contexts, client-side services, utilities, and catalog data. Contains migrated `features/`, `services/`, and `config/` directories.
 - `tests/`: Vitest coverage for calculations, repositories, exports, and UI text.
 - `scripts/`: Maintenance and safety scripts.
-- `integrations/scrive-proxy/`: Disabled/reference Scrive integration scaffold.
+
 
 The active application is fully encapsulated within the `src/` directory.
 
@@ -177,12 +177,7 @@ node .\scripts\backfill-quote-metadata.mjs
 
 The backfill script requires Firebase Admin credentials via `GOOGLE_APPLICATION_CREDENTIALS` or `FIREBASE_SERVICE_ACCOUNT_JSON`.
 
-## Scrive Notes
-Scrive support is currently reference-only:
 
-- Scrive UI/actions are disabled.
-- Existing Scrive metadata fields are retained for backward compatibility.
-- `integrations/scrive-proxy/` remains a reference scaffold rather than an active runtime dependency.
 
 ## Legacy and Reference Notes
 Actual legacy/reference assets:

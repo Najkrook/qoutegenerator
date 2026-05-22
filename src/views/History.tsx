@@ -279,6 +279,41 @@ export function History({ onBack, onOpenQuote }: HistoryProps) {
         }
     };
 
+    const duplicateQuote = async (quote: HistoryQuoteRow): Promise<void> => {
+        if (!user?.uid) return;
+
+        const ownerUid = getQuoteOwnerUid(quote);
+        try {
+            const payload = await quoteRepository.getQuoteLatestRevision({
+                userId: ownerUid,
+                quoteId: quote.quoteId
+            });
+
+            if (!payload?.revision) {
+                notifyInfo('Offerten saknar sparad revision och kan inte dupliceras.');
+                return;
+            }
+            if (!payload.revision.state) {
+                notifyInfo('Offerten saknar sparat tillstånd och kan inte dupliceras.');
+                return;
+            }
+
+            const nextState = buildHistoryOpenQuotePayload(
+                payload.revision.state,
+                null,
+                null,
+                0,
+                'draft'
+            );
+
+            notifySuccess('Offert duplicerad som nytt utkast.');
+            onOpenQuote?.(nextState);
+        } catch (openError) {
+            console.error('Failed to duplicate quote:', openError);
+            notifyError(`Kunde inte duplicera offerten: ${getErrorMessage(openError, 'okänt fel')}`);
+        }
+    };
+
     const openSpecificRevision = async (quote: HistoryQuoteRow, revisionId: string): Promise<void> => {
         const cached = revisionCache[quote.quoteId] || [];
         const revision = cached.find((row) => row.revisionId === revisionId);
@@ -434,6 +469,15 @@ export function History({ onBack, onOpenQuote }: HistoryProps) {
                                         }}
                                     >
                                         {quoteLifecycleEnabled ? 'Öppna senaste' : 'Öppna offert'}
+                                    </button>
+                                    <button
+                                        type="button"
+                                        className="px-4 py-2 text-sm border border-panel-border bg-transparent text-text-primary hover:bg-white/5 rounded w-full transition-colors"
+                                        onClick={() => {
+                                            void duplicateQuote(quote);
+                                        }}
+                                    >
+                                        Duplicera
                                     </button>
                                     {quoteLifecycleEnabled && (
                                         <button

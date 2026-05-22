@@ -61,11 +61,6 @@ Tooling and maintenance support.
 - `scripts/clean_black_inventory.mjs` exists but is not central to the main runtime.
 - `scripts/build_parasollkostnad.mjs` and the related Python helpers generate parasol cost data.
 
-### `integrations/scrive-proxy/`
-Reference or scaffold code.
-
-- Not an active runtime dependency for the main app.
-- Present as integration scaffolding only.
 
 ### `docs/`
 Companion documentation.
@@ -415,7 +410,7 @@ Current retailer reality:
 - sketch draft and sketch metadata
 - inventory basket
 - active quote ID and version
-- quote status and Scrive metadata
+- quote status
 - legal-template/payment/signature toggles and validity/payment days
 - `hideZeroDiscountReferencesInPdf`
 
@@ -464,7 +459,7 @@ The authoritative quote repository is `src/services/quoteRepository.ts`.
 - latest version
 - latest revision ID
 - saved-by metadata
-- Scrive metadata
+
 - `searchText`
 - `retailerName`
 
@@ -478,16 +473,6 @@ Quote statuses:
 - `lost`
 - `archived`
 
-Scrive statuses:
-
-- `not_sent`
-- `preparation`
-- `pending`
-- `closed`
-- `rejected`
-- `canceled`
-- `timedout`
-- `failed`
 
 ## Templates, Export, And Feature Flags
 

@@ -17,16 +17,7 @@ export function buildSavedQuoteStatePatch(
         activeQuoteId: saved?.quoteId || state.activeQuoteId || null,
         quoteNumber: metadata.quoteNumber ?? state.quoteNumber ?? null,
         activeQuoteVersion: metadata.latestVersion || saved?.revision?.version || state.activeQuoteVersion || 1,
-        quoteStatus: metadata.status || state.quoteStatus || 'draft',
-        scriveEnabled: typeof metadata.scriveEnabled === 'boolean' ? metadata.scriveEnabled : state.scriveEnabled,
-        scriveStatus: metadata.scriveStatus || state.scriveStatus || 'not_sent',
-        scriveDocumentId: metadata.scriveDocumentId ?? state.scriveDocumentId ?? null,
-        scriveSignerName: metadata.scriveSignerName ?? state.scriveSignerName ?? '',
-        scriveSignerEmail: metadata.scriveSignerEmail ?? state.scriveSignerEmail ?? '',
-        scriveLastError: metadata.scriveLastError ?? state.scriveLastError ?? null,
-        scriveSentAtMs: metadata.scriveSentAtMs ?? state.scriveSentAtMs ?? null,
-        scriveLastEventAtMs: metadata.scriveLastEventAtMs ?? state.scriveLastEventAtMs ?? null,
-        scriveCompletedAtMs: metadata.scriveCompletedAtMs ?? state.scriveCompletedAtMs ?? null
+        quoteStatus: metadata.status || state.quoteStatus || 'draft'
     };
 }
 

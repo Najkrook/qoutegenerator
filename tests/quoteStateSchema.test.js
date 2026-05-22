@@ -50,7 +50,6 @@ describe('quoteStateSchema', () => {
         expect(hydrated.quoteValidityDays).toBe(14);
         expect(hydrated.customerInfo.validity).toBe('14 dagar');
         expect(hydrated.inventoryData).toEqual({ bahama: [], clickitup: {} });
-        expect(hydrated.scriveStatus).toBe('not_sent');
         expect(hydrated.hideZeroDiscountReferencesInPdf).toBe(false);
     });
 
@@ -102,7 +101,6 @@ describe('quoteStateSchema', () => {
         expect(hydrated.customerInfo).toEqual(createInitialQuoteState().customerInfo);
         expect(hydrated.gridSelections).toEqual({});
         expect(hydrated.inventoryData).toEqual({ bahama: [], clickitup: {} });
-        expect(hydrated.scriveStatus).toBe('not_sent');
     });
 
     it('normalizes persisted grid maps and clickitup stock rows into concrete numeric shapes', () => {
