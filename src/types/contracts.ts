@@ -338,6 +338,7 @@ export interface QuoteState {
     inventoryData: InventoryData;
     cloudInventoryData: InventoryData;
     sketchDraft: SketchDraft | null;
+    advancedSketchDraft: AdvancedSketchDraft | null;
     sketchMeta: SketchMeta;
     inventoryBasket: InventoryBasketItem[];
     activeQuoteId: string | null;
@@ -383,7 +384,8 @@ export interface HistoryOpenQuotePayload extends QuoteIdentityPatch {
 }
 
 export interface SketchDraftStatePatch {
-    sketchDraft: SketchDraft;
+    sketchDraft?: SketchDraft | null;
+    advancedSketchDraft?: AdvancedSketchDraft | null;
     sketchMeta?: SketchMeta;
 }
 
@@ -1338,6 +1340,34 @@ export interface SketchDraft {
     workspace: SketchWorkspace;
 }
 
+export interface AdvancedNode {
+    id: string;
+    x: number;
+    y: number;
+}
+
+export interface AdvancedEdge {
+    id: string;
+    startNodeId: string;
+    endNodeId: string;
+    // products: PlacedProduct[]; // Add more as needed later
+}
+
+export interface AdvancedSketchConfigState {
+    nodes: AdvancedNode[];
+    edges: AdvancedEdge[];
+}
+
+export interface AdvancedSketchWorkspace {
+    camera: SketchCamera;
+    uiDensity: SketchDensity;
+}
+
+export interface AdvancedSketchDraft {
+    config: AdvancedSketchConfigState;
+    workspace: AdvancedSketchWorkspace;
+}
+
 export type EdgeDiagnosticErrorCode = 'NO_DOOR_COMBINATION' | 'NO_SECTION_SOLUTION' | 'WRONG_COUNT' | null;
 
 export interface EdgeDiagnostic {
@@ -1483,8 +1513,9 @@ export interface ComputedLayoutResult {
 }
 
 export interface SketchToolProps {
-    onBack?: () => void;
+    onBack: () => void;
     onExportToQuoteComplete?: () => void;
+    modeToggleNode?: React.ReactNode;
 }
 
 export interface SketchCanvasProps {

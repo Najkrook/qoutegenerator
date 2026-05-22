@@ -278,6 +278,7 @@ function createBaseInitialState(): QuoteState {
         inventoryData: { bahama: [], clickitup: {} },
         cloudInventoryData: { bahama: [], clickitup: {} },
         sketchDraft: null,
+        advancedSketchDraft: null,
         sketchMeta: { addedBahamaLine: false, addedFiestaLine: false },
         inventoryBasket: [],
         activeQuoteId: null,
@@ -338,6 +339,7 @@ function migrateV0ToV1(rawState: UnknownRecord = {}): UnknownRecord {
         inventoryData,
         cloudInventoryData,
         sketchDraft: Object.prototype.hasOwnProperty.call(next, 'sketchDraft') ? cloneValueOr(next.sketchDraft, null) : null,
+        advancedSketchDraft: Object.prototype.hasOwnProperty.call(next, 'advancedSketchDraft') ? cloneValueOr(next.advancedSketchDraft, null) : null,
         sketchMeta: {
             addedBahamaLine: Boolean(sketchMeta.addedBahamaLine),
             addedFiestaLine: Boolean(sketchMeta.addedFiestaLine)
@@ -447,6 +449,9 @@ export function hydrateQuoteState(input: HydratedQuoteStatePayload): QuoteState 
         sketchDraft: Object.prototype.hasOwnProperty.call(mergedState, 'sketchDraft')
             ? cloneValueOr(mergedState.sketchDraft, initialState.sketchDraft)
             : initialState.sketchDraft,
+        advancedSketchDraft: Object.prototype.hasOwnProperty.call(mergedState, 'advancedSketchDraft')
+            ? cloneValueOr(mergedState.advancedSketchDraft, initialState.advancedSketchDraft)
+            : initialState.advancedSketchDraft,
         sketchMeta: {
             ...initialState.sketchMeta,
             addedBahamaLine: Boolean(sketchMeta.addedBahamaLine),
