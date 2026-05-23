@@ -40,7 +40,6 @@ describe('quoteSaveService', () => {
             metadata: {
                 latestVersion: 3,
                 status: 'sent',
-                scriveStatus: 'pending',
                 quoteNumber: 'BRIXX - 260422-101'
             },
             revision: { version: 3 }
@@ -53,8 +52,7 @@ describe('quoteSaveService', () => {
                 activeQuoteId: 'quote_123',
                 activeQuoteVersion: 2,
                 quoteStatus: 'draft',
-                customerInfo: { name: 'Testkund' },
-                scriveStatus: 'not_sent'
+                customerInfo: { name: 'Testkund' }
             },
             summary: {
                 finalTotalSek: 2000,
@@ -71,7 +69,6 @@ describe('quoteSaveService', () => {
         expect(result.statePatch.quoteNumber).toBe('BRIXX - 260422-101');
         expect(result.statePatch.activeQuoteVersion).toBe(3);
         expect(result.statePatch.quoteStatus).toBe('sent');
-        expect(result.statePatch.scriveStatus).toBe('pending');
     });
 
     it('throws when the user is missing', async () => {
@@ -91,10 +88,7 @@ describe('quoteSaveService', () => {
             },
             {
                 activeQuoteId: 'quote_999',
-                quoteNumber: 'BRIXX - 260421-101',
-                scriveEnabled: true,
-                scriveStatus: 'closed',
-                scriveDocumentId: 'doc_1'
+                quoteNumber: 'BRIXX - 260421-101'
             }
         );
 
@@ -102,28 +96,16 @@ describe('quoteSaveService', () => {
         expect(patch.quoteNumber).toBe('BRIXX - 260421-101');
         expect(patch.activeQuoteVersion).toBe(4);
         expect(patch.quoteStatus).toBe('won');
-        expect(patch.scriveEnabled).toBe(true);
-        expect(patch.scriveStatus).toBe('closed');
-        expect(patch.scriveDocumentId).toBe('doc_1');
     });
 
-    it('buildSavedQuoteStatePatch copies quote identity and scrive fields from saved metadata', () => {
+    it('buildSavedQuoteStatePatch copies quote identity from saved metadata', () => {
         const patch = buildSavedQuoteStatePatch(
             {
                 quoteId: 'quote_321',
                 metadata: {
                     latestVersion: 7,
                     status: 'sent',
-                    quoteNumber: 'BRIXX - 260422-107',
-                    scriveEnabled: true,
-                    scriveStatus: 'pending',
-                    scriveDocumentId: 'scrive_7',
-                    scriveSignerName: 'Ada',
-                    scriveSignerEmail: 'ada@example.com',
-                    scriveLastError: null,
-                    scriveSentAtMs: 1700000000000,
-                    scriveLastEventAtMs: 1700000000100,
-                    scriveCompletedAtMs: null
+                    quoteNumber: 'BRIXX - 260422-107'
                 },
                 revision: { version: 7 }
             },
@@ -134,16 +116,7 @@ describe('quoteSaveService', () => {
             activeQuoteId: 'quote_321',
             quoteNumber: 'BRIXX - 260422-107',
             activeQuoteVersion: 7,
-            quoteStatus: 'sent',
-            scriveEnabled: true,
-            scriveStatus: 'pending',
-            scriveDocumentId: 'scrive_7',
-            scriveSignerName: 'Ada',
-            scriveSignerEmail: 'ada@example.com',
-            scriveLastError: null,
-            scriveSentAtMs: 1700000000000,
-            scriveLastEventAtMs: 1700000000100,
-            scriveCompletedAtMs: null
+            quoteStatus: 'sent'
         });
     });
 });

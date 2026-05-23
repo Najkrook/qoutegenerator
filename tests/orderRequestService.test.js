@@ -82,6 +82,9 @@ describe('orderRequestService', () => {
     });
 
     it('returns the existing request when the same quote version is submitted again', async () => {
+        vi.useFakeTimers();
+        vi.setSystemTime(new Date('2026-05-21T08:00:00.000Z'));
+
         const { service } = buildService();
         const first = await service.createOrderRequest({
             user,
@@ -98,6 +101,8 @@ describe('orderRequestService', () => {
         });
 
         expect(second).toEqual(first);
+
+        vi.useRealTimers();
     });
 
     it('creates a request without requiring a pre-read of the document', async () => {

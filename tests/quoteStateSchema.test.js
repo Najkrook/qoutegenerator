@@ -94,8 +94,7 @@ describe('quoteStateSchema', () => {
         const hydrated = hydrateQuoteState({
             customerInfo: null,
             gridSelections: null,
-            inventoryData: 'broken',
-            scriveStatus: 'bad-status'
+            inventoryData: 'broken'
         });
 
         expect(hydrated.customerInfo).toEqual(createInitialQuoteState().customerInfo);

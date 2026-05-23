@@ -80,9 +80,6 @@ export function RetailerDocuments({ onBack }: RetailerDocumentsProps) {
                         <p className="mt-2 text-sm text-text-secondary">
                             Se färgkartor och installationsinstruktioner för de produktlinjer som är aktiva för ert retailer-konto.
                         </p>
-                        <p className="mt-2 text-xs text-text-secondary">
-                            Alla dokument synkroniseras via Google Drive.
-                        </p>
                     </div>
                     <div className="flex items-center gap-3">
                         <button

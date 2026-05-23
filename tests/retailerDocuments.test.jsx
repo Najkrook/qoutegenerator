@@ -154,7 +154,6 @@ describe('RetailerDocuments', () => {
         expect(container.textContent).toContain('Färgkarta Akryl');
         expect(container.textContent).toContain('Installationsguide Fiesta');
         expect(container.textContent).toContain('Visa PDF');
-        expect(container.textContent).toContain('Google Drive');
         expect(container.textContent).not.toContain('Ladda ner PDF');
         expect(container.textContent).not.toContain('ClickitUp');
     });

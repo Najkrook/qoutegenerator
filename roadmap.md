@@ -160,7 +160,7 @@ Success signals:
 - Full SPA-to-MPA migration or multi-app split.
 - Access-control backend redesign or Firebase custom-claims migration.
 - Major data-model rewrite for quotes or planner.
-- Full Scrive/e-signature rollout.
+- E-signature rollout.
 - Full repo-wide TypeScript conversion of every remaining file, including tests/scripts/tooling.
 
 ## Assumptions
