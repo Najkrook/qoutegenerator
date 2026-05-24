@@ -1,6 +1,7 @@
 import autoTable, { type Color, type FontStyle, type Styles } from 'jspdf-autotable';
 import { BRIXX_LOGO_BASE64 } from '../../assets/logoData';
 import { buildPdfTableData } from '../services/exportDataBuilders';
+import { applyVat } from '../utils/vatHelper';
 import type {
     CustomerInfo,
     ExportSummaryInput,
@@ -50,10 +51,11 @@ export function normalizePositiveInt(value, fallback) {
     return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
 }
 
-export function createPdfTableLayout(hideDiscountReferences, pageWidth, layout = PDF_LAYOUT) {
+export function createPdfTableLayout(hideDiscountReferences, pageWidth, includesVat = false, layout = PDF_LAYOUT) {
+    const vatText = includesVat ? 'Inkl. moms' : 'Exkl. moms';
     const tableHead = hideDiscountReferences
-        ? [['Modell', 'Storlek', 'Pris/enhet\nExkl. moms', 'Antal', 'Ert Pris\nExkl. moms']]
-        : [['Modell', 'Storlek', 'Pris/enhet\nExkl. moms', 'Antal', 'Ert Pris\nExkl. moms', 'Rek Utpris\nExkl. moms', 'Rabatt\ni SEK', 'Rabatt\ni %']];
+        ? [['Modell', 'Storlek', `Pris/enhet\n${vatText}`, 'Antal', `Ert Pris\n${vatText}`]]
+        : [['Modell', 'Storlek', `Pris/enhet\n${vatText}`, 'Antal', `Ert Pris\n${vatText}`, `Rek Utpris\n${vatText}`, `Rabatt\ni SEK\n(${vatText})`, 'Rabatt\ni %']];
     const tableColumnStyles = (hideDiscountReferences
         ? {
             0: { halign: 'left', fontStyle: 'bold' as FontStyle, cellWidth: 54 },
@@ -264,6 +266,7 @@ export function renderGroupedTables(doc, {
     currentY,
     pageWidth,
     pageHeight,
+    includesVat,
     hideDiscountReferences,
     drawMainHeader,
     layout = PDF_LAYOUT
@@ -283,7 +286,7 @@ export function renderGroupedTables(doc, {
             if (y > pageHeight - (layout.contentBottomSafe - 3)) {
                 y = startNewPage(doc, drawMainHeader, layout.contentStartY);
             }
-            const textRow = `${row.model} | ${row.size || '-'} | x${row.qty} | ${formatSEK(row.net)} SEK`;
+            const textRow = `${row.model} | ${row.size || '-'} | x${row.qty} | ${formatSEK(applyVat(row.net, includesVat))} SEK`;
             doc.text(textRow, layout.pageMarginX, y);
             y += 4.5;
         });
@@ -297,7 +300,7 @@ export function renderGroupedTables(doc, {
         reducedTableWidth,
         tableLeftMargin,
         tableRightMargin
-    } = createPdfTableLayout(hideDiscountReferences, pageWidth, layout);
+    } = createPdfTableLayout(hideDiscountReferences, pageWidth, includesVat, layout);
 
     let finalY = currentY;
 
@@ -318,7 +321,8 @@ export function renderGroupedTables(doc, {
             head: tableHead,
             body: buildPdfTableData(lineItems, formatSEK, {
                 hideDiscountColumns: hideDiscountReferences,
-                hideRecommendedPriceColumn: hideDiscountReferences
+                hideRecommendedPriceColumn: hideDiscountReferences,
+                includesVat
             }),
             theme: 'striped',
             styles: {
@@ -381,14 +385,14 @@ export function renderGroupedTables(doc, {
             doc.setFontSize(8);
             doc.setTextColor(...layout.colors.grayText);
             doc.text('Produkter', barX + 4, currentY + 5);
-            doc.text(`${formatSEK(baseNet)} SEK`, pageWidth - layout.pageMarginX - 4, currentY + 5, { align: 'right' });
+            doc.text(`${formatSEK(applyVat(baseNet, includesVat))} SEK`, pageWidth - layout.pageMarginX - 4, currentY + 5, { align: 'right' });
             currentY += rowH;
 
             if (addonItems.length > 0) {
                 doc.setFillColor(250, 250, 250);
                 doc.rect(barX, currentY, barW, rowH, 'F');
                 doc.text('Tillval', barX + 4, currentY + 5);
-                doc.text(`${formatSEK(addonNet)} SEK`, pageWidth - layout.pageMarginX - 4, currentY + 5, { align: 'right' });
+                doc.text(`${formatSEK(applyVat(addonNet, includesVat))} SEK`, pageWidth - layout.pageMarginX - 4, currentY + 5, { align: 'right' });
                 currentY += rowH;
             }
 
@@ -398,8 +402,8 @@ export function renderGroupedTables(doc, {
             doc.setFont('helvetica', 'bold');
             doc.setFontSize(9);
             doc.setTextColor(255, 255, 255);
-            doc.text(`Delsumma ${lineKey} (Ert Pris)`, barX + 4, currentY + 6);
-            doc.text(`${formatSEK(groupNet)} SEK`, pageWidth - layout.pageMarginX - 4, currentY + 6, { align: 'right' });
+            doc.text(`Delsumma ${lineKey} (Ert Pris${includesVat ? ' Inkl. moms' : ''})`, barX + 4, currentY + 6);
+            doc.text(`${formatSEK(applyVat(groupNet, includesVat))} SEK`, pageWidth - layout.pageMarginX - 4, currentY + 6, { align: 'right' });
             doc.setTextColor(...layout.colors.darkText);
 
             currentY += totalBarHeight + 6;
@@ -480,12 +484,12 @@ export function renderTotalsSection(doc, {
         return boxY + boxHeight;
     };
 
-    drawTotalLine('Totalt Rek Utpris:', `${formatSEK(exportSummary.grossTotalSek)} SEK`, finalY);
+    drawTotalLine(state.includesVat ? 'Totalt Rek Utpris (Exkl. moms):' : 'Totalt Rek Utpris:', `${formatSEK(exportSummary.grossTotalSek)} SEK`, finalY);
     finalY += 6;
 
     if (!state.hideDiscountReferences) {
         doc.setTextColor(...layout.colors.grayText);
-        drawTotalLine('Total Rabatt:', `-${formatSEK(exportSummary.totalDiscountSek)} SEK`, finalY);
+        drawTotalLine(state.includesVat ? 'Total Rabatt (Exkl. moms):' : 'Total Rabatt:', `-${formatSEK(exportSummary.totalDiscountSek)} SEK`, finalY);
         finalY += 10;
     } else {
         finalY += 4;

@@ -111,19 +111,19 @@ export function buildExcelSheetData(
     const totals = buildExportSummary(state, summaryData);
     wsData.push([]);
     wsData.push([
-        'Totalt Exkl. Moms',
+        state.includesVat ? 'Totalt Inkl. Moms' : 'Totalt Exkl. Moms',
         '',
         '',
         '',
-        roundSek(totals.finalTotalSek),
-        roundSek(totals.grossTotalSek),
-        roundSek(-totals.totalDiscountSek),
+        roundSek(applyVat(totals.finalTotalSek, state.includesVat)),
+        roundSek(applyVat(totals.grossTotalSek, state.includesVat)),
+        roundSek(-applyVat(totals.totalDiscountSek, state.includesVat)),
         ''
     ]);
 
     if (state.includesVat) {
         wsData.push([
-            'Moms 25%',
+            'Varav Moms (25%)',
             '',
             '',
             '',
@@ -133,11 +133,11 @@ export function buildExcelSheetData(
             ''
         ]);
         wsData.push([
-            'TOTALT ATT BETALA (Ink. Moms)',
+            'Totalt Exkl. Moms',
             '',
             '',
             '',
-            roundSek(totals.totalWithVat),
+            roundSek(totals.finalTotalSek),
             '',
             '',
             ''
