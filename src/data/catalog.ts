@@ -321,10 +321,10 @@ const rawCatalogData: CatalogData = {
                             { id: "xl_spacer_electrics", name: "Spacer for Electrics", price: 660 },
                             { id: "xl_steel_base_4", name: "Steel Plate Base 4", price: 2830 },
                             { id: "xl_steel_base_8", name: "Steel Plate Base 8", price: 4940 },
-                            { id: "xl_powder_coat_steel_base", name: "Powder Coating for Steel Plate Base", price: 0 },
+                            { id: "xl_powder_coat_steel_base", name: "Powder Coating for Steel Plate Base", price: 640 },
                             { id: "xl_crossframe_16", name: "Cross-Frame 16 flagstones", price: 1880 },
                             { id: "xl_flagstones_16", name: "Flagstones 16st", price: 440 },
-                            { id: "xl_powder_coat_crossframe", name: "Powder Coating for Cross-Frame", price: 0 }
+                            { id: "xl_powder_coat_crossframe", name: "Powder Coating for Cross-Frame", price: 270 }
                         ]
                     },
                     {

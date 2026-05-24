@@ -22,6 +22,7 @@ interface AdvancedSketchSidebarProps {
     onSelectEdge: (edgeId: string | null) => void;
     onExportToQuote: () => void;
     onUpdateEdgeProperties: (edgeId: string, updates: Partial<AdvancedEdge>) => void;
+    onSplitEdge: (edgeId: string) => void;
 }
 
 export function AdvancedSketchSidebar({
@@ -42,7 +43,8 @@ export function AdvancedSketchSidebar({
     scale,
     onSelectEdge,
     onExportToQuote,
-    onUpdateEdgeProperties
+    onUpdateEdgeProperties,
+    onSplitEdge
 }: AdvancedSketchSidebarProps) {
     const [lengthInput, setLengthInput] = useState('');
     const [nodeXInput, setNodeXInput] = useState('');
@@ -319,12 +321,20 @@ export function AdvancedSketchSidebar({
                             </div>
                         </div>
 
-                        <button
-                            onClick={() => onDeleteEdge(selectedEdge.id)}
-                            className="mt-2 w-full py-1.5 border border-red-500/30 hover:border-red-500 hover:bg-red-500/10 text-red-400 hover:text-red-300 text-xs font-semibold rounded transition-all"
-                        >
-                            Ta bort vägg
-                        </button>
+                        <div className="flex flex-col gap-2 mt-2">
+                            <button
+                                onClick={() => onSplitEdge(selectedEdge.id)}
+                                className="w-full py-1.5 border border-primary/30 hover:border-primary hover:bg-primary/10 text-primary hover:text-primary-hover text-xs font-semibold rounded transition-all"
+                            >
+                                Dela vägg (Lägg till brytpunkt)
+                            </button>
+                            <button
+                                onClick={() => onDeleteEdge(selectedEdge.id)}
+                                className="w-full py-1.5 border border-red-500/30 hover:border-red-500 hover:bg-red-500/10 text-red-400 hover:text-red-300 text-xs font-semibold rounded transition-all"
+                            >
+                                Ta bort vägg
+                            </button>
+                        </div>
                     </div>
                 )}
 

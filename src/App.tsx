@@ -19,7 +19,7 @@ import { Login } from './views/Login';
 import { useQuote } from './store/QuoteContext';
 import { useAuth } from './store/AuthContext';
 import { db, doc, getDoc } from './services/firebase';
-import { confirmAction } from './services/notificationService';
+import { confirmChoiceAction } from './services/notificationService';
 import { cloneInventoryData, createDefaultInventoryData, normalizeStoredInventoryData } from './views/inventoryData';
 import {
     APP_PATHS,
@@ -29,10 +29,13 @@ import {
     getAuthorizedRouteForAccess,
     getNextLoginRedirectTarget,
     getQuoteDraftGuardRedirect,
+    getQuoteStepNumber,
+    getRetailerResumeQuoteStep,
     hasRetailerStartDraftData,
     parseSketchReturnTarget,
     resolveLoginRedirectTarget,
-    type AppRouteId
+    type AppRouteId,
+    type QuoteRouteStepId
 } from './navigation/routes';
 import { useAppNavigation } from './navigation/useAppNavigation';
 import type { HistoryOpenQuotePayload } from './types/contracts';
@@ -220,15 +223,21 @@ function DashboardPage() {
         }
 
         if (hasRetailerStartDraftData(state)) {
-            const confirmed = await confirmAction({
+            const choice = await confirmChoiceAction({
                 title: 'Starta ny offert?',
                 message: 'Det finns redan uppgifter i den nuvarande offerten. Om du fortsätter rensas utkastet och du börjar om från början.',
                 confirmText: 'Starta ny offert',
                 cancelText: 'Avbryt',
+                secondaryText: 'Fortsätt till nuvarande offert',
                 tone: 'danger'
             });
 
-            if (!confirmed) {
+            if (choice === 'secondary') {
+                navigation.goToQuoteStep(getRetailerResumeQuoteStep(state));
+                return;
+            }
+
+            if (choice !== 'confirm') {
                 return;
             }
         }
@@ -255,8 +264,22 @@ function DashboardPage() {
     );
 }
 
+function useSyncQuoteRouteStep(step: QuoteRouteStepId) {
+    const { state, dispatch } = useQuote();
+    const stepNumber = getQuoteStepNumber(step);
+
+    useEffect(() => {
+        if (state.step === stepNumber) {
+            return;
+        }
+
+        dispatch({ type: 'SET_STEP', payload: stepNumber });
+    }, [dispatch, state.step, stepNumber]);
+}
+
 function ProductLineSelectionPage() {
     const navigation = useAppNavigation();
+    useSyncQuoteRouteStep('product-lines');
 
     return <ProductLineSelection onNext={() => navigation.goToQuoteStep('configuration')} />;
 }
@@ -264,6 +287,7 @@ function ProductLineSelectionPage() {
 function ConfigurationPage() {
     const navigation = useAppNavigation();
     const { canAccessSketch } = useAuth();
+    useSyncQuoteRouteStep('configuration');
 
     return (
         <Configuration
@@ -276,6 +300,7 @@ function ConfigurationPage() {
 
 function PricingPage() {
     const navigation = useAppNavigation();
+    useSyncQuoteRouteStep('pricing');
 
     return (
         <Pricing
@@ -288,6 +313,7 @@ function PricingPage() {
 function SummaryExportPage() {
     const navigation = useAppNavigation();
     const { canAccessSketch } = useAuth();
+    useSyncQuoteRouteStep('summary');
 
     return (
         <SummaryExport

@@ -65,6 +65,13 @@ const QUOTE_STEP_NUMBERS: Record<QuoteRouteStepId, 1 | 2 | 3 | 4> = {
     summary: 4
 };
 
+const QUOTE_STEP_NUMBER_TO_STEP: Record<1 | 2 | 3 | 4, QuoteRouteStepId> = {
+    1: 'product-lines',
+    2: 'configuration',
+    3: 'pricing',
+    4: 'summary'
+};
+
 const ROUTE_ACCESS: Record<AppRouteId, AppRouteAccess> = {
     [APP_ROUTE_IDS.login]: 'public',
     [APP_ROUTE_IDS.dashboard]: 'authenticated',
@@ -247,6 +254,48 @@ export function hasRetailerStartDraftData(
     ].some((value) => String(value || '').trim().length > 0);
 
     return hasSelectedLines || hasSelections || hasCustomCosts || hasQuoteIdentity || hasCustomerInfo;
+}
+
+function getQuoteStepFromStateStep(step: QuoteState['step']): QuoteRouteStepId | null {
+    if (step === 1 || step === 2 || step === 3 || step === 4) {
+        return QUOTE_STEP_NUMBER_TO_STEP[step];
+    }
+
+    return null;
+}
+
+function getFallbackRetailerResumeQuoteStep(
+    state: Pick<QuoteState, 'selectedLines' | 'builderItems' | 'gridSelections' | 'activeQuoteId' | 'quoteNumber' | 'activeQuoteVersion'>
+): QuoteRouteStepId {
+    const hasSelectedLines = Array.isArray(state.selectedLines) && state.selectedLines.length > 0;
+    if (!hasSelectedLines) {
+        return 'product-lines';
+    }
+
+    const hasSelections = hasConfiguredQuoteSelections(state);
+    if (!hasSelections) {
+        return 'configuration';
+    }
+
+    const hasSavedQuoteIdentity = Boolean(state.activeQuoteId || state.quoteNumber || state.activeQuoteVersion);
+    return hasSavedQuoteIdentity ? 'summary' : 'pricing';
+}
+
+export function getRetailerResumeQuoteStep(
+    state: Pick<
+        QuoteState,
+        'step' | 'selectedLines' | 'builderItems' | 'gridSelections' | 'activeQuoteId' | 'quoteNumber' | 'activeQuoteVersion'
+    >
+): QuoteRouteStepId {
+    const currentStep = getQuoteStepFromStateStep(state.step);
+    if (currentStep) {
+        const currentRouteId = getQuoteStepRouteId(currentStep);
+        if (!getQuoteDraftGuardRedirect(currentRouteId, state)) {
+            return currentStep;
+        }
+    }
+
+    return getFallbackRetailerResumeQuoteStep(state);
 }
 
 export function getQuoteDraftGuardRedirect(

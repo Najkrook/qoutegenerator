@@ -445,137 +445,156 @@ export function SummaryExport({ onPrev, onBackToSketch, onOpenRetailerOrderHisto
                             <TermsAndPaymentPanel summaryData={summaryData} />
                         </section>
 
+
                         <section className="bg-panel-bg border border-panel-border rounded-lg p-6 shadow-sm">
                             <h3 className="text-lg font-bold mb-6 flex items-center gap-2">
                                 <span className="text-primary text-xl" aria-hidden="true">📋</span> Summering
                             </h3>
                             <FinalSummaryTable />
-                        </section>
-
-                        {isRetailer && (
-                            <section className="rounded-xl border border-panel-border bg-panel-bg p-6 shadow-sm">
-                                <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-                                    <div className="max-w-3xl">
-                                        <h3 className="m-0 text-lg font-bold text-text-primary">Skicka orderförfrågan till BRIXX</h3>
-                                        <p className="mt-2 text-sm text-text-secondary">
-                                            När offerten är sparad kan den skickas in som en orderförfrågan för intern hantering hos BRIXX.
-                                        </p>
-                                        {!canSubmitOrderRequest && (
-                                            <p className="mt-3 text-sm text-amber-200">
-                                                Spara offerten först för att kunna skicka en orderförfrågan.
+                            <section className="mt-8 flex flex-col gap-6">
+                                {exportBlockReason && (
+                                    <div className="flex items-start gap-4 rounded-xl border border-amber-500/30 bg-amber-500/10 px-6 py-5 shadow-sm">
+                                        <div className="flex-shrink-0 text-2xl" aria-hidden="true">⚠️</div>
+                                        <div>
+                                            <h4 className="m-0 text-base font-bold text-amber-200">Offerten saknar offertnummer</h4>
+                                            <p className="m-0 mt-1 text-sm text-amber-100/90">{exportBlockReason}</p>
+                                            <p className="m-0 mt-2 text-sm text-amber-100/80">
+                                                Spara offert är rekommenderat, men du kan fortfarande exportera PDF:n utan nummer.
                                             </p>
-                                        )}
-                                        {orderRequest && (
-                                            <div className="mt-4 flex flex-wrap items-center gap-3 text-sm">
-                                                <span className={`rounded-full border px-3 py-1 font-semibold ${getRetailerOrderRequestStatusClasses(orderRequest.status)}`}>
-                                                    {getRetailerOrderRequestStatusLabel(orderRequest.status)}
-                                                </span>
-                                                <span className="text-text-secondary">
-                                                    Registrerad för version v{orderRequest.quoteVersion}.
-                                                </span>
-                                            </div>
-                                        )}
-                                        {isLoadingOrderRequest && (
-                                            <p className="mt-3 text-sm text-text-secondary">Kontrollerar aktuell orderförfrågan...</p>
-                                        )}
-                                        {orderRequest && (
-                                            <div className="mt-4 rounded-xl border border-success/25 bg-success/10 p-4">
-                                                <h4 className="m-0 text-base font-semibold text-text-primary">
-                                                    {hasJustSubmittedOrderRequest ? 'Tack för din order!' : 'Orderförfrågan registrerad'}
-                                                </h4>
-                                                <p className="mt-2 text-sm text-text-secondary">
-                                                    {hasJustSubmittedOrderRequest
-                                                        ? 'Du kan följa statusen live under Skickade ordrar. Där ser du när BRIXX börjar hantera ärendet.'
-                                                        : 'Följ statusen för era skickade ordrar under Skickade ordrar.'}
-                                                </p>
-                                                {onOpenRetailerOrderHistory && (
-                                                    <button
-                                                        type="button"
-                                                        onClick={onOpenRetailerOrderHistory}
-                                                        className="mt-4 rounded-md border border-panel-border bg-black/10 px-4 py-2 text-sm font-medium text-text-primary transition-colors hover:bg-white/5"
-                                                    >
-                                                        Se skickade ordrar
-                                                    </button>
-                                                )}
-                                            </div>
-                                        )}
+                                        </div>
                                     </div>
+                                )}
 
-                                    <div className="flex w-full flex-col gap-3 lg:w-auto lg:min-w-[280px]">
+                                <div className="flex flex-col xl:flex-row justify-between items-center gap-4 rounded-xl border border-panel-border bg-black/40 p-3 shadow-sm">
+                                    <button
+                                        type="button"
+                                        onClick={handleBack}
+                                        className="w-full xl:w-auto px-6 py-3 bg-panel-bg border border-panel-border text-text-secondary rounded-lg font-medium hover:bg-panel-border hover:text-white transition-all text-sm tracking-wide flex items-center justify-center gap-2 group whitespace-nowrap"
+                                    >
+                                        <span className="group-hover:-translate-x-1 transition-transform">&larr;</span>
+                                        Tillbaka för att ändra priser
+                                    </button>
+
+                                    <div className="flex flex-col sm:flex-row items-center gap-3 w-full xl:w-auto">
                                         <button
                                             type="button"
                                             onClick={() => {
-                                                void handleSubmitOrderRequest();
+                                                void handleSaveQuote();
                                             }}
-                                            disabled={!canSubmitOrderRequest || Boolean(orderRequest) || isSubmittingOrderRequest || isLoadingOrderRequest}
-                                            className="rounded-lg bg-primary px-6 py-3 text-sm font-bold text-white shadow-lg shadow-primary/20 transition-all hover:bg-primary-hover disabled:cursor-not-allowed disabled:opacity-50"
+                                            disabled={isSavingQuote}
+                                            className="w-full sm:w-auto px-6 py-3 bg-success/10 border border-success/40 text-success rounded-lg font-bold hover:bg-success/20 hover:border-success/60 active:bg-success/30 transition-all text-sm tracking-wide flex items-center justify-center gap-2 disabled:cursor-not-allowed disabled:opacity-50 shadow-[0_0_15px_rgba(16,185,129,0.05)]"
                                         >
-                                            {isSubmittingOrderRequest
-                                                ? 'Skickar orderförfrågan...'
-                                                : orderRequest
-                                                    ? `Orderförfrågan registrerad för v${orderRequest.quoteVersion}`
-                                                    : 'Skicka orderförfrågan'}
+                                            <span aria-hidden="true" className="opacity-70">💾</span> {isSavingQuote ? 'Sparar...' : 'Spara offert'}
                                         </button>
-                                        <p className="m-0 text-xs text-text-secondary">
-                                            Det här påverkar inte offertens vanliga status utan skapar ett separat adminärende.
-                                        </p>
+                                        
+                                        {exportBlockReason && (
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    void handleExportPDF({ allowMissingQuoteNumber: true });
+                                                }}
+                                                className="w-full sm:w-auto px-6 py-3 bg-amber-500/10 text-amber-400 border border-amber-500/30 rounded-lg font-bold hover:bg-amber-500/20 transition-all text-sm tracking-wide flex items-center justify-center gap-2"
+                                            >
+                                                <span aria-hidden="true">!</span> Exportera ändå
+                                            </button>
+                                        )}
+
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                void handleExportPDF();
+                                            }}
+                                            disabled={Boolean(exportBlockReason)}
+                                            className="w-full sm:w-auto px-8 py-3 bg-primary text-white rounded-lg font-bold hover:bg-primary-hover shadow-lg shadow-primary/20 transition-all text-sm tracking-wide flex items-center justify-center gap-2 disabled:cursor-not-allowed disabled:opacity-50 disabled:shadow-none"
+                                        >
+                                            <span aria-hidden="true">📄</span> Exportera som PDF
+                                        </button>
+
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                void handleExportExcel();
+                                            }}
+                                            disabled={Boolean(exportBlockReason)}
+                                            className="w-full sm:w-auto px-6 py-3 bg-panel-bg border border-panel-border text-white rounded-lg font-bold hover:bg-white/5 transition-all text-sm tracking-wide flex items-center justify-center gap-2 disabled:cursor-not-allowed disabled:opacity-50"
+                                        >
+                                            <span aria-hidden="true" className={exportBlockReason ? "opacity-50" : "opacity-70"}>📊</span> Exportera som Excel
+                                        </button>
                                     </div>
                                 </div>
                             </section>
-                        )}
 
-                        <section className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mt-4 p-6 bg-black/40 border border-panel-border rounded-xl">
-                            <button
-                                type="button"
-                                onClick={handleBack}
-                                className="text-text-secondary hover:text-white transition-colors flex items-center gap-2 group whitespace-nowrap text-sm md:text-base"
-                            >
-                                <span className="group-hover:-translate-x-1 transition-transform">&larr;</span>
-                                Tillbaka för att ändra priser
-                            </button>
+                            {isRetailer && (
+                                <section className="rounded-xl border border-panel-border bg-panel-bg p-6 shadow-sm mt-8">
+                                    <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                                        <div className="max-w-3xl">
+                                            <h3 className="m-0 text-lg font-bold text-text-primary">Skicka orderförfrågan till BRIXX</h3>
+                                            <p className="mt-2 text-sm text-text-secondary">
+                                                När offerten är sparad kan den skickas in som en orderförfrågan för intern hantering hos BRIXX.
+                                            </p>
+                                            {!canSubmitOrderRequest && (
+                                                <p className="mt-3 text-sm text-amber-200">
+                                                    Spara offerten först för att kunna skicka en orderförfrågan.
+                                                </p>
+                                            )}
+                                            {orderRequest && (
+                                                <div className="mt-4 flex flex-wrap items-center gap-3 text-sm">
+                                                    <span className={`rounded-full border px-3 py-1 font-semibold ${getRetailerOrderRequestStatusClasses(orderRequest.status)}`}>
+                                                        {getRetailerOrderRequestStatusLabel(orderRequest.status)}
+                                                    </span>
+                                                    <span className="text-text-secondary">
+                                                        Registrerad för version v{orderRequest.quoteVersion}.
+                                                    </span>
+                                                </div>
+                                            )}
+                                            {isLoadingOrderRequest && (
+                                                <p className="mt-3 text-sm text-text-secondary">Kontrollerar aktuell orderförfrågan...</p>
+                                            )}
+                                            {orderRequest && (
+                                                <div className="mt-4 rounded-xl border border-success/25 bg-success/10 p-4">
+                                                    <h4 className="m-0 text-base font-semibold text-text-primary">
+                                                        {hasJustSubmittedOrderRequest ? 'Tack för din order!' : 'Orderförfrågan registrerad'}
+                                                    </h4>
+                                                    <p className="mt-2 text-sm text-text-secondary">
+                                                        {hasJustSubmittedOrderRequest
+                                                            ? 'Du kan följa statusen live under Skickade ordrar. Där ser du när BRIXX börjar hantera ärendet.'
+                                                            : 'Följ statusen för era skickade ordrar under Skickade ordrar.'}
+                                                    </p>
+                                                    {onOpenRetailerOrderHistory && (
+                                                        <button
+                                                            type="button"
+                                                            onClick={onOpenRetailerOrderHistory}
+                                                            className="mt-4 rounded-md border border-panel-border bg-black/10 px-4 py-2 text-sm font-medium text-text-primary transition-colors hover:bg-white/5"
+                                                        >
+                                                            Se skickade ordrar
+                                                        </button>
+                                                    )}
+                                                </div>
+                                            )}
+                                        </div>
 
-                            <div className="flex flex-col gap-3 w-full md:w-auto md:items-end">
-                                {exportBlockReason && (
-                                    <div className="max-w-[420px] rounded-xl border border-amber-400/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">
-                                        <p className="m-0 font-semibold">{'Offerten saknar offertnummer'}</p>
-                                        <p className="m-0 mt-1 text-amber-100/90">{exportBlockReason}</p>
-                                        <p className="m-0 mt-2 text-amber-100/80">{'Spara offert \u00E4r rekommenderat, men du kan fortfarande exportera PDF:n utan nummer.'}</p>
+                                        <div className="flex w-full flex-col gap-3 lg:w-auto lg:min-w-[280px]">
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    void handleSubmitOrderRequest();
+                                                }}
+                                                disabled={!canSubmitOrderRequest || Boolean(orderRequest) || isSubmittingOrderRequest || isLoadingOrderRequest}
+                                                className="rounded-lg bg-primary px-6 py-3 text-sm font-bold text-white shadow-lg shadow-primary/20 transition-all hover:bg-primary-hover disabled:cursor-not-allowed disabled:opacity-50"
+                                            >
+                                                {isSubmittingOrderRequest
+                                                    ? 'Skickar orderförfrågan...'
+                                                    : orderRequest
+                                                        ? `Orderförfrågan registrerad för v${orderRequest.quoteVersion}`
+                                                        : 'Skicka orderförfrågan'}
+                                            </button>
+                                            <p className="m-0 text-xs text-text-secondary">
+                                                Det här påverkar inte offertens vanliga status utan skapar ett separat adminärende.
+                                            </p>
+                                        </div>
                                     </div>
-                                )}
-
-                                <div className="flex flex-col sm:flex-row gap-3 md:gap-4 w-full md:w-auto md:justify-end">
-                                <button
-                                    type="button"
-                                    onClick={() => {
-                                        void handleExportPDF();
-                                    }}
-                                    disabled={Boolean(exportBlockReason)}
-                                    className="px-6 py-3 bg-primary text-white rounded-lg font-bold hover:bg-primary-hover shadow-lg shadow-primary/20 transition-all tracking-wide flex items-center justify-center gap-2 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-primary"
-                                >
-                                    <span aria-hidden="true">📄</span> Exportera som PDF
-                                </button>
-                                {exportBlockReason && (
-                                    <button
-                                        type="button"
-                                        onClick={() => {
-                                            void handleExportPDF({ allowMissingQuoteNumber: true });
-                                        }}
-                                        className="px-6 py-3 bg-amber-500/15 text-amber-100 border border-amber-400/35 rounded-lg font-bold hover:bg-amber-500/25 transition-all tracking-wide flex items-center justify-center gap-2"
-                                    >
-                                        <span aria-hidden="true">!</span> {'Exportera \u00E4nd\u00E5'}
-                                    </button>
-                                )}
-                                <button
-                                    type="button"
-                                    onClick={() => {
-                                        void handleExportExcel();
-                                    }}
-                                    className="px-6 py-3 bg-success text-white rounded-lg font-bold hover:bg-success-hover shadow-lg shadow-success/20 transition-all tracking-wide flex items-center justify-center gap-2"
-                                >
-                                    <span aria-hidden="true">📊</span> Exportera som Excel
-                                </button>
-                            </div>
-                            </div>
+                                </section>
+                            )}
                         </section>
                     </div>
                 </div>

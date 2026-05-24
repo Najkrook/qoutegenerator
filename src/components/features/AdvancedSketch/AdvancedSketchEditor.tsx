@@ -1,5 +1,5 @@
 import React, { useRef, useState, useEffect, useCallback } from 'react';
-import { Stage, Layer, Circle, Line, Group, Rect, Text } from 'react-konva';
+import { Stage, Layer, Circle, Line, Group, Rect, Text, Arc } from 'react-konva';
 import { useQuote } from '../../../store/QuoteContext';
 import type { SketchToolProps, AdvancedNode, AdvancedEdge, SketchCamera, GridCustomAddonRow, GridLineSelection } from '../../../types/contracts';
 import { AdvancedSketchSidebar } from './AdvancedSketchSidebar';
@@ -535,6 +535,46 @@ export function AdvancedSketchEditor({ onBack, modeToggleNode }: SketchToolProps
         toast.success('Vägg borttagen');
     };
 
+    const handleSplitEdge = (edgeId: string) => {
+        const edgeToSplit = edges.find(e => e.id === edgeId);
+        if (!edgeToSplit) return;
+        
+        const startNode = nodes.find(n => n.id === edgeToSplit.startNodeId);
+        const endNode = nodes.find(n => n.id === edgeToSplit.endNodeId);
+        if (!startNode || !endNode) return;
+
+        const mx = (startNode.x + endNode.x) / 2;
+        const my = (startNode.y + endNode.y) / 2;
+
+        const newNodeId = `node-${Date.now()}`;
+        const newNode: AdvancedNode = { id: newNodeId, x: mx, y: my };
+
+        const newEdge1: AdvancedEdge = {
+            ...edgeToSplit,
+            id: `edge-${Date.now()}-1`,
+            startNodeId: startNode.id,
+            endNodeId: newNode.id
+        };
+
+        const newEdge2: AdvancedEdge = {
+            ...edgeToSplit,
+            id: `edge-${Date.now()}-2`,
+            startNodeId: newNode.id,
+            endNodeId: endNode.id
+        };
+
+        const nextNodes = [...nodes, newNode];
+        const nextEdges = edges.filter(e => e.id !== edgeId).concat([newEdge1, newEdge2]);
+
+        setNodes(nextNodes);
+        setEdges(nextEdges);
+        pushState(nextNodes, nextEdges);
+        
+        setSelectedEdgeId(null);
+        setSelectedNodeId(newNodeId);
+        toast.success('Vägg delad på mitten');
+    };
+
     const handleApplyTemplate = (templateType: 'rect' | 'lshape' | 'ushape') => {
         const cx = 400;
         const cy = 300;
@@ -801,6 +841,129 @@ export function AdvancedSketchEditor({ onBack, modeToggleNode }: SketchToolProps
         return lines;
     };
 
+    // Render the active drawing line with length preview
+    const renderDrawPreview = () => {
+        if (drawMode !== 'draw' || !activeDrawNodeId || !cursorPos) return null;
+        
+        const start = nodes.find(n => n.id === activeDrawNodeId);
+        if (!start) return null;
+        
+        const dx = cursorPos.x - start.x;
+        const dy = cursorPos.y - start.y;
+        const distMm = Math.round(Math.sqrt(dx * dx + dy * dy) * SCALE);
+        const mx = start.x + dx / 2;
+        const my = start.y + dy / 2;
+        const angle = Math.atan2(dy, dx) * (180 / Math.PI);
+        const textRotation = angle > 90 || angle < -90 ? angle + 180 : angle;
+
+        return (
+            <Group listening={false}>
+                <Line
+                    points={[start.x, start.y, cursorPos.x, cursorPos.y]}
+                    stroke="#ef4444"
+                    strokeWidth={4}
+                    dash={[10, 10]}
+                />
+                {distMm > 50 && (
+                    <Group x={mx} y={my} rotation={textRotation}>
+                        <Rect
+                            x={-24}
+                            y={-12}
+                            width={48}
+                            height={16}
+                            fill="rgba(239, 68, 68, 0.9)"
+                            cornerRadius={4}
+                        />
+                        <Text
+                            text={`${distMm} mm`}
+                            x={-24}
+                            y={-8}
+                            width={48}
+                            align="center"
+                            fontSize={9}
+                            fontStyle="bold"
+                            fontFamily="Outfit, Inter, sans-serif"
+                            fill="white"
+                        />
+                    </Group>
+                )}
+            </Group>
+        );
+    };
+
+    // Render angles for connected edges
+    const renderAngles = () => {
+        const angleElements: React.ReactNode[] = [];
+        
+        nodes.forEach(node => {
+            const connectedEdges = edges.filter(e => e.startNodeId === node.id || e.endNodeId === node.id);
+            if (connectedEdges.length === 2) {
+                const edge1 = connectedEdges[0];
+                const edge2 = connectedEdges[1];
+                
+                const otherNode1 = nodes.find(n => n.id === (edge1.startNodeId === node.id ? edge1.endNodeId : edge1.startNodeId));
+                const otherNode2 = nodes.find(n => n.id === (edge2.startNodeId === node.id ? edge2.endNodeId : edge2.startNodeId));
+                
+                if (otherNode1 && otherNode2) {
+                    const dx1 = otherNode1.x - node.x;
+                    const dy1 = otherNode1.y - node.y;
+                    const dx2 = otherNode2.x - node.x;
+                    const dy2 = otherNode2.y - node.y;
+                    
+                    let a1 = Math.atan2(dy1, dx1) * (180 / Math.PI);
+                    let a2 = Math.atan2(dy2, dx2) * (180 / Math.PI);
+                    
+                    if (a1 < 0) a1 += 360;
+                    if (a2 < 0) a2 += 360;
+                    
+                    let angleDiff = Math.abs(a2 - a1);
+                    let startAngle = Math.min(a1, a2);
+                    
+                    if (angleDiff > 180) {
+                        angleDiff = 360 - angleDiff;
+                        startAngle = Math.max(a1, a2);
+                    }
+                    
+                    const degrees = Math.round(angleDiff);
+                    
+                    if (degrees > 0 && degrees < 180) {
+                        const bisectAngle = startAngle + angleDiff / 2;
+                        const bisectRad = bisectAngle * (Math.PI / 180);
+                        const radius = 25;
+                        
+                        angleElements.push(
+                            <Group key={`angle-${node.id}`} x={node.x} y={node.y}>
+                                <Arc
+                                    innerRadius={0}
+                                    outerRadius={radius}
+                                    angle={angleDiff}
+                                    rotation={startAngle}
+                                    fill="rgba(56, 189, 248, 0.15)"
+                                    stroke="#38bdf8"
+                                    strokeWidth={1.5}
+                                    listening={false}
+                                />
+                                <Text
+                                    text={`${degrees}°`}
+                                    x={Math.cos(bisectRad) * (radius + 12) - 15}
+                                    y={Math.sin(bisectRad) * (radius + 12) - 6}
+                                    fontSize={10}
+                                    fontStyle="bold"
+                                    fontFamily="Outfit, Inter, sans-serif"
+                                    fill="#7dd3fc"
+                                    width={30}
+                                    align="center"
+                                />
+                            </Group>
+                        );
+                    }
+                }
+            }
+        });
+        
+        return angleElements;
+    };
+
     // Draw dimension labels
     const renderDimensionLabels = () => {
         return edges.map(edge => {
@@ -1028,19 +1191,7 @@ export function AdvancedSketchEditor({ onBack, modeToggleNode }: SketchToolProps
                             ))}
 
                             {/* Drawing active line preview */}
-                            {drawMode === 'draw' && activeDrawNodeId && cursorPos && (
-                                <Line
-                                    points={[
-                                        nodes.find(n => n.id === activeDrawNodeId)?.x || 0,
-                                        nodes.find(n => n.id === activeDrawNodeId)?.y || 0,
-                                        cursorPos.x,
-                                        cursorPos.y
-                                    ]}
-                                    stroke="#ef4444"
-                                    strokeWidth={3}
-                                    dash={[5, 3]}
-                                />
-                            )}
+                            {renderDrawPreview()}
 
                             {/* Drawn Edges (Walls) */}
                             {edges.map(edge => {
@@ -1202,6 +1353,9 @@ export function AdvancedSketchEditor({ onBack, modeToggleNode }: SketchToolProps
                                 );
                             })}
 
+                            {/* Angles */}
+                            {renderAngles()}
+
                             {/* Dimension Labels */}
                             {renderDimensionLabels()}
 
@@ -1272,6 +1426,7 @@ export function AdvancedSketchEditor({ onBack, modeToggleNode }: SketchToolProps
                     onSelectEdge={(edgeId) => setSelectedEdgeId(edgeId)}
                     onExportToQuote={() => handleExportToQuote(false)}
                     onUpdateEdgeProperties={handleUpdateEdgeProperties}
+                    onSplitEdge={handleSplitEdge}
                 />
             </div>
         </div>

@@ -2,6 +2,7 @@ import React, { type ChangeEvent } from 'react';
 import { useQuote } from '../../store/QuoteContext';
 import { catalogData } from '../../data/catalog';
 import { computeQuoteTotals } from '../../services/calculationEngine';
+import { applyVat } from '../../utils/vatHelper';
 
 export function FinalSummaryTable() {
     const { state, dispatch } = useQuote();
@@ -38,9 +39,9 @@ export function FinalSummaryTable() {
                         <tr className="bg-black/20 text-[10px] uppercase font-bold text-text-secondary tracking-wider">
                             <th className="p-4 border-b border-panel-border">Modell</th>
                             <th className="p-4 border-b border-panel-border">Storlek</th>
-                            <th className="p-4 border-b border-panel-border text-right whitespace-nowrap">Ert pris</th>
+                            <th className="p-4 border-b border-panel-border text-right whitespace-nowrap">{state.includesVat ? 'Ert pris (Inkl. moms)' : 'Ert pris'}</th>
                             <th className="p-4 border-b border-panel-border text-center whitespace-nowrap">Antal</th>
-                            <th className="p-4 border-b border-panel-border text-right whitespace-nowrap">Rek utpris</th>
+                            <th className="p-4 border-b border-panel-border text-right whitespace-nowrap">{state.includesVat ? 'Rek utpris (Inkl. moms)' : 'Rek utpris'}</th>
                             <th className="p-4 border-b border-panel-border text-right whitespace-nowrap">Rabatt %</th>
                         </tr>
                     </thead>
@@ -52,9 +53,9 @@ export function FinalSummaryTable() {
                             >
                                 <td className={`p-3 text-sm ${row.isAddon ? 'pl-8' : ''}`}>{row.model}</td>
                                 <td className="p-3 text-sm text-text-secondary">{row.size}</td>
-                                <td className="p-3 text-sm text-right text-primary font-bold whitespace-nowrap">{formatSek(row.net)} SEK</td>
+                                <td className="p-3 text-sm text-right text-primary font-bold whitespace-nowrap">{formatSek(applyVat(row.net, state.includesVat))} SEK</td>
                                 <td className="p-3 text-sm text-center whitespace-nowrap">{row.qty}</td>
-                                <td className="p-3 text-sm text-right text-text-secondary whitespace-nowrap">{formatSek(row.gross)} SEK</td>
+                                <td className="p-3 text-sm text-right text-text-secondary whitespace-nowrap">{formatSek(applyVat(row.gross, state.includesVat))} SEK</td>
                                 <td className="p-3 text-sm text-right text-danger whitespace-nowrap">-{row.discountPct}%</td>
                             </tr>
                         ))}
@@ -62,7 +63,7 @@ export function FinalSummaryTable() {
                         {globalDiscountAmt > 0 && (
                             <tr className="bg-black/10 italic text-text-secondary">
                                 <td colSpan={2} className="p-3 text-sm">Övergripande offertrabatt ({state.globalDiscountPct}%)</td>
-                                <td className="p-3 text-sm text-right text-danger font-bold whitespace-nowrap">-{formatSek(globalDiscountAmt)} SEK</td>
+                                <td className="p-3 text-sm text-right text-danger font-bold whitespace-nowrap">-{formatSek(applyVat(globalDiscountAmt, state.includesVat))} SEK</td>
                                 <td colSpan={3}></td>
                             </tr>
                         )}
@@ -71,8 +72,8 @@ export function FinalSummaryTable() {
                         <tr>
                             <td colSpan={2} className="p-4 text-right text-xs uppercase font-bold text-text-secondary">Totalt exkl. moms</td>
                             <td className="p-4 text-right font-bold text-primary text-3xl whitespace-nowrap">{formatSek(finalTotalSek)} SEK</td>
-                            <td colSpan={2} className="p-4 text-right text-xs uppercase font-bold text-text-secondary whitespace-nowrap">Brutto: {formatSek(grossTotalSek)} SEK</td>
-                            <td className="p-4 text-right text-danger font-bold text-xs">Total rabatt:<br />-{formatSek(totalDiscountSek)} SEK</td>
+                            <td colSpan={2} className="p-4 text-right text-xs uppercase font-bold text-text-secondary whitespace-nowrap">{state.includesVat ? 'Brutto (inkl. moms):' : 'Brutto:'} {formatSek(applyVat(grossTotalSek, state.includesVat))} SEK</td>
+                            <td className="p-4 text-right text-danger font-bold text-xs">{state.includesVat ? 'Total rabatt (inkl. moms):' : 'Total rabatt:'}<br />-{formatSek(applyVat(totalDiscountSek, state.includesVat))} SEK</td>
                         </tr>
                         {state.includesVat && (
                             <>

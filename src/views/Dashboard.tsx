@@ -154,7 +154,7 @@ export function Dashboard({
         return (
             <div className="mx-auto flex max-w-6xl flex-col gap-8 animate-slide-in">
                 <section className="w-full rounded-2xl border border-panel-border bg-panel-bg p-8 shadow-lg">
-                    <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
+                    <div>
                         <div className="max-w-3xl">
                             <span className="inline-flex rounded-full border border-primary/30 bg-primary/10 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.2em] text-primary">
                                 Retailer Workspace
@@ -165,25 +165,6 @@ export function Dashboard({
                             <p className="mt-3 max-w-2xl text-sm leading-relaxed text-text-secondary">
                                 Här kan ni se och skapa offerter från de produktlinjer och sortiment ni har tillgång till hos BRIXX.
                             </p>
-                        </div>
-
-                        <div className="grid min-w-[240px] grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-1">
-                            <div className="rounded-xl border border-panel-border bg-black/10 p-4">
-                                <div className="text-[11px] font-bold uppercase tracking-[0.18em] text-text-secondary">
-                                    Aktiva produktlinjer
-                                </div>
-                                <div className="mt-2 text-3xl font-black text-text-primary">
-                                    {retailerLineSummaries.length}
-                                </div>
-                            </div>
-                            <div className="rounded-xl border border-panel-border bg-black/10 p-4">
-                                <div className="text-[11px] font-bold uppercase tracking-[0.18em] text-text-secondary">
-                                    Historik
-                                </div>
-                                <div className="mt-2 text-sm font-medium text-text-primary">
-                                    {canAccessQuoteHistory ? 'Mina Offerter tillgängligt' : 'Historik ej tillgänglig'}
-                                </div>
-                            </div>
                         </div>
                     </div>
 

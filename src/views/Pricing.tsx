@@ -264,7 +264,10 @@ export function Pricing({ onNext, onPrev }: PricingProps) {
                     </button>
                     <button
                         type="button"
-                        onClick={onNext}
+                        onClick={() => {
+                            window.scrollTo(0, 0);
+                            onNext();
+                        }}
                         className="px-8 py-2.5 rounded-md font-bold text-base bg-primary hover:bg-primary-hover text-white scale-105 shadow-lg shadow-primary-hover/30 transition-all flex items-center gap-2"
                     >
                         Granska Offert &raquo;

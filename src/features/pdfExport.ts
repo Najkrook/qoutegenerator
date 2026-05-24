@@ -129,6 +129,7 @@ export function generatePDF(
             currentY: finalY,
             pageWidth,
             pageHeight,
+            includesVat: state.includesVat,
             hideDiscountReferences,
             drawMainHeader,
             layout: PDF_LAYOUT

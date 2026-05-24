@@ -7,6 +7,7 @@ import type {
     PdfTableRow,
     QuoteTotalsRow
 } from '../types/contracts';
+import { applyVat } from '../utils/vatHelper';
 
 type WorksheetCell = string | number;
 type WorksheetRow = WorksheetCell[];
@@ -69,18 +70,27 @@ export function buildExcelSheetData(
         ['Datum', customerInfo.date || new Date().toLocaleDateString()],
         ['Giltighetstid', customerInfo.validity || ''],
         [],
-        ['Modell', 'Storlek', 'Pris/enhet (Exkl. moms)', 'Antal', 'Ert Pris', 'Rek Utpris', 'Rabatt i SEK', 'Rabatt i %']
+        [
+            'Modell', 
+            'Storlek', 
+            state.includesVat ? 'Pris/enhet (Inkl. moms)' : 'Pris/enhet (Exkl. moms)', 
+            'Antal', 
+            state.includesVat ? 'Ert Pris (Inkl. moms)' : 'Ert Pris', 
+            state.includesVat ? 'Rek Utpris (Inkl. moms)' : 'Rek Utpris', 
+            state.includesVat ? 'Rabatt i SEK (Inkl. moms)' : 'Rabatt i SEK', 
+            'Rabatt i %'
+        ]
     ];
 
     (summaryData.totals || []).forEach((row) => {
         wsData.push([
             row.model,
             row.size,
-            roundSek(row.unitPrice),
+            roundSek(applyVat(row.unitPrice, state.includesVat)),
             row.qty,
-            roundSek(row.net),
-            roundSek(row.gross),
-            roundSek(-(row.discountSek || 0)),
+            roundSek(applyVat(row.net, state.includesVat)),
+            roundSek(applyVat(row.gross, state.includesVat)),
+            roundSek(-applyVat(row.discountSek || 0, state.includesVat)),
             `${row.discountPct}%`
         ]);
     });
@@ -93,7 +103,7 @@ export function buildExcelSheetData(
             '',
             '',
             '',
-            roundSek(-(summaryData.globalDiscountAmt || 0)),
+            roundSek(-applyVat(summaryData.globalDiscountAmt || 0, state.includesVat)),
             ''
         ]);
     }
@@ -144,24 +154,25 @@ export function buildPdfTableData(
 ): PdfTableRow[] {
     const hideDiscountColumns = options.hideDiscountColumns === true;
     const hideRecommendedPriceColumn = options.hideRecommendedPriceColumn === true;
+    const includesVat = options.includesVat === true;
     const tableData: PdfTableRow[] = [];
 
     totalsArray.forEach((row) => {
         const cells: PdfTableRow = [
             row.model,
             row.size || '-',
-            `${formatSEK(row.unitPrice)} SEK`,
+            `${formatSEK(applyVat(row.unitPrice, includesVat))} SEK`,
             `${row.qty}`,
-            `${formatSEK(row.net)} SEK`
+            `${formatSEK(applyVat(row.net, includesVat))} SEK`
         ];
 
         if (!hideRecommendedPriceColumn) {
-            cells.push(`${formatSEK(row.gross)} SEK`);
+            cells.push(`${formatSEK(applyVat(row.gross, includesVat))} SEK`);
         }
 
         if (!hideDiscountColumns) {
             cells.push(
-                `${formatSEK(row.discountSek)} SEK`,
+                `${formatSEK(applyVat(row.discountSek, includesVat))} SEK`,
                 `${row.discountPct}%`
             );
         }

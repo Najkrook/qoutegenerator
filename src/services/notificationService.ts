@@ -2,6 +2,7 @@ import React from 'react';
 import toast, { type Toast } from 'react-hot-toast';
 
 type NotificationType = 'success' | 'error' | 'info' | 'warn';
+export type ConfirmActionChoice = 'cancel' | 'confirm' | 'secondary';
 
 interface NotificationOptions {
     id?: string;
@@ -36,10 +37,11 @@ let confirmOverlay: HTMLDivElement | null = null;
 let confirmDialog: HTMLDivElement | null = null;
 let confirmTitle: HTMLHeadingElement | null = null;
 let confirmMessage: HTMLParagraphElement | null = null;
+let confirmSecondaryBtn: HTMLButtonElement | null = null;
 let confirmCancelBtn: HTMLButtonElement | null = null;
 let confirmOkBtn: HTMLButtonElement | null = null;
 let lastFocusedElement: Element | null = null;
-let confirmResolver: ((value: boolean) => void) | null = null;
+let confirmResolver: ((value: ConfirmActionChoice) => void) | null = null;
 let removeConfirmTrap: ((event: KeyboardEvent) => void) | null = null;
 
 function createConfirmDialog() {
@@ -67,6 +69,12 @@ function createConfirmDialog() {
     const actions = document.createElement('div');
     actions.className = 'app-confirm-actions';
 
+    confirmSecondaryBtn = document.createElement('button');
+    confirmSecondaryBtn.type = 'button';
+    confirmSecondaryBtn.className = 'app-confirm-secondary';
+    confirmSecondaryBtn.textContent = 'Fortsätt';
+    confirmSecondaryBtn.hidden = true;
+
     confirmCancelBtn = document.createElement('button');
     confirmCancelBtn.type = 'button';
     confirmCancelBtn.className = 'app-confirm-cancel';
@@ -77,7 +85,7 @@ function createConfirmDialog() {
     confirmOkBtn.className = 'app-confirm-ok';
     confirmOkBtn.textContent = 'Bekräfta';
 
-    actions.append(confirmCancelBtn, confirmOkBtn);
+    actions.append(confirmSecondaryBtn, confirmCancelBtn, confirmOkBtn);
     confirmDialog.append(confirmTitle, confirmMessage, actions);
     confirmOverlay.appendChild(confirmDialog);
 }
@@ -87,13 +95,13 @@ function onConfirmKeydown(event: KeyboardEvent) {
 
     if (event.key === 'Escape') {
         event.preventDefault();
-        closeConfirm(false);
+        closeConfirm('cancel');
         return;
     }
 
     if (event.key !== 'Tab') return;
     const focusable = confirmDialog.querySelectorAll(
-        'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+        'button:not([hidden]), [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
     );
     if (focusable.length === 0) return;
 
@@ -119,7 +127,7 @@ function openConfirm() {
     confirmOkBtn.focus();
 }
 
-function closeConfirm(result: boolean) {
+function closeConfirm(result: ConfirmActionChoice) {
     if (!confirmOverlay) return;
     confirmOverlay.hidden = true;
     if (removeConfirmTrap) {
@@ -127,7 +135,7 @@ function closeConfirm(result: boolean) {
         removeConfirmTrap = null;
     }
     if (confirmResolver) {
-        confirmResolver(Boolean(result));
+        confirmResolver(result);
         confirmResolver = null;
     }
     if (lastFocusedElement && typeof (lastFocusedElement as HTMLElement).focus === 'function') {
@@ -139,17 +147,18 @@ export function initNotifications() {
     if (containersReady || !document.body) return;
 
     createConfirmDialog();
-    if (!confirmOverlay || !confirmCancelBtn || !confirmOkBtn) {
+    if (!confirmOverlay || !confirmSecondaryBtn || !confirmCancelBtn || !confirmOkBtn) {
         return;
     }
 
     document.body.append(confirmOverlay);
 
-    confirmCancelBtn.addEventListener('click', () => closeConfirm(false));
-    confirmOkBtn.addEventListener('click', () => closeConfirm(true));
+    confirmSecondaryBtn.addEventListener('click', () => closeConfirm('secondary'));
+    confirmCancelBtn.addEventListener('click', () => closeConfirm('cancel'));
+    confirmOkBtn.addEventListener('click', () => closeConfirm('confirm'));
     confirmOverlay.addEventListener('click', (event) => {
         if (event.target === confirmOverlay) {
-            closeConfirm(false);
+            closeConfirm('cancel');
         }
     });
 
@@ -320,7 +329,42 @@ export function notifyAction({
     );
 }
 
-export function confirmAction({
+export function confirmChoiceAction({
+    title = 'Bekräfta',
+    message = 'Är du säker?',
+    confirmText = 'Bekräfta',
+    cancelText = 'Avbryt',
+    secondaryText,
+    tone = 'danger'
+}: {
+    title?: string;
+    message?: string;
+    confirmText?: string;
+    cancelText?: string;
+    secondaryText?: string;
+    tone?: 'danger' | 'neutral';
+} = {}): Promise<ConfirmActionChoice> {
+    initNotifications();
+    if (!confirmOverlay || !confirmDialog || !confirmTitle || !confirmMessage || !confirmSecondaryBtn || !confirmOkBtn || !confirmCancelBtn) {
+        return Promise.resolve('cancel');
+    }
+
+    confirmTitle.textContent = title;
+    confirmMessage.textContent = message;
+    confirmOkBtn.textContent = confirmText;
+    confirmCancelBtn.textContent = cancelText;
+    confirmSecondaryBtn.textContent = secondaryText || '';
+    confirmSecondaryBtn.hidden = !secondaryText;
+    confirmOkBtn.classList.toggle('app-confirm-ok-danger', tone === 'danger');
+    confirmOkBtn.classList.toggle('app-confirm-ok-neutral', tone !== 'danger');
+
+    return new Promise((resolve) => {
+        confirmResolver = resolve;
+        openConfirm();
+    });
+}
+
+export async function confirmAction({
     title = 'Bekräfta',
     message = 'Är du säker?',
     confirmText = 'Bekräfta',
@@ -333,20 +377,13 @@ export function confirmAction({
     cancelText?: string;
     tone?: 'danger' | 'neutral';
 } = {}): Promise<boolean> {
-    initNotifications();
-    if (!confirmOverlay || !confirmDialog || !confirmTitle || !confirmMessage || !confirmOkBtn || !confirmCancelBtn) {
-        return Promise.resolve(false);
-    }
-
-    confirmTitle.textContent = title;
-    confirmMessage.textContent = message;
-    confirmOkBtn.textContent = confirmText;
-    confirmCancelBtn.textContent = cancelText;
-    confirmOkBtn.classList.toggle('app-confirm-ok-danger', tone === 'danger');
-    confirmOkBtn.classList.toggle('app-confirm-ok-neutral', tone !== 'danger');
-
-    return new Promise((resolve) => {
-        confirmResolver = resolve;
-        openConfirm();
+    const choice = await confirmChoiceAction({
+        title,
+        message,
+        confirmText,
+        cancelText,
+        tone
     });
+
+    return choice === 'confirm';
 }

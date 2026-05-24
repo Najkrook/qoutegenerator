@@ -115,7 +115,7 @@ describe('Retailer workspace', () => {
 
         expect(html).toContain('Retailer Workspace');
         expect(html).toContain('Välkommen, Markishuset');
-        expect(html).toContain('Aktiva produktlinjer');
+        expect(html).toContain('Aktiva produktlinjer och rabatter');
         expect(html).toContain('12% rabatt');
         expect(html).toContain('Starta Ny Offert');
         expect(html).toContain('Mina Offerter');

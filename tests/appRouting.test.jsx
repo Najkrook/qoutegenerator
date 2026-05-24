@@ -33,7 +33,8 @@ const firebaseMocks = vi.hoisted(() => ({
 }));
 
 const notificationMocks = vi.hoisted(() => ({
-    confirmAction: vi.fn(async () => true)
+    confirmAction: vi.fn(async () => true),
+    confirmChoiceAction: vi.fn(async () => 'confirm')
 }));
 
 vi.mock('../src/services/firebase', () => firebaseMocks);
@@ -198,6 +199,7 @@ afterEach(() => {
     }
     vi.clearAllMocks();
     notificationMocks.confirmAction.mockResolvedValue(true);
+    notificationMocks.confirmChoiceAction.mockResolvedValue('confirm');
 });
 
 describe('app routing', () => {
@@ -448,7 +450,7 @@ describe('app routing', () => {
 
         await clickButton(container, 'Starta Ny Offert');
 
-        expect(notificationMocks.confirmAction).not.toHaveBeenCalled();
+        expect(notificationMocks.confirmChoiceAction).not.toHaveBeenCalled();
         expect(dispatch).toHaveBeenCalledWith({ type: 'RESET_STATE' });
         expect(router.state.location.pathname).toBe(APP_PATHS[APP_ROUTE_IDS.quoteProductLines]);
     });
@@ -478,17 +480,18 @@ describe('app routing', () => {
 
         await clickButton(container, 'Starta Ny Offert');
 
-        expect(notificationMocks.confirmAction).toHaveBeenCalledWith(expect.objectContaining({
+        expect(notificationMocks.confirmChoiceAction).toHaveBeenCalledWith(expect.objectContaining({
             title: 'Starta ny offert?',
             confirmText: 'Starta ny offert',
-            cancelText: 'Avbryt'
+            cancelText: 'Avbryt',
+            secondaryText: 'Fortsätt till nuvarande offert'
         }));
         expect(dispatch).toHaveBeenCalledWith({ type: 'RESET_STATE' });
         expect(router.state.location.pathname).toBe(APP_PATHS[APP_ROUTE_IDS.quoteProductLines]);
     });
 
     it('keeps retailer dashboard state unchanged when the reset confirmation is cancelled', async () => {
-        notificationMocks.confirmAction.mockResolvedValueOnce(false);
+        notificationMocks.confirmChoiceAction.mockResolvedValueOnce('cancel');
         const dispatch = vi.fn();
         const { container, router } = await renderApp({
             initialEntries: [APP_PATHS[APP_ROUTE_IDS.dashboard]],
@@ -516,9 +519,50 @@ describe('app routing', () => {
 
         await clickButton(container, 'Starta Ny Offert');
 
-        expect(notificationMocks.confirmAction).toHaveBeenCalledTimes(1);
+        expect(notificationMocks.confirmChoiceAction).toHaveBeenCalledTimes(1);
         expect(dispatch).not.toHaveBeenCalledWith({ type: 'RESET_STATE' });
         expect(router.state.location.pathname).toBe(APP_PATHS[APP_ROUTE_IDS.dashboard]);
+    });
+
+    it('continues retailer draft from the latest valid quote step without clearing state', async () => {
+        notificationMocks.confirmChoiceAction.mockResolvedValueOnce('secondary');
+        const dispatch = vi.fn();
+        const { container, router } = await renderApp({
+            initialEntries: [APP_PATHS[APP_ROUTE_IDS.dashboard]],
+            auth: {
+                accessLevel: 'retailer',
+                retailer: {
+                    id: 'retailer_1',
+                    name: 'Roslagen',
+                    email: 'retailer@example.com',
+                    productLines: {
+                        BaHaMa: { enabled: true, discountPct: 20 }
+                    }
+                },
+                isRetailer: true
+            },
+            quoteState: {
+                ...createInitialQuoteState(),
+                step: 4,
+                selectedLines: ['BaHaMa'],
+                builderItems: [{
+                    id: 'item-1',
+                    line: 'BaHaMa',
+                    model: 'Jumbrella',
+                    size: '4x4 Kvadrat',
+                    qty: 1,
+                    discountPct: 0,
+                    addons: []
+                }]
+            },
+            dispatch
+        });
+
+        await clickButton(container, 'Starta Ny Offert');
+
+        expect(notificationMocks.confirmChoiceAction).toHaveBeenCalledTimes(1);
+        expect(dispatch).not.toHaveBeenCalledWith({ type: 'RESET_STATE' });
+        expect(router.state.location.pathname).toBe(APP_PATHS[APP_ROUTE_IDS.quoteSummary]);
     });
 
     it('keeps non-retailer start behavior direct without reset confirmation', async () => {
@@ -538,7 +582,7 @@ describe('app routing', () => {
 
         await clickButton(container, 'Starta Ny Offert');
 
-        expect(notificationMocks.confirmAction).not.toHaveBeenCalled();
+        expect(notificationMocks.confirmChoiceAction).not.toHaveBeenCalled();
         expect(dispatch).not.toHaveBeenCalledWith({ type: 'RESET_STATE' });
         expect(router.state.location.pathname).toBe(APP_PATHS[APP_ROUTE_IDS.quoteProductLines]);
     });

@@ -218,7 +218,7 @@ export function BuilderItem({ item, index, onRemove }: BuilderItemProps) {
 
         if (supportsAddonsOnly) {
             elements.push(
-                <optgroup key="addons-only-group" label="--- UTAN PARASOLL ---" className="bg-panel-bg text-primary font-bold italic">
+                <optgroup key="addons-only-group" label="--- UTAN PARASOLL ---" className="bg-panel-bg text-warning font-bold italic">
                     <option value={ADDONS_ONLY_SIZE} className="bg-panel-bg text-text-primary font-normal not-italic">
                         Endast tillägg
                     </option>
@@ -241,7 +241,7 @@ export function BuilderItem({ item, index, onRemove }: BuilderItemProps) {
                     <optgroup
                         key={groupName}
                         label={`--- ${groupName.toUpperCase()} ---`}
-                        className="bg-panel-bg text-primary font-bold italic"
+                        className="bg-panel-bg text-warning font-bold italic"
                     >
                         {sizeLabels.map((sizeLabel) => (
                             <option key={sizeLabel} value={sizeLabel} className="bg-panel-bg text-text-primary font-normal not-italic">

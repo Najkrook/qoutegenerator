@@ -753,6 +753,7 @@ export interface ExportSummaryResult {
 export interface PdfTableOptions {
     hideDiscountColumns?: boolean;
     hideRecommendedPriceColumn?: boolean;
+    includesVat?: boolean;
 }
 
 export type PdfTableRow = string[];

@@ -125,14 +125,8 @@ export function ProductLineSelection({ onNext }: ProductLineSelectionProps) {
 
     return (
         <div className="max-w-[1200px] mx-auto animate-fade-in">
-            <div className="flex justify-between items-center mb-8">
+            <div className="mb-8">
                 <h2 className="text-2xl font-bold m-0 text-text-primary">Välj Produktlinje</h2>
-                <button
-                    type="button"
-                    className="bg-panel-bg text-text-primary text-xs px-3 py-1.5 rounded border border-panel-border hover:bg-panel-border transition-colors"
-                >
-                    + Uppdatera Prislista
-                </button>
             </div>
 
             {isRetailer && (
