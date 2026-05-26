@@ -12,6 +12,7 @@ import { quoteRepository } from '../services/quoteRepositoryClient';
 import { saveQuoteToRepository } from '../services/quoteSaveService';
 import { safeLogActivity } from '../services/activityLogService';
 import { hasZeroDiscountSummary } from '../services/exportDataBuilders';
+import { buildQuoteRevisionLink } from '../navigation/quoteLinks';
 import {
     getOrderRequestStatusLabel,
     getRetailerOrderRequestStatusLabel,
@@ -331,6 +332,26 @@ export function SummaryExport({ onPrev, onBackToSketch, onOpenRetailerOrderHisto
         }
     };
 
+    const handleCopyQuoteLink = async (): Promise<void> => {
+        if (!state.activeQuoteId) return;
+
+        try {
+            if (!navigator.clipboard?.writeText) {
+                throw new Error('Clipboard API unavailable.');
+            }
+
+            const path = buildQuoteRevisionLink({
+                quoteId: state.activeQuoteId,
+                version: state.activeQuoteVersion
+            });
+            await navigator.clipboard.writeText(`${window.location.origin}${path}`);
+            notifySuccess('L\u00e4nk kopierad.');
+        } catch (error) {
+            console.error('Failed to copy quote link:', error);
+            notifyError('Kunde inte kopiera l\u00e4nken.');
+        }
+    };
+
     const handleSaveQuote = async (): Promise<void> => {
         if (isSavingQuote) return;
 
@@ -487,6 +508,17 @@ export function SummaryExport({ onPrev, onBackToSketch, onOpenRetailerOrderHisto
                                             <span aria-hidden="true" className="opacity-70">💾</span> {isSavingQuote ? 'Sparar...' : 'Spara offert'}
                                         </button>
                                         
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                void handleCopyQuoteLink();
+                                            }}
+                                            disabled={!state.activeQuoteId}
+                                            className="w-full sm:w-auto px-6 py-3 bg-panel-bg border border-panel-border text-white rounded-lg font-bold hover:bg-white/5 transition-all text-sm tracking-wide flex items-center justify-center gap-2 disabled:cursor-not-allowed disabled:opacity-50"
+                                        >
+                                            Kopiera länk
+                                        </button>
+
                                         {exportBlockReason && (
                                             <button
                                                 type="button"

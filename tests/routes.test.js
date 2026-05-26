@@ -10,6 +10,7 @@ import {
     getQuoteStepPath,
     getRetailerResumeQuoteStep,
     getSketchReturnPath,
+    hasConfiguredQuoteSelections,
     hasRetailerStartDraftData,
     parseSketchReturnTarget,
     resolveLoginRedirectTarget
@@ -73,6 +74,36 @@ describe('navigation routes', () => {
         expect(getQuoteDraftGuardRedirect(APP_ROUTE_IDS.quoteConfiguration, emptyState)).toBe(APP_PATHS[APP_ROUTE_IDS.quoteProductLines]);
         expect(getQuoteDraftGuardRedirect(APP_ROUTE_IDS.quotePricing, selectedLinesOnly)).toBe(APP_PATHS[APP_ROUTE_IDS.quoteConfiguration]);
         expect(getQuoteDraftGuardRedirect(APP_ROUTE_IDS.quoteSummary, configuredState)).toBeNull();
+    });
+
+    it('detects configured quote selections', () => {
+        const emptyState = createInitialQuoteState();
+        const builderState = {
+            ...emptyState,
+            builderItems: [{
+                id: 'item-1',
+                line: 'BaHaMa',
+                model: 'Jumbrella',
+                size: '4x4 Kvadrat',
+                qty: 1,
+                discountPct: 0,
+                addons: []
+            }]
+        };
+        const gridState = {
+            ...emptyState,
+            gridSelections: {
+                BaHaMa: {
+                    items: { Jumbrella: { qty: 1 } },
+                    addons: {}
+                }
+            }
+        };
+
+        expect(hasConfiguredQuoteSelections(emptyState)).toBe(false);
+        expect(hasConfiguredQuoteSelections({ ...emptyState, selectedLines: ['BaHaMa'] })).toBe(false);
+        expect(hasConfiguredQuoteSelections(builderState)).toBe(true);
+        expect(hasConfiguredQuoteSelections(gridState)).toBe(true);
     });
 
     it('resolves the retailer resume quote step from saved step and draft contents', () => {

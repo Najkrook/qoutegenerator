@@ -1,4 +1,5 @@
 import React, { Suspense, lazy, useEffect, useRef } from 'react';
+import { flushSync } from 'react-dom';
 import {
     createBrowserRouter,
     Navigate,
@@ -31,6 +32,7 @@ import {
     getQuoteDraftGuardRedirect,
     getQuoteStepNumber,
     getRetailerResumeQuoteStep,
+    hasConfiguredQuoteSelections,
     hasRetailerStartDraftData,
     parseSketchReturnTarget,
     resolveLoginRedirectTarget,
@@ -38,7 +40,7 @@ import {
     type QuoteRouteStepId
 } from './navigation/routes';
 import { useAppNavigation } from './navigation/useAppNavigation';
-import type { HistoryOpenQuotePayload } from './types/contracts';
+import type { GridSelections, HistoryOpenQuotePayload } from './types/contracts';
 
 const SummaryExport = lazy(() => import('./views/SummaryExport').then((module) => ({ default: module.SummaryExport })));
 const InventoryManager = lazy(() => import('./views/InventoryManager').then((module) => ({ default: module.InventoryManager })));
@@ -352,14 +354,22 @@ function HistoryPage() {
     const { dispatch } = useQuote();
 
     const handleOpenQuote = (payload: HistoryOpenQuotePayload) => {
-        dispatch({
-            type: 'HYDRATE_STATE',
-            payload: {
-                ...payload,
-                step: 1
-            }
+        const targetStep = hasConfiguredQuoteSelections({
+            builderItems: Array.isArray(payload.builderItems) ? payload.builderItems : [],
+            gridSelections: payload.gridSelections && typeof payload.gridSelections === 'object'
+                ? payload.gridSelections as GridSelections
+                : {}
+        }) ? 'summary' : 'product-lines';
+        flushSync(() => {
+            dispatch({
+                type: 'HYDRATE_STATE',
+                payload: {
+                    ...payload,
+                    step: getQuoteStepNumber(targetStep)
+                }
+            });
         });
-        navigation.goToQuoteStep('product-lines');
+        navigation.goToQuoteStep(targetStep);
     };
 
     return <History onBack={() => navigation.goToDashboard()} onOpenQuote={handleOpenQuote} />;

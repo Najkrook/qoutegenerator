@@ -232,6 +232,13 @@ beforeEach(() => {
     toastState.loading.mockReset();
     toastState.dismiss.mockReset();
 
+    Object.defineProperty(globalThis.navigator, 'clipboard', {
+        value: {
+            writeText: vi.fn(async () => {})
+        },
+        configurable: true
+    });
+
     if (!globalThis.URL.createObjectURL) {
         globalThis.URL.createObjectURL = vi.fn(() => 'blob:preview');
     } else {
@@ -374,5 +381,46 @@ describe('SummaryExport PDF override', () => {
 
         await clickButton(container, 'Se skickade ordrar');
         expect(onOpenRetailerOrderHistory).toHaveBeenCalledTimes(1);
+    });
+
+    it('disables quote link copying until the quote has been saved', async () => {
+        const { container } = await renderSummaryExport({
+            stateOverrides: {
+                activeQuoteId: null,
+                activeQuoteVersion: 0
+            }
+        });
+
+        expect(findButton(container, 'Kopiera länk').disabled).toBe(true);
+    });
+
+    it('copies the saved quote link', async () => {
+        const { container } = await renderSummaryExport({
+            stateOverrides: {
+                activeQuoteId: 'quote-1',
+                activeQuoteVersion: 2
+            }
+        });
+
+        await clickButton(container, 'Kopiera länk');
+
+        expect(globalThis.navigator.clipboard.writeText).toHaveBeenCalledWith('http://localhost:3000/quotes?openQuote=quote-1&version=2');
+        expect(toastState.success).toHaveBeenCalled();
+    });
+
+    it('shows an error when copying the saved quote link fails', async () => {
+        const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+        globalThis.navigator.clipboard.writeText.mockRejectedValueOnce(new Error('denied'));
+        const { container } = await renderSummaryExport({
+            stateOverrides: {
+                activeQuoteId: 'quote-1',
+                activeQuoteVersion: 2
+            }
+        });
+
+        await clickButton(container, 'Kopiera länk');
+
+        expect(consoleErrorSpy).toHaveBeenCalled();
+        expect(toastState.error).toHaveBeenCalled();
     });
 });

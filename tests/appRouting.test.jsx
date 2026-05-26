@@ -99,18 +99,41 @@ vi.mock('../src/views/RetailerDocuments', () => ({
 
 vi.mock('../src/views/History', () => ({
     History: ({ onOpenQuote }) => (
-        <button
-            type="button"
-            onClick={() => onOpenQuote?.({
-                selectedLines: ['BaHaMa'],
-                customerInfo: { name: 'Ada' },
-                activeQuoteId: 'quote-1',
-                activeQuoteVersion: 2,
-                quoteStatus: 'draft'
-            })}
-        >
-            Open History Quote
-        </button>
+        <div>
+            <button
+                type="button"
+                onClick={() => onOpenQuote?.({
+                    selectedLines: ['BaHaMa'],
+                    customerInfo: { name: 'Ada' },
+                    activeQuoteId: 'quote-1',
+                    activeQuoteVersion: 2,
+                    quoteStatus: 'draft'
+                })}
+            >
+                Open History Quote
+            </button>
+            <button
+                type="button"
+                onClick={() => onOpenQuote?.({
+                    selectedLines: ['BaHaMa'],
+                    builderItems: [{
+                        id: 'item-1',
+                        line: 'BaHaMa',
+                        model: 'Jumbrella',
+                        size: '4x4 Kvadrat',
+                        qty: 1,
+                        discountPct: 0,
+                        addons: []
+                    }],
+                    customerInfo: { name: 'Ada' },
+                    activeQuoteId: 'quote-2',
+                    activeQuoteVersion: 3,
+                    quoteStatus: 'draft'
+                })}
+            >
+                Open Configured History Quote
+            </button>
+        </div>
     )
 }));
 
@@ -372,7 +395,7 @@ describe('app routing', () => {
         expect(container.textContent).not.toContain('SummaryView');
     });
 
-    it('reopens history quotes into the first quote step', async () => {
+    it('reopens unconfigured history quotes into the first quote step', async () => {
         const dispatch = vi.fn();
         const { container, router } = await renderApp({
             initialEntries: [APP_PATHS[APP_ROUTE_IDS.quotes]],
@@ -388,6 +411,40 @@ describe('app routing', () => {
                 activeQuoteId: 'quote-1',
                 activeQuoteVersion: 2,
                 step: 1
+            })
+        }));
+    });
+
+    it('reopens configured history quotes into summary', async () => {
+        const dispatch = vi.fn();
+        const configuredState = {
+            ...createInitialQuoteState(),
+            selectedLines: ['BaHaMa'],
+            builderItems: [{
+                id: 'existing-item',
+                line: 'BaHaMa',
+                model: 'Jumbrella',
+                size: '4x4 Kvadrat',
+                qty: 1,
+                discountPct: 0,
+                addons: []
+            }]
+        };
+        const { container, router } = await renderApp({
+            initialEntries: [APP_PATHS[APP_ROUTE_IDS.quotes]],
+            quoteState: configuredState,
+            dispatch
+        });
+
+        await clickButton(container, 'Open Configured History Quote');
+
+        expect(router.state.location.pathname).toBe(APP_PATHS[APP_ROUTE_IDS.quoteSummary]);
+        expect(dispatch).toHaveBeenCalledWith(expect.objectContaining({
+            type: 'HYDRATE_STATE',
+            payload: expect.objectContaining({
+                activeQuoteId: 'quote-2',
+                activeQuoteVersion: 3,
+                step: 4
             })
         }));
     });

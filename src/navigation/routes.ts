@@ -238,6 +238,7 @@ export function hasRetailerStartDraftData(
         'selectedLines' | 'builderItems' | 'gridSelections' | 'customCosts' | 'activeQuoteId' | 'quoteNumber' | 'customerInfo'
     >
 ): boolean {
+    const hasSelectedLines = Array.isArray(state.selectedLines) && state.selectedLines.length > 0;
     const hasSelections = hasConfiguredQuoteSelections(state);
     const hasCustomCosts = Array.isArray(state.customCosts) && state.customCosts.length > 0;
     const hasQuoteIdentity = Boolean(state.activeQuoteId || state.quoteNumber);
@@ -252,7 +253,7 @@ export function hasRetailerStartDraftData(
         customerInfo.date
     ].some((value) => String(value || '').trim().length > 0);
 
-    return hasSelections || hasCustomCosts || hasQuoteIdentity || hasCustomerInfo;
+    return hasSelectedLines || hasSelections || hasCustomCosts || hasQuoteIdentity || hasCustomerInfo;
 }
 
 function getQuoteStepFromStateStep(step: QuoteState['step']): QuoteRouteStepId | null {

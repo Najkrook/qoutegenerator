@@ -1,10 +1,12 @@
 import React, { useCallback, useEffect, useState, type ChangeEvent } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useAuth } from '../store/AuthContext';
 import { quoteRepository } from '../services/quoteRepositoryClient';
 import { normalizeQuoteStatus, applyQuoteFilters, sortQuotes } from '../services/quoteRepository';
 import { notifyError, notifyInfo, notifySuccess, confirmAction } from '../services/notificationService';
 import { db, collection, getDocs } from '../services/firebase';
 import { getErrorMessage } from '../utils/runtime';
+import { buildQuoteRevisionLink, parseQuoteRevisionLinkParams } from '../navigation/quoteLinks';
 import { buildHistoryOpenQuotePayload } from './historyPayload';
 import type {
     HistoryOwnerOption,
@@ -26,6 +28,7 @@ const STATUS_LABELS: Record<QuoteStatus, string> = {
 
 export function History({ onBack, onOpenQuote }: HistoryProps) {
     const { user, canAccessQuoteHistory, canViewEverything } = useAuth();
+    const [searchParams, setSearchParams] = useSearchParams();
     const [quotes, setQuotes] = useState<HistoryQuoteRow[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -45,6 +48,94 @@ export function History({ onBack, onOpenQuote }: HistoryProps) {
         ? true
         : window.FEATURE_QUOTE_LIFECYCLE !== false;
     const isAdminBrowsing = canViewEverything && selectedOwnerUid !== '__mine__';
+
+    const copyQuoteLink = useCallback(async ({
+        quoteId,
+        version,
+        ownerUid
+    }: {
+        quoteId: string;
+        version: number;
+        ownerUid?: string | null;
+    }): Promise<void> => {
+        try {
+            if (!navigator.clipboard?.writeText) {
+                throw new Error('Clipboard API unavailable.');
+            }
+
+            const path = buildQuoteRevisionLink({ quoteId, version, ownerUid });
+            await navigator.clipboard.writeText(`${window.location.origin}${path}`);
+            notifySuccess('L\u00e4nk kopierad.');
+        } catch (copyError) {
+            console.error('Failed to copy quote link:', copyError);
+            notifyError('Kunde inte kopiera l\u00e4nken.');
+        }
+    }, []);
+
+    useEffect(() => {
+        if (!user?.uid || !canAccessQuoteHistory) return;
+
+        const parsed = parseQuoteRevisionLinkParams(searchParams);
+        if (!parsed) return;
+
+        const requestedOwnerUid = parsed.ownerUid;
+        const ownerUid = !requestedOwnerUid || requestedOwnerUid === user.uid
+            ? user.uid
+            : (canViewEverything ? requestedOwnerUid : null);
+
+        if (!ownerUid) {
+            notifyError('Du har inte beh\u00f6righet att \u00f6ppna den h\u00e4r offerten.');
+            setSearchParams({}, { replace: true });
+            return;
+        }
+
+        setSearchParams({}, { replace: true });
+
+        void (async () => {
+            try {
+                const latestPayloadPromise = quoteRepository.getQuoteLatestRevision({
+                    userId: ownerUid,
+                    quoteId: parsed.quoteId
+                });
+                const revisionPromise = parsed.version > 0
+                    ? quoteRepository.getQuoteRevisionByVersion({
+                        userId: ownerUid,
+                        quoteId: parsed.quoteId,
+                        version: parsed.version
+                    })
+                    : Promise.resolve(null);
+
+                const [latestPayload, specificRevision] = await Promise.all([
+                    latestPayloadPromise,
+                    revisionPromise
+                ]);
+
+                const revision = parsed.version > 0 ? specificRevision : latestPayload?.revision;
+                if (!latestPayload?.metadata || !revision) {
+                    notifyInfo('Offerten saknar sparad revision.');
+                    return;
+                }
+
+                if (!revision.state) {
+                    notifyInfo('Revisionen saknar sparat tillst\u00e5nd.');
+                    return;
+                }
+
+                const nextState = buildHistoryOpenQuotePayload(
+                    revision.state,
+                    parsed.quoteId,
+                    latestPayload.metadata.quoteNumber,
+                    revision.version,
+                    latestPayload.metadata.status
+                );
+
+                onOpenQuote?.(nextState);
+            } catch (openError) {
+                console.error('Failed to open quote link:', openError);
+                notifyError(`Kunde inte \u00f6ppna offerten: ${getErrorMessage(openError, 'ok\u00e4nt fel')}`);
+            }
+        })();
+    }, [canAccessQuoteHistory, canViewEverything, onOpenQuote, searchParams, setSearchParams, user?.uid]);
 
     useEffect(() => {
         if (!user?.uid || !canViewEverything) return;
@@ -187,12 +278,24 @@ export function History({ onBack, onOpenQuote }: HistoryProps) {
     const formatSek = (value: number): string => Math.round(Number(value) || 0).toLocaleString('sv-SE');
 
     const getQuoteOwnerUid = (quote: HistoryQuoteRow): string => {
+        if (quote.ownerUid) {
+            return quote.ownerUid;
+        }
+
+        if (selectedOwnerUid !== '__mine__' && selectedOwnerUid !== '__all__') {
+            return selectedOwnerUid;
+        }
+
         if (isAdminBrowsing || selectedOwnerUid === '__all__') {
             return quote.ownerUid || user?.uid || '';
         }
 
         return user?.uid || '';
     };
+
+    const getQuoteLinkOwnerUid = (quote: HistoryQuoteRow): string | null => (
+        isAdminBrowsing ? (getQuoteOwnerUid(quote) || null) : null
+    );
 
     const handleStatusChange = async (quote: HistoryQuoteRow, nextStatus: string): Promise<void> => {
         if (!quoteLifecycleEnabled || !user?.uid) return;
@@ -521,6 +624,19 @@ export function History({ onBack, onOpenQuote }: HistoryProps) {
                                     >
                                         Duplicera
                                     </button>
+                                    <button
+                                        type="button"
+                                        className="px-4 py-2 text-sm border border-panel-border bg-transparent text-text-primary hover:bg-white/5 rounded w-full transition-colors"
+                                        onClick={() => {
+                                            void copyQuoteLink({
+                                                quoteId: quote.quoteId,
+                                                version: quote.latestVersion,
+                                                ownerUid: getQuoteLinkOwnerUid(quote)
+                                            });
+                                        }}
+                                    >
+                                        Kopiera länk
+                                    </button>
                                     {quoteLifecycleEnabled && (
                                         <button
                                             type="button"
@@ -552,17 +668,34 @@ export function History({ onBack, onOpenQuote }: HistoryProps) {
                                         ) : (
                                             <div className="flex flex-col gap-2 pt-2">
                                                 {revisions.map((revision) => (
-                                                    <button
+                                                    <div
                                                         key={revision.revisionId}
-                                                        type="button"
-                                                        className="w-full text-left border border-panel-border bg-white/5 hover:bg-white/10 rounded-md text-text-primary text-xs px-3 py-2 flex justify-between gap-3 cursor-pointer transition-colors"
-                                                        onClick={() => {
-                                                            void openSpecificRevision(quote, revision.revisionId);
-                                                        }}
+                                                        className="w-full border border-panel-border bg-white/5 hover:bg-white/10 rounded-md text-text-primary text-xs px-3 py-2 flex items-center justify-between gap-3 transition-colors"
                                                     >
-                                                        <span>v{revision.version} - {formatDateTime(revision.savedAtMs)}</span>
-                                                        <span>{revision.changeNote || ''}</span>
-                                                    </button>
+                                                        <button
+                                                            type="button"
+                                                            className="flex-1 text-left flex justify-between gap-3"
+                                                            onClick={() => {
+                                                                void openSpecificRevision(quote, revision.revisionId);
+                                                            }}
+                                                        >
+                                                            <span>v{revision.version} - {formatDateTime(revision.savedAtMs)}</span>
+                                                            <span>{revision.changeNote || ''}</span>
+                                                        </button>
+                                                        <button
+                                                            type="button"
+                                                            className="shrink-0 rounded border border-panel-border px-2 py-1 text-[11px] text-text-primary hover:bg-white/10"
+                                                            onClick={() => {
+                                                                void copyQuoteLink({
+                                                                    quoteId: quote.quoteId,
+                                                                    version: revision.version,
+                                                                    ownerUid: getQuoteLinkOwnerUid(quote)
+                                                                });
+                                                            }}
+                                                        >
+                                                            Kopiera länk
+                                                        </button>
+                                                    </div>
                                                 ))}
                                             </div>
                                         )}
