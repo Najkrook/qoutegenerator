@@ -590,17 +590,17 @@ const rawCatalogData: CatalogData = {
                         id: "classic_light",
                         name: "Classic Light",
                         items: [
-                            { id: "outside_classic_light_4", name: "LED-Lighting with 4 RGBW-LED strips", price: 0 },
-                            { id: "outside_classic_light_8", name: "LED-Lighting with 8 RGBW-LED strips", price: 0 }
+                            { id: "outside_classic_light_4", name: "LED-Lighting with 4 RGBW-LED strips", price: 0, priceUponRequest: true },
+                            { id: "outside_classic_light_8", name: "LED-Lighting with 8 RGBW-LED strips", price: 0, priceUponRequest: true }
                         ]
                     },
                     {
                         id: "heating",
                         name: "Heating",
                         items: [
-                            { id: "outside_heating_2", name: "2 Radiators", price: 0 },
-                            { id: "outside_heating_4", name: "4 Radiators", price: 0 },
-                            { id: "outside_premod_heating", name: "Premodification for heating equipment", price: 0 }
+                            { id: "outside_heating_2", name: "2 Radiators", price: 0, priceUponRequest: true },
+                            { id: "outside_heating_4", name: "4 Radiators", price: 0, priceUponRequest: true },
+                            { id: "outside_premod_heating", name: "Premodification for heating equipment", price: 0, priceUponRequest: true }
                         ]
                     },
                     {
@@ -672,8 +672,8 @@ const rawCatalogData: CatalogData = {
                         items: [
                             { id: "outside_v4a_maritime", name: "V4A | Maritime Edition", price: 540 },
                             { id: "outside_pole_extension", name: "Umbrella Center Pole Extension", price: 340 },
-                            { id: "outside_frame_fancy", name: "Frame Color fancy designs", price: 0 },
-                            { id: "outside_frame_custom", name: "Frame Color custom finish", price: 0 },
+                            { id: "outside_frame_fancy", name: "Frame Color fancy designs", price: 0, priceUponRequest: true },
+                            { id: "outside_frame_custom", name: "Frame Color custom finish", price: 0, priceUponRequest: true },
                             { id: "outside_upgrade_precontraint_o3", name: "Uppgradering: Precontraint 302 / elegance duk (3m Runda)", price: 320 },
                             { id: "outside_upgrade_precontraint_o35", name: "Uppgradering: Precontraint 302 / elegance duk (3.5m Runda)", price: 340 },
                             { id: "outside_upgrade_precontraint_o4_kv3", name: "Uppgradering: Precontraint 302 / elegance duk (4m Runda / 3x3 Kvadrat)", price: 370 },

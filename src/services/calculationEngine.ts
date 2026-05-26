@@ -57,6 +57,16 @@ function findGridBasePrice(lineData, model, size) {
     return 0;
 }
 
+function isGridSizePriceUponRequest(lineData, model, size) {
+    if (!lineData || !Array.isArray(lineData.gridItems)) return false;
+    for (const group of lineData.gridItems) {
+        if (group.model !== model) continue;
+        const sizeRow = (group.sizes || []).find((row) => row.size === size);
+        if (sizeRow) return sizeRow.priceUponRequest === true;
+    }
+    return false;
+}
+
 function findGridAddon(lineData, addonId) {
     if (!lineData || !Array.isArray(lineData.addonCategories)) return null;
     for (const category of lineData.addonCategories) {
@@ -216,6 +226,9 @@ export function computeQuoteTotals({
             grossTotalSek += gross;
             totalDiscountSek += discountSek;
 
+            const sizeDef = safeCatalog?.[item.line]?.models?.[item.model]?.sizes?.[item.size];
+            const sizePriceUponRequest = sizeDef?.priceUponRequest === true;
+
             totals.push({
                 model: displayModelLabel,
                 size: formattedSize,
@@ -226,6 +239,7 @@ export function computeQuoteTotals({
                 discountSek,
                 net,
                 isAddon: false,
+                priceUponRequest: sizePriceUponRequest,
                 source: { type: 'builder', itemId: item.id },
                 line: item?.line || 'Övrigt',
                 sortModel: `${item?.line || ''} ${item?.model || ''}`.trim(),
@@ -299,6 +313,7 @@ export function computeQuoteTotals({
                 discountSek: addonDiscountSek,
                 net: addonNet,
                 isAddon: true,
+                priceUponRequest: addonDef?.priceUponRequest === true,
                 source: { type: 'builder-addon', itemId: item.id, addonId: addon.id },
                 line: item?.line || 'Övrigt',
                 sortModel: `${item?.line || ''} ${item?.model || ''}`.trim(),
@@ -344,6 +359,7 @@ export function computeQuoteTotals({
                 discountSek,
                 net,
                 isAddon: false,
+                priceUponRequest: isGridSizePriceUponRequest(lineData, model, size),
                 source: { type: 'grid', lineId: line, key },
                 line: line || 'Övrigt',
                 sortModel: model || '',
@@ -379,6 +395,7 @@ export function computeQuoteTotals({
                 discountSek,
                 net,
                 isAddon: true,
+                priceUponRequest: addonDef?.priceUponRequest === true,
                 source: { type: 'grid-addon', lineId: line, addonId },
                 line: line || 'Övrigt',
                 sortModel: line,

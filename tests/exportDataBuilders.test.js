@@ -203,6 +203,7 @@ describe('export data builders', () => {
         const wsData = buildExcelSheetData(state, summary);
         const pdfRows = buildPdfTableData(summary.totals, formatSek);
 
+
         expect(wsData.some((row) => String(row[0]).includes('Overgripande Rabatt'))).toBe(true);
         expect(pdfRows.some((row) => String(row[0]).includes('Overgripande Rabatt'))).toBe(false);
         expect(pdfRows).toHaveLength(summary.totals.length);
@@ -249,5 +250,51 @@ describe('export data builders', () => {
         expect(shouldHideDiscountReferencesInPdf({
             hideZeroDiscountReferencesInPdf: true
         }, discountedSummary)).toBe(false);
+    });
+
+    it('formats priceUponRequest rows and appends footnote at the bottom of the Excel sheet', () => {
+        const state = createStateFixture();
+        const summary = {
+            totals: [
+                {
+                    model: 'Jumbrella outSide Heater',
+                    size: '4 Spokes',
+                    unitPrice: 0,
+                    qty: 1,
+                    gross: 0,
+                    net: 0,
+                    discountSek: 0,
+                    discountPct: 0,
+                    priceUponRequest: true
+                }
+            ],
+            finalTotalSek: 0,
+            grossTotalSek: 0,
+            totalDiscountSek: 0
+        };
+
+        const pdfRows = buildPdfTableData(summary.totals, formatSek);
+        expect(pdfRows).toHaveLength(1);
+        expect(pdfRows[0][2]).toBe('Pris på förfrågan');
+        expect(pdfRows[0][4]).toBe('Pris på förfrågan');
+        expect(pdfRows[0][5]).toBe('Pris på förfrågan'); // gross column
+        expect(pdfRows[0][6]).toBe('-'); // discount SEK column
+        expect(pdfRows[0][7]).toBe('-'); // discount pct column
+
+        const wsData = buildExcelSheetData(state, summary);
+        expect(wsData.length).toBeGreaterThan(10);
+        
+        // Assert product row formats correctly
+        const productRow = wsData.find((row) => row[0] === 'Jumbrella outSide Heater');
+        expect(productRow).toBeTruthy();
+        expect(productRow[2]).toBe('Pris på förfrågan');
+        expect(productRow[4]).toBe('Pris på förfrågan');
+        expect(productRow[5]).toBe('Pris på förfrågan');
+        expect(productRow[6]).toBe('-');
+        expect(productRow[7]).toBe('-');
+
+        // Assert footnote is at the absolute bottom
+        const lastRow = wsData[wsData.length - 1];
+        expect(lastRow[0]).toBe('* Totalsumman exkluderar artiklar med pris på förfrågan');
     });
 });

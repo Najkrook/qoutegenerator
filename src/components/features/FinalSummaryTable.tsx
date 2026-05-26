@@ -46,19 +46,28 @@ export function FinalSummaryTable() {
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-panel-border/50">
-                        {totals.map((row, index) => (
-                            <tr
-                                key={`${row.model}-${index}`}
-                                className={`${row.isAddon ? 'text-text-secondary italic bg-black/5' : 'font-medium'} ${row.isCustom ? 'italic text-secondary/80' : ''}`}
-                            >
-                                <td className={`p-3 text-sm ${row.isAddon ? 'pl-8' : ''}`}>{row.model}</td>
-                                <td className="p-3 text-sm text-text-secondary">{row.size}</td>
-                                <td className="p-3 text-sm text-right text-primary font-bold whitespace-nowrap">{formatSek(applyVat(row.net, state.includesVat))} SEK</td>
-                                <td className="p-3 text-sm text-center whitespace-nowrap">{row.qty}</td>
-                                <td className="p-3 text-sm text-right text-text-secondary whitespace-nowrap">{formatSek(applyVat(row.gross, state.includesVat))} SEK</td>
-                                <td className="p-3 text-sm text-right text-danger whitespace-nowrap">-{row.discountPct}%</td>
-                            </tr>
-                        ))}
+                        {totals.map((row, index) => {
+                            const isReq = row.priceUponRequest === true;
+                            return (
+                                <tr
+                                    key={`${row.model}-${index}`}
+                                    className={`${row.isAddon ? 'text-text-secondary italic bg-black/5' : 'font-medium'} ${row.isCustom ? 'italic text-secondary/80' : ''}`}
+                                >
+                                    <td className={`p-3 text-sm ${row.isAddon ? 'pl-8' : ''}`}>{row.model}</td>
+                                    <td className="p-3 text-sm text-text-secondary">{row.size}</td>
+                                    <td className="p-3 text-sm text-right text-primary font-bold whitespace-nowrap">
+                                        {isReq ? 'Pris på förfrågan' : `${formatSek(applyVat(row.net, state.includesVat))} SEK`}
+                                    </td>
+                                    <td className="p-3 text-sm text-center whitespace-nowrap">{row.qty}</td>
+                                    <td className="p-3 text-sm text-right text-text-secondary whitespace-nowrap">
+                                        {isReq ? 'Pris på förfrågan' : `${formatSek(applyVat(row.gross, state.includesVat))} SEK`}
+                                    </td>
+                                    <td className="p-3 text-sm text-right text-danger whitespace-nowrap">
+                                        {isReq ? '-' : `-${row.discountPct}%`}
+                                    </td>
+                                </tr>
+                            );
+                        })}
 
                         {globalDiscountAmt > 0 && (
                             <tr className="bg-black/10 italic text-text-secondary">
@@ -92,6 +101,11 @@ export function FinalSummaryTable() {
                     </tfoot>
                 </table>
             </div>
+            {totals.some((row) => row.priceUponRequest === true) && (
+                <p className="text-xs text-text-secondary italic text-right px-1">
+                    * Totalsumman exkluderar artiklar med pris på förfrågan
+                </p>
+            )}
         </div>
     );
 }

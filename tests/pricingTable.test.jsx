@@ -144,3 +144,34 @@ describe('PricingTable retailer discount bounds', () => {
         expect(clampPricingRowDiscount('140', false, 30)).toBe(100);
     });
 });
+
+describe('PricingTable priceUponRequest rendering', () => {
+    it('renders "Pris på förfrågan" instead of numeric prices and displays the totals-exclusion footnote', () => {
+        const html = renderPricingTable({
+            builderItems: [
+                {
+                    id: 'builder_outside_1',
+                    line: 'BaHaMa',
+                    model: 'Jumbrella outSide',
+                    size: '3x3 Kvadrat',
+                    qty: 1,
+                    discountPct: 0,
+                    addons: [
+                        {
+                            id: 'outside_classic_light_4',
+                            qty: 1,
+                            discountPct: 0
+                        }
+                    ]
+                }
+            ]
+        });
+
+        // The accessory outside_classic_light_4 is a request-based item and has priceUponRequest: true
+        expect(html).toContain('Pris på förfrågan');
+        // The discount percentage field should render a "-" for that row
+        expect(html).toContain('<span class="text-text-secondary italic text-xs">-</span>');
+        // Footnote should be displayed
+        expect(html).toContain('* Totalsumman exkluderar artiklar med pris på förfrågan');
+    });
+});

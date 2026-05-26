@@ -362,12 +362,72 @@ describe('pdfExport helpers', () => {
         expect(textValues).toContain('Godkännande');
         expect(textValues).toContain('Projektreferens: REF-7');
         expect(textValues).toContain('Er referens: ER-7');
-        expect(textValues).toContain('Projektreferens: REF-7');
         expect(paymentBoxRect).toBeTruthy();
         expect(signatureRect).toBeTruthy();
 
         if (paymentBoxRect.page === signatureRect.page) {
             expect(paymentBoxRect.y + paymentBoxRect.height).toBeLessThanOrEqual(signatureRect.y);
         }
+    });
+
+    it('renders "Pris på förfrågan" on request-based table rows and prints totals-exclusion footnote on PDF', () => {
+        const state = createZeroDiscountState({
+            builderItems: [
+                {
+                    line: 'BaHaMa',
+                    model: 'Jumbrella outSide',
+                    size: '3x3 Kvadrat',
+                    qty: 1,
+                    discountPct: 0,
+                    addons: [{ id: 'outside_classic_light_4', qty: 1, discountPct: 0 }]
+                }
+            ]
+        });
+        const summary = {
+            totals: [
+                {
+                    model: 'BaHaMa Jumbrella outSide',
+                    size: '3x3',
+                    unitPrice: 75900,
+                    qty: 1,
+                    gross: 75900,
+                    net: 75900,
+                    discountSek: 0,
+                    discountPct: 0,
+                    line: 'BaHaMa'
+                },
+                {
+                    model: 'Tillval: LED-Lighting with 4 RGBW-LED strips',
+                    size: '-',
+                    unitPrice: 0,
+                    qty: 1,
+                    gross: 0,
+                    net: 0,
+                    discountSek: 0,
+                    discountPct: 0,
+                    priceUponRequest: true,
+                    isAddon: true,
+                    line: 'BaHaMa'
+                }
+            ],
+            finalTotalSek: 75900,
+            grossTotalSek: 75900,
+            totalDiscountSek: 0
+        };
+
+        const pdfBlob = generatePDF(state, summary, true);
+        const textValues = pdfMockState.textCalls.map((call) => call.value);
+
+        expect(pdfBlob).toBeInstanceOf(Blob);
+        
+        // Assert footnote is printed
+        expect(textValues).toContain('* Totalsumman exkluderar artiklar med pris på förfrågan');
+
+        // Assert that the table row is formatted with 'Pris på förfrågan'
+        expect(pdfMockState.autoTableCalls[0].body[1][2]).toBe('Pris på förfrågan');
+        expect(pdfMockState.autoTableCalls[0].body[1][4]).toBe('Pris på förfrågan');
+        expect(pdfMockState.autoTableCalls[0].body[1][5]).toBe('Pris på förfrågan'); // gross column
+        expect(pdfMockState.autoTableCalls[0].body[1][6]).toBe('-'); // discount SEK column
+        expect(pdfMockState.autoTableCalls[0].body[1][7]).toBe('-'); // discount pct column
     });
 });

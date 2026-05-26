@@ -154,7 +154,8 @@ export function generatePDF(
             formatSEK: formatSek,
             shouldRenderPaymentBox,
             drawMainHeader,
-            layout: PDF_LAYOUT
+            layout: PDF_LAYOUT,
+            hasPriceUponRequest: (summaryData.totals || []).some((r) => r.priceUponRequest === true)
         });
 
         finalY = renderExtraNotesBlock(doc, {

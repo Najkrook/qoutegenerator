@@ -39,6 +39,7 @@ interface OrderRequestItemOverviewRow {
     net: number;
     isAddon: boolean;
     isCustom: boolean;
+    priceUponRequest?: boolean;
 }
 
 interface OrderRequestItemOverviewState {
@@ -113,7 +114,8 @@ function buildOrderRequestItemOverviewRows(summaryData: QuoteTotalsResult): Orde
         lineLabel: getCatalogLineName(row.line) || row.line || '-',
         net: row.net,
         isAddon: Boolean(row.isAddon),
-        isCustom: Boolean(row.isCustom)
+        isCustom: Boolean(row.isCustom),
+        priceUponRequest: row.priceUponRequest === true
     }));
 }
 
@@ -532,12 +534,17 @@ export function RetailerOrderRequests({ onBack }: RetailerOrderRequestsProps) {
                                                         <td className="px-3 py-3 text-center text-sm">{row.qty}</td>
                                                         <td className="px-3 py-3 text-sm text-text-secondary">{row.lineLabel}</td>
                                                         <td className="px-3 py-3 text-right text-sm font-semibold text-primary whitespace-nowrap">
-                                                            {formatCurrencySek(row.net)}
+                                                            {row.priceUponRequest ? 'Pris på förfrågan' : formatCurrencySek(row.net)}
                                                         </td>
                                                     </tr>
                                                 ))}
                                             </tbody>
                                         </table>
+                                        {selectedRequestItems.rows.some((row) => row.priceUponRequest === true) && (
+                                            <p className="mt-3 text-xs text-text-secondary italic text-right">
+                                                * Totalsumman exkluderar artiklar med pris på förfrågan
+                                            </p>
+                                        )}
                                     </div>
                                 )}
                             </div>

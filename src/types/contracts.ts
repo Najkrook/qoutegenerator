@@ -213,12 +213,14 @@ export interface RawPersistedBuilderAddon extends UnknownRecord {
 
 export interface BuilderCatalogSizeOption {
     price: number;
+    priceUponRequest?: boolean;
 }
 
 export interface BuilderCatalogAddonOption {
     id: string;
     name: string;
     price: number;
+    priceUponRequest?: boolean;
 }
 
 export interface BuilderCatalogAddonCategory {
@@ -244,6 +246,7 @@ export interface BuilderCatalogLineData {
 export interface GridCatalogSizeOption {
     size: string;
     price: number;
+    priceUponRequest?: boolean;
 }
 
 export interface GridCatalogItemGroup {
@@ -426,6 +429,7 @@ export interface QuoteTotalsRow {
     net: number;
     isAddon: boolean;
     isCustom?: boolean;
+    priceUponRequest?: boolean;
     source: QuoteTotalsRowSource;
     line: string;
     sortModel: string;

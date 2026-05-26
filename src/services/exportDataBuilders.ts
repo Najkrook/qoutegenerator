@@ -83,15 +83,16 @@ export function buildExcelSheetData(
     ];
 
     (summaryData.totals || []).forEach((row) => {
+        const isReq = row.priceUponRequest === true;
         wsData.push([
             row.model,
-            row.size,
-            roundSek(applyVat(row.unitPrice, state.includesVat)),
+            row.size || '',
+            isReq ? 'Pris på förfrågan' : roundSek(applyVat(row.unitPrice, state.includesVat)),
             row.qty,
-            roundSek(applyVat(row.net, state.includesVat)),
-            roundSek(applyVat(row.gross, state.includesVat)),
-            roundSek(-applyVat(row.discountSek || 0, state.includesVat)),
-            `${row.discountPct}%`
+            isReq ? 'Pris på förfrågan' : roundSek(applyVat(row.net, state.includesVat)),
+            isReq ? 'Pris på förfrågan' : roundSek(applyVat(row.gross, state.includesVat)),
+            isReq ? '-' : roundSek(-applyVat(row.discountSek || 0, state.includesVat)),
+            isReq ? '-' : `${row.discountPct}%`
         ]);
     });
 
@@ -144,6 +145,14 @@ export function buildExcelSheetData(
         ]);
     }
 
+    const hasPriceUponRequest = (summaryData.totals || []).some((r) => r.priceUponRequest === true);
+    if (hasPriceUponRequest) {
+        wsData.push([]);
+        wsData.push([
+            '* Totalsumman exkluderar artiklar med pris på förfrågan'
+        ]);
+    }
+
     return wsData;
 }
 
@@ -158,22 +167,23 @@ export function buildPdfTableData(
     const tableData: PdfTableRow[] = [];
 
     totalsArray.forEach((row) => {
+        const isReq = row.priceUponRequest === true;
         const cells: PdfTableRow = [
             row.model,
             row.size || '-',
-            `${formatSEK(applyVat(row.unitPrice, includesVat))} SEK`,
+            isReq ? 'Pris på förfrågan' : `${formatSEK(applyVat(row.unitPrice, includesVat))} SEK`,
             `${row.qty}`,
-            `${formatSEK(applyVat(row.net, includesVat))} SEK`
+            isReq ? 'Pris på förfrågan' : `${formatSEK(applyVat(row.net, includesVat))} SEK`
         ];
 
         if (!hideRecommendedPriceColumn) {
-            cells.push(`${formatSEK(applyVat(row.gross, includesVat))} SEK`);
+            cells.push(isReq ? 'Pris på förfrågan' : `${formatSEK(applyVat(row.gross, includesVat))} SEK`);
         }
 
         if (!hideDiscountColumns) {
             cells.push(
-                `${formatSEK(applyVat(row.discountSek, includesVat))} SEK`,
-                `${row.discountPct}%`
+                isReq ? '-' : `${formatSEK(applyVat(row.discountSek, includesVat))} SEK`,
+                isReq ? '-' : `${row.discountPct}%`
             );
         }
 

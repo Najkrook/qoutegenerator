@@ -424,7 +424,8 @@ export function renderTotalsSection(doc, {
     formatSEK,
     shouldRenderPaymentBox,
     drawMainHeader,
-    layout = PDF_LAYOUT
+    layout = PDF_LAYOUT,
+    hasPriceUponRequest = false
 }) {
     const rightColX = pageWidth - 90;
 
@@ -512,6 +513,17 @@ export function renderTotalsSection(doc, {
         doc.text('Totalt inkl. moms:', rightColX, finalY);
         doc.text(`${formatSEK(exportSummary.totalWithVat)} SEK`, pageWidth - layout.pageMarginX, finalY, { align: 'right' });
         doc.setTextColor(...layout.colors.darkText);
+        finalY += 10;
+    }
+
+    if (hasPriceUponRequest) {
+        doc.setFont('helvetica', 'italic');
+        doc.setFontSize(8);
+        doc.setTextColor(...layout.colors.grayText);
+        doc.text('* Totalsumman exkluderar artiklar med pris på förfrågan', pageWidth - layout.pageMarginX, finalY - 2, { align: 'right' });
+        finalY += 6;
+        doc.setTextColor(...layout.colors.darkText);
+        doc.setFontSize(9);
     }
 
     if (shouldRenderPaymentBox) {

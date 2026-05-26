@@ -425,4 +425,53 @@ describe('RetailerOrderRequests', () => {
         expect(itemsSection.textContent).toContain(formatSek(18400));
         expect(itemsSection.textContent).not.toContain('BaHaMa Jumbrella');
     });
+
+    it('renders "Pris på förfrågan" on request-based rows and displays the totals-exclusion footnote in the quick overview', async () => {
+        calculationMocks.computeQuoteTotals.mockImplementation(({ state }) => {
+            return {
+                totals: [
+                    {
+                        model: 'BaHaMa Jumbrella outSide',
+                        size: '3x3',
+                        qty: 1,
+                        net: 75900,
+                        gross: 75900,
+                        unitPrice: 75900,
+                        discountPct: 0,
+                        discountSek: 0,
+                        isAddon: false,
+                        isCustom: false,
+                        line: 'BaHaMa',
+                        source: { type: 'builder', itemId: 'builder-1' }
+                    },
+                    {
+                        model: 'LED-Lighting with 4 RGBW-LED strips',
+                        size: '-',
+                        qty: 1,
+                        net: 0,
+                        gross: 0,
+                        unitPrice: 0,
+                        discountPct: 0,
+                        discountSek: 0,
+                        isAddon: true,
+                        isCustom: false,
+                        priceUponRequest: true,
+                        line: 'BaHaMa',
+                        source: { type: 'builder-addon', itemId: 'builder-1', addonId: 'outside_classic_light_4' }
+                    }
+                ],
+                finalTotalSek: 75900,
+                grossTotalSek: 75900,
+                totalDiscountSek: 0,
+                globalDiscountAmt: 0
+            };
+        });
+
+        const { container } = await renderRetailerOrders();
+        const itemsSection = getItemsSection(container);
+
+        expect(itemsSection.textContent).toContain('LED-Lighting with 4 RGBW-LED strips');
+        expect(itemsSection.textContent).toContain('Pris på förfrågan');
+        expect(itemsSection.textContent).toContain('* Totalsumman exkluderar artiklar med pris på förfrågan');
+    });
 });

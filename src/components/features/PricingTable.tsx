@@ -550,121 +550,139 @@ export function PricingTable() {
 
     const formatSek = (value: number): string => Math.round(value).toLocaleString('sv-SE');
 
-    return (
-        <div className="overflow-x-auto bg-panel-bg border border-panel-border rounded-lg shadow-inner">
-            <table className="w-full text-left border-collapse min-w-[900px]">
-                <thead>
-                    <tr className="bg-black/20 text-[10px] uppercase font-bold text-text-secondary tracking-wider">
-                        <th className="p-4 border-b border-panel-border">Modell/Beskrivning</th>
-                        <th className="p-4 border-b border-panel-border">Storlek</th>
-                        <th className="p-4 border-b border-panel-border text-right">Pris/enhet</th>
-                        <th className="p-4 border-b border-panel-border text-center">Antal</th>
-                        <th className="p-4 border-b border-panel-border text-right">Rek utpris</th>
-                        <th className="p-4 border-b border-panel-border text-center">Rabatt %</th>
-                        <th className="p-4 border-b border-panel-border text-right">Ert pris (SEK)</th>
-                    </tr>
-                </thead>
-                <tbody className="divide-y divide-panel-border/50">
-                    {totals.map((row, index) => {
-                        const editable = isEditableBuilderRow(row.source);
-                        const builderSource = editable ? row.source as PricingTableBuilderRowSource : null;
-                        const rowKey = getRowKey(row, index);
-                        const displayNameValue = editable ? getDisplayNameInputValue(row, rowKey) : '';
-                        const dropIndicatorPosition = dropTarget?.rowKey === rowKey ? dropTarget.position : null;
-                        const dragHandleLabel = row.source.type === 'builder'
-                            ? 'Dra och flytta produkt'
-                            : 'Dra och flytta tillval';
-                        const dragHandleClass = isRetailer
-                            ? 'cursor-not-allowed opacity-40'
-                            : 'cursor-grab active:cursor-grabbing hover:bg-white/10';
-                        const dropIndicatorClass = dropIndicatorPosition === 'before'
-                            ? 'border-t-2 border-primary'
-                            : dropIndicatorPosition === 'after'
-                                ? 'border-b-2 border-primary'
-                                : '';
-                        const isDraggedRow = dragState?.rowKey === rowKey;
+    const hasPriceUponRequest = totals.some((row) => row.priceUponRequest === true);
 
-                        return (
-                            <tr
-                                key={rowKey}
-                                onDragOver={editable ? handleDragOver(rowKey, row.source) : undefined}
-                                onDragLeave={editable ? handleDragLeave(rowKey) : undefined}
-                                onDrop={editable ? handleDrop(row.source) : undefined}
-                                className={`hover:bg-white/[0.02] transition-colors ${row.isAddon ? 'bg-black/5' : ''} ${row.isCustom ? 'bg-secondary/5' : ''} ${isDraggedRow ? 'opacity-60' : ''}`}
-                            >
-                                <td className={`p-4 text-sm ${dropIndicatorClass} ${row.isAddon ? 'pl-8 text-text-secondary italic' : 'font-medium'}`}>
-                                    {editable ? (
-                                        <div className="flex items-center gap-3">
-                                            <button
-                                                type="button"
-                                                draggable={!isRetailer}
-                                                disabled={isRetailer}
-                                                onDragStart={builderSource ? handleDragStart(rowKey, builderSource) : undefined}
-                                                onDragEnd={clearDragState}
-                                                className={`flex h-9 w-9 shrink-0 items-center justify-center rounded border border-panel-border text-text-secondary transition-colors ${dragHandleClass}`}
-                                                aria-label={dragHandleLabel}
-                                            >
-                                                <span className="grid grid-cols-2 gap-[3px]" aria-hidden="true">
-                                                    {Array.from({ length: 6 }).map((_, dotIndex) => (
-                                                        <span key={dotIndex} className="h-1 w-1 rounded-full bg-current" />
-                                                    ))}
-                                                </span>
-                                            </button>
+    return (
+        <div className="space-y-4">
+            <div className="overflow-x-auto bg-panel-bg border border-panel-border rounded-lg shadow-inner">
+                <table className="w-full text-left border-collapse min-w-[900px]">
+                    <thead>
+                        <tr className="bg-black/20 text-[10px] uppercase font-bold text-text-secondary tracking-wider">
+                            <th className="p-4 border-b border-panel-border">Modell/Beskrivning</th>
+                            <th className="p-4 border-b border-panel-border">Storlek</th>
+                            <th className="p-4 border-b border-panel-border text-right">Pris/enhet</th>
+                            <th className="p-4 border-b border-panel-border text-center">Antal</th>
+                            <th className="p-4 border-b border-panel-border text-right">Rek utpris</th>
+                            <th className="p-4 border-b border-panel-border text-center">Rabatt %</th>
+                            <th className="p-4 border-b border-panel-border text-right">Ert pris (SEK)</th>
+                        </tr>
+                    </thead>
+                    <tbody className="divide-y divide-panel-border/50">
+                        {totals.map((row, index) => {
+                            const editable = isEditableBuilderRow(row.source);
+                            const builderSource = editable ? row.source as PricingTableBuilderRowSource : null;
+                            const rowKey = getRowKey(row, index);
+                            const displayNameValue = editable ? getDisplayNameInputValue(row, rowKey) : '';
+                            const dropIndicatorPosition = dropTarget?.rowKey === rowKey ? dropTarget.position : null;
+                            const dragHandleLabel = row.source.type === 'builder'
+                                ? 'Dra och flytta produkt'
+                                : 'Dra och flytta tillval';
+                            const dragHandleClass = isRetailer
+                                ? 'cursor-not-allowed opacity-40'
+                                : 'cursor-grab active:cursor-grabbing hover:bg-white/10';
+                            const dropIndicatorClass = dropIndicatorPosition === 'before'
+                                ? 'border-t-2 border-primary'
+                                : dropIndicatorPosition === 'after'
+                                    ? 'border-b-2 border-primary'
+                                    : '';
+                            const isDraggedRow = dragState?.rowKey === rowKey;
+                            const isReq = row.priceUponRequest === true;
+
+                            return (
+                                <tr
+                                    key={rowKey}
+                                    onDragOver={editable ? handleDragOver(rowKey, row.source) : undefined}
+                                    onDragLeave={editable ? handleDragLeave(rowKey) : undefined}
+                                    onDrop={editable ? handleDrop(row.source) : undefined}
+                                    className={`hover:bg-white/[0.02] transition-colors ${row.isAddon ? 'bg-black/5' : ''} ${row.isCustom ? 'bg-secondary/5' : ''} ${isDraggedRow ? 'opacity-60' : ''}`}
+                                >
+                                    <td className={`p-4 text-sm ${dropIndicatorClass} ${row.isAddon ? 'pl-8 text-text-secondary italic' : 'font-medium'}`}>
+                                        {editable ? (
+                                            <div className="flex items-center gap-3">
+                                                <button
+                                                    type="button"
+                                                    draggable={!isRetailer}
+                                                    disabled={isRetailer}
+                                                    onDragStart={builderSource ? handleDragStart(rowKey, builderSource) : undefined}
+                                                    onDragEnd={clearDragState}
+                                                    className={`flex h-9 w-9 shrink-0 items-center justify-center rounded border border-panel-border text-text-secondary transition-colors ${dragHandleClass}`}
+                                                    aria-label={dragHandleLabel}
+                                                >
+                                                    <span className="grid grid-cols-2 gap-[3px]" aria-hidden="true">
+                                                        {Array.from({ length: 6 }).map((_, dotIndex) => (
+                                                            <span key={dotIndex} className="h-1 w-1 rounded-full bg-current" />
+                                                        ))}
+                                                    </span>
+                                                </button>
+                                                <input
+                                                    type="text"
+                                                    value={displayNameValue}
+                                                    disabled={isRetailer}
+                                                    onBlur={() => clearDisplayNameDraft(rowKey)}
+                                                    onChange={(event: ChangeEvent<HTMLInputElement>) => handleDisplayNameChange(row, rowKey, event.target.value)}
+                                                    className={`w-full bg-black/20 border border-panel-border rounded p-2 text-sm outline-none focus:border-primary placeholder:text-text-secondary ${
+                                                        row.isAddon ? 'text-text-secondary italic' : 'text-text-primary font-medium'
+                                                    } ${isRetailer ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                                    aria-label="Redigera radnamn"
+                                                />
+                                            </div>
+                                        ) : (
+                                            row.model
+                                        )}
+                                    </td>
+                                    <td className={`p-4 text-sm text-text-secondary ${dropIndicatorClass}`}>{row.size}</td>
+                                    <td className={`p-4 text-sm text-right text-text-secondary ${dropIndicatorClass}`}>
+                                        {isReq ? 'Pris på förfrågan' : formatSek(row.unitPrice)}
+                                    </td>
+                                    <td className={`p-4 text-sm text-center font-medium ${dropIndicatorClass}`}>{row.qty}</td>
+                                    <td className={`p-4 text-sm text-right text-text-secondary ${dropIndicatorClass}`}>
+                                        {isReq ? 'Pris på förfrågan' : formatSek(row.gross)}
+                                    </td>
+                                    <td className={`p-4 text-center ${dropIndicatorClass}`}>
+                                        {isReq ? (
+                                            <span className="text-text-secondary italic text-xs">-</span>
+                                        ) : (
                                             <input
-                                                type="text"
-                                                value={displayNameValue}
-                                                disabled={isRetailer}
-                                                onBlur={() => clearDisplayNameDraft(rowKey)}
-                                                onChange={(event: ChangeEvent<HTMLInputElement>) => handleDisplayNameChange(row, rowKey, event.target.value)}
-                                                className={`w-full bg-black/20 border border-panel-border rounded p-2 text-sm outline-none focus:border-primary placeholder:text-text-secondary ${
-                                                    row.isAddon ? 'text-text-secondary italic' : 'text-text-primary font-medium'
-                                                } ${isRetailer ? 'opacity-50 cursor-not-allowed' : ''}`}
-                                                aria-label="Redigera radnamn"
+                                                type="number"
+                                                step="1"
+                                                min="0"
+                                                max={isRetailer ? retailerDiscountPct : 100}
+                                                value={row.discountPct}
+                                                onChange={(event: ChangeEvent<HTMLInputElement>) => handleDiscountChange(row.source, event.target.value)}
+                                                className={`w-16 text-center bg-black/20 border border-panel-border rounded p-1 text-sm outline-none focus:border-primary ${row.discountPct > 0 ? 'text-primary' : ''}`}
                                             />
-                                        </div>
-                                    ) : (
-                                        row.model
-                                    )}
-                                </td>
-                                <td className={`p-4 text-sm text-text-secondary ${dropIndicatorClass}`}>{row.size}</td>
-                                <td className={`p-4 text-sm text-right text-text-secondary ${dropIndicatorClass}`}>{formatSek(row.unitPrice)}</td>
-                                <td className={`p-4 text-sm text-center font-medium ${dropIndicatorClass}`}>{row.qty}</td>
-                                <td className={`p-4 text-sm text-right text-text-secondary ${dropIndicatorClass}`}>{formatSek(row.gross)}</td>
-                                <td className={`p-4 text-center ${dropIndicatorClass}`}>
-                                    <input
-                                        type="number"
-                                        step="1"
-                                        min="0"
-                                        max={isRetailer ? retailerDiscountPct : 100}
-                                        value={row.discountPct}
-                                        onChange={(event: ChangeEvent<HTMLInputElement>) => handleDiscountChange(row.source, event.target.value)}
-                                        className={`w-16 text-center bg-black/20 border border-panel-border rounded p-1 text-sm outline-none focus:border-primary ${row.discountPct > 0 ? 'text-primary' : ''}`}
-                                    />
-                                </td>
-                                <td className={`p-4 text-sm text-right font-bold text-primary ${dropIndicatorClass}`}>
-                                    {formatSek(row.net)}
-                                </td>
-                            </tr>
-                        );
-                    })}
-                </tbody>
-                <tfoot className="bg-black/40">
-                    <tr className="border-t-2 border-panel-border">
-                        <td colSpan={4} className="p-4 text-right font-semibold text-text-secondary uppercase text-xs">Summa brutto</td>
-                        <td className="p-4 text-right font-medium text-text-secondary">{formatSek(grossTotalSek)} SEK</td>
-                        <td colSpan={2}></td>
-                    </tr>
-                    <tr>
-                        <td colSpan={4} className="p-4 text-right font-semibold text-text-secondary uppercase text-xs">Total rabatt</td>
-                        <td colSpan={2} className="p-4 text-right font-medium text-danger">-{formatSek(totalDiscountSek)} SEK</td>
-                        <td></td>
-                    </tr>
-                    <tr className="bg-primary/10">
-                        <td colSpan={4} className="p-4 text-right font-bold text-lg uppercase">Totalt att betala (exkl. moms)</td>
-                        <td colSpan={3} className="p-4 text-right font-black text-2xl text-primary">{formatSek(finalTotalSek)} SEK</td>
-                    </tr>
-                </tfoot>
-            </table>
+                                        )}
+                                    </td>
+                                    <td className={`p-4 text-sm text-right font-bold text-primary ${dropIndicatorClass}`}>
+                                        {isReq ? 'Pris på förfrågan' : formatSek(row.net)}
+                                    </td>
+                                </tr>
+                            );
+                        })}
+                    </tbody>
+                    <tfoot className="bg-black/40">
+                        <tr className="border-t-2 border-panel-border">
+                            <td colSpan={4} className="p-4 text-right font-semibold text-text-secondary uppercase text-xs">Summa brutto</td>
+                            <td className="p-4 text-right font-medium text-text-secondary">{formatSek(grossTotalSek)} SEK</td>
+                            <td colSpan={2}></td>
+                        </tr>
+                        <tr>
+                            <td colSpan={4} className="p-4 text-right font-semibold text-text-secondary uppercase text-xs">Total rabatt</td>
+                            <td colSpan={2} className="p-4 text-right font-medium text-danger">-{formatSek(totalDiscountSek)} SEK</td>
+                            <td></td>
+                        </tr>
+                        <tr className="bg-primary/10">
+                            <td colSpan={4} className="p-4 text-right font-bold text-lg uppercase">Totalt att betala (exkl. moms)</td>
+                            <td colSpan={3} className="p-4 text-right font-black text-2xl text-primary">{formatSek(finalTotalSek)} SEK</td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+            {hasPriceUponRequest && (
+                <p className="text-xs text-text-secondary italic text-right px-1">
+                    * Totalsumman exkluderar artiklar med pris på förfrågan
+                </p>
+            )}
         </div>
     );
 }
