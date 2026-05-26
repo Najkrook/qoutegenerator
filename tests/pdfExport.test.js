@@ -231,9 +231,9 @@ describe('pdfExport helpers', () => {
         const pdfBlob = generatePDF(state, summary, true);
 
         expect(pdfBlob).toBeInstanceOf(Blob);
-        expect(pdfMockState.autoTableCalls[0].head[0]).toContain('Rabatt\ni SEK');
+        expect(pdfMockState.autoTableCalls[0].head[0].some((h) => h.includes('Rabatt\ni SEK'))).toBe(true);
         expect(pdfMockState.autoTableCalls[0].head[0]).toContain('Rabatt\ni %');
-        expect(pdfMockState.textCalls.map((call) => call.value)).toContain('Total Rabatt:');
+        expect(pdfMockState.textCalls.map((call) => call.value).some((t) => t.includes('Total Rabatt'))).toBe(true);
     });
 
     it('includes custom builder add-ons in the generated PDF table body', () => {

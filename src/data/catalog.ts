@@ -559,6 +559,174 @@ const rawCatalogData: CatalogData = {
                         ]
                     }
                 ]
+            },
+            "Jumbrella outSide": {
+                name: "Jumbrella outSide",
+                sizes: {
+                    "3* Runda": { price: 6780 },
+                    "3,5* Runda": { price: 6900 },
+                    "4* Runda": { price: 7110 },
+                    "3x3 Kvadrat": { price: 6900 },
+                    "3,5x3,5 Kvadrat": { price: 7110 },
+                    "4x4 Kvadrat": { price: 7320 }
+                },
+                addonCategories: [
+                    {
+                        id: "installationsalternativ",
+                        name: "Installationsalternativ",
+                        items: [
+                            { id: "outside_tipping_base", name: "In-Ground Tipping Base", price: 630 },
+                            { id: "outside_tipping_base_electric", name: "In-Ground Tipping Base WITH electrical connection", price: 740 },
+                            { id: "outside_conn_tipping", name: "Connecting Components - for In-Ground Tipping Base", price: 460 },
+                            { id: "outside_in_ground_ext", name: "In-Ground Installation Extension", price: 420 },
+                            { id: "outside_surface_mount", name: "Surface Mount", price: 1610 },
+                            { id: "outside_fischer_bolts", name: "Optional: 'fischer' heavy duty anchoring bolts", price: 680 },
+                            { id: "outside_wall_brackets", name: "Wall Brackets", price: 670 },
+                            { id: "outside_wall_fastening_std", name: "Fastening set for Wall Brackets (standard)", price: 100 },
+                            { id: "outside_wall_fastening_insulation", name: "Fastening set for Wall Brackets (with external thermal insulation)", price: 370 }
+                        ]
+                    },
+                    {
+                        id: "classic_light",
+                        name: "Classic Light",
+                        items: [
+                            { id: "outside_classic_light_4", name: "LED-Lighting with 4 RGBW-LED strips", price: 0 },
+                            { id: "outside_classic_light_8", name: "LED-Lighting with 8 RGBW-LED strips", price: 0 }
+                        ]
+                    },
+                    {
+                        id: "heating",
+                        name: "Heating",
+                        items: [
+                            { id: "outside_heating_2", name: "2 Radiators", price: 0 },
+                            { id: "outside_heating_4", name: "4 Radiators", price: 0 },
+                            { id: "outside_premod_heating", name: "Premodification for heating equipment", price: 0 }
+                        ]
+                    },
+                    {
+                        id: "cover",
+                        name: "Cover",
+                        items: [
+                            { id: "outside_cover_comfort", name: "Protective Cover – comfort", price: 500 },
+                            { id: "outside_cover_comfort_rod", name: "Protective Cover – comfort with telescopic rod", price: 670 }
+                        ]
+                    },
+                    {
+                        id: "textilduk_rund",
+                        name: "Textilduk RUND",
+                        items: [
+                            { id: "outside_textil_o3_betex", name: "Textilduk Ø3 (betex® 05)", price: 690 },
+                            { id: "outside_textil_o35_betex", name: "Textilduk Ø3,5 (betex® 05)", price: 780 },
+                            { id: "outside_textil_o4_betex", name: "Textilduk Ø4 (betex® 05)", price: 960 },
+                            { id: "outside_textil_o3_acryl", name: "Textilduk Ø3 (acryl)", price: 690 },
+                            { id: "outside_textil_o35_acryl", name: "Textilduk Ø3,5 (acryl)", price: 780 },
+                            { id: "outside_textil_o4_acryl", name: "Textilduk Ø4 (acryl)", price: 960 },
+                            { id: "outside_textil_o3_precontraint", name: "Textilduk Ø3 (Precontraint 302)", price: 1020 },
+                            { id: "outside_textil_o35_precontraint", name: "Textilduk Ø3,5 (Precontraint 302)", price: 1130 },
+                            { id: "outside_textil_o4_precontraint", name: "Textilduk Ø4 (Precontraint 302)", price: 1340 },
+                            { id: "outside_textil_o3_elegance", name: "Textilduk Ø3 (elegance)", price: 1020 },
+                            { id: "outside_textil_o35_elegance", name: "Textilduk Ø3,5 (elegance)", price: 1130 },
+                            { id: "outside_textil_o4_elegance", name: "Textilduk Ø4 (elegance)", price: 1340 },
+                            { id: "outside_textil_o3_elegance_striped", name: "Textilduk Ø3 (elegance randig)", price: 1250 },
+                            { id: "outside_textil_o35_elegance_striped", name: "Textilduk Ø3,5 (elegance randig)", price: 1400 },
+                            { id: "outside_textil_o4_elegance_striped", name: "Textilduk Ø4 (elegance randig)", price: 1630 }
+                        ]
+                    },
+                    {
+                        id: "textilduk_kvadrat",
+                        name: "Textilduk Kvadrat",
+                        items: [
+                            { id: "outside_textil_3x3_betex", name: "Textilduk 3x3 (betex® 05)", price: 820 },
+                            { id: "outside_textil_35x35_betex", name: "Textilduk 3,5x3,5 (betex® 05)", price: 1100 },
+                            { id: "outside_textil_4x4_betex", name: "Textilduk 4x4 (betex® 05)", price: 1220 },
+                            { id: "outside_textil_3x3_acryl", name: "Textilduk 3x3 (acryl)", price: 820 },
+                            { id: "outside_textil_35x35_acryl", name: "Textilduk 3,5x3,5 (acryl)", price: 1100 },
+                            { id: "outside_textil_4x4_acryl", name: "Textilduk 4x4 (acryl)", price: 1220 },
+                            { id: "outside_textil_3x3_precontraint", name: "Textilduk 3x3 (Precontraint 302)", price: 1190 },
+                            { id: "outside_textil_35x35_precontraint", name: "Textilduk 3,5x3,5 (Precontraint 302)", price: 1540 },
+                            { id: "outside_textil_4x4_precontraint", name: "Textilduk 4x4 (Precontraint 302)", price: 1710 },
+                            { id: "outside_textil_3x3_elegance", name: "Textilduk 3x3 (elegance)", price: 1190 },
+                            { id: "outside_textil_35x35_elegance", name: "Textilduk 3,5x3,5 (elegance)", price: 1540 },
+                            { id: "outside_textil_4x4_elegance", name: "Textilduk 4x4 (elegance)", price: 1710 },
+                            { id: "outside_textil_3x3_elegance_striped", name: "Textilduk 3x3 (elegance randig)", price: 1490 },
+                            { id: "outside_textil_35x35_elegance_striped", name: "Textilduk 3,5x3,5 (elegance randig)", price: 1900 },
+                            { id: "outside_textil_4x4_elegance_striped", name: "Textilduk 4x4 (elegance randig)", price: 2070 }
+                        ]
+                    },
+                    {
+                        id: "hangranna_kvadrat",
+                        name: "Hängränna Kvadrat",
+                        items: [
+                            { id: "outside_gutter_frame_mod", name: "Frame Modification for Textile Gutter (per spoke)", price: 21 },
+                            { id: "outside_gutter_3x3_betex", name: "Textilränna 3x3 (betex® 05)", price: 620 },
+                            { id: "outside_gutter_35x35_betex", name: "Textilränna 3,5x3,5 (betex® 05)", price: 670 },
+                            { id: "outside_gutter_4x4_betex", name: "Textilränna 4x4 (betex® 05)", price: 710 },
+                            { id: "outside_gutter_3x3_precontraint", name: "Textilränna 3x3 (Precontraint 302)", price: 700 },
+                            { id: "outside_gutter_35x35_precontraint", name: "Textilränna 3,5x3,5 (Precontraint 302)", price: 750 },
+                            { id: "outside_gutter_4x4_precontraint", name: "Textilränna 4x4 (Precontraint 302)", price: 800 }
+                        ]
+                    },
+                    {
+                        id: "cosmetic",
+                        name: "Cosmetic",
+                        items: [
+                            { id: "outside_v4a_maritime", name: "V4A | Maritime Edition", price: 540 },
+                            { id: "outside_pole_extension", name: "Umbrella Center Pole Extension", price: 340 },
+                            { id: "outside_frame_fancy", name: "Frame Color fancy designs", price: 0 },
+                            { id: "outside_frame_custom", name: "Frame Color custom finish", price: 0 },
+                            { id: "outside_upgrade_precontraint_o3", name: "Uppgradering: Precontraint 302 / elegance duk (3m Runda)", price: 320 },
+                            { id: "outside_upgrade_precontraint_o35", name: "Uppgradering: Precontraint 302 / elegance duk (3.5m Runda)", price: 340 },
+                            { id: "outside_upgrade_precontraint_o4_kv3", name: "Uppgradering: Precontraint 302 / elegance duk (4m Runda / 3x3 Kvadrat)", price: 370 },
+                            { id: "outside_upgrade_precontraint_kv35", name: "Uppgradering: Precontraint 302 / elegance duk (3.5x3.5 Kvadrat)", price: 430 },
+                            { id: "outside_upgrade_precontraint_kv4", name: "Uppgradering: Precontraint 302 / elegance duk (4x4 Kvadrat)", price: 470 },
+                            { id: "outside_upgrade_striped_o3", name: "Uppgradering: elegance duk randig (3m Runda)", price: 550 },
+                            { id: "outside_upgrade_striped_o35", name: "Uppgradering: elegance duk randig (3.5m Runda)", price: 590 },
+                            { id: "outside_upgrade_striped_o4_kv3", name: "Uppgradering: elegance duk randig (4m Runda / 3x3 Kvadrat)", price: 650 },
+                            { id: "outside_upgrade_striped_kv35", name: "Uppgradering: elegance duk randig (3.5x3.5 Kvadrat)", price: 780 },
+                            { id: "outside_upgrade_striped_kv4", name: "Uppgradering: elegance duk randig (4x4 Kvadrat)", price: 820 }
+                        ]
+                    },
+                    {
+                        id: "sidovaggar",
+                        name: "Sidoväggar",
+                        items: [
+                            { id: "outside_side_panel_frame_mod", name: "Frame Modification for Side Panel (per spoke)", price: 21 },
+                            { id: "outside_side_no_window_3x3_betex", name: "Sidovägg utan fönster 3x3 (betex® 05/acryl)", price: 400 },
+                            { id: "outside_side_no_window_35x35_betex", name: "Sidovägg utan fönster 3,5x3,5 (betex® 05/acryl)", price: 450 },
+                            { id: "outside_side_no_window_4x4_betex", name: "Sidovägg utan fönster 4x4 (betex® 05/acryl)", price: 500 },
+                            { id: "outside_side_no_window_3x3_precontraint", name: "Sidovägg utan fönster 3x3 (Precontraint 302)", price: 550 },
+                            { id: "outside_side_no_window_35x35_precontraint", name: "Sidovägg utan fönster 3,5x3,5 (Precontraint 302)", price: 615 },
+                            { id: "outside_side_no_window_4x4_precontraint", name: "Sidovägg utan fönster 4x4 (Precontraint 302)", price: 685 },
+                            { id: "outside_side_door_no_window_3x3_betex", name: "Sidovägg utan fönster med dörr 3x3 (betex® 05/acryl)", price: 570 },
+                            { id: "outside_side_door_no_window_35x35_betex", name: "Sidovägg utan fönster med dörr 3,5x3,5 (betex® 05/acryl)", price: 610 },
+                            { id: "outside_side_door_no_window_4x4_betex", name: "Sidovägg utan fönster med dörr 4x4 (betex® 05/acryl)", price: 670 },
+                            { id: "outside_side_door_no_window_3x3_precontraint", name: "Sidovägg utan fönster med dörr 3x3 (Precontraint 302)", price: 820 },
+                            { id: "outside_side_door_no_window_35x35_precontraint", name: "Sidovägg utan fönster med dörr 3,5x3,5 (Precontraint 302)", price: 880 },
+                            { id: "outside_side_door_no_window_4x4_precontraint", name: "Sidovägg utan fönster med dörr 4x4 (Precontraint 302)", price: 965 },
+                            { id: "outside_side_window_3x3_betex", name: "Sidovägg med fönster 3x3 (betex® 05/acryl)", price: 420 },
+                            { id: "outside_side_window_35x35_betex", name: "Sidovägg med fönster 3,5x3,5 (betex® 05/acryl)", price: 470 },
+                            { id: "outside_side_window_4x4_betex", name: "Sidovägg med fönster 4x4 (betex® 05/acryl)", price: 520 },
+                            { id: "outside_side_window_3x3_precontraint", name: "Sidovägg med fönster 3x3 (Precontraint 302)", price: 575 },
+                            { id: "outside_side_window_35x35_precontraint", name: "Sidovägg med fönster 3,5x3,5 (Precontraint 302)", price: 645 },
+                            { id: "outside_side_window_4x4_precontraint", name: "Sidovägg med fönster 4x4 (Precontraint 302)", price: 710 },
+                            { id: "outside_side_door_window_3x3_betex", name: "Sidovägg med fönster & dörr 3x3 (betex® 05/acryl)", price: 590 },
+                            { id: "outside_side_door_window_35x35_betex", name: "Sidovägg med fönster & dörr 3,5x3,5 (betex® 05/acryl)", price: 630 },
+                            { id: "outside_side_door_window_4x4_betex", name: "Sidovägg med fönster & dörr 4x4 (betex® 05/acryl)", price: 690 },
+                            { id: "outside_side_door_window_3x3_precontraint", name: "Sidovägg med fönster & dörr 3x3 (Precontraint 302)", price: 850 },
+                            { id: "outside_side_door_window_35x35_precontraint", name: "Sidovägg med fönster & dörr 3,5x3,5 (Precontraint 302)", price: 905 },
+                            { id: "outside_side_door_window_4x4_precontraint", name: "Sidovägg med fönster & dörr 4x4 (Precontraint 302)", price: 995 },
+                            { id: "outside_conn_piece_betex", name: "Skarvstycke för 2 parasoller (betex® 05/acryl)", price: 140 },
+                            { id: "outside_conn_piece_precontraint", name: "Skarvstycke för 2 parasoller (Precontraint 302)", price: 190 }
+                        ]
+                    },
+                    {
+                        id: "annat",
+                        name: "Annat",
+                        items: [
+                            { id: "outside_soft_foam", name: "Soft Foam Safeguard for center pole", price: 600 }
+                        ]
+                    }
+                ]
             }
         }
     },
