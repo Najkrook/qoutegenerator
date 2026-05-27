@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useQuote } from '../store/QuoteContext';
 import { useAuth } from '../store/AuthContext';
 import { catalogData } from '../data/catalog';
+import { PDF_THEME_OPTIONS, normalizePdfThemeId } from '../config/pdfThemes';
 import { computeQuoteTotals } from '../services/calculationEngine';
 import { CustomerInfoForm } from '../components/features/CustomerInfoForm';
 import { FinalSummaryTable } from '../components/features/FinalSummaryTable';
@@ -162,6 +163,7 @@ export function SummaryExport({ onPrev, onBackToSketch, onOpenRetailerOrderHisto
     const [hasJustSubmittedOrderRequest, setHasJustSubmittedOrderRequest] = useState(false);
     const previewUrlRef = useRef<string>('');
     const exportBlockReason = getPdfExportBlockReason(state.quoteNumber);
+    const selectedPdfThemeId = normalizePdfThemeId(state.pdfThemeId);
     const canSubmitOrderRequest = Boolean(
         isRetailer
         && state.activeQuoteId
@@ -260,6 +262,13 @@ export function SummaryExport({ onPrev, onBackToSketch, onOpenRetailerOrderHisto
         if (onPrev) {
             onPrev();
         }
+    };
+
+    const handlePdfThemeChange = (event: React.ChangeEvent<HTMLSelectElement>): void => {
+        dispatch({
+            type: 'SET_PDF_THEME_ID',
+            payload: normalizePdfThemeId(event.target.value)
+        });
     };
 
     const handleExportPDF = async ({ allowMissingQuoteNumber = false }: PdfExportOptions = {}): Promise<void> => {
@@ -497,6 +506,22 @@ export function SummaryExport({ onPrev, onBackToSketch, onOpenRetailerOrderHisto
                                     </button>
 
                                     <div className="flex flex-col sm:flex-row items-center gap-3 w-full xl:w-auto">
+                                        <label className="flex w-full flex-col gap-1 text-xs font-semibold uppercase tracking-wide text-text-secondary sm:w-[180px]">
+                                            Offert tema
+                                            <select
+                                                name="pdfThemeId"
+                                                value={selectedPdfThemeId}
+                                                onChange={handlePdfThemeChange}
+                                                className="h-[46px] w-full rounded-lg border border-panel-border bg-panel-bg px-3 text-sm font-bold normal-case tracking-normal text-white outline-none transition-colors hover:bg-white/5 focus:border-primary focus:ring-2 focus:ring-primary/25"
+                                            >
+                                                {PDF_THEME_OPTIONS.map((option) => (
+                                                    <option key={option.id} value={option.id}>
+                                                        {option.label}
+                                                    </option>
+                                                ))}
+                                            </select>
+                                        </label>
+
                                         <button
                                             type="button"
                                             onClick={() => {

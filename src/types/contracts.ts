@@ -5,6 +5,7 @@ export type QuoteStatus = 'draft' | 'sent' | 'won' | 'lost' | 'archived';
 
 export type OrderRequestStatus = 'new' | 'reviewing' | 'completed';
 export type RetailerDocumentKind = 'color-chart' | 'installation-instructions';
+export type PdfThemeId = 'brixx' | 'custom';
 
 export type AccessLevel = 'guest' | 'full' | 'quote-only' | 'sketch-only' | 'retailer';
 
@@ -355,6 +356,7 @@ export interface QuoteState {
     includeSignatureBlock: boolean;
     includePaymentBox: boolean;
     hideZeroDiscountReferencesInPdf: boolean;
+    pdfThemeId: PdfThemeId;
     paymentTermsDays: number;
     quoteValidityDays: number;
 }
@@ -906,6 +908,7 @@ export type QuoteReducerAction =
     | { type: 'SET_INCLUDE_PAYMENT_BOX'; payload: boolean }
     | { type: 'SET_INCLUDE_SIGNATURE_BLOCK'; payload: boolean }
     | { type: 'SET_HIDE_ZERO_DISCOUNT_REFERENCES_IN_PDF'; payload: boolean }
+    | { type: 'SET_PDF_THEME_ID'; payload: PdfThemeId }
     | { type: 'SET_PAYMENT_TERMS_DAYS'; payload: number }
     | { type: 'SET_QUOTE_VALIDITY_DAYS'; payload: number }
     | { type: 'RESET_STATE' };

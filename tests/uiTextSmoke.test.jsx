@@ -520,6 +520,7 @@ describe('UI text smoke', () => {
 
         expect(html).toContain('Offertsammanställning');
         expect(html).toContain('Spara offert');
+        expect(html).toContain('Offert tema');
         expect(html).toContain('PDF förhandsvisning');
         expect(html).toContain('Exportera som PDF');
         expect(html).toContain('Offerten saknar offertnummer');

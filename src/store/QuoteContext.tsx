@@ -85,6 +85,8 @@ export function quoteReducer(state: QuoteState, action: QuoteReducerAction): Quo
             return { ...state, includeSignatureBlock: Boolean(action.payload) };
         case 'SET_HIDE_ZERO_DISCOUNT_REFERENCES_IN_PDF':
             return { ...state, hideZeroDiscountReferencesInPdf: Boolean(action.payload) };
+        case 'SET_PDF_THEME_ID':
+            return hydrateQuoteState({ ...state, pdfThemeId: action.payload });
         case 'SET_PAYMENT_TERMS_DAYS':
             return hydrateQuoteState({ ...state, paymentTermsDays: normalizePositiveInt(action.payload, 30) });
         case 'SET_QUOTE_VALIDITY_DAYS':

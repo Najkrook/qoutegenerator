@@ -17,9 +17,10 @@ import type {
     UnknownRecord
 } from '../types/contracts';
 import { DEFAULT_TEMPLATE_ID, getTemplateById, isBuiltinTemplateId } from '../config/legalTemplates.shared';
+import { DEFAULT_PDF_THEME_ID, normalizePdfThemeId } from '../config/pdfThemes';
 
 export const QUOTE_STATE_STORAGE_KEY = 'offertverktyg_state';
-export const CURRENT_STATE_VERSION = 1;
+export const CURRENT_STATE_VERSION = 2;
 
 const VALID_QUOTE_STATUSES: QuoteStatus[] = ['draft', 'sent', 'won', 'lost', 'archived'];
 
@@ -292,6 +293,7 @@ function createBaseInitialState(): QuoteState {
         includeSignatureBlock: false,
         includePaymentBox: false,
         hideZeroDiscountReferencesInPdf: false,
+        pdfThemeId: DEFAULT_PDF_THEME_ID,
         paymentTermsDays: 30,
         quoteValidityDays: 30
     };
@@ -363,6 +365,16 @@ function migrateV0ToV1(rawState: UnknownRecord = {}): UnknownRecord {
     };
 }
 
+function migrateV1ToV2(rawState: UnknownRecord = {}): UnknownRecord {
+    const next = toRecord(rawState);
+
+    return {
+        ...next,
+        stateVersion: 2,
+        pdfThemeId: normalizePdfThemeId(next.pdfThemeId)
+    };
+}
+
 export function migrateQuoteState(fromVersion: unknown, rawState: unknown): UnknownRecord {
     let version = Number.isFinite(Number(fromVersion)) ? Number(fromVersion) : 0;
     let nextState: UnknownRecord = isObject(rawState) ? clone(rawState) : {};
@@ -371,6 +383,12 @@ export function migrateQuoteState(fromVersion: unknown, rawState: unknown): Unkn
         if (version === 0) {
             nextState = migrateV0ToV1(nextState);
             version = 1;
+            continue;
+        }
+
+        if (version === 1) {
+            nextState = migrateV1ToV2(nextState);
+            version = 2;
             continue;
         }
 
@@ -473,6 +491,7 @@ export function hydrateQuoteState(input: HydratedQuoteStatePayload): QuoteState 
         includeSignatureBlock: mergedState.includeSignatureBlock === true,
         includePaymentBox: mergedState.includePaymentBox === true,
         hideZeroDiscountReferencesInPdf: mergedState.hideZeroDiscountReferencesInPdf === true,
+        pdfThemeId: normalizePdfThemeId(mergedState.pdfThemeId),
         paymentTermsDays: normalizePositiveInt(mergedState.paymentTermsDays, initialState.paymentTermsDays),
         quoteValidityDays: normalizedValidityDays
     };

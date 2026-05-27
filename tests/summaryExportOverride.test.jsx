@@ -265,6 +265,27 @@ afterEach(() => {
 });
 
 describe('SummaryExport PDF override', () => {
+    it('renders the offer theme dropdown and dispatches theme changes', async () => {
+        const { container, dispatch } = await renderSummaryExport();
+        const select = container.querySelector('select[name="pdfThemeId"]');
+
+        expect(container.textContent).toContain('Offert tema');
+        expect(select).toBeTruthy();
+        expect(select.value).toBe('brixx');
+        expect(Array.from(select.options).map((option) => option.textContent)).toEqual(['BRIXX', 'Eget tema']);
+
+        await act(async () => {
+            select.value = 'custom';
+            select.dispatchEvent(new Event('change', { bubbles: true }));
+            await Promise.resolve();
+        });
+
+        expect(dispatch).toHaveBeenCalledWith({
+            type: 'SET_PDF_THEME_ID',
+            payload: 'custom'
+        });
+    });
+
     it('allows legacy export through Exportera ändå when quoteNumber is missing', async () => {
         const { container } = await renderSummaryExport({
             stateOverrides: { quoteNumber: null }

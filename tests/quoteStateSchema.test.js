@@ -13,6 +13,7 @@ describe('quoteStateSchema', () => {
         expect(hydrated).toEqual(createInitialQuoteState());
         expect(hydrated.stateVersion).toBe(CURRENT_STATE_VERSION);
         expect(hydrated.hideZeroDiscountReferencesInPdf).toBe(false);
+        expect(hydrated.pdfThemeId).toBe('brixx');
         expect(hydrated.customerInfo.customerReference).toBe('');
         expect(hydrated.gridSelections).toEqual({});
     });
@@ -38,7 +39,7 @@ describe('quoteStateSchema', () => {
             }
         });
 
-        expect(hydrated.stateVersion).toBe(1);
+        expect(hydrated.stateVersion).toBe(CURRENT_STATE_VERSION);
         expect(hydrated.step).toBe(3);
         expect(hydrated.selectedLines).toEqual(['ClickitUp']);
         expect(hydrated.builderItems).toHaveLength(1);
@@ -51,6 +52,7 @@ describe('quoteStateSchema', () => {
         expect(hydrated.customerInfo.validity).toBe('14 dagar');
         expect(hydrated.inventoryData).toEqual({ bahama: [], clickitup: {} });
         expect(hydrated.hideZeroDiscountReferencesInPdf).toBe(false);
+        expect(hydrated.pdfThemeId).toBe('brixx');
     });
 
     it('normalizes legacy validity and terms defaults safely', () => {
@@ -81,13 +83,20 @@ describe('quoteStateSchema', () => {
             quoteStatus: 'sent'
         });
 
-        expect(hydrated.stateVersion).toBe(1);
+        expect(hydrated.stateVersion).toBe(CURRENT_STATE_VERSION);
         expect(hydrated.activeQuoteId).toBe('quote_123');
         expect(hydrated.quoteNumber).toBe('BRIXX - 260422-103');
         expect(hydrated.activeQuoteVersion).toBe(4);
         expect(hydrated.quoteStatus).toBe('sent');
         expect(hydrated.customerInfo.name).toBe('Revision Kund');
         expect(hydrated.customerInfo.customerReference).toBe('');
+    });
+
+    it('hydrates PDF theme selection with a conservative default', () => {
+        expect(hydrateQuoteState({ pdfThemeId: 'custom' }).pdfThemeId).toBe('custom');
+        expect(hydrateQuoteState({ pdfThemeId: 'brixx' }).pdfThemeId).toBe('brixx');
+        expect(hydrateQuoteState({ pdfThemeId: 'unknown_theme' }).pdfThemeId).toBe('brixx');
+        expect(hydrateQuoteState({}).pdfThemeId).toBe('brixx');
     });
 
     it('survives malformed nested objects without crashing', () => {
@@ -384,6 +393,17 @@ describe('quoteStateSchema', () => {
         });
 
         expect(nextState.hideZeroDiscountReferencesInPdf).toBe(true);
+    });
+
+    it('supports changing the PDF theme through the reducer', () => {
+        const initial = createInitialQuoteState();
+
+        const nextState = quoteReducer(initial, {
+            type: 'SET_PDF_THEME_ID',
+            payload: 'custom'
+        });
+
+        expect(nextState.pdfThemeId).toBe('custom');
     });
 
     it('preserves sketch metadata for both parasol and fiesta exports', () => {
