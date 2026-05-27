@@ -272,7 +272,7 @@ describe('SummaryExport PDF override', () => {
         expect(container.textContent).toContain('Offert tema');
         expect(select).toBeTruthy();
         expect(select.value).toBe('brixx');
-        expect(Array.from(select.options).map((option) => option.textContent)).toEqual(['BRIXX', 'Eget tema']);
+        expect(Array.from(select.options).map((option) => option.textContent)).toEqual(['BRIXX', 'Eget tema', 'Roslagsmarkisen']);
 
         await act(async () => {
             select.value = 'custom';

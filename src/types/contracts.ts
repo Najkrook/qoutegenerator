@@ -5,7 +5,7 @@ export type QuoteStatus = 'draft' | 'sent' | 'won' | 'lost' | 'archived';
 
 export type OrderRequestStatus = 'new' | 'reviewing' | 'completed';
 export type RetailerDocumentKind = 'color-chart' | 'installation-instructions';
-export type PdfThemeId = 'brixx' | 'custom';
+export type PdfThemeId = 'brixx' | 'custom' | 'roslagsmarkisen';
 
 export type AccessLevel = 'guest' | 'full' | 'quote-only' | 'sketch-only' | 'retailer';
 

@@ -6,7 +6,7 @@ import {
 } from '../services/exportDataBuilders';
 import type { CustomerInfo, QuoteState, QuoteTotalsResult } from '../types/contracts';
 import {
-    PDF_LAYOUT,
+    getPdfLayout,
     drawHeader,
     drawTermsPageHeader,
     normalizePositiveInt,
@@ -107,12 +107,13 @@ export function generatePDF(
         const shouldRenderSignatureBlock = pdfLegalTemplatesEnabled && state.includeSignatureBlock !== false;
         const hideDiscountReferences = shouldHideDiscountReferencesInPdf(state, summaryData);
         const validUntilDate = computeValidUntilDateString(customerInfo.date, state.quoteValidityDays);
+        const activeLayout = getPdfLayout(state.pdfThemeId);
         const drawMainHeader = () => drawHeader(doc, {
             pageWidth,
             quoteDate,
             quoteNumber: state.quoteNumber || null,
             customerInfo,
-            layout: PDF_LAYOUT
+            layout: activeLayout
         });
 
         drawMainHeader();
@@ -120,7 +121,7 @@ export function generatePDF(
         let finalY = renderCustomerInfoBlock(doc, {
             customerInfo,
             pageWidth,
-            layout: PDF_LAYOUT
+            layout: activeLayout
         });
 
         finalY = renderGroupedTables(doc, {
@@ -132,7 +133,7 @@ export function generatePDF(
             includesVat: state.includesVat,
             hideDiscountReferences,
             drawMainHeader,
-            layout: PDF_LAYOUT
+            layout: activeLayout
         });
 
         if ((summaryData.totals || []).length === 0 && !returnBlob) {
@@ -154,7 +155,7 @@ export function generatePDF(
             formatSEK: formatSek,
             shouldRenderPaymentBox,
             drawMainHeader,
-            layout: PDF_LAYOUT,
+            layout: activeLayout,
             hasPriceUponRequest: (summaryData.totals || []).some((r) => r.priceUponRequest === true)
         });
 
@@ -164,14 +165,14 @@ export function generatePDF(
             pageHeight,
             drawMainHeader,
             currentY: finalY + 12,
-            layout: PDF_LAYOUT
+            layout: activeLayout
         });
 
         const termsPageEndY = renderTermsPages(doc, {
             state,
             pageWidth,
             pageHeight,
-            layout: PDF_LAYOUT
+            layout: activeLayout
         });
 
         if (shouldRenderSignatureBlock) {
@@ -181,8 +182,8 @@ export function generatePDF(
                     preferredY: termsPageEndY,
                     pageWidth,
                     pageHeight,
-                    drawPageHeader: () => drawTermsPageHeader(doc, { pageWidth, layout: PDF_LAYOUT }),
-                    layout: PDF_LAYOUT
+                    drawPageHeader: () => drawTermsPageHeader(doc, { pageWidth, layout: activeLayout }),
+                    layout: activeLayout
                 });
             } else {
                 renderSignatureBlock(doc, {
@@ -190,12 +191,12 @@ export function generatePDF(
                     pageWidth,
                     pageHeight,
                     drawPageHeader: drawMainHeader,
-                    layout: PDF_LAYOUT
+                    layout: activeLayout
                 });
             }
         }
 
-        renderFooters(doc, { pageWidth, pageHeight, layout: PDF_LAYOUT });
+        renderFooters(doc, { pageWidth, pageHeight, layout: activeLayout });
 
         const pdfBlob = doc.output('blob');
         return pdfBlob;

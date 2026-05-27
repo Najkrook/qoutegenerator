@@ -10,7 +10,41 @@ import type {
     QuoteTotalsRow
 } from '../types/contracts';
 
-export const PDF_LAYOUT = Object.freeze({
+export interface PdfThemeLayout {
+    pageMarginX: number;
+    headerTopY: number;
+    headerLineY: number;
+    customerBoxY: number;
+    contentStartY: number;
+    contentBottomSafe: number;
+    termsStartY: number;
+    termsFooterZone: number;
+    footerBandHeight: number;
+    colors: {
+        brandPrimary: [number, number, number];
+        darkText: [number, number, number];
+        grayText: [number, number, number];
+        lightGray: [number, number, number];
+        accent: [number, number, number];
+        backgroundTint?: [number, number, number];
+    };
+    logoConfig: {
+        type: 'base64' | 'text';
+        data: string;
+        width: number;
+        height: number;
+        fallbackSize: number;
+        textYOffset?: number;
+    };
+    footerConfig: {
+        slogan: string;
+        address: string;
+        contact: string;
+        website?: string;
+    };
+}
+
+export const BRIXX_LAYOUT: PdfThemeLayout = Object.freeze<PdfThemeLayout>({
     pageMarginX: 10,
     headerTopY: 16,
     headerLineY: 34,
@@ -21,13 +55,69 @@ export const PDF_LAYOUT = Object.freeze({
     termsFooterZone: 35,
     footerBandHeight: 30,
     colors: {
-        brandOrange: [243, 156, 18],
+        brandPrimary: [243, 156, 18],
         darkText: [30, 30, 30],
         grayText: [120, 120, 120],
         lightGray: [230, 230, 230],
-        accentGreen: [46, 174, 96]
+        accent: [46, 174, 96]
+    },
+    logoConfig: {
+        type: 'base64',
+        data: BRIXX_LOGO_BASE64,
+        width: 50,
+        height: 16,
+        fallbackSize: 22
+    },
+    footerConfig: {
+        slogan: 'Parasoll | Värme | Vindskydd | Miljö',
+        address: 'BRIXX EUROPE | Dockplatsen 1 | SE 211 19 Malmö | SWEDEN',
+        website: 'Products Designed for Excellence, Engineered for Performance.',
+        contact: "+46 (0) 708-500 000   |   team@brixx.se   |   WWW.BRIXX.SE   |   EST'D 1992"
     }
 });
+
+export const ROSLAGSMARKISEN_LAYOUT: PdfThemeLayout = Object.freeze<PdfThemeLayout>({
+    pageMarginX: 10,
+    headerTopY: 16,
+    headerLineY: 34,
+    customerBoxY: 37,
+    contentStartY: 41,
+    contentBottomSafe: 36,
+    termsStartY: 31,
+    termsFooterZone: 35,
+    footerBandHeight: 30,
+    colors: {
+        brandPrimary: [2, 26, 53],
+        darkText: [30, 30, 30],
+        grayText: [120, 120, 120],
+        lightGray: [230, 230, 230],
+        accent: [80, 99, 84],
+        backgroundTint: [251, 249, 246]
+    },
+    logoConfig: {
+        type: 'text',
+        data: 'ROSLAGSMARKISEN',
+        width: 0,
+        height: 16,
+        fallbackSize: 18,
+        textYOffset: -2
+    },
+    footerConfig: {
+        slogan: 'Skydd mot solen med stil och hållbarhet',
+        address: 'Stora björknäsvägen 6 | 761 98 Norrtälje',
+        website: 'info@roslagsmarkisen.se | www.roslagsmarkisen.se',
+        contact: 'Tel: 0176 15615'
+    }
+});
+
+export function getPdfLayout(themeId?: string): PdfThemeLayout {
+    if (themeId === 'roslagsmarkisen') {
+        return ROSLAGSMARKISEN_LAYOUT;
+    }
+    return BRIXX_LAYOUT;
+}
+
+export const PDF_LAYOUT = BRIXX_LAYOUT;
 
 const GROUP_SORT_ORDER = ['clickitup', 'bahama', 'fiesta', 'ovrigt'];
 
@@ -119,14 +209,23 @@ export function groupSummaryTotalsByLine(summaryData: ExportSummaryInput = {}) {
     return { groupedTotals, groupKeys };
 }
 
-function drawBrandLogo(doc, x, y, width, height, fallbackSize, layout) {
+function drawBrandLogo(doc, x, y, layout: PdfThemeLayout) {
+    if (layout.logoConfig.type === 'text') {
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(layout.logoConfig.fallbackSize);
+        doc.setTextColor(...layout.colors.brandPrimary);
+        const yOffset = layout.logoConfig.textYOffset || 0;
+        doc.text(layout.logoConfig.data, x, y + layout.logoConfig.height + yOffset);
+        return;
+    }
+
     try {
-        doc.addImage(BRIXX_LOGO_BASE64, 'PNG', x, y, width, height);
+        doc.addImage(layout.logoConfig.data, 'PNG', x, y, layout.logoConfig.width, layout.logoConfig.height);
     } catch (error) {
         doc.setFont('helvetica', 'bold');
-        doc.setFontSize(fallbackSize);
-        doc.setTextColor(...layout.colors.brandOrange);
-        doc.text('BRIXX', x, y + height - 4);
+        doc.setFontSize(layout.logoConfig.fallbackSize);
+        doc.setTextColor(...layout.colors.brandPrimary);
+        doc.text('BRIXX', x, y + layout.logoConfig.height - 4);
     }
 }
 
@@ -157,7 +256,7 @@ export function drawHeader(doc, { pageWidth, quoteDate, quoteNumber = null, cust
     const safeCustomerInfo = normalizeCustomerInfo(customerInfo);
     const headerLineY = quoteNumber ? layout.headerLineY + 2 : layout.headerLineY;
 
-    drawBrandLogo(doc, pageMarginX, 8, 50, 16, 22, layout);
+    drawBrandLogo(doc, pageMarginX, 8, layout);
 
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(20);
@@ -178,7 +277,7 @@ export function drawHeader(doc, { pageWidth, quoteDate, quoteNumber = null, cust
         doc.text(`Er referens: ${safeCustomerInfo.customerReference}`, pageWidth - pageMarginX, quoteNumber ? 34 : 30, { align: 'right' });
     }
 
-    doc.setDrawColor(...layout.colors.brandOrange);
+    doc.setDrawColor(...layout.colors.brandPrimary);
     doc.setLineWidth(0.8);
     doc.line(pageMarginX, headerLineY, pageWidth - pageMarginX, headerLineY);
 }
@@ -346,11 +445,11 @@ export function renderGroupedTables(doc, {
             columnStyles: tableColumnStyles,
             didParseCell(data) {
                 if (data.section === 'head' && data.column.index === 4) {
-                    data.cell.styles.fillColor = layout.colors.accentGreen as Color;
+                    data.cell.styles.fillColor = layout.colors.accent as Color;
                     data.cell.styles.textColor = [255, 255, 255] as Color;
                 }
                 if (data.section === 'body' && data.column.index === 4) {
-                    data.cell.styles.fillColor = [235, 250, 240] as Color;
+                    data.cell.styles.fillColor = layout.colors.backgroundTint || ([235, 250, 240] as Color);
                 }
             },
             margin: {
@@ -496,7 +595,7 @@ export function renderTotalsSection(doc, {
         finalY += 4;
     }
 
-    drawTotalLine('Totalt Exkl. moms:', `${formatSEK(exportSummary.finalTotalSek)} SEK`, finalY, true, layout.colors.accentGreen);
+    drawTotalLine('Totalt Exkl. moms:', `${formatSEK(exportSummary.finalTotalSek)} SEK`, finalY, true, layout.colors.accent);
     doc.setTextColor(255, 255, 255);
     doc.setFont('helvetica', 'bold');
     doc.text('Totalt Exkl. moms:', rightColX, finalY);
@@ -534,14 +633,14 @@ export function renderTotalsSection(doc, {
 }
 
 export function drawTermsPageHeader(doc, { pageWidth, layout = PDF_LAYOUT }) {
-    drawBrandLogo(doc, layout.pageMarginX, 8, 35, 11, 16, layout);
+    drawBrandLogo(doc, layout.pageMarginX, 8, layout);
 
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(16);
     doc.setTextColor(...layout.colors.darkText);
     doc.text('VILLKOR', pageWidth - layout.pageMarginX, 16, { align: 'right' });
 
-    doc.setDrawColor(...layout.colors.brandOrange);
+    doc.setDrawColor(...layout.colors.brandPrimary);
     doc.setLineWidth(0.6);
     doc.line(layout.pageMarginX, 24, pageWidth - layout.pageMarginX, 24);
 }
@@ -656,7 +755,7 @@ export function renderFooters(doc, { pageWidth, pageHeight, layout = PDF_LAYOUT 
         doc.setFillColor(35, 35, 45);
         doc.rect(0, footerBandY, pageWidth, layout.footerBandHeight, 'F');
 
-        doc.setDrawColor(...layout.colors.brandOrange);
+        doc.setDrawColor(...layout.colors.brandPrimary);
         doc.setLineWidth(0.6);
         doc.line(layout.pageMarginX, footerBandY, pageWidth - layout.pageMarginX, footerBandY);
 
@@ -664,25 +763,27 @@ export function renderFooters(doc, { pageWidth, pageHeight, layout = PDF_LAYOUT 
         doc.setFont('helvetica', 'bold');
         doc.setFontSize(8);
         doc.setTextColor(255, 255, 255);
-        doc.text('Parasoll | Värme | Vindskydd | Miljö', pageWidth / 2, footerY, { align: 'center' });
+        doc.text(layout.footerConfig.slogan, pageWidth / 2, footerY, { align: 'center' });
 
         footerY += 5;
         doc.setFont('helvetica', 'normal');
         doc.setFontSize(7.5);
         doc.setTextColor(180, 180, 190);
-        doc.text('BRIXX EUROPE | Dockplatsen 1 | SE 211 19 Malmö | SWEDEN', pageWidth / 2, footerY, { align: 'center' });
+        doc.text(layout.footerConfig.address, pageWidth / 2, footerY, { align: 'center' });
 
-        footerY += 4;
-        doc.setFontSize(7);
-        doc.text('Products Designed for Excellence, Engineered for Performance.', pageWidth / 2, footerY, { align: 'center' });
+        if (layout.footerConfig.website) {
+            footerY += 4;
+            doc.setFontSize(7);
+            doc.text(layout.footerConfig.website, pageWidth / 2, footerY, { align: 'center' });
+        }
 
         footerY += 5;
         doc.setFont('helvetica', 'bold');
         doc.setFontSize(7.5);
         doc.setTextColor(255, 255, 255);
-        doc.text("+46 (0) 708-500 000   |   team@brixx.se   |   WWW.BRIXX.SE   |   EST'D 1992", pageWidth / 2, footerY, { align: 'center' });
+        doc.text(layout.footerConfig.contact, pageWidth / 2, footerY, { align: 'center' });
 
-        doc.setTextColor(...layout.colors.brandOrange);
+        doc.setTextColor(...layout.colors.brandPrimary);
         doc.setFontSize(7);
         doc.text(`${page} / ${pageCount}`, pageWidth - layout.pageMarginX, pageHeight - 5, { align: 'right' });
     }
