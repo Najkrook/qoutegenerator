@@ -426,6 +426,7 @@ export function BuilderItem({ item, index, onRemove }: BuilderItemProps) {
                                             ));
                                             const isChecked = Boolean(existingAddon);
                                             const priceSek = getPriceSek(addonOption.price, lineData, exchangeRate);
+                                            const isReq = addonOption.priceUponRequest === true;
 
                                             return (
                                                 <div key={addonOption.id} className="grid grid-cols-[1fr_auto_auto_auto] items-center gap-4">
@@ -439,7 +440,7 @@ export function BuilderItem({ item, index, onRemove }: BuilderItemProps) {
                                                         {addonOption.name}
                                                     </label>
                                                     <span className="text-sm text-text-secondary whitespace-nowrap">
-                                                        {priceSek.toLocaleString('sv-SE')} SEK
+                                                        {isReq ? 'Pris på förfrågan' : `${priceSek.toLocaleString('sv-SE')} SEK`}
                                                     </span>
                                                     <input
                                                         type="number"
@@ -451,7 +452,9 @@ export function BuilderItem({ item, index, onRemove }: BuilderItemProps) {
                                                     />
                                                     <span className="text-sm font-semibold min-w-[100px] text-right">
                                                         {isChecked
-                                                            ? `= ${(priceSek * (Number(existingAddon?.qty) || 1)).toLocaleString('sv-SE')} SEK`
+                                                            ? isReq
+                                                                ? '= Pris på förfrågan'
+                                                                : `= ${(priceSek * (Number(existingAddon?.qty) || 1)).toLocaleString('sv-SE')} SEK`
                                                             : ''}
                                                     </span>
                                                 </div>

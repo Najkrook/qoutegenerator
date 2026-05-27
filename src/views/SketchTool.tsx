@@ -39,29 +39,34 @@ export function SketchTool(props: SketchToolProps) {
     };
 
     const toggleNode = (
-        <div className="flex bg-panel-bg border border-panel-border rounded-md overflow-hidden ml-4">
+        <div className="absolute top-3 left-1/2 -translate-x-1/2 z-[100] flex bg-panel-bg/80 backdrop-blur-md border border-indigo-500/30 p-1 rounded-full shadow-lg shadow-indigo-500/20">
             <button
                 onClick={() => handleModeSwitch('simple')}
-                className={`px-3 py-1.5 text-sm font-medium transition-colors ${
-                    editorMode === 'simple' ? 'bg-primary text-white' : 'text-text-secondary hover:text-text-primary hover:bg-white/5'
+                className={`px-6 py-2 rounded-full text-sm font-bold transition-all duration-300 ${
+                    editorMode === 'simple' ? 'bg-indigo-600 text-white shadow-md' : 'text-text-secondary hover:text-text-primary hover:bg-white/5'
                 }`}
             >
-                Rektangel
+                Enkel
             </button>
             <button
                 onClick={() => handleModeSwitch('advanced')}
-                className={`px-3 py-1.5 text-sm font-medium transition-colors border-l border-panel-border ${
-                    editorMode === 'advanced' ? 'bg-primary text-white' : 'text-text-secondary hover:text-text-primary hover:bg-white/5'
+                className={`px-6 py-2 rounded-full text-sm font-bold transition-all duration-300 ${
+                    editorMode === 'advanced' ? 'bg-indigo-600 text-white shadow-md' : 'text-text-secondary hover:text-text-primary hover:bg-white/5'
                 }`}
             >
-                Friform
+                Avancerat
             </button>
         </div>
     );
 
-    if (editorMode === 'simple') {
-        return <SimpleSketchEditor {...props} modeToggleNode={toggleNode} />;
-    }
-
-    return <AdvancedSketchEditor {...props} modeToggleNode={toggleNode} />;
+    return (
+        <div className="relative w-full h-full">
+            {editorMode === 'simple' ? (
+                <SimpleSketchEditor {...props} modeToggleNode={null} />
+            ) : (
+                <AdvancedSketchEditor {...props} modeToggleNode={null} />
+            )}
+            {toggleNode}
+        </div>
+    );
 }

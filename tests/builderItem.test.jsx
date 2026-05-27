@@ -164,4 +164,24 @@ describe('BuilderItem header add-on badge', () => {
         expect(html).toContain('Övriga tillval');
         expect(html).toContain('Lägg till egen rad');
     });
+
+    it('renders "Pris på förfrågan" for request-based addons in the accessory selection lists', () => {
+        const html = renderBuilderItem({
+            id: 'outside-item-1',
+            line: 'BaHaMa',
+            model: 'Jumbrella outSide',
+            size: '3x3 Kvadrat',
+            qty: 1,
+            addons: [
+                { id: 'outside_classic_light_4', qty: 1, discountPct: 0 }
+            ]
+        });
+
+        // The checkbox label should be present
+        expect(html).toContain('LED-Lighting with 4 RGBW-LED strips');
+        // The individual price column should render 'Pris på förfrågan'
+        expect(html).toContain('Pris på förfrågan');
+        // The total/equality price display should render '= Pris på förfrågan' since the checkbox is checked (active)
+        expect(html).toContain('= Pris på förfrågan');
+    });
 });
