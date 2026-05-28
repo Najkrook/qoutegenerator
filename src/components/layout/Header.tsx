@@ -9,6 +9,7 @@ import {
     getQuoteStepNumber
 } from '../../navigation/routes';
 import { useAppNavigation } from '../../navigation/useAppNavigation';
+import ThemeToggle from '../ThemeToggle';
 
 export function Header() {
     const { dispatch } = useQuote();
@@ -153,6 +154,7 @@ export function Header() {
                             Logga ut
                         </button>
                     </div>
+                    <ThemeToggle />
                 </div>
             </div>
 

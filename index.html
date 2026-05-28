@@ -6,9 +6,12 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Brixx portal</title>
 
+    <script>
+        document.documentElement.dataset.theme = localStorage.getItem('quote-generator-theme') || 'portal-dark';
+    </script>
 </head>
 
-<body class="bg-[#0f0f1a] text-[#eee] select-none">
+<body class="select-none">
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
 </body>

@@ -506,21 +506,6 @@ export function SummaryExport({ onPrev, onBackToSketch, onOpenRetailerOrderHisto
                                     </button>
 
                                     <div className="flex flex-col sm:flex-row sm:flex-wrap items-center justify-center xl:justify-end gap-3 w-full xl:w-auto">
-                                        <label className="flex w-full flex-col gap-1 text-xs font-semibold uppercase tracking-wide text-text-secondary sm:w-[180px]">
-                                            Offert tema
-                                            <select
-                                                name="pdfThemeId"
-                                                value={selectedPdfThemeId}
-                                                onChange={handlePdfThemeChange}
-                                                className="h-[46px] w-full rounded-lg border border-panel-border bg-panel-bg px-3 text-sm font-bold normal-case tracking-normal text-white outline-none transition-colors hover:bg-white/5 focus:border-primary focus:ring-2 focus:ring-primary/25"
-                                            >
-                                                {PDF_THEME_OPTIONS.map((option) => (
-                                                    <option key={option.id} value={option.id}>
-                                                        {option.label}
-                                                    </option>
-                                                ))}
-                                            </select>
-                                        </label>
 
                                         <button
                                             type="button"
@@ -533,16 +518,7 @@ export function SummaryExport({ onPrev, onBackToSketch, onOpenRetailerOrderHisto
                                             <span aria-hidden="true" className="opacity-70">💾</span> {isSavingQuote ? 'Sparar...' : 'Spara offert'}
                                         </button>
                                         
-                                        <button
-                                            type="button"
-                                            onClick={() => {
-                                                void handleCopyQuoteLink();
-                                            }}
-                                            disabled={!state.activeQuoteId}
-                                            className="w-full sm:w-auto px-6 py-3 bg-panel-bg border border-panel-border text-white rounded-lg font-bold hover:bg-white/5 transition-all text-sm tracking-wide flex items-center justify-center gap-2 disabled:cursor-not-allowed disabled:opacity-50"
-                                        >
-                                            Kopiera länk
-                                        </button>
+
 
                                         {exportBlockReason && (
                                             <button
@@ -656,10 +632,29 @@ export function SummaryExport({ onPrev, onBackToSketch, onOpenRetailerOrderHisto
                     </div>
                 </div>
 
-                <aside className="bg-panel-bg border border-panel-border rounded-lg p-4 xl:sticky xl:top-4 shadow-sm">
-                    <h3 className="text-base font-bold text-text-primary">PDF förhandsvisning</h3>
-                    <p className="text-xs text-text-secondary mt-1">Uppdateras automatiskt när offertdata ändras.</p>
-                    <div className="mt-3 h-[860px] bg-white border border-panel-border rounded-md overflow-hidden">
+                <aside className="bg-panel-bg border border-panel-border rounded-lg p-4 xl:sticky xl:top-4 shadow-sm flex flex-col gap-4">
+                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                        <div>
+                            <h3 className="text-base font-bold text-text-primary">PDF förhandsvisning</h3>
+                            <p className="text-xs text-text-secondary mt-1">Uppdateras automatiskt när offertdata ändras.</p>
+                        </div>
+                        <label className="flex flex-col gap-1 text-xs font-semibold uppercase tracking-wide text-text-secondary w-full sm:w-[180px]">
+                            Offert tema
+                            <select
+                                name="pdfThemeId"
+                                value={selectedPdfThemeId}
+                                onChange={handlePdfThemeChange}
+                                className="h-[38px] w-full rounded-md border border-panel-border bg-panel-bg px-3 text-sm font-bold normal-case tracking-normal text-white outline-none transition-colors hover:bg-white/5 focus:border-primary focus:ring-2 focus:ring-primary/25"
+                            >
+                                {PDF_THEME_OPTIONS.map((option) => (
+                                    <option key={option.id} value={option.id}>
+                                        {option.label}
+                                    </option>
+                                ))}
+                            </select>
+                        </label>
+                    </div>
+                    <div className="h-[860px] bg-white border border-panel-border rounded-md overflow-hidden">
                         {previewUrl ? (
                             <iframe
                                 title="PDF förhandsvisning"
@@ -671,6 +666,18 @@ export function SummaryExport({ onPrev, onBackToSketch, onOpenRetailerOrderHisto
                                 {previewError || 'Genererar PDF-förhandsvisning...'}
                             </div>
                         )}
+                    </div>
+                    <div className="flex justify-end">
+                        <button
+                            type="button"
+                            onClick={() => {
+                                void handleCopyQuoteLink();
+                            }}
+                            disabled={!state.activeQuoteId}
+                            className="w-full sm:w-auto px-5 py-2.5 bg-panel-bg border border-panel-border text-white rounded-lg font-bold hover:bg-white/5 transition-all text-sm tracking-wide flex items-center justify-center gap-2 disabled:cursor-not-allowed disabled:opacity-50 shadow-sm"
+                        >
+                            <span aria-hidden="true" className="opacity-70">🔗</span> Kopiera länk
+                        </button>
                     </div>
                 </aside>
             </div>

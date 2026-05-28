@@ -5,13 +5,13 @@
   while giving us full Tailwind utility class power.
 */
 @theme {
-  --color-primary: #3b82f6;
-  --color-primary-hover: #2563eb;
-  --color-bg: #0f0f1a;
-  --color-panel-bg: #1e1e2e;
-  --color-panel-border: #333344;
-  --color-text-primary: #ffffff;
-  --color-text-secondary: #a0aec0;
+  --color-primary: var(--theme-primary);
+  --color-primary-hover: var(--theme-primary-hover);
+  --color-bg: var(--theme-bg);
+  --color-panel-bg: var(--theme-panel-bg);
+  --color-panel-border: var(--theme-panel-border);
+  --color-text-primary: var(--theme-text-primary);
+  --color-text-secondary: var(--theme-text-secondary);
   --color-success: #10b981;
   --color-danger: #ef4444;
   --color-warning: #f59e0b;
@@ -28,6 +28,50 @@
     50% { opacity: 0.8; stroke-width: 2.5; }
     100% { opacity: 0.5; stroke-width: 1.5; }
   }
+}
+
+:root,
+[data-theme="portal-dark"] {
+  --theme-primary: #3b82f6;
+  --theme-primary-hover: #2563eb;
+  --theme-bg: #0f0f1a;
+  --theme-panel-bg: #1e1e2e;
+  --theme-panel-border: #333344;
+  --theme-text-primary: #ffffff;
+  --theme-text-secondary: #a0aec0;
+  
+  --theme-glass-panel-bg: rgba(30, 30, 46, 0.65);
+  --theme-glass-panel-border: rgba(255, 255, 255, 0.07);
+  --theme-glass-panel-border-hover: rgba(255, 255, 255, 0.12);
+  --theme-glass-panel-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.4);
+  
+  --theme-glass-card-bg: rgba(15, 15, 26, 0.45);
+  --theme-glass-card-bg-hover: rgba(15, 15, 26, 0.6);
+  --theme-glass-card-border: rgba(255, 255, 255, 0.04);
+}
+
+[data-theme="brixx-light"] {
+  --theme-primary: #EDB059;
+  --theme-primary-hover: #D99A3F;
+  --theme-bg: #F0F5FA;
+  --theme-panel-bg: #FFFFFF;
+  --theme-panel-border: #D1D5DB;
+  --theme-text-primary: #111111;
+  --theme-text-secondary: #6B7280;
+  
+  --theme-glass-panel-bg: rgba(255, 255, 255, 0.85);
+  --theme-glass-panel-border: rgba(0, 0, 0, 0.07);
+  --theme-glass-panel-border-hover: rgba(0, 0, 0, 0.12);
+  --theme-glass-panel-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.05);
+  
+  --theme-glass-card-bg: rgba(255, 255, 255, 0.75);
+  --theme-glass-card-bg-hover: rgba(255, 255, 255, 0.95);
+  --theme-glass-card-border: rgba(0, 0, 0, 0.04);
+}
+
+/* Ensure button text has good contrast in Brixx mode */
+[data-theme="brixx-light"] .bg-primary {
+  color: #111111 !important;
 }
 
 body {
@@ -55,31 +99,31 @@ select optgroup {
 
 /* Glassmorphism panel styling */
 .glass-panel {
-  background: rgba(30, 30, 46, 0.65);
+  background: var(--theme-glass-panel-bg);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
-  border: 1px solid rgba(255, 255, 255, 0.07);
-  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.4);
+  border: 1px solid var(--theme-glass-panel-border);
+  box-shadow: var(--theme-glass-panel-shadow);
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .glass-panel:hover {
-  border-color: rgba(255, 255, 255, 0.12);
+  border-color: var(--theme-glass-panel-border-hover);
   box-shadow: 0 8px 32px 0 rgba(59, 130, 246, 0.08);
 }
 
 /* Glassmorphism cards */
 .glass-card {
-  background: rgba(15, 15, 26, 0.45);
+  background: var(--theme-glass-card-bg);
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
-  border: 1px solid rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--theme-glass-card-border);
   border-radius: 0.75rem;
   transition: all 0.2s ease-in-out;
 }
 
 .glass-card:hover {
-  background: rgba(15, 15, 26, 0.6);
+  background: var(--theme-glass-card-bg-hover);
   border-color: rgba(59, 130, 246, 0.3);
   box-shadow: 0 4px 20px rgba(59, 130, 246, 0.12);
 }
