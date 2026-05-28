@@ -505,7 +505,7 @@ export function SummaryExport({ onPrev, onBackToSketch, onOpenRetailerOrderHisto
                                         Tillbaka för att ändra priser
                                     </button>
 
-                                    <div className="flex flex-col sm:flex-row items-center gap-3 w-full xl:w-auto">
+                                    <div className="flex flex-col sm:flex-row sm:flex-wrap items-center justify-center xl:justify-end gap-3 w-full xl:w-auto">
                                         <label className="flex w-full flex-col gap-1 text-xs font-semibold uppercase tracking-wide text-text-secondary sm:w-[180px]">
                                             Offert tema
                                             <select
