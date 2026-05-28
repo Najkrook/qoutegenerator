@@ -727,6 +727,118 @@ const rawCatalogData: CatalogData = {
                         ]
                     }
                 ]
+            },
+            "Magnum": {
+                name: "Magnum",
+                sizes: {
+                    "7* Runda": { price: 32900 },
+                    "8* Runda": { price: 37500 },
+                    "9* Runda": { price: 45100 },
+                    "10* Runda": { price: 56700 },
+                    "11* Runda": { price: 79600 },
+                    "12* Runda": { price: 88400 },
+                    "7x7 Kvadrat": { price: 37800 },
+                    "8x8 Kvadrat": { price: 50400 },
+                    "9,3x9,3 Kvadrat": { price: 63100 },
+                    "10x10 Kvadrat": { price: 82000 },
+                    "12x12 Kvadrat": { price: 113600 }
+                },
+                addonCategories: [
+                    {
+                        name: "Motorization",
+                        items: [
+                            { id: "magnum_motor_standard", name: "E-geared motor (ø7-ø10, 7x7-9.3x9.3)", price: 7550 },
+                            { id: "magnum_motor_large", name: "E-geared motor (ø11-ø12, 10x10-12x12)", price: 0 }
+                        ]
+                    },
+                    {
+                        name: "Textilduk (Replacement Membrane)",
+                        items: [
+                            { id: "magnum_textil_o7", name: "Textilduk 7*", price: 8820 },
+                            { id: "magnum_textil_o8", name: "Textilduk 8*", price: 10100 },
+                            { id: "magnum_textil_o9", name: "Textilduk 9*", price: 11300 },
+                            { id: "magnum_textil_o10", name: "Textilduk 10*", price: 12400 },
+                            { id: "magnum_textil_o11", name: "Textilduk 11*", price: 13500 },
+                            { id: "magnum_textil_o12", name: "Textilduk 12*", price: 15900 },
+                            { id: "magnum_textil_7x7", name: "Textilduk 7x7", price: 10200 },
+                            { id: "magnum_textil_8x8", name: "Textilduk 8x8", price: 11700 },
+                            { id: "magnum_textil_93x93", name: "Textilduk 9,3x9,3", price: 13500 },
+                            { id: "magnum_textil_10x10", name: "Textilduk 10x10", price: 14500 },
+                            { id: "magnum_textil_12x12", name: "Textilduk 12x12", price: 17500 }
+                        ]
+                    },
+                    {
+                        name: "Footing Console",
+                        items: [
+                            { id: "magnum_footing", name: "Footing Console", price: 3260 }
+                        ]
+                    },
+                    {
+                        name: "Hängränna",
+                        items: [
+                            { id: "magnum_gutter_mod", name: "Frame Modification for Textile Gutter", price: 410 },
+                            { id: "magnum_gutter_7x7", name: "Textile Gutter 7x7", price: 3670 },
+                            { id: "magnum_gutter_8x8", name: "Textile Gutter 8x8", price: 4200 },
+                            { id: "magnum_gutter_93x93", name: "Textile Gutter 9,3x9,3", price: 4930 },
+                            { id: "magnum_gutter_10x10", name: "Textile Gutter 10x10", price: 5300 },
+                            { id: "magnum_gutter_12x12", name: "Textile Gutter 12x12", price: 6300 }
+                        ]
+                    },
+                    {
+                        name: "Sidoväggar",
+                        items: [
+                            { id: "magnum_side_mod", name: "Frame Modification for Side Panel", price: 410 },
+                            { id: "magnum_side_without_7x7", name: "Sidovägg WITHOUT window 7x7", price: 1470 },
+                            { id: "magnum_side_without_8x8", name: "Sidovägg WITHOUT window 8x8", price: 1680 },
+                            { id: "magnum_side_without_93x93", name: "Sidovägg WITHOUT window 9,3x9,3", price: 1940 },
+                            { id: "magnum_side_without_10x10", name: "Sidovägg WITHOUT window 10x10", price: 2100 },
+                            { id: "magnum_side_without_12x12", name: "Sidovägg WITHOUT window 12x12", price: 2520 },
+                            { id: "magnum_side_door_7x7", name: "Sidovägg WITH door 7x7", price: 2100 },
+                            { id: "magnum_side_door_8x8", name: "Sidovägg WITH door 8x8", price: 2260 },
+                            { id: "magnum_side_door_93x93", name: "Sidovägg WITH door 9,3x9,3", price: 2630 },
+                            { id: "magnum_side_door_10x10", name: "Sidovägg WITH door 10x10", price: 2780 },
+                            { id: "magnum_side_door_12x12", name: "Sidovägg WITH door 12x12", price: 3360 },
+                            { id: "magnum_side_window_7x7", name: "Sidovägg WITH window 7x7", price: 1580 },
+                            { id: "magnum_side_window_8x8", name: "Sidovägg WITH window 8x8", price: 1840 },
+                            { id: "magnum_side_window_93x93", name: "Sidovägg WITH window 9,3x9,3", price: 2150 },
+                            { id: "magnum_side_window_10x10", name: "Sidovägg WITH window 10x10", price: 2310 },
+                            { id: "magnum_side_window_12x12", name: "Sidovägg WITH window 12x12", price: 2780 },
+                            { id: "magnum_side_window_door_7x7", name: "Sidovägg WITH window and door 7x7", price: 2210 },
+                            { id: "magnum_side_window_door_8x8", name: "Sidovägg WITH window and door 8x8", price: 2360 },
+                            { id: "magnum_side_window_door_93x93", name: "Sidovägg WITH window and door 9,3x9,3", price: 2730 },
+                            { id: "magnum_side_window_door_10x10", name: "Sidovägg WITH window and door 10x10", price: 2940 },
+                            { id: "magnum_side_window_door_12x12", name: "Sidovägg WITH window and door 12x12", price: 3520 },
+                            { id: "magnum_side_conn_angled", name: "Connecting Piece (angled corners 45°)", price: 630 },
+                            { id: "magnum_side_conn_straight", name: "Connecting Piece for joining 2 parasols", price: 630 }
+                        ]
+                    },
+                    {
+                        name: "Lighting & Heating",
+                        items: [
+                            { id: "magnum_lighting_8led", name: "8 LED-lamps", price: 2400 },
+                            { id: "magnum_lighting_rgbw_8_10", name: "LED-Lighting with 8 or 10 RGBW-LED strips (ø7-10x10)", price: 3260 },
+                            { id: "magnum_lighting_rgbw_10_12x12", name: "LED-Lighting with 10 RGBW-LED strips (12x12)", price: 3780 },
+                            { id: "magnum_lighting_rgbw_16_20", name: "LED-Lighting with 16 or 20 RGBW-LED strips (ø7-10x10)", price: 6300 },
+                            { id: "magnum_lighting_rgbw_20_12x12", name: "LED-Lighting with 20 RGBW-LED strips (12x12)", price: 7550 },
+                            { id: "magnum_heating", name: "Heating (8 electric radiators)", price: 5300 },
+                            { id: "magnum_light_heat_discount", name: "Price Reduction for combination of lighting & radiators", price: -320 }
+                        ]
+                    },
+                    {
+                        name: "Technology / Electronics",
+                        items: [
+                            { id: "magnum_speakers", name: "Speakers (frame integrated audio system)", price: 0, priceUponRequest: true },
+                            { id: "magnum_tv", name: "TV Frame Modification for 1 or 2 TVs", price: 3150 },
+                            { id: "magnum_wifi", name: "Wifi Frame Modification", price: 0, priceUponRequest: true }
+                        ]
+                    },
+                    {
+                        name: "Maritime Edition",
+                        items: [
+                            { id: "magnum_v4a", name: "V4A Maritime Edition", price: 4930 }
+                        ]
+                    }
+                ]
             }
         }
     },

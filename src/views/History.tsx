@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState, type ChangeEvent } from 'react';
+import React, { useCallback, useEffect, useRef, useState, type ChangeEvent } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useAuth } from '../store/AuthContext';
 import { quoteRepository } from '../services/quoteRepositoryClient';
@@ -43,11 +43,16 @@ export function History({ onBack, onOpenQuote }: HistoryProps) {
     const [userList, setUserList] = useState<HistoryOwnerOption[]>([]);
     const [selectedOwnerUid, setSelectedOwnerUid] = useState<HistoryOwnerSelection>('__mine__');
     const [loadingAllUsers, setLoadingAllUsers] = useState(false);
+    const allUsersQuotesRef = useRef<Array<HistoryQuoteRow & { ownerUid: string }>>([]);
 
     const quoteLifecycleEnabled = typeof window === 'undefined'
         ? true
         : window.FEATURE_QUOTE_LIFECYCLE !== false;
     const isAdminBrowsing = canViewEverything && selectedOwnerUid !== '__mine__';
+
+    useEffect(() => {
+        allUsersQuotesRef.current = allUsersQuotes;
+    }, [allUsersQuotes]);
 
     const copyQuoteLink = useCallback(async ({
         quoteId,
@@ -224,8 +229,8 @@ export function History({ onBack, onOpenQuote }: HistoryProps) {
                     sortBy: sort
                 });
             } else if (selectedOwnerUid === '__all__') {
-                const allQuotes = allUsersQuotes.length > 0
-                    ? allUsersQuotes
+                const allQuotes = allUsersQuotesRef.current.length > 0
+                    ? allUsersQuotesRef.current
                     : await quoteRepository.getAllUsersQuotes({ status: '', search: '' });
 
                 data = sortQuotes(
@@ -252,7 +257,15 @@ export function History({ onBack, onOpenQuote }: HistoryProps) {
         } finally {
             setLoading(false);
         }
-    }, [allUsersQuotes, selectedOwnerUid, user?.uid]);
+    }, [selectedOwnerUid, user?.uid]);
+
+    useEffect(() => {
+        if (selectedOwnerUid !== '__all__' || allUsersQuotes.length === 0) {
+            return;
+        }
+
+        void loadQuotes(statusFilter, searchFilter, dateFilter, originFilter, sortBy);
+    }, [allUsersQuotes, dateFilter, loadQuotes, originFilter, searchFilter, selectedOwnerUid, sortBy, statusFilter]);
 
     useEffect(() => {
         if (!user?.uid || !canAccessQuoteHistory) return;
