@@ -49,6 +49,8 @@ Success signals:
 
 ## Phase 2: Workflow Upgrades
 
+Codebase review note, 2026-05-28: several items in this phase have moved beyond the original roadmap wording. The statuses below reflect the current implementation found in `src/` rather than only the original plan.
+
 ### [x] 1. Incremental TypeScript Migration
 Status: App-source TypeScript migration for `src/` is complete, including shared contracts, state, views, and service-layer code.
 
@@ -59,7 +61,7 @@ Success signals:
 - Common contract mistakes are caught earlier in local development.
 
 ### [~] 2. Retailer Workspace
-Status: Retailer Workspace V1 is now live. The current delivery includes a retailer-specific dashboard/workspace, visible enabled/disabled product lines with explanation, retailer discount preview during product-line selection, retailer-specific pricing guidance with lock copy in the pricing step, and an app-first retailer order-request workflow from summary/export into an admin inbox.
+Status: Retailer Workspace V1 is live and several follow-ups from the original roadmap have also shipped. The current delivery includes a retailer-specific dashboard/workspace, visible product-line scope, retailer discount preview during product-line selection, retailer-specific pricing guidance and discount caps in the pricing step, an app-first retailer order-request workflow from summary/export into an admin inbox, retailer-facing order-request history with live status updates, and retailer product-document access.
 
 Turn retailer access from a hidden role variant into a clearer dedicated workspace experience. The current V1 now covers the core "understand my scope" path and the first retailer-to-admin handoff path, but the initiative remains active until retailer workflows feel fully intentional across the whole quote flow. Keep retailer management and admin controls aligned with the same model so the admin-facing configuration stays easy to reason about.
 
@@ -70,15 +72,17 @@ Shipped in the current V1:
 - In-app order request submission from `SummaryExport` for saved quote versions.
 - Admin recent-order-request visibility on the dashboard.
 - Admin inbox/detail workflow at `/retailer-orders` with status handling and a compact derived product overview from the submitted quote revision.
+- Retailer order-request history at `/retailer-order-requests`, including live status updates and detail review.
+- Retailer document access at `/retailer-documents`, with admin-managed product-line document links.
+- Retailer pricing protections including capped global/row discounts and disabled row drag/reorder behavior.
 
-Remaining follow-up work includes: continued review of retailer-specific edge cases; an explicit product decision on whether `CustomCosts`, save/export behavior, or other pricing-adjacent actions should be further restricted for retailer users; and a later decision on whether retailer order requests should also gain history, notification, or email-backed follow-up.
-
-
+Remaining follow-up work includes: continued review of retailer-specific edge cases; an explicit product decision on whether `CustomCosts`, save/export behavior, or other pricing-adjacent actions should be further restricted for retailer users; and a later decision on whether retailer order requests should gain email-backed follow-up or other external notifications.
 
 Success signals:
 - Retailer users can now see their discount and product scope without guessing.
 - Restricted product lines are now visibly explained instead of silently absent.
 - Retailer users can now hand off a saved quote into a clear admin workflow without needing a side-channel.
+- Retailer users can now follow submitted order requests from their own workspace.
 - Remaining retailer-specific edge cases and permission inconsistencies continue to trend down as the follow-up work lands.
 
 ### [x] 3. Quote Duplication
@@ -88,12 +92,15 @@ Success signals:
 - Users can create a variation of an existing quote without manual re-entry.
 - Reuse of prior quotes becomes a normal workflow rather than a workaround.
 
-### 4. Quote History Hub
-Evolve quote history from a simple saved-quote list into a more operational review surface. Improve admin browsing across users and retailer-originated quotes, and add better filtering and context around revisions, ownership, and recent activity. Prioritize common workflows such as finding a quote, inspecting context, reopening it safely, and continuing work without re-discovery.
+### [x] 4. Quote History Hub
+Status: The quote history hub work is implemented. History now supports admin browsing across all users or a selected owner, retailer-originated quote context, status/date/origin filters, value/date sorting, search, status updates, revision lists, opening latest or specific revisions, quote duplication, and copyable deep links to quote revisions.
+
+The original goal was to evolve quote history from a simple saved-quote list into a more operational review surface. That operational layer is now present in `History.tsx` and `quoteRepository.ts`, backed by cross-user `collectionGroup` quote queries, normalized quote metadata, revision APIs, and URL-based quote revision links.
 
 Success signals:
 - Admins can quickly find relevant quotes across owners.
 - Reopened work has enough context to resume safely.
+- Users can share or revisit specific quote revisions through stable links.
 
 ### 5. Planner Links
 Connect planner items to quotes, customers, and retailers where that linkage adds operational value. The goal is not a heavy project-management subsystem, but a lightweight reference model that helps planner records point back to real commercial work. Keep planner permissions and admin scope aligned with the current access model while reducing manual context-switching between planner and quote history.
@@ -120,12 +127,15 @@ Success signals:
 - Browser navigation works as users expect across major app views.
 - Deep links and refresh behavior become stable and shareable.
 
-### 2. Export Polish
-Improve PDF and Excel output clarity, consistency, and perceived professionalism using the existing export architecture. Refine template and presentation quality, and improve how customer notes, legal terms, summary content, and optional sections appear in exports. Preserve the current save/export workflow while making outputs easier to send externally without manual cleanup.
+### [~] 2. Export Polish
+Status: Export polish is partially implemented. The current export stack includes PDF theme selection, improved customer/reference handling, extra customer notes, payment and validity presentation, long legal-terms pagination, VAT-aware totals, discount-column hiding for zero-discount exports, Excel output alignment with computed totals, PDF preview generation, and save-dialog/download fallback behavior.
+
+Remaining work should be treated as quality refinement rather than first implementation: review the generated PDF and Excel outputs against real sales examples, tune template spacing and brand presentation where needed, and decide whether additional optional sections or customer-facing copy should be standardized.
 
 Success signals:
 - Exports need less manual cleanup before sending.
 - Internal users trust the default output quality more often.
+- Remaining export work is driven by real output review rather than missing core mechanics.
 
 ### 3. Dashboard Analytics
 Add at-a-glance operational visibility to the admin dashboard. The data already exists in Firestore - surface it as summary cards and simple charts covering quote pipeline by status (draft/sent/won/lost), total SEK in pipeline, quotes created this week/month, and retailer activity. The goal is to make the dashboard useful for daily decision-making rather than just a navigation hub.
@@ -139,21 +149,21 @@ Success signals:
 ## Cross-Cutting Dependencies
 - Text cleanup should happen before export polish so branded and customer-facing output improves on a clean baseline.
 - Retailer, history, and planner follow-up work should continue to use the shared notification model so new flows do not reintroduce special-case messaging patterns.
-- Quote duplication should land alongside the history-hub work so cloning and reopen flows share the same metadata and draft-creation rules.
+- Quote duplication and the history hub have landed; future quote reopen, clone, and share-link changes should preserve the same metadata, revision, and draft-creation rules.
 - Quote history and planner linking should share identifiers and reference conventions rather than inventing separate linking schemes.
-- Routing follow-up for quote duplication, global search, and history improvements should stay coordinated so navigation patterns are not redesigned twice.
+- Global search and planner-link work should reuse the existing quote-history deep-link and route patterns instead of introducing another navigation model.
 - Type hardening should continue alongside quote-state-heavy workflow work to reduce regression risk, even though the main app-source TypeScript migration is complete.
-- Admin UID centralization (moving hardcoded UIDs in `firestore.rules` and `accessControl.shared.js` to a Firestore-based role model or shared constant) should be resolved before Phase 2 work adds more admin-gated features, to prevent synchronization drift.
+- Admin UID centralization (moving hardcoded UIDs in `firestore.rules` and `accessControl.shared.ts` to a Firestore-based role model or shared constant) should be resolved before more admin-gated features are added, to prevent synchronization drift.
 - Any future retailer email or notification phase should build on the existing `order_requests` workflow rather than replace it with a separate submission path.
 - Validation should be updated whenever quote state, export rendering, or business-critical admin flows are changed.
 
 ## Success Metrics
 - Visible encoding issues are reduced to zero in prioritized app areas.
 - Retailer support questions around access and quote setup decrease.
-- Admin quote retrieval and continuation become faster and less error-prone.
+- Admin quote retrieval and continuation remain fast and reliable as quote history grows.
 - Planner usage becomes more connected to real quote and customer work.
-- Export-related manual cleanup and confusion decrease.
-- Quote reuse through duplication becomes materially faster than manual re-entry.
+- Export-related manual cleanup and confusion continue to decrease through real-output review.
+- Quote reuse through duplication remains materially faster than manual re-entry.
 - Navigation and record discovery become more predictable through routing and global search.
 
 ## Out of Scope for This Roadmap

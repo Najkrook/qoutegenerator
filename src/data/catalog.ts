@@ -126,7 +126,9 @@ const rawCatalogData: CatalogData = {
                         items: [
                             { id: "heating_2_rad", name: "2 Radiators", price: 2290 },
                             { id: "heating_4_kvarts", name: "Kvartsvärmare FLEX 1500 watt 4 per parasoll", price: 3070 },
-                            { id: "premod_heating", name: "Premodification for heating", price: 1510 }
+                            { id: "premod_heating", name: "Premodification for heating", price: 1510 },
+                            { id: "heater_unit_with_mount", name: "Värmare med fäste (styckepris)", price: 540 },
+                            { id: "heater_unit_without_mount", name: "Värmare utan fäste (styckepris)", price: 450 }
                         ]
                     },
                     {
@@ -344,7 +346,9 @@ const rawCatalogData: CatalogData = {
                         name: "Heating",
                         items: [
                             { id: "xl_premod_heating", name: "Pre modifacation for heating", price: 1980 },
-                            { id: "xl_kvarts_flex", name: "Kvartsvärmare FLEX 1500 watt 4 per parasoll", price: 3540 }
+                            { id: "xl_kvarts_flex", name: "Kvartsvärmare FLEX 1500 watt 4 per parasoll", price: 3540 },
+                            { id: "heater_unit_with_mount", name: "Värmare med fäste (styckepris)", price: 540 },
+                            { id: "heater_unit_without_mount", name: "Värmare utan fäste (styckepris)", price: 450 }
                         ]
                     },
                     {
@@ -600,7 +604,9 @@ const rawCatalogData: CatalogData = {
                         items: [
                             { id: "outside_heating_2", name: "2 Radiators", price: 0, priceUponRequest: true },
                             { id: "outside_heating_4", name: "4 Radiators", price: 0, priceUponRequest: true },
-                            { id: "outside_premod_heating", name: "Premodification for heating equipment", price: 0, priceUponRequest: true }
+                            { id: "outside_premod_heating", name: "Premodification for heating equipment", price: 0, priceUponRequest: true },
+                            { id: "heater_unit_with_mount", name: "Värmare med fäste (styckepris)", price: 540 },
+                            { id: "heater_unit_without_mount", name: "Värmare utan fäste (styckepris)", price: 450 }
                         ]
                     },
                     {
@@ -821,7 +827,9 @@ const rawCatalogData: CatalogData = {
                             { id: "magnum_lighting_rgbw_16_20", name: "LED-Lighting with 16 or 20 RGBW-LED strips (ø7-10x10)", price: 6300 },
                             { id: "magnum_lighting_rgbw_20_12x12", name: "LED-Lighting with 20 RGBW-LED strips (12x12)", price: 7550 },
                             { id: "magnum_heating", name: "Heating (8 electric radiators)", price: 5300 },
-                            { id: "magnum_light_heat_discount", name: "Price Reduction for combination of lighting & radiators", price: -320 }
+                            { id: "magnum_light_heat_discount", name: "Price Reduction for combination of lighting & radiators", price: -320 },
+                            { id: "heater_unit_with_mount", name: "Värmare med fäste (styckepris)", price: 540 },
+                            { id: "heater_unit_without_mount", name: "Värmare utan fäste (styckepris)", price: 450 }
                         ]
                     },
                     {
