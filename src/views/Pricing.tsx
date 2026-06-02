@@ -5,6 +5,8 @@ import { catalogData } from '../data/catalog';
 import { getCatalogLineName } from '../data/catalogLookup';
 import { PricingTable } from '../components/features/PricingTable';
 import { CustomCosts } from '../components/features/CustomCosts';
+import { MarginSummaryPanel } from '../components/features/MarginSummaryPanel';
+import { computeQuoteTotals } from '../services/calculationEngine';
 import {
     applyGlobalDiscountToGridCustomAddons,
     applyGlobalDiscountToGridCustomItems,
@@ -67,6 +69,10 @@ export function Pricing({ onNext, onPrev }: PricingProps) {
         ? (Number(retailer?.productLines?.[selectedLineId]?.discountPct) || 0)
         : 0;
     const globalDiscountMax = isRetailer ? retailerDiscountPct : 100;
+    const summaryData = React.useMemo(
+        () => computeQuoteTotals({ state, catalogData }),
+        [state]
+    );
 
     const handleGlobalDiscountChange = (event: ChangeEvent<HTMLInputElement>): void => {
         const nextGlobalDiscount = getNextGlobalDiscount(event.target.value, isRetailer, retailerDiscountPct);
@@ -192,6 +198,8 @@ export function Pricing({ onNext, onPrev }: PricingProps) {
             )}
 
             <PricingTable />
+
+            <MarginSummaryPanel summaryData={summaryData} className="mt-6" />
 
             <CustomCosts />
 

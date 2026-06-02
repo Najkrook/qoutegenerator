@@ -93,12 +93,14 @@ describe('export data builders', () => {
         const wsData = buildExcelSheetData(state, summary);
         const totalsRow = wsData.find((row) => row[0] === 'Totalt Exkl. Moms');
         const customerLabels = wsData.slice(0, 6).map((row) => row[0]);
+        const serializedSheet = JSON.stringify(wsData);
 
         expect(totalsRow).toBeTruthy();
         expect(customerLabels).toContain('Foretag');
         expect(customerLabels).toContain('Projektreferens');
         expect(customerLabels).toContain('Er referens');
         expect(customerLabels).not.toContain('Kund');
+        expect(serializedSheet).not.toMatch(/Marginal|Bruttovinst|Kostnad/i);
         expect(totalsRow[4]).toBe(Math.round(summary.finalTotalSek));
         expect(totalsRow[5]).toBe(Math.round(summary.grossTotalSek));
         expect(totalsRow[6]).toBe(Math.round(-summary.totalDiscountSek));
@@ -137,9 +139,11 @@ describe('export data builders', () => {
 
         const wsData = buildExcelSheetData(state, summary);
         const pdfRows = buildPdfTableData(summary.totals, formatSek);
+        const serializedPdfRows = JSON.stringify(pdfRows);
 
         expect(wsData.some((row) => row[0] === 'Tillval: Speciallack')).toBe(true);
         expect(pdfRows.some((row) => row[0] === 'Tillval: Speciallack')).toBe(true);
+        expect(serializedPdfRows).not.toMatch(/Marginal|Bruttovinst|Kostnad/i);
     });
 
     it('uses renamed builder rows and preserved block order in export rows', () => {

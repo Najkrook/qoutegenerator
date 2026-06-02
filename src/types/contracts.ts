@@ -741,6 +741,59 @@ export interface RawOrderRequestDoc extends UnknownRecord {
     statusUpdatedByEmail?: unknown;
 }
 
+export type QuoteMarginLineId = 'BaHaMa' | 'ClickitUp' | 'Fiesta';
+
+export type QuoteMarginReviewCode =
+    | 'price-upon-request'
+    | 'missing-margin'
+    | 'manual-pricing'
+    | 'other-line'
+    | 'non-positive-net'
+    | 'negative-profit';
+
+export interface QuoteMarginSettings {
+    marginsByLine: Record<QuoteMarginLineId, number>;
+    updatedAt: number;
+    updatedBy: string;
+    updatedByUid: string;
+}
+
+export interface RawQuoteMarginSettingsDoc extends UnknownRecord {
+    marginsByLine?: unknown;
+    updatedAt?: unknown;
+    updatedBy?: unknown;
+    updatedByUid?: unknown;
+}
+
+export interface SaveQuoteMarginSettingsInput {
+    marginsByLine: Partial<Record<QuoteMarginLineId, number>> | UnknownRecord;
+    user: AccessUser | null;
+}
+
+export interface QuoteMarginAnalysisRow {
+    row: QuoteTotalsRow;
+    lineId: string;
+    marginPct: number | null;
+    estimatedCostSek: number;
+    estimatedGrossProfitSek: number;
+    actualMarginPct: number | null;
+    discountImpactSek: number;
+    includedInTotals: boolean;
+    reviewCodes: QuoteMarginReviewCode[];
+}
+
+export interface QuoteMarginAnalysis {
+    rows: QuoteMarginAnalysisRow[];
+    totalEstimatedCostSek: number;
+    totalEstimatedGrossProfitSek: number;
+    totalDiscountImpactSek: number;
+    totalNetSek: number;
+    actualMarginPct: number | null;
+    includedRowCount: number;
+    reviewCounts: Record<QuoteMarginReviewCode, number>;
+    hasReviewItems: boolean;
+}
+
 export type ExportSummaryState = Partial<Pick<
     QuoteState,
     'customerInfo' | 'includesVat' | 'globalDiscountPct' | 'hideZeroDiscountReferencesInPdf'
@@ -807,6 +860,11 @@ export interface RetailerDocumentService {
     getRetailerDocumentsForLines(input: GetRetailerDocumentsForLinesInput): Promise<RetailerLineDocumentsRecord[]>;
     listRetailerLineDocuments(): Promise<RetailerLineDocumentsRecord[]>;
     saveRetailerLineDocuments(input: SaveRetailerLineDocumentsInput): Promise<RetailerLineDocumentsRecord>;
+}
+
+export interface MarginSettingsService {
+    getQuoteMarginSettings(): Promise<QuoteMarginSettings>;
+    saveQuoteMarginSettings(input: SaveQuoteMarginSettingsInput): Promise<QuoteMarginSettings>;
 }
 
 export interface FirestoreDocRef {

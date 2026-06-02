@@ -114,6 +114,10 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
+    match /app_settings/{docId} {
+      allow read, write: if isAdmin();
+    }
+
     // Allow admins to read all templates via collectionGroup queries
     match /{path=**}/templates/{templateId} {
       allow read: if isAdmin();

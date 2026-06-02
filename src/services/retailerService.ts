@@ -49,15 +49,19 @@ function normalizeRetailerProductLines(
     }, {});
 }
 
+function normalizeRetailerPdfThemes(value: unknown): PdfThemeId[] {
+    if (!Array.isArray(value)) {
+        return [];
+    }
+
+    const validIds = new Set<string>(PDF_THEME_OPTIONS.map((option) => option.id));
+    return value.filter((themeId): themeId is PdfThemeId => (
+        typeof themeId === 'string' && validIds.has(themeId)
+    ));
+}
+
 export function toRetailerRecord(value: unknown, id?: string): RetailerRecord {
     const raw = isRecord(value) ? value : {};
-    
-    // Normalize pdfThemes array
-    let pdfThemes: PdfThemeId[] = [];
-    if (Array.isArray(raw.pdfThemes)) {
-        const validIds = new Set(PDF_THEME_OPTIONS.map(o => o.id));
-        pdfThemes = raw.pdfThemes.filter((t) => typeof t === 'string' && validIds.has(t)) as PdfThemeId[];
-    }
 
     return {
         id,
@@ -66,7 +70,7 @@ export function toRetailerRecord(value: unknown, id?: string): RetailerRecord {
         email: String(raw.email ?? ''),
         notes: String(raw.notes ?? ''),
         productLines: normalizeRetailerProductLines(raw.productLines),
-        pdfThemes
+        pdfThemes: normalizeRetailerPdfThemes(raw.pdfThemes)
     };
 }
 
@@ -91,18 +95,12 @@ export function normalizeRetailerData(
         throw new Error('Användare (E-post) är obligatoriskt.');
     }
 
-    let pdfThemes: PdfThemeId[] = [];
-    if (Array.isArray(data?.pdfThemes)) {
-        const validIds = new Set(PDF_THEME_OPTIONS.map(o => o.id));
-        pdfThemes = data.pdfThemes.filter((t) => typeof t === 'string' && validIds.has(t)) as PdfThemeId[];
-    }
-
     return {
         name,
         email,
         productLines,
         notes: String(data?.notes ?? '').trim(),
-        pdfThemes
+        pdfThemes: normalizeRetailerPdfThemes(data?.pdfThemes)
     };
 }
 

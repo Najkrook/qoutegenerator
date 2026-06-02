@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { Suspense, lazy, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useQuote } from '../../store/QuoteContext';
 import { useAuth } from '../../store/AuthContext';
@@ -11,9 +11,14 @@ import {
 import { useAppNavigation } from '../../navigation/useAppNavigation';
 import ThemeToggle from '../ThemeToggle';
 
+const AdminSettingsModal = lazy(() => import('../features/AdminSettingsModal').then((module) => ({
+    default: module.AdminSettingsModal
+})));
+
 export function Header() {
     const { dispatch } = useQuote();
     const { user, logout, canViewEverything, canAccessQuoteHistory, isRetailer } = useAuth();
+    const [settingsOpen, setSettingsOpen] = useState(false);
     const location = useLocation();
     const navigation = useAppNavigation();
     const routeId = getAppRouteIdFromPath(location.pathname);
@@ -154,6 +159,17 @@ export function Header() {
                             Logga ut
                         </button>
                     </div>
+                    {canViewEverything && (
+                        <button
+                            type="button"
+                            onClick={() => setSettingsOpen(true)}
+                            className="flex h-[38px] w-[38px] items-center justify-center rounded-md border border-panel-border bg-panel-bg text-text-secondary transition-colors hover:bg-panel-border hover:text-text-primary"
+                            aria-label="Öppna admininställningar"
+                            title="Admininställningar"
+                        >
+                            <span aria-hidden="true">⚙</span>
+                        </button>
+                    )}
                     <ThemeToggle />
                 </div>
             </div>
@@ -179,6 +195,11 @@ export function Header() {
                         );
                     })}
                 </div>
+            )}
+            {settingsOpen && (
+                <Suspense fallback={null}>
+                    <AdminSettingsModal open={settingsOpen} onClose={() => setSettingsOpen(false)} />
+                </Suspense>
             )}
         </header>
     );

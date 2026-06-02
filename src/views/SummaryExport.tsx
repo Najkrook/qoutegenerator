@@ -7,6 +7,7 @@ import { computeQuoteTotals } from '../services/calculationEngine';
 import { CustomerInfoForm } from '../components/features/CustomerInfoForm';
 import { FinalSummaryTable } from '../components/features/FinalSummaryTable';
 import { TermsAndPaymentPanel } from '../components/features/TermsAndPaymentPanel';
+import { MarginSummaryPanel } from '../components/features/MarginSummaryPanel';
 import { downloadBlob, saveBlobWithPicker } from '../utils/fileUtils';
 import { createQuotePdfBlob } from '../services/quotePdfService';
 import { quoteRepository } from '../services/quoteRepositoryClient';
@@ -506,6 +507,7 @@ export function SummaryExport({ onPrev, onBackToSketch, onOpenRetailerOrderHisto
                                 <span className="text-primary text-xl" aria-hidden="true">📋</span> Summering
                             </h3>
                             <FinalSummaryTable />
+                            <MarginSummaryPanel summaryData={summaryData} className="mt-6" />
                             <section className="mt-8 flex flex-col gap-6">
                                 {exportBlockReason && (
                                     <div className="flex items-start gap-4 rounded-xl border border-amber-500/30 bg-amber-500/10 px-6 py-5 shadow-sm">
