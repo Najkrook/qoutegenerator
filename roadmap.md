@@ -1,5 +1,7 @@
 # QuoteGenerator Roadmap
 
+Last reviewed: `2026-06-02`
+
 This roadmap focuses on improving reliability, internal usability, and sales workflow quality in the current React SPA. It is intended as a 6-month engineering roadmap built around strengthening existing workflows, addressing high-friction gaps, and making a small number of deliberate platform investments where they materially improve day-to-day usability.
 
 ## Objectives
@@ -25,14 +27,14 @@ Success signals:
 - Text-related regressions become easier to catch before merge.
 
 ### [x] 2. Error Boundaries and Runtime Safety
-Add a top-level React error boundary around the main content area in `App.jsx` so that unhandled errors in any view produce a recoverable fallback UI rather than a white screen crash. Users currently have no recovery path short of manually clearing localStorage. The fallback should offer a "reset and return to dashboard" action. This is a small investment that prevents the worst possible UX failure across every view in the app.
+Add a top-level React error boundary around the main content area in `App.tsx` so that unhandled errors in any view produce a recoverable fallback UI rather than a white screen crash. Users currently have no recovery path short of manually clearing localStorage. The fallback should offer a "reset and return to dashboard" action. This is a small investment that prevents the worst possible UX failure across every view in the app.
 
 Success signals:
 - Runtime errors in any view never produce an unrecoverable white screen.
 - Users can self-recover from unexpected state without external help.
 
 ### [x] 3. Dead Code and Dev Artifact Removal
-Remove leftover development artifacts that pose real operational risk. The Planner view currently includes a live "Generera Test-data" button that writes dummy records to the production Firestore database, plus a commented-out old delete handler. These should be cleaned up before any Phase 2 workflow work touches the Planner.
+Remove leftover development artifacts that posed real operational risk. The Planner view previously included a live "Generera Test-data" button that wrote dummy records to the production Firestore database, plus a commented-out old delete handler. These were cleaned up before Phase 2 workflow work touched the Planner.
 
 Success signals:
 - No dev-only UI controls exist in production views.
@@ -153,7 +155,7 @@ Success signals:
 - Quote history and planner linking should share identifiers and reference conventions rather than inventing separate linking schemes.
 - Global search and planner-link work should reuse the existing quote-history deep-link and route patterns instead of introducing another navigation model.
 - Type hardening should continue alongside quote-state-heavy workflow work to reduce regression risk, even though the main app-source TypeScript migration is complete.
-- Admin UID centralization (moving hardcoded UIDs in `firestore.rules` and `accessControl.shared.ts` to a Firestore-based role model or shared constant) should be resolved before more admin-gated features are added, to prevent synchronization drift.
+- Admin role centralization is partly underway through Firestore `user_roles`; finish removing hardcoded UID drift between `firestore.rules` and `accessControl.shared.ts` before more admin-gated features are added.
 - Any future retailer email or notification phase should build on the existing `order_requests` workflow rather than replace it with a separate submission path.
 - Validation should be updated whenever quote state, export rendering, or business-critical admin flows are changed.
 

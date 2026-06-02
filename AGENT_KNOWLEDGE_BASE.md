@@ -2,7 +2,7 @@
 
 This file exists to help future agents understand the actual `QuoteGenerator` project shape before editing anything substantial.
 
-Last verified: `2026-05-21`
+Last verified: `2026-06-02`
 Active branch at verification: `main`
 
 `QuoteGenerator` is a React SPA repository. All active runtime logic lives under `src/`. `README.md` is useful for human onboarding; this file is the deeper agent map for implementation work.
@@ -14,18 +14,19 @@ Active branch at verification: `main`
 - App-source TypeScript migration for `src/` is complete.
 - Runtime architecture is a single React SPA with React Router route entrypoints layered on top of the existing quote-state flow.
 - In-progress quote state is persisted in localStorage under `offertverktyg_state` through `src/store/QuoteContext.tsx` and `src/store/quoteStatePersistence.ts`.
-- Persistent backend data lives in Firestore for quotes, revisions, templates, inventory, inventory logs, activity logs, planner projects, retailers, and retailer order requests.
+- Persistent backend data lives in Firestore for quotes, revisions, templates, inventory, inventory logs, activity logs, planner projects, retailers, retailer order requests, user roles, and retailer product-line documents.
 - Access control is UID-based and resolved in `src/config/accessControl.shared.ts`, with retailer access detected from Firestore during auth bootstrap.
-- Retailer Workspace V1 is live: retailer users now see scope and discount guidance directly in dashboard, product-line selection, and pricing, with retailer-specific draft reset protection on "Starta Ny Offert".
-- Retailer Order Requests V1 is live: retailer users can submit an in-app order request from `SummaryExport`, and admins now have a dashboard recent-requests panel plus a dedicated inbox/detail view at `/retailer-orders`.
+- Retailer Workspace V1 is live: retailer users now see scope and discount guidance directly in dashboard, product-line selection, pricing, order-request history, and product documents, with retailer-specific draft reset protection on "Starta Ny Offert".
+- Retailer Order Requests V1 is live: retailer users can submit an in-app order request from `SummaryExport`, admins now have a dashboard recent-requests panel plus a dedicated inbox/detail view at `/retailer-orders`, and retailers can follow their own request status at `/retailer-order-requests`.
+- Retailer product documents are live: admins manage per-product-line PDF links in `RetailerManager`, and retailer users can view documents for their enabled product lines at `/retailer-documents`.
 - Quote persistence and revisioning are centralized in `src/services/quoteRepository.ts`.
 - Shared runtime/domain contracts live in `src/types/contracts.ts`.
 - Shared runtime boundary helpers now live in `src/utils/runtime.ts`.
 - CI in `.github/workflows/ci.yml` runs the safety script, clean-repo sanity check, `npm ci`, `npm run test:confidence`, `npm run typecheck`, and `npm run build`.
 - Current repo reality at verification:
-  - targeted order-request and text-encoding tests pass
-  - `npm run typecheck` currently passes on main without any sketch typing mismatches
-  - do not assume the older "all green on main" status still reflects the live branch without re-running the full suite
+  - repo shape, routes, Firestore rules, scripts, and retailer document/order-history surfaces were checked by file inspection
+  - no full test suite was rerun during this documentation refresh
+  - do not assume any "all green on main" status still reflects the live branch without re-running the relevant suite
 
 ## Repo Topology
 
@@ -49,8 +50,8 @@ Primary active React runtime.
 Vitest coverage.
 
 - `npm run test:confidence` runs the focused confidence suite used by CI.
-- Full `vitest run` currently passes on `main`.
-- Coverage includes access control, quote persistence/schema, calculations, exports, sketch helpers, retailer service, inventory normalization, activity logs, and UI smoke coverage.
+- Full `vitest run` has passed historically on `main`, but this should be revalidated before relying on it.
+- Coverage includes access control, quote persistence/schema, calculations, exports, sketch helpers, retailer service, retailer documents, retailer order requests/history, inventory normalization, activity logs, and UI smoke coverage.
 - Tests remain JavaScript/JSX by choice; that is outside the completed app-source TypeScript migration scope.
 
 ### `scripts/`
@@ -58,6 +59,7 @@ Tooling and maintenance support.
 
 - `scripts/verify-git-safety.ps1` enforces tracked-file safety.
 - `scripts/backfill-quote-metadata.mjs` backfills quote metadata with Firebase Admin credentials.
+- `scripts/migrate-user-roles.mjs` migrates/maintains Firestore `user_roles` records with Firebase Admin credentials.
 - `scripts/clean_black_inventory.mjs` exists but is not central to the main runtime.
 - `scripts/build_parasollkostnad.mjs` and the related Python helpers generate parasol cost data.
 
@@ -101,6 +103,8 @@ The following root files are **not** part of the active runtime and should be ig
   - `History`
   - `RetailerManager`
   - `RetailerOrderRequests`
+  - `RetailerOrderHistory`
+  - `RetailerDocuments`
 
 ### Shared internal modules
 
@@ -215,12 +219,15 @@ The following root files are **not** part of the active runtime and should be ig
 - Entry condition:
   - retailer submission is available from the summary/export route for retailer users only
   - admin inbox lives at `/retailer-orders`
+  - retailer-facing request history lives at `/retailer-order-requests`
 - Access gate:
   - retailer submission requires retailer context plus a saved quote with `activeQuoteId`, `quoteNumber`, and `activeQuoteVersion`
   - admin inbox/detail view requires `canViewEverything`
+  - retailer history requires the `retailer` access level
 - Main files:
   - `src/views/SummaryExport.tsx`
   - `src/views/RetailerOrderRequests.tsx`
+  - `src/views/RetailerOrderHistory.tsx`
   - `src/views/Dashboard.tsx`
   - `src/services/orderRequestService.ts`
   - `src/services/quoteRepository.ts`
@@ -233,6 +240,30 @@ The following root files are **not** part of the active runtime and should be ig
   - admin detail view resolves the exact saved quote revision for PDF export and compact product overview rendering
   - compact product rows are derived live from the saved revision via `buildHistoryOpenQuotePayload(...)`, `hydrateQuoteState(...)`, and `computeQuoteTotals(...)`
   - admins can move request status through `new`, `reviewing`, and `completed`
+  - retailer history subscribes to the current user's requests and live selected-request updates, so status changes made by admins appear without a manual reload
+
+### Retailer Documents
+
+- Entry condition:
+  - retailer document view lives at `/retailer-documents`
+  - admin document management is embedded in the retailer manager view
+- Access gate:
+  - retailer document view requires `canAccessRetailerDocumentsLevel(...)`, currently full/admin or retailer access
+  - admin management requires `canViewEverything` through `RetailerManager`
+- Main files:
+  - `src/views/RetailerDocuments.tsx`
+  - `src/views/RetailerManager.tsx`
+  - `src/services/retailerDocumentService.ts`
+  - `src/data/catalogLookup.ts`
+  - `src/config/accessControl.shared.ts`
+  - `src/navigation/routes.ts`
+- Persistence:
+  - Firestore root collection `retailer_line_documents`
+- Behavior notes:
+  - admins configure PDF links per catalog product line, including title, kind, URL, filename, sort order, and description
+  - retailer users only see documents for product lines enabled on their retailer profile
+  - document kinds currently normalize to `color-chart` and `installation-instructions`
+  - document updates are logged through `src/services/activityLogService.ts`
 
 ### Inventory Manager
 
@@ -327,6 +358,7 @@ The following root files are **not** part of the active runtime and should be ig
   - retailers are linked to Firebase Auth via `createRetailerAuthUser()`
   - CRUD operations are logged through `src/services/activityLogService.ts`
   - retailer product-line discounts and enablement live in Firestore
+  - admin-managed retailer product-line documents are edited here and stored separately in `retailer_line_documents`
 
 ## Authentication And Access Control
 
@@ -374,7 +406,7 @@ If you change roles or access expectations:
 - update `src/config/accessControl.shared.ts`
 - review `src/store/AuthContext.tsx`
 - review `src/App.tsx`, `src/components/layout/Header.tsx`, and `src/views/History.tsx`
-- if the change involves retailers, also review `src/services/retailerService.ts` and `src/views/RetailerManager.tsx`
+- if the change involves retailers, also review `src/services/retailerService.ts`, `src/services/retailerDocumentService.ts`, `src/views/RetailerManager.tsx`, `src/views/RetailerDocuments.tsx`, and `src/views/RetailerOrderHistory.tsx`
 - Role resolution occurs async in `AuthContext` with a precedence of `admin` > `sketch_only` > `retailer` > `quote_only` > `guest`. The `user_roles` Firestore collection is the source of truth, with hardcoded lists serving only as a Phase 1 fallback.
 
 Current retailer reality:
@@ -388,6 +420,8 @@ Current retailer reality:
 - `CustomCosts` remains editable for retailer users
 - retailer users can still save and export from step 4 in the current implementation
 - retailer users can submit an in-app order request from step 4 once the quote has been saved
+- retailer users can follow their own submitted order requests at `/retailer-order-requests`
+- retailer users can view configured product-line documents at `/retailer-documents`
 - admin-only retailer-order-request surfaces are route-gated and not visible to retailer users
 
 ## State Model And Persistence
@@ -439,6 +473,8 @@ The authoritative quote repository is `src/services/quoteRepository.ts`.
 - Revisions: `users/{uid}/quotes/{quoteId}/revisions/{revisionId}`
 - Templates: `users/{uid}/templates/{templateId}`
 - Retailer order requests: `order_requests/{requestId}`
+- User roles: `user_roles/{uid}`
+- Retailer product-line documents: `retailer_line_documents/{lineId}`
 
 ### Save flow
 
@@ -504,10 +540,12 @@ Quote statuses:
 - `stock/{docId}` for admins
 - `inventory_logs/{logId}` for admins
 - `activity_logs/{logId}` with admin read and signed-in self-authenticated create
+- `user_roles/{userId}` with self-read and admin writes for allowed role values
 - `users/{userId}/templates/{templateId}` for the signed-in owner
 - `planner_projects/{projectId}` for admins
 - `retailers/{retailerId}` for admins, plus self-read by matching auth email
 - `order_requests/{requestId}` for retailer self-create/read and admin read/update
+- `retailer_line_documents/{lineId}` for admin writes and signed-in reads
 - admin collection-group reads for `templates`
 - admin collection-group reads for `quotes`
 
@@ -537,6 +575,7 @@ If `npm.ps1` is blocked by execution policy, use `cmd /c npm ...` or invoke Node
 
 - `scripts/verify-git-safety.ps1`
 - `scripts/backfill-quote-metadata.mjs`
+- `scripts/migrate-user-roles.mjs`
 - `scripts/clean_black_inventory.mjs`
 - `scripts/build_parasollkostnad.mjs`
 - `scripts/build_parasollkostnad_excel.py`
@@ -555,9 +594,11 @@ If `npm.ps1` is blocked by execution policy, use `cmd /c npm ...` or invoke Node
 
 ## Known Issues And Repo Traps
 
-- Vite still warns about large chunks in production builds, especially `export-tools` (Note: split into smaller chunks to resolve).
-- `vite.config.js` manually groups:
-  - `export-tools` (now split into `jspdf-vendor`, `xlsx-vendor`, `html2canvas-vendor`)
+- Vite may still warn about large chunks in production builds; treat bundle/performance work as a follow-up unless the current change touches build output.
+- `vite.config.js` currently groups large vendors with `manualChunks`:
+  - `jspdf-vendor`
+  - `xlsx-vendor`
+  - `html2canvas-vendor`
   - `firebase`
   - `react-vendor`
 - Quote-state schema changes are high-risk because they affect local persistence, saved revisions, and history rehydration together.
@@ -624,9 +665,12 @@ Start with:
 - `src/App.tsx`
 - `src/store/AuthContext.tsx`
 - `src/components/layout/Header.tsx`
+- `src/navigation/routes.ts`
 - `src/views/History.tsx`
 - `src/services/retailerService.ts`
+- `src/services/retailerDocumentService.ts`
 - `src/views/RetailerManager.tsx`
+- `src/views/RetailerDocuments.tsx`
 - `firestore.rules`
 
 ### Change runtime-boundary handling
@@ -715,6 +759,7 @@ Start with:
 - `src/views/Pricing.tsx`
 - `src/views/RetailerManager.tsx`
 - `src/services/retailerService.ts`
+- `src/services/retailerDocumentService.ts`
 - `src/services/authService.ts`
 - `src/store/AuthContext.tsx`
 - `src/config/accessControl.shared.ts`
@@ -726,6 +771,7 @@ Start with:
 
 - `src/views/SummaryExport.tsx`
 - `src/views/RetailerOrderRequests.tsx`
+- `src/views/RetailerOrderHistory.tsx`
 - `src/views/Dashboard.tsx`
 - `src/services/orderRequestService.ts`
 - `src/services/quoteRepository.ts`
@@ -735,23 +781,37 @@ Start with:
 - `src/services/calculationEngine.ts`
 - `firestore.rules`
 
+### Change retailer document workflow
+
+Start with:
+
+- `src/views/RetailerDocuments.tsx`
+- `src/views/RetailerManager.tsx`
+- `src/services/retailerDocumentService.ts`
+- `src/services/activityLogService.ts`
+- `src/data/catalogLookup.ts`
+- `src/navigation/routes.ts`
+- `src/config/accessControl.shared.ts`
+- `firestore.rules`
+
 ## Recommended First Read Order
 
 If you are new to the repo, read these files in order:
 
 1. `README.md`
 2. `src/App.tsx`
-3. `src/types/contracts.ts`
-4. `src/store/AuthContext.tsx`
-5. `src/store/QuoteContext.tsx`
-6. `src/store/quoteStateSchema.ts`
-7. `src/services/quoteRepository.ts`
-8. `src/views/SummaryExport.tsx`
-9. `src/config/accessControl.shared.ts`
-10. `firestore.rules`
-11. `vite.config.js`
-12. `docs/COPY_EDITING_GUIDE.md`
-13. `roadmap.md`
+3. `src/navigation/routes.ts`
+4. `src/types/contracts.ts`
+5. `src/store/AuthContext.tsx`
+6. `src/store/QuoteContext.tsx`
+7. `src/store/quoteStateSchema.ts`
+8. `src/services/quoteRepository.ts`
+9. `src/views/SummaryExport.tsx`
+10. `src/config/accessControl.shared.ts`
+11. `firestore.rules`
+12. `vite.config.js`
+13. `docs/COPY_EDITING_GUIDE.md`
+14. `roadmap.md`
 
 ## Validation Expectations For Future Changes
 
