@@ -110,6 +110,7 @@ describe('normalizeRetailerData', () => {
             name: 'Solklar',
             email: 'test@example.com',
             notes: 'VIP retailer',
+            pdfThemes: [],
             productLines: {
                 BaHaMa: { enabled: true, discountPct: 22 },
                 ClickitUp: { enabled: true, discountPct: 20 },
@@ -140,14 +141,42 @@ describe('normalizeRetailerData', () => {
         expect(result.notes).toBe('some notes');
     });
 
-    it('only includes name, email, productLines, and notes in output', () => {
+    it('preserves valid pdfThemes array', () => {
+        const result = normalizeRetailerData({
+            name: 'Test',
+            email: 'sales@example.com',
+            pdfThemes: ['custom', 'roslagsmarkisen']
+        }, mockCatalog);
+        expect(result.pdfThemes).toEqual(['custom', 'roslagsmarkisen']);
+    });
+
+    it('filters out non-string items from pdfThemes', () => {
+        const result = normalizeRetailerData({
+            name: 'Test',
+            email: 'sales@example.com',
+            pdfThemes: ['custom', 123, null, 'roslagsmarkisen']
+        }, mockCatalog);
+        expect(result.pdfThemes).toEqual(['custom', 'roslagsmarkisen']);
+    });
+
+    it('defaults pdfThemes to empty array if invalid type', () => {
+        const result = normalizeRetailerData({
+            name: 'Test',
+            email: 'sales@example.com',
+            pdfThemes: 'not an array'
+        }, mockCatalog);
+        expect(result.pdfThemes).toEqual([]);
+    });
+
+    it('only includes name, email, productLines, notes, and pdfThemes in output', () => {
         const result = normalizeRetailerData({
             name: 'Test',
             email: 'test@example.com',
             extraField: 'should be stripped',
-            productLines: {}
+            productLines: {},
+            pdfThemes: ['custom']
         }, mockCatalog);
-        expect(Object.keys(result)).toEqual(['name', 'email', 'productLines', 'notes']);
+        expect(Object.keys(result).sort()).toEqual(['name', 'email', 'productLines', 'notes', 'pdfThemes'].sort());
     });
 
     it('parses and lowercases email', () => {
@@ -210,6 +239,7 @@ describe('fetchRetailers', () => {
                 name: 'Nordvind',
                 email: 'sales@nordvind.se',
                 notes: 'VIP',
+                pdfThemes: [],
                 productLines: {
                     BaHaMa: { enabled: true, discountPct: 15 },
                     ClickitUp: { enabled: false, discountPct: 0 },

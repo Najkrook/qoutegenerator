@@ -3,6 +3,7 @@ import type { AccessLevel, AccessUser, AuthContextValue, RetailerRecord } from '
 import { onAuthChange, login as firebaseLogin, logout as firebaseLogout } from '../services/authService';
 import { ACCESS_LEVELS, getAccessCapabilities, resolveAccessLevelFromUser } from '../config/accessControl.shared';
 import { db, doc, getDoc, collection, query, where, limit, getDocs } from '../services/firebase';
+import { toRetailerRecord } from '../services/retailerService';
 
 export const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
@@ -60,7 +61,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
 
                         if (!snap.empty) {
                             const docSnap = snap.docs[0];
-                            setRetailer({ id: docSnap.id, ...docSnap.data() });
+                            setRetailer(toRetailerRecord(docSnap.data(), docSnap.id));
                             resolvedLevel = ACCESS_LEVELS.RETAILER;
                         }
                     } catch (err) {

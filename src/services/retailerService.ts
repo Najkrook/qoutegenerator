@@ -1,6 +1,7 @@
 import type {
     AccessUser,
     CatalogData,
+    PdfThemeId,
     RetailerProductLineConfig,
     RetailerRecord,
     RetailerWriteSource,
@@ -47,15 +48,23 @@ function normalizeRetailerProductLines(
     }, {});
 }
 
-function toRetailerRecord(value: unknown, id?: string): RetailerRecord {
+export function toRetailerRecord(value: unknown, id?: string): RetailerRecord {
     const raw = isRecord(value) ? value : {};
+    
+    // Normalize pdfThemes array
+    let pdfThemes: PdfThemeId[] = [];
+    if (Array.isArray(raw.pdfThemes)) {
+        pdfThemes = raw.pdfThemes.filter((t) => typeof t === 'string') as PdfThemeId[];
+    }
+
     return {
         id,
         ...raw,
         name: String(raw.name ?? ''),
         email: String(raw.email ?? ''),
         notes: String(raw.notes ?? ''),
-        productLines: normalizeRetailerProductLines(raw.productLines)
+        productLines: normalizeRetailerProductLines(raw.productLines),
+        pdfThemes
     };
 }
 
@@ -80,11 +89,17 @@ export function normalizeRetailerData(
         throw new Error('Användare (E-post) är obligatoriskt.');
     }
 
+    let pdfThemes: PdfThemeId[] = [];
+    if (Array.isArray(data?.pdfThemes)) {
+        pdfThemes = data.pdfThemes.filter((t) => typeof t === 'string') as PdfThemeId[];
+    }
+
     return {
         name,
         email,
         productLines,
-        notes: String(data?.notes ?? '').trim()
+        notes: String(data?.notes ?? '').trim(),
+        pdfThemes
     };
 }
 

@@ -286,6 +286,50 @@ describe('SummaryExport PDF override', () => {
         });
     });
 
+    it('restricts PDF themes for retailers and allows all for admins', async () => {
+        const { container: adminContainer } = await renderSummaryExport({
+            authOverrides: { accessLevel: 'admin', isRetailer: false }
+        });
+        const adminSelect = adminContainer.querySelector('select[name="pdfThemeId"]');
+        expect(Array.from(adminSelect.options).map(o => o.value)).toEqual(['brixx', 'custom', 'roslagsmarkisen']);
+
+        const { container: retailerContainer1 } = await renderSummaryExport({
+            authOverrides: {
+                accessLevel: 'retailer',
+                isRetailer: true,
+                retailer: { id: 'ret-1', pdfThemes: [] }
+            }
+        });
+        const retSelect1 = retailerContainer1.querySelector('select[name="pdfThemeId"]');
+        expect(Array.from(retSelect1.options).map(o => o.value)).toEqual(['brixx']);
+
+        const { container: retailerContainer2 } = await renderSummaryExport({
+            authOverrides: {
+                accessLevel: 'retailer',
+                isRetailer: true,
+                retailer: { id: 'ret-2', pdfThemes: ['roslagsmarkisen'] }
+            }
+        });
+        const retSelect2 = retailerContainer2.querySelector('select[name="pdfThemeId"]');
+        expect(Array.from(retSelect2.options).map(o => o.value)).toEqual(['brixx', 'roslagsmarkisen']);
+    });
+
+    it('forces fallback to default theme if an unauthorized theme is loaded in state', async () => {
+        const { dispatch } = await renderSummaryExport({
+            authOverrides: {
+                accessLevel: 'retailer',
+                isRetailer: true,
+                retailer: { id: 'ret-1', pdfThemes: [] }
+            },
+            stateOverrides: { pdfThemeId: 'custom' }
+        });
+        
+        expect(dispatch).toHaveBeenCalledWith({
+            type: 'SET_PDF_THEME_ID',
+            payload: 'brixx'
+        });
+    });
+
     it('allows legacy export through Exportera ändå when quoteNumber is missing', async () => {
         const { container } = await renderSummaryExport({
             stateOverrides: { quoteNumber: null }

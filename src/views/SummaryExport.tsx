@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useQuote } from '../store/QuoteContext';
 import { useAuth } from '../store/AuthContext';
 import { catalogData } from '../data/catalog';
-import { PDF_THEME_OPTIONS, normalizePdfThemeId } from '../config/pdfThemes';
+import { PDF_THEME_OPTIONS, normalizePdfThemeId, DEFAULT_PDF_THEME_ID } from '../config/pdfThemes';
 import { computeQuoteTotals } from '../services/calculationEngine';
 import { CustomerInfoForm } from '../components/features/CustomerInfoForm';
 import { FinalSummaryTable } from '../components/features/FinalSummaryTable';
@@ -163,7 +163,23 @@ export function SummaryExport({ onPrev, onBackToSketch, onOpenRetailerOrderHisto
     const [hasJustSubmittedOrderRequest, setHasJustSubmittedOrderRequest] = useState(false);
     const previewUrlRef = useRef<string>('');
     const exportBlockReason = getPdfExportBlockReason(state.quoteNumber);
+
+    const allowedThemeOptions = useMemo(() => {
+        if (!isRetailer) {
+            return PDF_THEME_OPTIONS;
+        }
+        const allowedIds = new Set<string>([DEFAULT_PDF_THEME_ID, ...(retailer?.pdfThemes || [])]);
+        return PDF_THEME_OPTIONS.filter((theme) => allowedIds.has(theme.id));
+    }, [isRetailer, retailer?.pdfThemes]);
+
     const selectedPdfThemeId = normalizePdfThemeId(state.pdfThemeId);
+
+    useEffect(() => {
+        if (selectedPdfThemeId && !allowedThemeOptions.some(t => t.id === selectedPdfThemeId)) {
+            dispatch({ type: 'SET_PDF_THEME_ID', payload: DEFAULT_PDF_THEME_ID });
+        }
+    }, [selectedPdfThemeId, allowedThemeOptions, dispatch]);
+
     const canSubmitOrderRequest = Boolean(
         isRetailer
         && state.activeQuoteId
@@ -646,7 +662,7 @@ export function SummaryExport({ onPrev, onBackToSketch, onOpenRetailerOrderHisto
                                 onChange={handlePdfThemeChange}
                                 className="h-[38px] w-full rounded-md border border-panel-border bg-panel-bg px-3 text-sm font-bold normal-case tracking-normal text-white outline-none transition-colors hover:bg-white/5 focus:border-primary focus:ring-2 focus:ring-primary/25"
                             >
-                                {PDF_THEME_OPTIONS.map((option) => (
+                                {allowedThemeOptions.map((option) => (
                                     <option key={option.id} value={option.id}>
                                         {option.label}
                                     </option>

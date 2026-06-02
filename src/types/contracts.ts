@@ -1023,6 +1023,7 @@ export interface RetailerWriteInput {
     password?: string;
     notes: string;
     productLines: Record<string, RetailerProductLineDraftConfig>;
+    pdfThemes: PdfThemeId[];
 }
 
 export type RetailerWriteSource = Partial<RetailerWriteInput> | UnknownRecord;
@@ -1035,6 +1036,7 @@ export interface RetailerRecord {
     email?: string;
     notes?: string;
     productLines?: Record<string, RetailerProductLineConfig>;
+    pdfThemes?: PdfThemeId[];
     createdAt?: number;
     updatedAt?: number;
     createdBy?: string;

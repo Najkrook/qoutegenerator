@@ -24,6 +24,7 @@ import {
 import { notifySuccess } from '../services/notificationService';
 import { getErrorMessage } from '../utils/runtime';
 import type {
+    PdfThemeId,
     RetailerFormState,
     RetailerDocumentKind,
     RetailerLineDocument,
@@ -147,6 +148,16 @@ function RetailerForm({ initial, onSave, onCancel, saving }: RetailerFormProps) 
         }));
     };
 
+    const handleTogglePdfTheme = (themeId: PdfThemeId) => {
+        setForm((prev) => {
+            const currentThemes = prev.pdfThemes || [];
+            if (currentThemes.includes(themeId)) {
+                return { ...prev, pdfThemes: currentThemes.filter((t) => t !== themeId) };
+            }
+            return { ...prev, pdfThemes: [...currentThemes, themeId] };
+        });
+    };
+
     const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
         event.preventDefault();
         setError('');
@@ -251,6 +262,26 @@ function RetailerForm({ initial, onSave, onCancel, saving }: RetailerFormProps) 
                         );
                     })}
                 </div>
+            </div>
+
+            <div>
+                <label className="block text-xs font-bold text-text-secondary uppercase mb-3">PDF-teman</label>
+                <div className="space-y-2">
+                    {PDF_THEME_OPTIONS.filter((t) => t.id !== DEFAULT_PDF_THEME_ID).map((theme) => (
+                        <label key={theme.id} className="flex items-center gap-2.5 cursor-pointer">
+                            <input
+                                type="checkbox"
+                                checked={(form.pdfThemes || []).includes(theme.id)}
+                                onChange={() => handleTogglePdfTheme(theme.id)}
+                                className="w-4 h-4 accent-primary cursor-pointer"
+                            />
+                            <span className="text-sm text-text-primary">{theme.label}</span>
+                        </label>
+                    ))}
+                </div>
+                <p className="mt-2 text-xs text-text-secondary italic">
+                    (Standardtemat "BRIXX" är alltid tillgängligt.)
+                </p>
             </div>
 
             <div>
