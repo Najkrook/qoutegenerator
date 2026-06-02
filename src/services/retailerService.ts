@@ -19,6 +19,7 @@ import {
     orderBy
 } from './firebase';
 import { safeLogActivity } from './activityLogService';
+import { PDF_THEME_OPTIONS } from '../config/pdfThemes';
 
 interface RetailerPersistedRecord extends RetailerRecord {
     productLines: Record<string, RetailerProductLineConfig>;
@@ -54,7 +55,8 @@ export function toRetailerRecord(value: unknown, id?: string): RetailerRecord {
     // Normalize pdfThemes array
     let pdfThemes: PdfThemeId[] = [];
     if (Array.isArray(raw.pdfThemes)) {
-        pdfThemes = raw.pdfThemes.filter((t) => typeof t === 'string') as PdfThemeId[];
+        const validIds = new Set(PDF_THEME_OPTIONS.map(o => o.id));
+        pdfThemes = raw.pdfThemes.filter((t) => typeof t === 'string' && validIds.has(t)) as PdfThemeId[];
     }
 
     return {
@@ -91,7 +93,8 @@ export function normalizeRetailerData(
 
     let pdfThemes: PdfThemeId[] = [];
     if (Array.isArray(data?.pdfThemes)) {
-        pdfThemes = data.pdfThemes.filter((t) => typeof t === 'string') as PdfThemeId[];
+        const validIds = new Set(PDF_THEME_OPTIONS.map(o => o.id));
+        pdfThemes = data.pdfThemes.filter((t) => typeof t === 'string' && validIds.has(t)) as PdfThemeId[];
     }
 
     return {

@@ -174,6 +174,15 @@ export function SummaryExport({ onPrev, onBackToSketch, onOpenRetailerOrderHisto
 
     const selectedPdfThemeId = normalizePdfThemeId(state.pdfThemeId);
 
+    const effectivePdfThemeId = allowedThemeOptions.some(t => t.id === selectedPdfThemeId)
+        ? selectedPdfThemeId
+        : DEFAULT_PDF_THEME_ID;
+
+    const effectiveState = useMemo(() => ({
+        ...state,
+        pdfThemeId: effectivePdfThemeId
+    }), [state, effectivePdfThemeId]);
+
     useEffect(() => {
         if (selectedPdfThemeId && !allowedThemeOptions.some(t => t.id === selectedPdfThemeId)) {
             dispatch({ type: 'SET_PDF_THEME_ID', payload: DEFAULT_PDF_THEME_ID });
@@ -202,7 +211,7 @@ export function SummaryExport({ onPrev, onBackToSketch, onOpenRetailerOrderHisto
         let cancelled = false;
 
         void (async () => {
-            const pdfBlob = await createQuotePdfBlob(state, summaryData);
+            const pdfBlob = await createQuotePdfBlob(effectiveState, summaryData);
             if (cancelled) return;
 
             if (!pdfBlob) {
@@ -228,7 +237,7 @@ export function SummaryExport({ onPrev, onBackToSketch, onOpenRetailerOrderHisto
         return () => {
             cancelled = true;
         };
-    }, [state, summaryData]);
+    }, [effectiveState, summaryData]);
 
     useEffect(() => {
         if (!canSubmitOrderRequest || !state.activeQuoteId) {
@@ -294,7 +303,7 @@ export function SummaryExport({ onPrev, onBackToSketch, onOpenRetailerOrderHisto
         }
 
         const fileName = buildPdfFileName(state.customerInfo);
-        const pdfBlob = await createQuotePdfBlob(state, summaryData);
+        const pdfBlob = await createQuotePdfBlob(effectiveState, summaryData);
         if (!pdfBlob) {
             notifyError('Kunde inte skapa PDF.');
             return;
@@ -304,7 +313,7 @@ export function SummaryExport({ onPrev, onBackToSketch, onOpenRetailerOrderHisto
         if (pickerResult === 'saved') {
             logPdfExportActivity({
                 user,
-                state,
+                state: effectiveState,
                 fileName,
                 missingQuoteNumber: !state.quoteNumber
             });
@@ -325,7 +334,9 @@ export function SummaryExport({ onPrev, onBackToSketch, onOpenRetailerOrderHisto
             downloadBlob(pdfBlob, fileName);
             logPdfExportActivity({
                 user,
-                state,
+                activityLogService: safeLogActivity,
+                state: effectiveState,
+                summaryData,
                 fileName,
                 missingQuoteNumber: !state.quoteNumber
             });
@@ -335,7 +346,7 @@ export function SummaryExport({ onPrev, onBackToSketch, onOpenRetailerOrderHisto
 
     const handleExportExcel = async (): Promise<void> => {
         try {
-            await exportExcelWorkbook(state, summaryData);
+            await exportExcelWorkbook(effectiveState, summaryData);
             void safeLogActivity({
                 user,
                 eventType: 'quote_export_excel',
@@ -386,7 +397,7 @@ export function SummaryExport({ onPrev, onBackToSketch, onOpenRetailerOrderHisto
                 quoteRepository,
                 user,
                 retailer,
-                state,
+                state: effectiveState,
                 summary: summaryData
             });
             const saveStatePatch: SavedQuoteStatePatch = statePatch;
@@ -436,7 +447,7 @@ export function SummaryExport({ onPrev, onBackToSketch, onOpenRetailerOrderHisto
             const createdRequest = await orderRequestService.createOrderRequest({
                 user,
                 retailer,
-                state,
+                state: effectiveState,
                 summary: summaryData
             });
             setOrderRequest(createdRequest);
@@ -658,7 +669,7 @@ export function SummaryExport({ onPrev, onBackToSketch, onOpenRetailerOrderHisto
                             Offert tema
                             <select
                                 name="pdfThemeId"
-                                value={selectedPdfThemeId}
+                                value={effectivePdfThemeId}
                                 onChange={handlePdfThemeChange}
                                 className="h-[38px] w-full rounded-md border border-panel-border bg-panel-bg px-3 text-sm font-bold normal-case tracking-normal text-white outline-none transition-colors hover:bg-white/5 focus:border-primary focus:ring-2 focus:ring-primary/25"
                             >

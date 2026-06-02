@@ -9,6 +9,7 @@ import React, {
 import { useAuth } from '../store/AuthContext';
 import { catalogData } from '../data/catalog';
 import { getCatalogLineIds, getCatalogLineName } from '../data/catalogLookup';
+import { PDF_THEME_OPTIONS, DEFAULT_PDF_THEME_ID } from '../config/pdfThemes';
 import { createRetailerAuthUser } from '../services/authService';
 import {
     fetchRetailers,
@@ -74,7 +75,8 @@ function buildFormState(retailer: RetailerRecord | null = null): RetailerFormSta
                 };
                 return acc;
             }, {})
-            : buildEmptyProductLines()
+            : buildEmptyProductLines(),
+        pdfThemes: retailer?.pdfThemes || []
     };
 }
 
