@@ -148,6 +148,16 @@ Success signals:
 - Admins can see pipeline health without opening individual quotes.
 - Trends in quote activity and retailer usage are visible at a glance.
 
+### 4. Quote Margin Visibility
+Add admin-only margin and profitability visibility to the quote workflow so internal users can understand commercial risk before a quote is sent or marked won. This should start in Pricing and Summary/Export, with optional History visibility later, and must remain completely hidden from retailer users and customer-facing PDF/Excel exports.
+
+The first implementation should clarify the source of truth for cost data before adding UI. Once cost inputs are reliable, surface margin percentage, estimated gross profit, and discount impact in internal-only panels or columns. Highlight quotes where discounts, custom costs, retailer pricing, or price-on-request rows make margin review necessary.
+
+Success signals:
+- Admins can see whether a quote is commercially healthy before sending it.
+- Margin-sensitive data never appears in retailer views, order-request retailer history, PDFs, or Excel exports.
+- High-discount or low-margin quotes are easier to identify before they enter the pipeline.
+
 ## Cross-Cutting Dependencies
 - Text cleanup should happen before export polish so branded and customer-facing output improves on a clean baseline.
 - Retailer, history, and planner follow-up work should continue to use the shared notification model so new flows do not reintroduce special-case messaging patterns.
@@ -156,6 +166,7 @@ Success signals:
 - Global search and planner-link work should reuse the existing quote-history deep-link and route patterns instead of introducing another navigation model.
 - Type hardening should continue alongside quote-state-heavy workflow work to reduce regression risk, even though the main app-source TypeScript migration is complete.
 - Admin role centralization is partly underway through Firestore `user_roles`; finish removing hardcoded UID drift between `firestore.rules` and `accessControl.shared.ts` before more admin-gated features are added.
+- Margin visibility must use a clearly defined internal cost source and remain excluded from all retailer/customer-facing surfaces.
 - Any future retailer email or notification phase should build on the existing `order_requests` workflow rather than replace it with a separate submission path.
 - Validation should be updated whenever quote state, export rendering, or business-critical admin flows are changed.
 
@@ -167,6 +178,7 @@ Success signals:
 - Export-related manual cleanup and confusion continue to decrease through real-output review.
 - Quote reuse through duplication remains materially faster than manual re-entry.
 - Navigation and record discovery become more predictable through routing and global search.
+- Admins can identify low-margin or high-discount quotes before sending or marking them won.
 
 ## Out of Scope for This Roadmap
 - Full SPA-to-MPA migration or multi-app split.

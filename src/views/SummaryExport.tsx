@@ -334,9 +334,7 @@ export function SummaryExport({ onPrev, onBackToSketch, onOpenRetailerOrderHisto
             downloadBlob(pdfBlob, fileName);
             logPdfExportActivity({
                 user,
-                activityLogService: safeLogActivity,
                 state: effectiveState,
-                summaryData,
                 fileName,
                 missingQuoteNumber: !state.quoteNumber
             });
