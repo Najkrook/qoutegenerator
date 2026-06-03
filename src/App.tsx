@@ -72,6 +72,21 @@ function RouteShell() {
     const location = useLocation();
     const routeId = getAppRouteIdFromPath(location.pathname);
     const isSummaryRoute = routeId === APP_ROUTE_IDS.quoteSummary;
+    const isInventoryRoute = routeId === APP_ROUTE_IDS.inventory;
+
+    if (isInventoryRoute) {
+        return (
+            <div className="min-h-screen bg-bg text-text-primary font-sans antialiased">
+                <ErrorBoundary resetHref={APP_PATHS[APP_ROUTE_IDS.dashboard]}>
+                    <main>
+                        <Suspense fallback={<ViewLoader />}>
+                            <Outlet />
+                        </Suspense>
+                    </main>
+                </ErrorBoundary>
+            </div>
+        );
+    }
 
     return (
         <div className="min-h-screen bg-bg text-text-primary p-4 md:p-8 font-sans antialiased">
@@ -117,9 +132,11 @@ function ProtectedAppLayout() {
 
         const hasLoadedInventory =
             (state.inventoryData?.bahama?.length || 0) > 0 ||
+            (state.inventoryData?.bahamaV2?.length || 0) > 0 ||
             Object.keys(state.inventoryData?.clickitup || {}).length > 0 ||
             Boolean(state.inventoryData?.notes) ||
             (state.cloudInventoryData?.bahama?.length || 0) > 0 ||
+            (state.cloudInventoryData?.bahamaV2?.length || 0) > 0 ||
             Object.keys(state.cloudInventoryData?.clickitup || {}).length > 0 ||
             Boolean(state.cloudInventoryData?.notes);
 

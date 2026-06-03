@@ -1,6 +1,6 @@
 import React from 'react';
 import type {
-    BahamaInventoryItem,
+    BahamaInventoryV2Item,
     ClickitupFieldKey,
     ClickitupStockMap,
     PendingChangesPanelProps
@@ -18,24 +18,27 @@ const CLICKITUP_FIELDS: ClickitupFieldKey[] = ['sektion', 'dorr_h', 'dorr_v', 'h
 
 function DiffTag({ title, description, icon, color }: { title: string; description: string; icon: string; color: string }) {
     return (
-        <div className="flex flex-col gap-1 rounded p-2.5 border-l-[3px]" style={{ borderColor: color, background: 'rgba(255,255,255,0.03)' }}>
-            <div className="text-xs text-text-secondary uppercase">{title}</div>
-            <div className="flex justify-between items-center text-sm">
-                <span className="text-text-primary">{description}</span>
-                <span className="font-bold" style={{ color }}>{icon}</span>
+        <div className="flex flex-col gap-1 rounded border-l-[3px] bg-white/[0.03] p-2.5" style={{ borderColor: color }}>
+            <div className="text-xs uppercase text-slate-500">{title}</div>
+            <div className="flex items-center justify-between gap-3 text-sm">
+                <span className="truncate text-slate-200">{description}</span>
+                <span className="shrink-0 font-bold" style={{ color }}>{icon}</span>
             </div>
         </div>
     );
 }
 
-function buildInventoryMap(items: BahamaInventoryItem[]): Record<string, BahamaInventoryItem> {
-    return items.reduce<Record<string, BahamaInventoryItem>>((acc, item) => {
-        const id = String(item.ID || '');
-        if (id) {
-            acc[id] = item;
+function buildBahamaMap(items: BahamaInventoryV2Item[]): Record<string, BahamaInventoryV2Item> {
+    return items.reduce<Record<string, BahamaInventoryV2Item>>((acc, item) => {
+        if (item.id) {
+            acc[item.id] = item;
         }
         return acc;
     }, {});
+}
+
+function formatBahamaDescription(item: BahamaInventoryV2Item): string {
+    return [item.id, item.type, item.size].filter(Boolean).join(' - ');
 }
 
 function formatClickitupField(field: ClickitupFieldKey): string {
@@ -50,32 +53,25 @@ function formatClickitupField(field: ClickitupFieldKey): string {
 export function PendingChangesPanel({ inventoryData, cloudInventoryData, onCommit, isSaving }: PendingChangesPanelProps) {
     const changes: DiffChange[] = [];
 
-    const bahamaLocal = inventoryData.bahama || [];
-    const bahamaCloud = cloudInventoryData.bahama || [];
-    const cloudMap = buildInventoryMap(bahamaCloud);
-    const localMap = buildInventoryMap(bahamaLocal);
-    let fallbackGlobalDiff = false;
+    const bahamaLocal = inventoryData.bahamaV2 || [];
+    const bahamaCloud = cloudInventoryData.bahamaV2 || [];
+    const cloudMap = buildBahamaMap(bahamaCloud);
+    const localMap = buildBahamaMap(bahamaLocal);
 
     bahamaLocal.forEach((item) => {
-        const id = String(item.ID || '');
-        if (!id) {
-            fallbackGlobalDiff = true;
-            return;
-        }
-
-        if (!cloudMap[id]) {
+        if (!cloudMap[item.id]) {
             changes.push({
-                key: `add-${id}`,
+                key: `add-${item.id}`,
                 title: 'BaHaMa: Lades till',
-                desc: `${id} - ${String(item.TYP || '')} ${String(item.STORLEK || '')}`.trim(),
+                desc: formatBahamaDescription(item),
                 icon: '+',
                 color: 'var(--success)'
             });
-        } else if (JSON.stringify(item) !== JSON.stringify(cloudMap[id])) {
+        } else if (JSON.stringify(item) !== JSON.stringify(cloudMap[item.id])) {
             changes.push({
-                key: `upd-${id}`,
+                key: `upd-${item.id}`,
                 title: 'BaHaMa: Ändrades',
-                desc: id,
+                desc: formatBahamaDescription(item),
                 icon: 'upd',
                 color: 'var(--primary)'
             });
@@ -83,27 +79,16 @@ export function PendingChangesPanel({ inventoryData, cloudInventoryData, onCommi
     });
 
     bahamaCloud.forEach((item) => {
-        const id = String(item.ID || '');
-        if (id && !localMap[id]) {
+        if (item.id && !localMap[item.id]) {
             changes.push({
-                key: `del-${id}`,
+                key: `del-${item.id}`,
                 title: 'BaHaMa: Togs bort',
-                desc: id,
+                desc: formatBahamaDescription(item),
                 icon: '-',
                 color: 'var(--danger)'
             });
         }
     });
-
-    if (fallbackGlobalDiff && JSON.stringify(bahamaLocal) !== JSON.stringify(bahamaCloud)) {
-        changes.push({
-            key: 'mass-update',
-            title: 'BaHaMa',
-            desc: 'Massuppdatering via Excel',
-            icon: 'i',
-            color: 'var(--primary)'
-        });
-    }
 
     const clickitupLocal: ClickitupStockMap = inventoryData.clickitup || {};
     const clickitupCloud: ClickitupStockMap = cloudInventoryData.clickitup || {};
@@ -126,13 +111,13 @@ export function PendingChangesPanel({ inventoryData, cloudInventoryData, onCommi
             }
         });
     });
-    
+
     if (inventoryData.notes !== cloudInventoryData.notes) {
         changes.push({
             key: 'inventory-notes',
             title: 'Huvudnoteringar',
             desc: 'Noteringar har ändrats',
-            icon: '📝',
+            icon: 'txt',
             color: 'var(--primary)'
         });
     }
@@ -140,17 +125,17 @@ export function PendingChangesPanel({ inventoryData, cloudInventoryData, onCommi
     const hasChanges = changes.length > 0;
 
     return (
-        <div className="bg-panel-bg border border-panel-border rounded-xl p-5">
-            <div className="flex items-center justify-between mb-4">
-                <h4 className="text-sm font-semibold text-text-primary uppercase m-0">Väntande ändringar</h4>
+        <div className="rounded-lg border border-white/10 bg-[#10161b] p-5">
+            <div className="mb-4 flex items-center justify-between">
+                <h4 className="m-0 text-sm font-semibold uppercase text-slate-200">Väntande ändringar</h4>
                 {hasChanges && (
-                    <span className="bg-primary text-white text-xs font-bold rounded-full px-2.5 py-0.5">
+                    <span className="rounded-full bg-[#e8e1d4] px-2.5 py-0.5 text-xs font-bold text-[#10161b]">
                         {changes.length}
                     </span>
                 )}
             </div>
 
-            <div className="space-y-2 max-h-[500px] overflow-y-auto mb-4">
+            <div className="mb-4 max-h-[260px] space-y-2 overflow-y-auto">
                 {hasChanges ? (
                     changes.map((change) => (
                         <DiffTag
@@ -162,7 +147,7 @@ export function PendingChangesPanel({ inventoryData, cloudInventoryData, onCommi
                         />
                     ))
                 ) : (
-                    <p className="text-text-secondary text-center text-sm py-8 m-0">
+                    <p className="m-0 py-8 text-center text-sm text-slate-500">
                         Inga ändringar gjorda ännu.
                     </p>
                 )}
@@ -172,7 +157,7 @@ export function PendingChangesPanel({ inventoryData, cloudInventoryData, onCommi
                 <button
                     onClick={onCommit}
                     disabled={isSaving}
-                    className="w-full py-3 bg-green-600 text-white border-none rounded-lg font-semibold cursor-pointer hover:brightness-110 disabled:opacity-60 disabled:cursor-not-allowed transition-all"
+                    className="w-full rounded-md border border-emerald-400/30 bg-emerald-400/10 py-3 font-semibold text-emerald-100 transition-colors hover:bg-emerald-400/20 disabled:cursor-not-allowed disabled:opacity-60"
                 >
                     {isSaving ? 'Sparar till molnet...' : `Spara ändringar (${changes.length})`}
                 </button>

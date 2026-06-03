@@ -1,4 +1,6 @@
 import type {
+    BahamaInventoryStatus,
+    BahamaInventoryV2Item,
     ClickitupStockEntry,
     BuilderAddon,
     GridAddonState,
@@ -23,6 +25,7 @@ export const QUOTE_STATE_STORAGE_KEY = 'offertverktyg_state';
 export const CURRENT_STATE_VERSION = 2;
 
 const VALID_QUOTE_STATUSES: QuoteStatus[] = ['draft', 'sent', 'won', 'lost', 'archived'];
+const VALID_BAHAMA_STATUSES: BahamaInventoryStatus[] = ['available', 'reserved', 'needs-review', 'used', 'sold'];
 
 function clone<T>(value: T): T {
     if (value === undefined) {
@@ -130,6 +133,55 @@ function normalizeOptionalDisplayName(value: unknown): string | undefined {
     return normalized.length > 0 ? normalized : undefined;
 }
 
+function normalizeInventoryString(value: unknown): string {
+    return typeof value === 'string' ? value.trim() : '';
+}
+
+function normalizeBahamaInventoryStatus(value: unknown): BahamaInventoryStatus {
+    const normalized = normalizeInventoryString(value).toLowerCase();
+    return VALID_BAHAMA_STATUSES.includes(normalized as BahamaInventoryStatus)
+        ? (normalized as BahamaInventoryStatus)
+        : 'available';
+}
+
+function normalizeBahamaV2Items(value: unknown): BahamaInventoryV2Item[] {
+    if (!Array.isArray(value)) {
+        return [];
+    }
+
+    const seen = new Set<string>();
+    const now = new Date().toISOString();
+    return value.flatMap((entry) => {
+        const record = toRecord(entry);
+        const id = normalizeInventoryString(record.id);
+        if (!id || seen.has(id)) {
+            return [];
+        }
+        seen.add(id);
+
+        const properties = toRecord(record.properties);
+        return [{
+            id,
+            type: normalizeInventoryString(record.type),
+            size: normalizeInventoryString(record.size),
+            status: normalizeBahamaInventoryStatus(record.status),
+            location: normalizeInventoryString(record.location),
+            properties: {
+                stativ: normalizeInventoryString(properties.stativ),
+                textil: normalizeInventoryString(properties.textil),
+                fot: normalizeInventoryString(properties.fot),
+                belysning: normalizeInventoryString(properties.belysning),
+                varme: normalizeInventoryString(properties.varme)
+            },
+            comment: normalizeInventoryString(record.comment),
+            createdAt: normalizeInventoryString(record.createdAt) || now,
+            updatedAt: normalizeInventoryString(record.updatedAt) || normalizeInventoryString(record.createdAt) || now,
+            updatedByUid: normalizeInventoryString(record.updatedByUid),
+            updatedByEmail: normalizeInventoryString(record.updatedByEmail)
+        }];
+    });
+}
+
 function parseValidityDays(value: unknown): number | null {
     const match = String(value ?? '').match(/(\d+)/);
     if (!match) return null;
@@ -157,7 +209,9 @@ function normalizeInventoryData(value: RawPersistedInventoryData | unknown): Quo
 
     return {
         bahama: cloneArray(record.bahama),
-        clickitup: normalizeClickitupStockMap(record.clickitup)
+        bahamaV2: normalizeBahamaV2Items(record.bahamaV2),
+        clickitup: normalizeClickitupStockMap(record.clickitup),
+        notes: typeof record.notes === 'string' ? record.notes : ''
     };
 }
 
@@ -276,8 +330,8 @@ function createBaseInitialState(): QuoteState {
             validity: '30 dagar',
             extraNotes: ''
         },
-        inventoryData: { bahama: [], clickitup: {} },
-        cloudInventoryData: { bahama: [], clickitup: {} },
+        inventoryData: { bahama: [], bahamaV2: [], clickitup: {}, notes: '' },
+        cloudInventoryData: { bahama: [], bahamaV2: [], clickitup: {}, notes: '' },
         sketchDraft: null,
         advancedSketchDraft: null,
         sketchMeta: { addedBahamaLine: false, addedFiestaLine: false },

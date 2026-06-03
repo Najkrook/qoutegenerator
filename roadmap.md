@@ -148,10 +148,8 @@ Success signals:
 - Admins can see pipeline health without opening individual quotes.
 - Trends in quote activity and retailer usage are visible at a glance.
 
-### 4. Quote Margin Visibility
-Add admin-only margin and profitability visibility to the quote workflow so internal users can understand commercial risk before a quote is sent or marked won. This should start in Pricing and Summary/Export, with optional History visibility later, and must remain completely hidden from retailer users and customer-facing PDF/Excel exports.
-
-The first implementation should clarify the source of truth for cost data before adding UI. Once cost inputs are reliable, surface margin percentage, estimated gross profit, and discount impact in internal-only panels or columns. Highlight quotes where discounts, custom costs, retailer pricing, or price-on-request rows make margin review necessary.
+### [x] 4. Quote Margin Visibility
+Status: Implemented and validated. Added shared Firestore margin settings (`app_settings/quote_margins`) with default values (BaHaMa 40%, ClickitUp 32%, Fiesta 30%), admin-only settings gear modal in the header, and admin-only margin summary panels in Pricing and Summary/Export views. Margins are managed as gross margin on list price, with pure margin analysis separated from core quote state calculations. Kept margin data completely out of quote state, revisions, retailer order requests, PDF exports, and Excel exports. Security rule coverage limits app settings to administrators.
 
 Success signals:
 - Admins can see whether a quote is commercially healthy before sending it.

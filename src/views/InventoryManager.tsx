@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, type ChangeEvent } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useQuote } from '../store/QuoteContext';
 import { useAuth } from '../store/AuthContext';
 import { db, doc, getDoc, collection, writeBatch } from '../services/firebase';
@@ -6,15 +6,14 @@ import { InventoryTable } from '../components/features/InventoryTable';
 import { ClickitupStockGrid } from '../components/features/ClickitupStockGrid';
 import { InventoryItemModal } from '../components/features/InventoryItemModal';
 import { PendingChangesPanel } from '../components/features/PendingChangesPanel';
+import ThemeToggle from '../components/ThemeToggle';
 import {
-    buildImportedInventoryItem,
+    BAHAMA_INVENTORY_STATUSES,
     cloneInventoryData,
     createDefaultInventoryData,
     DEFAULT_CLICKITUP_ENTRY,
-    normalizeInventorySheetHeaders,
     normalizeStoredInventoryData
 } from './inventoryData';
-import * as XLSX from 'xlsx';
 import {
     confirmAction,
     notifyError,
@@ -23,41 +22,131 @@ import {
 } from '../services/notificationService';
 import { getErrorMessage } from '../utils/runtime';
 import type {
-    BahamaInventoryItem,
+    BahamaInventoryStatus,
+    BahamaInventoryV2Item,
     ClickitupFieldKey,
     InventoryData,
     InventoryManagerProps
 } from '../types/contracts';
 
-interface InventoryModalState {
-    open: boolean;
-    index: number;
-    item: BahamaInventoryItem | null;
-}
-
-type SheetCell = string | number | boolean | null | undefined;
-type SheetRow = SheetCell[];
+type ProductLine = 'bahama' | 'clickitup';
+type InspectorMode = 'view' | 'create' | 'edit';
 
 const DEFAULT_INVENTORY_DATA: InventoryData = createDefaultInventoryData();
 
-function createEmptyModalState(): InventoryModalState {
-    return { open: false, index: -1, item: null };
+const STATUS_LABELS: Record<BahamaInventoryStatus, string> = {
+    available: 'Tillgänglig',
+    reserved: 'Reserverad',
+    'needs-review': 'Kontroll',
+    used: 'Begagnad',
+    sold: 'Såld'
+};
+
+function getSafeInventoryData(inventoryData: InventoryData | undefined): InventoryData {
+    return normalizeStoredInventoryData({
+        ...DEFAULT_INVENTORY_DATA,
+        ...(inventoryData || {})
+    });
 }
 
-function readInventorySheetRows(sheet: XLSX.WorkSheet): SheetRow[] {
-    return XLSX.utils.sheet_to_json<SheetRow>(sheet, { header: 1 });
+function sortBahamaItems(items: BahamaInventoryV2Item[]): BahamaInventoryV2Item[] {
+    return [...items].sort((a, b) => a.id.localeCompare(b.id, undefined, { numeric: true, sensitivity: 'base' }));
+}
+
+function getSearchBlob(item: BahamaInventoryV2Item): string {
+    return [
+        item.id,
+        item.type,
+        item.size,
+        STATUS_LABELS[item.status],
+        item.status,
+        item.location,
+        item.properties.stativ,
+        item.properties.textil,
+        item.properties.fot,
+        item.properties.belysning,
+        item.properties.varme,
+        item.comment
+    ].join(' ').toLowerCase();
+}
+
+function formatBahamaDetails(item: BahamaInventoryV2Item): string {
+    const properties = [
+        item.properties.stativ,
+        item.properties.textil,
+        item.properties.fot,
+        item.properties.belysning,
+        item.properties.varme
+    ].filter(Boolean).join(' / ');
+
+    return [
+        item.type,
+        item.size,
+        properties
+    ].filter(Boolean).join(' - ') || item.id;
+}
+
+function hasInventoryChanges(local: InventoryData, cloud: InventoryData): boolean {
+    return JSON.stringify(local) !== JSON.stringify(cloud);
+}
+
+function getUserEmail(user: { email?: string | null } | null): string {
+    return user?.email || 'unknown';
+}
+
+function getUserUid(user: { uid?: string | null } | null): string {
+    return user?.uid || '';
 }
 
 export function InventoryManager({ onBack }: InventoryManagerProps) {
     const { state, dispatch } = useQuote();
     const { user } = useAuth();
+    const [activeLine, setActiveLine] = useState<ProductLine>('bahama');
     const [searchTerm, setSearchTerm] = useState('');
-    const [showBahama, setShowBahama] = useState(false);
-    const [showClickitup, setShowClickitup] = useState(false);
-    const [modalState, setModalState] = useState<InventoryModalState>(createEmptyModalState());
+    const [statusFilter, setStatusFilter] = useState<'all' | BahamaInventoryStatus>('all');
+    const [sizeFilter, setSizeFilter] = useState('all');
+    const [selectedBahamaId, setSelectedBahamaId] = useState<string | null>(null);
+    const [inspectorMode, setInspectorMode] = useState<InspectorMode>('view');
     const [isSaving, setIsSaving] = useState(false);
     const [isLoading, setIsLoading] = useState(true);
     const [loadError, setLoadError] = useState<string | null>(null);
+
+    const inventoryData = useMemo(() => getSafeInventoryData(state.inventoryData), [state.inventoryData]);
+    const cloudInventoryData = useMemo(() => getSafeInventoryData(state.cloudInventoryData), [state.cloudInventoryData]);
+    const bahamaItems = inventoryData.bahamaV2 || [];
+    const sortedBahamaItems = useMemo(() => sortBahamaItems(bahamaItems), [bahamaItems]);
+    const selectedItem = useMemo(
+        () => sortedBahamaItems.find((item) => item.id === selectedBahamaId) || null,
+        [selectedBahamaId, sortedBahamaItems]
+    );
+
+    const sizeOptions = useMemo(() => {
+        const sizes = new Set<string>();
+        sortedBahamaItems.forEach((item) => {
+            if (item.size) {
+                sizes.add(item.size);
+            }
+        });
+        return Array.from(sizes).sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' }));
+    }, [sortedBahamaItems]);
+
+    const filteredBahamaItems = useMemo(() => {
+        const lowerTerm = searchTerm.trim().toLowerCase();
+        return sortedBahamaItems.filter((item) => {
+            if (statusFilter !== 'all' && item.status !== statusFilter) {
+                return false;
+            }
+            if (sizeFilter !== 'all' && item.size !== sizeFilter) {
+                return false;
+            }
+            if (!lowerTerm) {
+                return true;
+            }
+            return getSearchBlob(item).includes(lowerTerm);
+        });
+    }, [searchTerm, sizeFilter, sortedBahamaItems, statusFilter]);
+
+    const changesPending = hasInventoryChanges(inventoryData, cloudInventoryData);
 
     const loadInventory = useCallback(async () => {
         setIsLoading(true);
@@ -65,15 +154,12 @@ export function InventoryManager({ onBack }: InventoryManagerProps) {
         try {
             const docRef = doc(db, 'stock', 'main_inventory');
             const docSnap = await getDoc(docRef);
+            const loadedInventory = docSnap.exists()
+                ? normalizeStoredInventoryData(docSnap.data())
+                : createDefaultInventoryData();
 
-            if (docSnap.exists()) {
-                const inventoryData = normalizeStoredInventoryData(docSnap.data());
-                dispatch({ type: 'SET_CLOUD_INVENTORY_DATA', payload: cloneInventoryData(inventoryData) });
-                dispatch({ type: 'SET_INVENTORY_DATA', payload: inventoryData });
-            } else {
-                dispatch({ type: 'SET_CLOUD_INVENTORY_DATA', payload: cloneInventoryData(DEFAULT_INVENTORY_DATA) });
-                dispatch({ type: 'SET_INVENTORY_DATA', payload: cloneInventoryData(DEFAULT_INVENTORY_DATA) });
-            }
+            dispatch({ type: 'SET_CLOUD_INVENTORY_DATA', payload: cloneInventoryData(loadedInventory) });
+            dispatch({ type: 'SET_INVENTORY_DATA', payload: cloneInventoryData(loadedInventory) });
         } catch (err) {
             console.error('Failed to load Firestore inventory:', err);
             setLoadError(getErrorMessage(err, 'Kunde inte läsa lagersaldot.'));
@@ -98,99 +184,79 @@ export function InventoryManager({ onBack }: InventoryManagerProps) {
         void loadInventory();
     }, [loadInventory]);
 
-    const handleFileUpload = useCallback((event: ChangeEvent<HTMLInputElement>) => {
-        const file = event.target.files?.[0];
-        if (!file) return;
-
-        const reader = new FileReader();
-        reader.onload = (loadEvent: ProgressEvent<FileReader>) => {
-            try {
-                const result = loadEvent.target?.result;
-                if (!(result instanceof ArrayBuffer)) {
-                    throw new Error('Kunde inte läsa den valda filen.');
-                }
-
-                const data = new Uint8Array(result);
-                const workbook = XLSX.read(data, { type: 'array' });
-                const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
-                const jsonArr = readInventorySheetRows(firstSheet);
-
-                let headerIdx = -1;
-                for (let index = 0; index < Math.min(jsonArr.length, 10); index += 1) {
-                    if (jsonArr[index]?.includes('BESKRIVNING')) {
-                        headerIdx = index;
-                        break;
-                    }
-                }
-
-                if (headerIdx === -1) {
-                    notifyError("Kunde inte hitta kolumnen 'BESKRIVNING'. Kontrollera att det är rätt lagersaldo-fil.");
-                    return;
-                }
-
-                const headers = normalizeInventorySheetHeaders(jsonArr[headerIdx] || []);
-                const inventory: BahamaInventoryItem[] = [];
-
-                for (let rowIndex = headerIdx + 1; rowIndex < jsonArr.length; rowIndex += 1) {
-                    const row = jsonArr[rowIndex];
-                    if (!row || row.length === 0) continue;
-
-                    const { item: cleanItem, hasData } = buildImportedInventoryItem(headers, row);
-                    if (hasData && cleanItem.BESKRIVNING) {
-                        inventory.push(cleanItem);
-                    }
-                }
-
-                const newData: InventoryData = { ...state.inventoryData, bahama: inventory };
-                dispatch({ type: 'SET_INVENTORY_DATA', payload: newData });
-                notifySuccess(`Lagersaldo inläst: ${inventory.length} artiklar. Klicka "Spara ändringar" för att synkronisera.`);
-            } catch (err) {
-                console.error(err);
-                notifyError(`Fel vid inläsning: ${getErrorMessage(err, 'Okänt fel')}`);
-            }
-        };
-
-        reader.readAsArrayBuffer(file);
-        event.target.value = '';
-    }, [dispatch, state.inventoryData]);
-
-    const handleSaveItem = (formData: BahamaInventoryItem, editIndex: number) => {
-        const newBahama = [...state.inventoryData.bahama];
-        if (editIndex >= 0) {
-            newBahama[editIndex] = { ...newBahama[editIndex], ...formData };
-        } else {
-            newBahama.push(formData);
+    useEffect(() => {
+        if (inspectorMode === 'create') {
+            return;
         }
+        if (selectedBahamaId && sortedBahamaItems.some((item) => item.id === selectedBahamaId)) {
+            return;
+        }
+        setSelectedBahamaId(sortedBahamaItems[0]?.id || null);
+        setInspectorMode(sortedBahamaItems[0] ? 'edit' : 'view');
+    }, [inspectorMode, selectedBahamaId, sortedBahamaItems]);
 
-        dispatch({ type: 'SET_INVENTORY_DATA', payload: { ...state.inventoryData, bahama: newBahama } });
-        setModalState(createEmptyModalState());
-        notifySuccess(editIndex >= 0 ? 'Artikel uppdaterad' : 'Artikel tillagd');
+    const replaceBahamaItems = (items: BahamaInventoryV2Item[]) => {
+        dispatch({
+            type: 'SET_INVENTORY_DATA',
+            payload: {
+                ...inventoryData,
+                bahamaV2: sortBahamaItems(items)
+            }
+        });
     };
 
-    const handleDeleteItem = async (index: number, item: BahamaInventoryItem) => {
+    const handleSelectItem = (item: BahamaInventoryV2Item) => {
+        setSelectedBahamaId(item.id);
+        setInspectorMode('edit');
+    };
+
+    const handleCreateItem = () => {
+        setActiveLine('bahama');
+        setSelectedBahamaId(null);
+        setInspectorMode('create');
+    };
+
+    const handleSaveBahamaItem = (item: BahamaInventoryV2Item, previousId: string | null) => {
+        const now = new Date().toISOString();
+        const userEmail = getUserEmail(user);
+        const userUid = getUserUid(user);
+        const existingItem = previousId ? bahamaItems.find((candidate) => candidate.id === previousId) : null;
+        const nextItem: BahamaInventoryV2Item = {
+            ...item,
+            createdAt: existingItem?.createdAt || item.createdAt || now,
+            updatedAt: now,
+            updatedByUid: userUid,
+            updatedByEmail: userEmail
+        };
+
+        const nextItems = previousId
+            ? bahamaItems.map((candidate) => candidate.id === previousId ? nextItem : candidate)
+            : [...bahamaItems, nextItem];
+
+        replaceBahamaItems(nextItems);
+        setSelectedBahamaId(nextItem.id);
+        setInspectorMode('edit');
+        notifySuccess(previousId ? 'BaHaMa-artikel uppdaterad' : 'BaHaMa-artikel tillagd');
+    };
+
+    const handleDeleteBahamaItem = async (item: BahamaInventoryV2Item) => {
         const confirmed = await confirmAction({
             title: 'Ta bort artikel',
-            message: `Ta bort artikel ID: ${String(item.ID || '-')}?`,
+            message: `Ta bort BaHaMa-artikel ${item.id}?`,
             confirmText: 'Ta bort',
             cancelText: 'Avbryt',
             tone: 'danger'
         });
         if (!confirmed) return;
 
-        const newBahama = [...state.inventoryData.bahama];
-        newBahama.splice(index, 1);
-        dispatch({ type: 'SET_INVENTORY_DATA', payload: { ...state.inventoryData, bahama: newBahama } });
-        notifySuccess('Artikel borttagen');
-    };
-
-    const handleAddToBasket = (item: BahamaInventoryItem) => {
-        const newBasket = [...state.inventoryBasket, item];
-        dispatch({ type: 'SET_INVENTORY_BASKET', payload: newBasket });
-        notifySuccess(`${String(item.ID || 'Artikel')} tillagd i korg`);
+        replaceBahamaItems(bahamaItems.filter((candidate) => candidate.id !== item.id));
+        setSelectedBahamaId(null);
+        setInspectorMode('view');
+        notifySuccess('BaHaMa-artikel borttagen');
     };
 
     const handleUpdateStock = (size: string, field: ClickitupFieldKey, delta: number) => {
-        const clickitup = cloneInventoryData({ bahama: [], clickitup: state.inventoryData.clickitup || {} }).clickitup;
+        const clickitup = cloneInventoryData(inventoryData).clickitup;
         if (!clickitup[size]) {
             clickitup[size] = { ...DEFAULT_CLICKITUP_ENTRY };
         }
@@ -198,7 +264,7 @@ export function InventoryManager({ onBack }: InventoryManagerProps) {
         const currentVal = clickitup[size][field] || 0;
         if (currentVal + delta < 0) return;
         clickitup[size][field] = currentVal + delta;
-        dispatch({ type: 'SET_INVENTORY_DATA', payload: { ...state.inventoryData, clickitup } });
+        dispatch({ type: 'SET_INVENTORY_DATA', payload: { ...inventoryData, clickitup } });
     };
 
     const handleCommit = async () => {
@@ -210,36 +276,30 @@ export function InventoryManager({ onBack }: InventoryManagerProps) {
         setIsSaving(true);
         try {
             const batch = writeBatch(db);
+            const inventoryToSave = cloneInventoryData(inventoryData);
             const invRef = doc(db, 'stock', 'main_inventory');
-            batch.set(invRef, state.inventoryData);
+            batch.set(invRef, inventoryToSave);
 
             const logsRef = collection(db, 'inventory_logs');
-            const userEmail = user.email || 'unknown';
-            const userUid = user.uid || null;
+            const userEmail = getUserEmail(user);
+            const userUid = getUserUid(user);
             const now = new Date().toISOString();
             const nowMs = Date.now();
 
-            const bahamaLocal = state.inventoryData.bahama || [];
-            const bahamaCloud = state.cloudInventoryData.bahama || [];
-            const cloudMap = bahamaCloud.reduce<Record<string, BahamaInventoryItem>>((acc, item) => {
-                const id = String(item.ID || '');
-                if (id) {
-                    acc[id] = item;
-                }
+            const bahamaLocal = inventoryToSave.bahamaV2 || [];
+            const bahamaCloud = cloudInventoryData.bahamaV2 || [];
+            const cloudMap = bahamaCloud.reduce<Record<string, BahamaInventoryV2Item>>((acc, item) => {
+                acc[item.id] = item;
                 return acc;
             }, {});
-            const localMap: Record<string, BahamaInventoryItem> = {};
-            let fallbackGlobalDiff = false;
+            const localMap = bahamaLocal.reduce<Record<string, BahamaInventoryV2Item>>((acc, item) => {
+                acc[item.id] = item;
+                return acc;
+            }, {});
 
             bahamaLocal.forEach((item) => {
-                const id = String(item.ID || '');
-                if (!id) {
-                    fallbackGlobalDiff = true;
-                    return;
-                }
-
-                localMap[id] = item;
-                if (!cloudMap[id]) {
+                const cloudItem = cloudMap[item.id];
+                if (!cloudItem) {
                     const logRef = doc(logsRef);
                     batch.set(logRef, {
                         timestamp: now,
@@ -248,14 +308,14 @@ export function InventoryManager({ onBack }: InventoryManagerProps) {
                         system: 'BaHaMa',
                         category: 'bahama',
                         targetType: 'item',
-                        targetId: id,
-                        element: id,
-                        details: `${String(item.TYP || '')} ${String(item.STORLEK || '')}`.trim(),
+                        targetId: item.id,
+                        element: item.id,
+                        details: formatBahamaDetails(item),
                         user: userEmail,
                         userUid,
                         delta: null
                     });
-                } else if (JSON.stringify(item) !== JSON.stringify(cloudMap[id])) {
+                } else if (JSON.stringify(item) !== JSON.stringify(cloudItem)) {
                     const logRef = doc(logsRef);
                     batch.set(logRef, {
                         timestamp: now,
@@ -264,9 +324,9 @@ export function InventoryManager({ onBack }: InventoryManagerProps) {
                         system: 'BaHaMa',
                         category: 'bahama',
                         targetType: 'item',
-                        targetId: id,
-                        element: id,
-                        details: 'Attribut uppdaterade',
+                        targetId: item.id,
+                        element: item.id,
+                        details: formatBahamaDetails(item),
                         user: userEmail,
                         userUid,
                         delta: null
@@ -275,8 +335,7 @@ export function InventoryManager({ onBack }: InventoryManagerProps) {
             });
 
             bahamaCloud.forEach((item) => {
-                const id = String(item.ID || '');
-                if (id && !localMap[id]) {
+                if (!localMap[item.id]) {
                     const logRef = doc(logsRef);
                     batch.set(logRef, {
                         timestamp: now,
@@ -285,9 +344,9 @@ export function InventoryManager({ onBack }: InventoryManagerProps) {
                         system: 'BaHaMa',
                         category: 'bahama',
                         targetType: 'item',
-                        targetId: id,
-                        element: id,
-                        details: '-',
+                        targetId: item.id,
+                        element: item.id,
+                        details: formatBahamaDetails(item),
                         user: userEmail,
                         userUid,
                         delta: null
@@ -295,26 +354,8 @@ export function InventoryManager({ onBack }: InventoryManagerProps) {
                 }
             });
 
-            if (fallbackGlobalDiff && JSON.stringify(bahamaLocal) !== JSON.stringify(bahamaCloud)) {
-                const logRef = doc(logsRef);
-                batch.set(logRef, {
-                    timestamp: now,
-                    createdAt: nowMs,
-                    action: 'Massuppdatering',
-                    system: 'BaHaMa',
-                    category: 'bahama',
-                    targetType: 'batch',
-                    targetId: 'excel-upload',
-                    element: 'Excel Uppladdning',
-                    details: `${bahamaLocal.length} rader`,
-                    user: userEmail,
-                    userUid,
-                    delta: null
-                });
-            }
-
-            const clickitupLocal = state.inventoryData.clickitup || {};
-            const clickitupCloud = state.cloudInventoryData.clickitup || {};
+            const clickitupLocal = inventoryToSave.clickitup || {};
+            const clickitupCloud = cloudInventoryData.clickitup || {};
             Object.keys(clickitupLocal).forEach((size) => {
                 (['sektion', 'dorr_h', 'dorr_v', 'hane_h', 'hane_v'] as ClickitupFieldKey[]).forEach((field) => {
                     const localValue = clickitupLocal[size]?.[field] || 0;
@@ -348,7 +389,7 @@ export function InventoryManager({ onBack }: InventoryManagerProps) {
             });
 
             await batch.commit();
-            dispatch({ type: 'SET_CLOUD_INVENTORY_DATA', payload: cloneInventoryData(state.inventoryData) });
+            dispatch({ type: 'SET_CLOUD_INVENTORY_DATA', payload: cloneInventoryData(inventoryToSave) });
             notifySuccess('Ändringar sparade till molnet!');
         } catch (err) {
             console.error('Failed to commit:', err);
@@ -360,175 +401,235 @@ export function InventoryManager({ onBack }: InventoryManagerProps) {
 
     if (isLoading) {
         return (
-            <div className="flex flex-col items-center justify-center py-20">
-                <div className="animate-spin w-10 h-10 border-4 border-primary border-t-transparent rounded-full mb-4"></div>
-                <p className="text-text-secondary">Laddar lagersaldo...</p>
+            <div className="flex min-h-screen items-center justify-center bg-[#0d1115]">
+                <div className="text-center">
+                    <div className="mx-auto mb-4 h-10 w-10 animate-spin rounded-full border-4 border-[#e8e1d4] border-t-transparent" />
+                    <p className="m-0 text-sm text-slate-400">Laddar lagersaldo...</p>
+                </div>
             </div>
         );
     }
 
     return (
-        <div className="animate-slide-in">
-            <div className="flex justify-between items-center mb-8 gap-4 flex-wrap">
-                <div>
-                    <h2 className="text-3xl font-semibold text-text-primary m-0">Hantera lagersaldo</h2>
-                    <p className="text-text-secondary mt-1 m-0">Uppdatera lagersaldon för BaHaMa och ClickitUp. Se loggar och historik.</p>
+        <div className="flex min-h-screen bg-[#0d1115] text-slate-100">
+            <aside className="hidden w-[248px] shrink-0 border-r border-white/10 bg-[#10161b] p-5 lg:flex lg:flex-col">
+                <div className="mb-8">
+                    <p className="m-0 text-xs font-semibold uppercase text-slate-500">Brixx</p>
+                    <h1 className="m-0 mt-1 text-2xl font-semibold tracking-normal text-slate-50">Lagersaldo</h1>
                 </div>
-                <button
-                    onClick={onBack}
-                    className="px-5 py-2.5 border border-panel-border bg-panel-bg text-text-primary rounded-lg cursor-pointer hover:bg-white/5 transition-colors"
-                >
-                    &larr; Tillbaka
-                </button>
-            </div>
 
-            {loadError && (
-                <div className="bg-danger/10 border border-danger/30 text-danger rounded-lg p-4 mb-6 text-sm">
-                    ⚠️ Firebase kunde inte nås: {loadError}. Visar lokalt lagersaldo (skrivskyddat).
-                </div>
-            )}
-
-            <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-6">
-                <div className="space-y-6">
-                    <section className="bg-panel-bg border border-panel-border rounded-xl overflow-hidden">
+                <nav className="space-y-6 text-sm">
+                    <div>
+                        <p className="mb-2 text-[11px] font-semibold uppercase text-slate-600">Produktlinjer</p>
                         <button
-                            onClick={() => setShowBahama((prev) => !prev)}
-                            className="w-full flex justify-between items-center p-5 bg-transparent border-none text-text-primary cursor-pointer hover:bg-white/5 transition-colors"
+                            type="button"
+                            onClick={() => setActiveLine('bahama')}
+                            className={`mb-1 flex w-full items-center justify-between rounded-md px-3 py-2 text-left font-semibold transition-colors ${
+                                activeLine === 'bahama' ? 'bg-[#e8e1d4] text-[#10161b]' : 'text-slate-300 hover:bg-white/5'
+                            }`}
                         >
-                            <div className="flex items-center gap-3">
-                                <h3 className="text-lg font-semibold m-0">📦 BaHaMa lagersaldo</h3>
-                                <span className="text-xs text-text-secondary bg-white/5 px-2.5 py-1 rounded-full">
-                                    {state.inventoryData.bahama.length} artiklar
-                                </span>
-                            </div>
-                            <span className={`text-text-secondary transition-transform ${showBahama ? 'rotate-180' : ''}`}>▼</span>
+                            BaHaMa
+                            <span>{bahamaItems.length}</span>
                         </button>
-
-                        {showBahama && (
-                            <div className="p-5 pt-0 space-y-4">
-                                <div className="flex flex-wrap gap-3 items-center">
-                                    <input
-                                        type="text"
-                                        placeholder="Sök ID, typ, storlek, beskrivning..."
-                                        value={searchTerm}
-                                        onChange={(event) => setSearchTerm(event.target.value)}
-                                        className="flex-1 min-w-[200px] bg-input-bg border border-panel-border text-text-primary p-2.5 rounded-lg outline-none focus:border-primary text-sm"
-                                    />
-                                    <button
-                                        onClick={() => setModalState({ open: true, index: -1, item: null })}
-                                        className="px-4 py-2.5 bg-primary text-white border-none rounded-lg cursor-pointer font-semibold text-sm hover:brightness-110"
-                                    >
-                                        + Ny artikel
-                                    </button>
-                                    <label className="px-4 py-2.5 border border-panel-border bg-panel-bg text-text-primary rounded-lg cursor-pointer text-sm hover:bg-white/5 flex items-center gap-2">
-                                        📄 Ladda Excel
-                                        <input type="file" accept=".xlsx,.xls,.csv" onChange={handleFileUpload} className="hidden" />
-                                    </label>
-                                </div>
-
-                                <InventoryTable
-                                    items={state.inventoryData.bahama}
-                                    searchTerm={searchTerm}
-                                    onAddToBasket={handleAddToBasket}
-                                    onEdit={(index, item) => setModalState({ open: true, index, item })}
-                                    onDelete={(index, item) => {
-                                        void handleDeleteItem(index, item);
-                                    }}
-                                />
-                            </div>
-                        )}
-                    </section>
-
-                    <section className="bg-panel-bg border border-panel-border rounded-xl overflow-hidden">
                         <button
-                            onClick={() => setShowClickitup((prev) => !prev)}
-                            className="w-full flex justify-between items-center p-5 bg-transparent border-none text-text-primary cursor-pointer hover:bg-white/5 transition-colors"
+                            type="button"
+                            onClick={() => setActiveLine('clickitup')}
+                            className={`flex w-full items-center justify-between rounded-md px-3 py-2 text-left font-semibold transition-colors ${
+                                activeLine === 'clickitup' ? 'bg-[#e8e1d4] text-[#10161b]' : 'text-slate-300 hover:bg-white/5'
+                            }`}
                         >
-                            <div className="flex items-center gap-3">
-                                <h3 className="text-lg font-semibold m-0">🔩 ClickitUp lagersaldo</h3>
-                            </div>
-                            <span className={`text-text-secondary transition-transform ${showClickitup ? 'rotate-180' : ''}`}>▼</span>
+                            ClickitUp
+                            <span>{Object.keys(inventoryData.clickitup || {}).length}</span>
                         </button>
-
-                        {showClickitup && (
-                            <div className="p-5 pt-0">
-                                <ClickitupStockGrid
-                                    inventoryData={state.inventoryData}
-                                    cloudInventoryData={state.cloudInventoryData}
-                                    onUpdateStock={handleUpdateStock}
-                                />
-                            </div>
-                        )}
-                    </section>
-                </div>
-
-                <div className="lg:sticky lg:top-4 lg:self-start space-y-4">
-                    <PendingChangesPanel
-                        inventoryData={state.inventoryData}
-                        cloudInventoryData={state.cloudInventoryData}
-                        onCommit={handleCommit}
-                        isSaving={isSaving}
-                    />
-
-                    <div className="bg-panel-bg border border-panel-border rounded-xl p-5">
-                        <div className="flex items-center gap-2 mb-3">
-                            <span className="text-lg">📝</span>
-                            <h4 className="text-sm font-semibold text-text-primary uppercase m-0">Noteringar</h4>
-                        </div>
-                        <textarea
-                            value={state.inventoryData.notes || ''}
-                            onChange={(e) => {
-                                dispatch({
-                                    type: 'SET_INVENTORY_DATA',
-                                    payload: { ...state.inventoryData, notes: e.target.value }
-                                });
-                            }}
-                            placeholder="Skriv interna noteringar om lagret här..."
-                            className="w-full h-40 bg-input-bg border border-panel-border text-text-primary p-3 rounded-lg outline-none focus:border-primary text-sm resize-none"
-                        />
-                        <p className="text-[10px] text-text-secondary mt-2 m-0 italic">
-                            Dessa noteringar sparas när du klickar på "Spara ändringar" ovan.
-                        </p>
                     </div>
 
-                    {state.inventoryBasket.length > 0 && (
-                        <div className="mt-4 bg-panel-bg border border-panel-border rounded-xl p-4">
-                            <h4 className="text-sm font-semibold text-text-primary uppercase mb-3 m-0">
-                                🛒 Korg ({state.inventoryBasket.length})
-                            </h4>
-                            <div className="space-y-2 max-h-[200px] overflow-y-auto">
-                                {state.inventoryBasket.map((item, index) => (
-                                    <div key={`${String(item.ID || 'item')}-${index}`} className="flex justify-between items-start bg-white/[0.03] border border-panel-border rounded p-2.5 text-sm">
-                                        <div>
-                                            <div className="text-primary font-bold text-xs">ID: {String(item.ID || '-')}</div>
-                                            <div className="text-text-primary text-xs mt-0.5 line-clamp-2">{String(item.BESKRIVNING || '')}</div>
-                                        </div>
-                                        <button
-                                            onClick={() => {
-                                                const newBasket = [...state.inventoryBasket];
-                                                newBasket.splice(index, 1);
-                                                dispatch({ type: 'SET_INVENTORY_BASKET', payload: newBasket });
-                                            }}
-                                            className="bg-transparent border-none text-text-secondary cursor-pointer text-sm hover:text-danger ml-2 shrink-0"
-                                        >
-                                            ×
-                                        </button>
+                    <div>
+                        <p className="mb-2 text-[11px] font-semibold uppercase text-slate-600">Navigering</p>
+                        <button type="button" onClick={onBack} className="block w-full rounded-md px-3 py-2 text-left font-semibold text-slate-300 transition-colors hover:bg-white/5">
+                            Start
+                        </button>
+                        <a href="/inventory-logs" className="block rounded-md px-3 py-2 font-semibold text-slate-300 no-underline transition-colors hover:bg-white/5">
+                            Lagerloggar
+                        </a>
+                    </div>
+                </nav>
+
+                <div className="mt-auto space-y-3">
+                    <ThemeToggle />
+                    <div className="rounded-lg border border-white/10 bg-white/[0.03] p-3">
+                        <p className="m-0 text-[11px] uppercase text-slate-500">Inloggad</p>
+                        <p className="m-0 mt-1 truncate text-sm text-slate-300">{user?.email || '-'}</p>
+                    </div>
+                </div>
+            </aside>
+
+            <main className="flex min-w-0 flex-1 flex-col">
+                <header className="border-b border-white/10 bg-[#0f1418] px-4 py-4 md:px-6">
+                    <div className="flex flex-wrap items-center justify-between gap-4">
+                        <div>
+                            <p className="m-0 text-xs font-semibold uppercase text-slate-500">Inventory V2</p>
+                            <h2 className="m-0 mt-1 text-2xl font-semibold text-slate-50">
+                                {activeLine === 'bahama' ? 'BaHaMa lagersaldo' : 'ClickitUp lagersaldo'}
+                            </h2>
+                        </div>
+
+                        <div className="flex flex-wrap items-center gap-2">
+                            {activeLine === 'bahama' && (
+                                <button
+                                    type="button"
+                                    onClick={handleCreateItem}
+                                    className="rounded-md border border-[#e8e1d4] bg-[#e8e1d4] px-4 py-2 text-sm font-semibold text-[#10161b] transition-colors hover:bg-white"
+                                >
+                                    Ny artikel
+                                </button>
+                            )}
+                            <div className="flex rounded-lg border border-white/10 bg-[#12191f] p-1">
+                                <button
+                                    type="button"
+                                    onClick={() => setActiveLine('bahama')}
+                                    className={`rounded-md px-3 py-2 text-sm font-semibold transition-colors ${activeLine === 'bahama' ? 'bg-[#e8e1d4] text-[#10161b]' : 'text-slate-400 hover:text-slate-100'}`}
+                                >
+                                    BaHaMa
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setActiveLine('clickitup')}
+                                    className={`rounded-md px-3 py-2 text-sm font-semibold transition-colors ${activeLine === 'clickitup' ? 'bg-[#e8e1d4] text-[#10161b]' : 'text-slate-400 hover:text-slate-100'}`}
+                                >
+                                    ClickitUp
+                                </button>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    void handleCommit();
+                                }}
+                                disabled={!changesPending || isSaving}
+                                className="rounded-md border border-emerald-400/30 bg-emerald-400/10 px-4 py-2 text-sm font-semibold text-emerald-100 transition-colors hover:bg-emerald-400/20 disabled:cursor-not-allowed disabled:opacity-45"
+                            >
+                                {isSaving ? 'Sparar...' : 'Spara ändringar'}
+                            </button>
+                        </div>
+                    </div>
+                </header>
+
+                {loadError && (
+                    <div className="mx-4 mt-4 rounded-lg border border-amber-400/30 bg-amber-400/10 px-4 py-3 text-sm text-amber-100 md:mx-6">
+                        Firebase kunde inte nås: {loadError}. Visar lokalt lagersaldo.
+                    </div>
+                )}
+
+                {activeLine === 'bahama' ? (
+                    <div className="grid min-h-0 flex-1 grid-cols-1 gap-4 p-4 xl:grid-cols-[minmax(0,1fr)_360px] md:p-6">
+                        <section className="flex min-h-0 flex-col gap-4">
+                            <div className="grid gap-3 rounded-lg border border-white/10 bg-[#10161b] p-3 md:grid-cols-[minmax(220px,1fr)_180px_180px]">
+                                <input
+                                    type="search"
+                                    value={searchTerm}
+                                    onChange={(event) => setSearchTerm(event.target.value)}
+                                    placeholder="Sök ID, typ, status, storlek, lagerplats eller egenskap"
+                                    className="rounded-md border border-white/10 bg-[#12191f] px-3 py-2 text-sm text-slate-100 outline-none placeholder:text-slate-600 focus:border-[#e8e1d4]"
+                                />
+                                <select
+                                    value={statusFilter}
+                                    onChange={(event) => setStatusFilter(event.target.value as 'all' | BahamaInventoryStatus)}
+                                    className="rounded-md border border-white/10 bg-[#12191f] px-3 py-2 text-sm text-slate-100 outline-none focus:border-[#e8e1d4]"
+                                >
+                                    <option value="all">Alla statusar</option>
+                                    {BAHAMA_INVENTORY_STATUSES.map((status) => (
+                                        <option key={status} value={status}>{STATUS_LABELS[status]}</option>
+                                    ))}
+                                </select>
+                                <select
+                                    value={sizeFilter}
+                                    onChange={(event) => setSizeFilter(event.target.value)}
+                                    className="rounded-md border border-white/10 bg-[#12191f] px-3 py-2 text-sm text-slate-100 outline-none focus:border-[#e8e1d4]"
+                                >
+                                    <option value="all">Alla storlekar</option>
+                                    {sizeOptions.map((size) => (
+                                        <option key={size} value={size}>{size}</option>
+                                    ))}
+                                </select>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
+                                <div className="rounded-lg border border-white/10 bg-[#10161b] p-3">
+                                    <p className="m-0 text-[11px] uppercase text-slate-500">Totalt</p>
+                                    <p className="m-0 mt-1 text-xl font-semibold">{bahamaItems.length}</p>
+                                </div>
+                                {BAHAMA_INVENTORY_STATUSES.slice(0, 4).map((status) => (
+                                    <div key={status} className="rounded-lg border border-white/10 bg-[#10161b] p-3">
+                                        <p className="m-0 text-[11px] uppercase text-slate-500">{STATUS_LABELS[status]}</p>
+                                        <p className="m-0 mt-1 text-xl font-semibold">
+                                            {bahamaItems.filter((item) => item.status === status).length}
+                                        </p>
                                     </div>
                                 ))}
                             </div>
-                        </div>
-                    )}
-                </div>
-            </div>
 
-            {modalState.open && (
-                <InventoryItemModal
-                    item={modalState.item}
-                    editIndex={modalState.index}
-                    onSave={handleSaveItem}
-                    onClose={() => setModalState(createEmptyModalState())}
-                />
-            )}
+                            <InventoryTable
+                                items={filteredBahamaItems}
+                                selectedItemId={selectedBahamaId}
+                                onSelect={handleSelectItem}
+                            />
+                        </section>
+
+                        <div className="grid min-h-0 gap-4 xl:grid-rows-[minmax(0,1fr)_auto]">
+                            <InventoryItemModal
+                                item={inspectorMode === 'create' ? null : selectedItem}
+                                mode={inspectorMode}
+                                existingIds={bahamaItems.map((item) => item.id)}
+                                onSave={handleSaveBahamaItem}
+                                onDelete={(item) => {
+                                    void handleDeleteBahamaItem(item);
+                                }}
+                                onCancel={() => {
+                                    setInspectorMode(selectedItem ? 'edit' : 'view');
+                                }}
+                            />
+                            <PendingChangesPanel
+                                inventoryData={inventoryData}
+                                cloudInventoryData={cloudInventoryData}
+                                onCommit={handleCommit}
+                                isSaving={isSaving}
+                            />
+                        </div>
+                    </div>
+                ) : (
+                    <div className="min-h-0 flex-1 space-y-4 p-4 md:p-6">
+                        <section className="rounded-lg border border-white/10 bg-[#10161b] p-4">
+                            <ClickitupStockGrid
+                                inventoryData={inventoryData}
+                                cloudInventoryData={cloudInventoryData}
+                                onUpdateStock={handleUpdateStock}
+                            />
+                        </section>
+                        <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_360px]">
+                            <section className="rounded-lg border border-white/10 bg-[#10161b] p-5">
+                                <label className="flex flex-col gap-2">
+                                    <span className="text-[11px] font-semibold uppercase text-slate-500">Noteringar</span>
+                                    <textarea
+                                        value={inventoryData.notes || ''}
+                                        onChange={(event) => {
+                                            dispatch({
+                                                type: 'SET_INVENTORY_DATA',
+                                                payload: { ...inventoryData, notes: event.target.value }
+                                            });
+                                        }}
+                                        className="min-h-32 rounded-md border border-white/10 bg-[#12191f] px-3 py-2 text-sm text-slate-100 outline-none focus:border-[#e8e1d4]"
+                                    />
+                                </label>
+                            </section>
+                            <PendingChangesPanel
+                                inventoryData={inventoryData}
+                                cloudInventoryData={cloudInventoryData}
+                                onCommit={handleCommit}
+                                isSaving={isSaving}
+                            />
+                        </div>
+                    </div>
+                )}
+            </main>
         </div>
     );
 }

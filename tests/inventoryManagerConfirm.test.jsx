@@ -6,27 +6,45 @@ import { createRoot } from 'react-dom/client';
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 
-const firebaseMocks = vi.hoisted(() => ({
-    db: {},
-    doc: vi.fn(() => ({})),
-    getDoc: vi.fn(async () => ({
-        exists: () => true,
-        data: () => ({
-            bahama: [{
-                ID: '3.5.1',
-                TYP: 'JUMB',
-                STORLEK: '4x4',
-                TEXTIL: '',
-                BESKRIVNING: 'Testartikel',
-                Kommentar: ''
-            }],
-            clickitup: {},
-            notes: ''
-        })
-    })),
-    collection: vi.fn(() => ({})),
-    writeBatch: vi.fn(() => ({ set: vi.fn(), commit: vi.fn(async () => {}) }))
-}));
+const firebaseMocks = vi.hoisted(() => {
+    const batchSet = vi.fn();
+    const batchCommit = vi.fn(async () => {});
+    return {
+        db: {},
+        doc: vi.fn(() => ({})),
+        getDoc: vi.fn(async () => ({
+            exists: () => true,
+            data: () => ({
+                bahama: [{ ID: 'legacy-1', BESKRIVNING: 'Legacyrad' }],
+                bahamaV2: [{
+                    id: 'BA-001',
+                    type: 'Parasoll',
+                    size: '4x4',
+                    status: 'available',
+                    location: 'Grenställ 3',
+                    properties: {
+                        stativ: 'RAL 7016',
+                        textil: 'MUSHROOM',
+                        fot: 'TIPP',
+                        belysning: '',
+                        varme: ''
+                    },
+                    comment: '',
+                    createdAt: '2026-06-01T10:00:00.000Z',
+                    updatedAt: '2026-06-01T10:00:00.000Z',
+                    updatedByUid: 'admin-1',
+                    updatedByEmail: 'admin@example.com'
+                }],
+                clickitup: {},
+                notes: ''
+            })
+        })),
+        collection: vi.fn(() => ({})),
+        writeBatch: vi.fn(() => ({ set: batchSet, commit: batchCommit })),
+        batchSet,
+        batchCommit
+    };
+});
 
 const notificationMocks = vi.hoisted(() => ({
     confirmAction: vi.fn(async () => false),
@@ -46,19 +64,40 @@ import { createInitialQuoteState } from '../src/store/quoteStateSchema';
 
 const mountedRoots = [];
 
-async function renderInventoryManager() {
+const inventoryItem = {
+    id: 'BA-001',
+    type: 'Parasoll',
+    size: '4x4',
+    status: 'available',
+    location: 'Grenställ 3',
+    properties: {
+        stativ: 'RAL 7016',
+        textil: 'MUSHROOM',
+        fot: 'TIPP',
+        belysning: '',
+        varme: ''
+    },
+    comment: '',
+    createdAt: '2026-06-01T10:00:00.000Z',
+    updatedAt: '2026-06-01T10:00:00.000Z',
+    updatedByUid: 'admin-1',
+    updatedByEmail: 'admin@example.com'
+};
+
+function createStateOverrides(overrides = {}) {
+    return {
+        ...createInitialQuoteState(),
+        inventoryData: { bahama: [], bahamaV2: [inventoryItem], clickitup: {}, notes: '' },
+        cloudInventoryData: { bahama: [], bahamaV2: [inventoryItem], clickitup: {}, notes: '' },
+        ...overrides
+    };
+}
+
+async function renderInventoryManager(stateOverrides = {}) {
     const container = document.createElement('div');
     document.body.appendChild(container);
     const root = createRoot(container);
     const dispatch = vi.fn();
-    const inventoryItem = {
-        ID: '3.5.1',
-        TYP: 'JUMB',
-        STORLEK: '4x4',
-        TEXTIL: '',
-        BESKRIVNING: 'Testartikel',
-        Kommentar: ''
-    };
 
     await act(async () => {
         root.render(
@@ -77,11 +116,7 @@ async function renderInventoryManager() {
                 isRetailer: false
             }}>
                 <QuoteContext.Provider value={{
-                    state: {
-                        ...createInitialQuoteState(),
-                        inventoryData: { bahama: [inventoryItem], clickitup: {}, notes: '' },
-                        cloudInventoryData: { bahama: [inventoryItem], clickitup: {}, notes: '' }
-                    },
+                    state: createStateOverrides(stateOverrides),
                     dispatch
                 }}>
                     <InventoryManager onBack={() => {}} />
@@ -89,10 +124,18 @@ async function renderInventoryManager() {
             </AuthContext.Provider>
         );
         await Promise.resolve();
+        await Promise.resolve();
+        await Promise.resolve();
     });
 
     mountedRoots.push({ root, container });
-    return { container };
+    return { container, dispatch };
+}
+
+function setInputValue(input, value) {
+    const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
+    setter.call(input, value);
+    input.dispatchEvent(new Event('input', { bubbles: true }));
 }
 
 afterEach(() => {
@@ -106,6 +149,8 @@ afterEach(() => {
 });
 
 beforeEach(() => {
+    firebaseMocks.batchSet.mockReset();
+    firebaseMocks.batchCommit.mockClear();
     notificationMocks.confirmAction.mockReset();
     notificationMocks.confirmAction.mockResolvedValue(false);
     notificationMocks.notifyError.mockReset();
@@ -114,20 +159,11 @@ beforeEach(() => {
     notificationMocks.notifyWarn.mockReset();
 });
 
-describe('InventoryManager delete confirmation', () => {
-    it('uses confirmAction before removing a BaHaMa item', async () => {
+describe('InventoryManager BaHaMa V2 workflow', () => {
+    it('uses confirmAction before removing a BaHaMa V2 item', async () => {
         const { container } = await renderInventoryManager();
-        const sectionToggle = Array.from(container.querySelectorAll('button')).find((button) => (
-            button.textContent?.includes('BaHaMa lagersaldo')
-        ));
-
-        await act(async () => {
-            sectionToggle.click();
-            await Promise.resolve();
-        });
-
         const deleteButton = Array.from(container.querySelectorAll('button')).find((button) => (
-            button.textContent === 'Del'
+            button.textContent === 'Ta bort'
         ));
 
         expect(deleteButton).toBeTruthy();
@@ -141,6 +177,81 @@ describe('InventoryManager delete confirmation', () => {
             title: 'Ta bort artikel',
             confirmText: 'Ta bort',
             cancelText: 'Avbryt'
+        }));
+    });
+
+    it('creates a manual BaHaMa V2 row through the inspector', async () => {
+        const { container, dispatch } = await renderInventoryManager({
+            inventoryData: { bahama: [], bahamaV2: [], clickitup: {}, notes: '' },
+            cloudInventoryData: { bahama: [], bahamaV2: [], clickitup: {}, notes: '' }
+        });
+        const newButton = Array.from(container.querySelectorAll('button')).find((button) => button.textContent === 'Ny artikel');
+
+        await act(async () => {
+            newButton.click();
+            await Promise.resolve();
+        });
+
+        const idInput = container.querySelector('input[placeholder="BA-001"]');
+        const typeInput = container.querySelector('input[placeholder="Pure"]');
+        const form = container.querySelector('form');
+
+        await act(async () => {
+            setInputValue(idInput, ' BA-002 ');
+            setInputValue(typeInput, ' Parasoll ');
+            await Promise.resolve();
+        });
+
+        await act(async () => {
+            form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+            await Promise.resolve();
+        });
+
+        expect(dispatch).toHaveBeenCalledWith(expect.objectContaining({
+            type: 'SET_INVENTORY_DATA',
+            payload: expect.objectContaining({
+                bahamaV2: [expect.objectContaining({
+                    id: 'BA-002',
+                    type: 'Parasoll',
+                    updatedByUid: 'admin-1',
+                    updatedByEmail: 'admin@example.com'
+                })]
+            })
+        }));
+    });
+
+    it('switches between BaHaMa and ClickitUp without changing ClickitUp grid flow', async () => {
+        const { container } = await renderInventoryManager();
+        const clickitupButton = Array.from(container.querySelectorAll('button')).find((button) => button.textContent === 'ClickitUp');
+
+        await act(async () => {
+            clickitupButton.click();
+            await Promise.resolve();
+        });
+
+        expect(container.textContent).toContain('ClickitUp lagersaldo');
+        expect(container.textContent).toContain('Sektion');
+        expect(container.textContent).toContain('Dörr H');
+    });
+
+    it('writes BaHaMa V2 inventory logs on save', async () => {
+        const localItem = { ...inventoryItem, comment: 'Uppdaterad' };
+        const { container } = await renderInventoryManager({
+            inventoryData: { bahama: [], bahamaV2: [localItem], clickitup: {}, notes: '' },
+            cloudInventoryData: { bahama: [], bahamaV2: [], clickitup: {}, notes: '' }
+        });
+        const saveButton = Array.from(container.querySelectorAll('button')).find((button) => button.textContent === 'Spara ändringar');
+
+        await act(async () => {
+            saveButton.click();
+            await Promise.resolve();
+        });
+
+        expect(firebaseMocks.batchCommit).toHaveBeenCalled();
+        expect(firebaseMocks.batchSet).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
+            category: 'bahama',
+            targetId: 'BA-001',
+            details: expect.stringContaining('Parasoll')
         }));
     });
 });

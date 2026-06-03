@@ -94,13 +94,41 @@ export interface BahamaInventoryItem {
     ID?: string;
     TYP?: string;
     STORLEK?: string;
+    Stativ?: string;
     TEXTIL?: string;
+    Fot?: string;
+    Belysning?: string;
+    Värme?: string;
     BESKRIVNING?: string;
     Kommentar?: string;
     [key: string]: unknown;
 }
 
 export type InventoryBasketItem = BahamaInventoryItem;
+
+export type BahamaInventoryStatus = 'available' | 'reserved' | 'needs-review' | 'used' | 'sold';
+
+export interface BahamaInventoryProperties {
+    stativ: string;
+    textil: string;
+    fot: string;
+    belysning: string;
+    varme: string;
+}
+
+export interface BahamaInventoryV2Item {
+    id: string;
+    type: string;
+    size: string;
+    status: BahamaInventoryStatus;
+    location: string;
+    properties: BahamaInventoryProperties;
+    comment: string;
+    createdAt: string;
+    updatedAt: string;
+    updatedByUid: string;
+    updatedByEmail: string;
+}
 
 export type ClickitupFieldKey = 'sektion' | 'dorr_h' | 'dorr_v' | 'hane_h' | 'hane_v';
 
@@ -124,13 +152,16 @@ export type ClickitupStockMap = Record<string, ClickitupStockEntry>;
 
 export interface InventoryData {
     bahama: BahamaInventoryItem[];
+    bahamaV2: BahamaInventoryV2Item[];
     clickitup: ClickitupStockMap;
     notes?: string;
 }
 
 export interface RawPersistedInventoryData extends UnknownRecord {
     bahama?: unknown;
+    bahamaV2?: unknown;
     clickitup?: unknown;
+    notes?: unknown;
 }
 
 export interface GridCustomAddonRow {
@@ -1105,18 +1136,18 @@ export interface RetailerRecord {
 }
 
 export interface InventoryTableProps {
-    items: BahamaInventoryItem[];
-    searchTerm: string;
-    onAddToBasket: (item: BahamaInventoryItem) => void;
-    onEdit: (index: number, item: BahamaInventoryItem) => void;
-    onDelete: (index: number, item: BahamaInventoryItem) => void;
+    items: BahamaInventoryV2Item[];
+    selectedItemId: string | null;
+    onSelect: (item: BahamaInventoryV2Item) => void;
 }
 
 export interface InventoryItemModalProps {
-    item: BahamaInventoryItem | null;
-    editIndex: number;
-    onSave: (item: BahamaInventoryItem, editIndex: number) => void;
-    onClose: () => void;
+    item: BahamaInventoryV2Item | null;
+    mode: 'view' | 'create' | 'edit';
+    existingIds: string[];
+    onSave: (item: BahamaInventoryV2Item, previousId: string | null) => void;
+    onDelete: (item: BahamaInventoryV2Item) => void;
+    onCancel: () => void;
 }
 
 export interface PendingChangesPanelProps {

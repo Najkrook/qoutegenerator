@@ -50,7 +50,7 @@ describe('quoteStateSchema', () => {
         expect(hydrated.customerInfo.customerReference).toBe('ER-14');
         expect(hydrated.quoteValidityDays).toBe(14);
         expect(hydrated.customerInfo.validity).toBe('14 dagar');
-        expect(hydrated.inventoryData).toEqual({ bahama: [], clickitup: {} });
+        expect(hydrated.inventoryData).toEqual({ bahama: [], bahamaV2: [], clickitup: {}, notes: '' });
         expect(hydrated.hideZeroDiscountReferencesInPdf).toBe(false);
         expect(hydrated.pdfThemeId).toBe('brixx');
     });
@@ -108,17 +108,37 @@ describe('quoteStateSchema', () => {
 
         expect(hydrated.customerInfo).toEqual(createInitialQuoteState().customerInfo);
         expect(hydrated.gridSelections).toEqual({});
-        expect(hydrated.inventoryData).toEqual({ bahama: [], clickitup: {} });
+        expect(hydrated.inventoryData).toEqual({ bahama: [], bahamaV2: [], clickitup: {}, notes: '' });
     });
 
     it('normalizes persisted grid maps and clickitup stock rows into concrete numeric shapes', () => {
         const hydrated = hydrateQuoteState({
             inventoryData: {
                 bahama: [{ ID: 'B-1', BESKRIVNING: 'Parasollfot' }],
+                bahamaV2: [{
+                    id: ' BA-001 ',
+                    type: ' Parasoll ',
+                    size: ' 4x4 ',
+                    status: 'reserved',
+                    location: ' Grenställ 3 ',
+                    properties: {
+                        stativ: ' RAL 7016 ',
+                        textil: ' MUSHROOM ',
+                        fot: ' TIPP ',
+                        belysning: ' Classic Light ',
+                        varme: ' Infra '
+                    },
+                    comment: ' Kontroll ',
+                    createdAt: '2026-06-01T10:00:00.000Z',
+                    updatedAt: '2026-06-02T10:00:00.000Z',
+                    updatedByUid: 'admin-1',
+                    updatedByEmail: 'admin@example.com'
+                }],
                 clickitup: {
                     '3m': { sektion: '2', dorr_h: '3', hane_v: '4' },
                     broken: null
-                }
+                },
+                notes: 'Lagernotis'
             },
             gridSelections: {
                 ClickitUp: {
@@ -137,10 +157,30 @@ describe('quoteStateSchema', () => {
 
         expect(hydrated.inventoryData).toEqual({
             bahama: [{ ID: 'B-1', BESKRIVNING: 'Parasollfot' }],
+            bahamaV2: [{
+                id: 'BA-001',
+                type: 'Parasoll',
+                size: '4x4',
+                status: 'reserved',
+                location: 'Grenställ 3',
+                properties: {
+                    stativ: 'RAL 7016',
+                    textil: 'MUSHROOM',
+                    fot: 'TIPP',
+                    belysning: 'Classic Light',
+                    varme: 'Infra'
+                },
+                comment: 'Kontroll',
+                createdAt: '2026-06-01T10:00:00.000Z',
+                updatedAt: '2026-06-02T10:00:00.000Z',
+                updatedByUid: 'admin-1',
+                updatedByEmail: 'admin@example.com'
+            }],
             clickitup: {
                 '3m': { sektion: 2, dorr_h: 3, dorr_v: 0, hane_h: 0, hane_v: 4 },
                 broken: { sektion: 0, dorr_h: 0, dorr_v: 0, hane_h: 0, hane_v: 0 }
-            }
+            },
+            notes: 'Lagernotis'
         });
         expect(hydrated.gridSelections.ClickitUp.items).toEqual({
             section_1500: { qty: 3, discountPct: 5 },
