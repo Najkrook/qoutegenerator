@@ -35,6 +35,12 @@ function normalizeDiscountPct(value: unknown): number {
     return Math.max(0, Math.min(100, parsed));
 }
 
+function getAutoScaledQty(addonDef: GridCatalogAddonOption, itemsQtyTotal: number): number {
+    const normalizedTotal = normalizeNonNegativeInt(itemsQtyTotal);
+    const divisor = normalizeNonNegativeInt(addonDef.autoScaleDivisor);
+    return divisor > 0 ? Math.ceil(normalizedTotal / divisor) : normalizedTotal;
+}
+
 function nearlyEqual(a: number, b: number): boolean {
     return Math.abs(a - b) < 0.0001;
 }
@@ -100,7 +106,7 @@ export function getEffectiveGridAddonQty({
 }: GridAddonQtyInput): number {
     const syncMode = getGridAddonSyncMode({ addonDef, addonState });
     if (addonDef?.autoScale && syncMode === 'auto') {
-        return normalizeNonNegativeInt(itemsQtyTotal);
+        return getAutoScaledQty(addonDef, itemsQtyTotal);
     }
     return normalizeNonNegativeInt(addonState?.qty);
 }

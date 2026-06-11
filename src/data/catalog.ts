@@ -89,9 +89,9 @@ const rawCatalogData: CatalogData = {
                         name: "Installationsalternativ",
                         items: [
                             { id: "gjuthylsa_jumbrella", name: "Gjuthylsa Jumbrella", price: 560 },
+                            { id: "jumb_in_ground_tipping_base_electrical", name: "In-Ground Tipping Base with electrical connection", price: 560 },
                             { id: "conn_comp_tipping", name: "Connecting Components - for In-Ground Tipping Base", price: 320 },
                             { id: "in_ground_ext", name: "In-Ground Installation Extension", price: 410 },
-                            { id: "in_ground_sleeve", name: "In-Ground Sleeve", price: 450 },
                             { id: "conn_comp_sleeve", name: "Connecting component for In-Ground Sleeve", price: 320 },
                             { id: "oct_surface_mount", name: "Octagonal Surface Mount", price: 560 },
                             { id: "base_8_flags", name: "Parasollfot ovan mark - 8 flagstones (100x100)", price: 670 },
@@ -102,9 +102,15 @@ const rawCatalogData: CatalogData = {
                             { id: "jumb_steel_base_8_490", name: "Steel Plate Base with 8 Steel Plates (490x490)", price: 2480 },
                             { id: "jumb_steel_base_4_740", name: "Steel Plate Base with 4 Steel Plates (740x740)", price: 2670 },
                             { id: "jumb_steel_base_8_740", name: "Steel Plate Base with 8 Steel Plates (740x740)", price: 4680 },
+                            { id: "jumb_liro_mobile_stand", name: "Liro Mobile Stand - Liro Maxi Plus", price: 2955 },
+                            { id: "jumb_delschen_mobile_stand", name: "Delschen Mobile Stand - Concrete Stand", price: 1166 },
+                            { id: "jumb_spacer_steel_plate_base", name: "Spacer for Steel Plate Base", price: 390 },
+                            { id: "jumb_spacer_electrics", name: "Spacer for Electrics", price: 430 },
                             { id: "jumb_powder_coat_steel_4_490", name: "Powder Coating of 4 Steel Plates (490x490)", price: 530 },
                             { id: "jumb_powder_coat_steel_4_740", name: "Powder Coating of 4 Steel Plates (740x740)", price: 640 },
                             { id: "powder_coat", name: "Powder coating in RAL 9016/7016", price: 270 },
+                            { id: "jumb_fischer_bolts", name: "Optional: 'fischer' heavy duty anchoring bolts", price: 340 },
+                            { id: "jumb_multi_use_flange_plate", name: "Multi-use Flange Plate", price: 260 },
                             { id: "cementsten", name: "Cementsten (flagstone) (50x50)", price: 5 },
                             { id: "fancy_frame", name: "Fancy Frame", price: 670 }
                         ]
@@ -135,7 +141,15 @@ const rawCatalogData: CatalogData = {
                         name: "Cover",
                         items: [
                             { id: "cover_comfort", name: "Protective Cover –comfort", price: 400 },
+                            { id: "jumb_cover_basic", name: "Protective Cover - basic", price: 140 },
                             { id: "telescopic_rod", name: "Telescopic rod for Comfort cover", price: 490 }
+                        ]
+                    },
+                    {
+                        id: "jumb_soft_foam_safeguard",
+                        name: "Soft Foam Safeguard",
+                        items: [
+                            { id: "jumb_soft_foam", name: "Soft Foam Safeguard", price: 350 }
                         ]
                     },
                     {
@@ -152,6 +166,20 @@ const rawCatalogData: CatalogData = {
                         ]
                     },
                     {
+                        id: "jumb_textil_valance_round",
+                        name: "Textilduk RUND med kappa",
+                        items: [
+                            { id: "jumb_textil_valance_o3", name: "JUMBRELLA Textilduk med kappa 3*", price: 900 },
+                            { id: "jumb_textil_valance_o35", name: "JUMBRELLA Textilduk med kappa 3,5*", price: 1010 },
+                            { id: "jumb_textil_valance_o4", name: "JUMBRELLA Textilduk med kappa 4*", price: 1220 },
+                            { id: "jumb_textil_valance_o45", name: "JUMBRELLA Textilduk med kappa 4,5*", price: 1450 },
+                            { id: "jumb_textil_valance_o5", name: "JUMBRELLA Textilduk med kappa 5*", price: 1610 },
+                            { id: "jumb_textil_valance_o56", name: "JUMBRELLA Textilduk med kappa 5,6*", price: 1940 },
+                            { id: "jumb_textil_valance_o63", name: "JUMBRELLA Textilduk med kappa 6,3*", price: 2320 },
+                            { id: "jumb_textil_valance_o7", name: "JUMBRELLA Textilduk med kappa 7*", price: 2420 }
+                        ]
+                    },
+                    {
                         name: "Textilduk Kvadrat",
                         items: [
                             { id: "jumb_textil_3x3", name: "JUMBRELLA Textilduk 3x3", price: 820 },
@@ -160,6 +188,18 @@ const rawCatalogData: CatalogData = {
                             { id: "jumb_textil_45x45", name: "JUMBRELLA Textilduk 4,5x4,5", price: 1410 },
                             { id: "jumb_textil_5x5", name: "JUMBRELLA Textilduk 5x5", price: 1780 },
                             { id: "jumb_textil_6x6", name: "JUMBRELLA Textilduk 6x6", price: 2240 }
+                        ]
+                    },
+                    {
+                        id: "jumb_textil_valance_square",
+                        name: "Textilduk Kvadrat med kappa",
+                        items: [
+                            { id: "jumb_textil_valance_3x3", name: "JUMBRELLA Textilduk med kappa 3x3", price: 1070 },
+                            { id: "jumb_textil_valance_35x35", name: "JUMBRELLA Textilduk med kappa 3,5x3,5", price: 1410 },
+                            { id: "jumb_textil_valance_4x4", name: "JUMBRELLA Textilduk med kappa 4x4", price: 1540 },
+                            { id: "jumb_textil_valance_45x45", name: "JUMBRELLA Textilduk med kappa 4,5x4,5", price: 1750 },
+                            { id: "jumb_textil_valance_5x5", name: "JUMBRELLA Textilduk med kappa 5x5", price: 2220 },
+                            { id: "jumb_textil_valance_6x6", name: "JUMBRELLA Textilduk med kappa 6x6", price: 2460 }
                         ]
                     },
                     {
@@ -191,6 +231,27 @@ const rawCatalogData: CatalogData = {
                             { id: "jumb_textil_6x3", name: "JUMBRELLA Textilduk 6x3", price: 1420 },
                             { id: "jumb_textil_6x4", name: "JUMBRELLA Textilduk 6x4", price: 1690 },
                             { id: "jumb_textil_6x45", name: "JUMBRELLA Textilduk 6x4,5", price: 1940 }
+                        ]
+                    },
+                    {
+                        id: "jumb_textil_valance_rect",
+                        name: "Textilduk Rektangel med kappa",
+                        items: [
+                            { id: "jumb_textil_valance_3x15", name: "JUMBRELLA Textilduk med kappa 3x1,5", price: 830 },
+                            { id: "jumb_textil_valance_3x35", name: "JUMBRELLA Textilduk med kappa 3x3,5", price: 1330 },
+                            { id: "jumb_textil_valance_4x2", name: "JUMBRELLA Textilduk med kappa 4x2", price: 1050 },
+                            { id: "jumb_textil_valance_4x3", name: "JUMBRELLA Textilduk med kappa 4x3", price: 1390 },
+                            { id: "jumb_textil_valance_4x35", name: "JUMBRELLA Textilduk med kappa 4x3,5", price: 1450 },
+                            { id: "jumb_textil_valance_45x3", name: "JUMBRELLA Textilduk med kappa 4,5x3", price: 1450 },
+                            { id: "jumb_textil_valance_45x35", name: "JUMBRELLA Textilduk med kappa 4,5x3,5", price: 1500 },
+                            { id: "jumb_textil_valance_45x4", name: "JUMBRELLA Textilduk med kappa 4,5x4", price: 1590 },
+                            { id: "jumb_textil_valance_5x25", name: "JUMBRELLA Textilduk med kappa 5x2,5", price: 1390 },
+                            { id: "jumb_textil_valance_5x3", name: "JUMBRELLA Textilduk med kappa 5x3", price: 1460 },
+                            { id: "jumb_textil_valance_5x375", name: "JUMBRELLA Textilduk med kappa 5x3,75", price: 1780 },
+                            { id: "jumb_textil_valance_5x4", name: "JUMBRELLA Textilduk med kappa 5x4", price: 1780 },
+                            { id: "jumb_textil_valance_6x3", name: "JUMBRELLA Textilduk med kappa 6x3", price: 1780 },
+                            { id: "jumb_textil_valance_6x4", name: "JUMBRELLA Textilduk med kappa 6x4", price: 2100 },
+                            { id: "jumb_textil_valance_6x45", name: "JUMBRELLA Textilduk med kappa 6x4,5", price: 2420 }
                         ]
                     },
                     {
@@ -248,11 +309,11 @@ const rawCatalogData: CatalogData = {
                         items: [
                             { id: "jumb_valance_o3", name: "Valance Ø3", price: 200 },
                             { id: "jumb_valance_o35", name: "Valance Ø3,5", price: 230 },
-                            { id: "jumb_valance_o4", name: "Valance Ø4", price: 270 },
+                            { id: "jumb_valance_o4", name: "Valance Ø4", price: 250 },
                             { id: "jumb_valance_o45", name: "Valance Ø4,5", price: 310 },
                             { id: "jumb_valance_o5", name: "Valance Ø5", price: 330 },
                             { id: "jumb_valance_o56", name: "Valance Ø5,6", price: 370 },
-                            { id: "jumb_valance_o63", name: "Valance Ø6,3", price: 390 },
+                            { id: "jumb_valance_o63", name: "Valance Ø6,3", price: 370 },
                             { id: "jumb_valance_o7", name: "Valance Ø7", price: 470 }
                         ]
                     },
@@ -456,15 +517,19 @@ const rawCatalogData: CatalogData = {
                             { id: "pure_gjuthylsa", name: "Gjuthylsa PURE", price: 360 },
                             { id: "pure_surface_mount", name: "Surface Mount", price: 510 },
                             { id: "pure_surface_above", name: "Surface Mount (ovan markinstallation)", price: 510 },
+                            { id: "pure_fischer_bolts", name: "Optional: 'fischer' heavy duty anchoring bolts", price: 190 },
                             { id: "pure_steel_base_4", name: "Steel Plate Base with 4 Steel Plates", price: 1580 },
                             { id: "pure_steel_base_8", name: "Steel Plate Base with 8 Steel Plates", price: 2480 },
+                            { id: "pure_liro_mobile_stand", name: "Liro Mobile Stand - Liro Maxi Plus", price: 2955 },
+                            { id: "pure_delschen_mobile_stand", name: "Delschen Mobile Stand - Concrete Stand", price: 1166 },
                             { id: "pure_powder_coat_4", name: "Powder Coating of 4 Steel Plate", price: 540 },
                             { id: "pure_crossframe_8", name: "Cross-Frame for 8 flagstones", price: 670 },
                             { id: "pure_flagstone", name: "Cementsten (flagstone)", price: 7 },
                             { id: "pure_flagstones_8", name: "8 Standard Flagstones", price: 220 },
                             { id: "pure_leveling_feet", name: "4 Leveling Feet", price: 130 },
-                            { id: "pure_powder_coat_crossframe", name: "Powder Coating for Cross-Frame", price: 270 },
+                            { id: "pure_powder_coat_crossframe", name: "Powder Coating for Cross-Frame", price: 230 },
                             { id: "pure_krinner_plate", name: "Adaptation Plate for Krinner Ground Screw", price: 240 },
+                            { id: "pure_multi_use_flange_plate", name: "Multi-use Flange Plate", price: 240 },
                             { id: "pure_tilt_conn_above", name: "Tiltable Connecting Components (Above-ground)", price: 260 }
                         ]
                     },
@@ -487,6 +552,17 @@ const rawCatalogData: CatalogData = {
                         ]
                     },
                     {
+                        id: "pure_textil_valance_square",
+                        name: "Textilduk Kvadrat med kappa",
+                        items: [
+                            { id: "pure_textil_valance_2x2", name: "PURE Textilduk med kappa 2x2", price: 860 },
+                            { id: "pure_textil_valance_25x25", name: "PURE Textilduk med kappa 2,5x2,5", price: 890 },
+                            { id: "pure_textil_valance_3x3", name: "PURE Textilduk med kappa 3x3", price: 1000 },
+                            { id: "pure_textil_valance_35x35", name: "PURE Textilduk med kappa 3,5x3,5", price: 1110 },
+                            { id: "pure_textil_valance_4x4", name: "PURE Textilduk med kappa 4x4", price: 1230 }
+                        ]
+                    },
+                    {
                         name: "Textilduk Runda",
                         items: [
                             { id: "pure_textil_o2", name: "PURE Textilduk Ø2", price: 620 },
@@ -494,6 +570,17 @@ const rawCatalogData: CatalogData = {
                             { id: "pure_textil_o3", name: "PURE Textilduk Ø3", price: 670 },
                             { id: "pure_textil_o35", name: "PURE Textilduk Ø3,5", price: 780 },
                             { id: "pure_textil_o4", name: "PURE Textilduk Ø4", price: 870 }
+                        ]
+                    },
+                    {
+                        id: "pure_textil_valance_round",
+                        name: "Textilduk Runda med kappa",
+                        items: [
+                            { id: "pure_textil_valance_o2", name: "PURE Textilduk med kappa Ø2", price: 790 },
+                            { id: "pure_textil_valance_o25", name: "PURE Textilduk med kappa Ø2,5", price: 790 },
+                            { id: "pure_textil_valance_o3", name: "PURE Textilduk med kappa Ø3", price: 880 },
+                            { id: "pure_textil_valance_o35", name: "PURE Textilduk med kappa Ø3,5", price: 980 },
+                            { id: "pure_textil_valance_o4", name: "PURE Textilduk med kappa Ø4", price: 1100 }
                         ]
                     },
                     {
@@ -512,10 +599,27 @@ const rawCatalogData: CatalogData = {
                         ]
                     },
                     {
+                        id: "pure_textil_valance_rect",
+                        name: "Textilduk Rektangel med kappa",
+                        items: [
+                            { id: "pure_textil_valance_25x2", name: "PURE Textilduk med kappa 2,5x2", price: 790 },
+                            { id: "pure_textil_valance_3x2", name: "PURE Textilduk med kappa 3x2", price: 790 },
+                            { id: "pure_textil_valance_3x25", name: "PURE Textilduk med kappa 3x2,5", price: 910 },
+                            { id: "pure_textil_valance_35x2", name: "PURE Textilduk med kappa 3,5x2", price: 910 },
+                            { id: "pure_textil_valance_35x25", name: "PURE Textilduk med kappa 3,5x2,5", price: 990 },
+                            { id: "pure_textil_valance_35x3", name: "PURE Textilduk med kappa 3,5x3", price: 1040 },
+                            { id: "pure_textil_valance_4x2", name: "PURE Textilduk med kappa 4x2", price: 990 },
+                            { id: "pure_textil_valance_4x25", name: "PURE Textilduk med kappa 4x2,5", price: 1040 },
+                            { id: "pure_textil_valance_4x3", name: "PURE Textilduk med kappa 4x3", price: 1140 },
+                            { id: "pure_textil_valance_4x35", name: "PURE Textilduk med kappa 4x3,5", price: 1220 }
+                        ]
+                    },
+                    {
                         name: "Mounts & Consoles",
                         items: [
                             { id: "pure_dual_console", name: "Dual Mounting Console", price: 820 },
                             { id: "pure_spacer", name: "Spacer", price: 390 },
+                            { id: "pure_spacer_tipping", name: "Spacer for In-Ground Tipping Base", price: 310 },
                             { id: "pure_tilt_conn", name: "Tiltable Connecting Components", price: 260 }
                         ]
                     },
@@ -524,7 +628,16 @@ const rawCatalogData: CatalogData = {
                         items: [
                             { id: "pure_frame_custom", name: "Frame Color custom finish", price: 560 },
                             { id: "pure_v4a_maritime", name: "V4A | Maritime", price: 230 },
+                            { id: "pure_pole_extension", name: "Umbrella Center Pole Extension", price: 180 },
+                            { id: "pure_pole_reduction", name: "Umbrella Center Pole Reduction", price: 180 },
                             { id: "custom_edge_binding", name: "Custom Edge Binding", price: 250 }
+                        ]
+                    },
+                    {
+                        id: "pure_soft_foam_safeguard",
+                        name: "Soft Foam Safeguard",
+                        items: [
+                            { id: "pure_soft_foam", name: "Soft Foam Safeguard", price: 350 }
                         ]
                     },
                     {
@@ -555,9 +668,9 @@ const rawCatalogData: CatalogData = {
                             { id: "pure_valance_3x25", name: "Valance 3x2,5", price: 170 },
                             { id: "pure_valance_35x2", name: "Valance 3,5x2", price: 170 },
                             { id: "pure_valance_35x25", name: "Valance 3,5x2,5", price: 200 },
-                            { id: "pure_valance_35x3", name: "Valance 3,5x3", price: 200 },
+                            { id: "pure_valance_35x3", name: "Valance 3,5x3", price: 190 },
                             { id: "pure_valance_4x2", name: "Valance 4x2", price: 200 },
-                            { id: "pure_valance_4x25", name: "Valance 4x2,5", price: 200 },
+                            { id: "pure_valance_4x25", name: "Valance 4x2,5", price: 190 },
                             { id: "pure_valance_4x3", name: "Valance 4x3", price: 220 },
                             { id: "pure_valance_4x35", name: "Valance 4x3,5", price: 230 }
                         ]
@@ -892,7 +1005,7 @@ const rawCatalogData: CatalogData = {
                 id: "freight",
                 name: "Fraktkostnad",
                 items: [
-                    { id: "frakt_glas", name: "Glasfrakt Specialpall", price: 2120 }
+                    { id: "frakt_glas", name: "Glasfrakt Specialpall", price: 2120, autoScale: true, autoScaleDivisor: 6 }
                 ]
             },
             {
@@ -993,7 +1106,7 @@ const rawCatalogData: CatalogData = {
                 id: "freight",
                 name: "Fraktkostnad",
                 items: [
-                    { id: "frakt_glas", name: "Glasfrakt Specialpall", price: 2120 }
+                    { id: "frakt_glas", name: "Glasfrakt Specialpall", price: 2120, autoScale: true, autoScaleDivisor: 6 }
                 ]
             },
             {

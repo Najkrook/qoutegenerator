@@ -288,6 +288,7 @@ export interface GridCatalogItemGroup {
 
 export interface GridCatalogAddonOption extends BuilderCatalogAddonOption {
     autoScale?: boolean;
+    autoScaleDivisor?: number;
 }
 
 export interface GridCatalogAddonCategory {

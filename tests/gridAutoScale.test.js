@@ -11,6 +11,7 @@ import { createCatalogFixture } from './fixtures/calculationFixtures';
         catalog.ClickitUp.addonCategories.push({
             id: 'recommended',
             items: [
+                { id: 'frakt_glas', name: 'Glasfrakt Specialpall', price: 2120, autoScale: true, autoScaleDivisor: 6 },
                 { id: 'svartanodiserade', name: 'Svartanodiserade profiler', price: 340, autoScale: true },
                 { id: 'stoppknapp', name: 'Stoppknapp 140 cm', price: 564, autoScale: true }
             ]
@@ -79,5 +80,39 @@ describe('gridAutoScale discount follow', () => {
             { id: 'c1', name: 'Egen rad 1', price: 500, qty: 1, discountPct: 10 },
             { id: 'c2', name: 'Egen rad 2', price: 700, qty: 1, discountPct: 2 }
         ]);
+    });
+
+    it.each([
+        [0, 0],
+        [1, 1],
+        [6, 1],
+        [7, 2],
+        [12, 2],
+        [14, 3]
+    ])('auto-scales freight pallets by rounding %i sections up to %i pallets', (sectionQty, expectedQty) => {
+        const lineData = createLineData();
+        const effectiveSelections = buildEffectiveGridSelections(lineData, {
+            items: {
+                'ClickitUp Section|1000': { qty: sectionQty, discountPct: 0 }
+            },
+            addons: {}
+        });
+
+        expect(effectiveSelections.addons.frakt_glas.qty).toBe(expectedQty);
+    });
+
+    it('keeps manual freight pallet overrides instead of applying the divisor', () => {
+        const lineData = createLineData();
+        const effectiveSelections = buildEffectiveGridSelections(lineData, {
+            items: {
+                'ClickitUp Section|1000': { qty: 14, discountPct: 0 }
+            },
+            addons: {
+                frakt_glas: { qty: 5, discountPct: 0, syncMode: 'manual' }
+            }
+        });
+
+        expect(effectiveSelections.addons.frakt_glas.qty).toBe(5);
+        expect(effectiveSelections.addons.frakt_glas.syncMode).toBe('manual');
     });
 });

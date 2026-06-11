@@ -7,6 +7,7 @@ describe('computeQuoteTotals', () => {
         catalogData.ClickitUp.addonCategories.push({
             id: 'recommended',
             items: [
+                { id: 'frakt_glas', name: 'Glasfrakt Specialpall', price: 2120, autoScale: true, autoScaleDivisor: 6 },
                 { id: 'svartanodiserade', name: 'Svartanodiserade profiler', price: 340, autoScale: true },
                 { id: 'stoppknapp', name: 'Stoppknapp 140 cm', price: 564, autoScale: true }
             ]
@@ -692,6 +693,33 @@ describe('computeQuoteTotals', () => {
         const svartanodiserade = summary.totals.find((row) => row.source.addonId === 'svartanodiserade');
 
         expect(svartanodiserade.discountPct).toBe(0);
+    });
+
+    it('auto-syncs ClickitUp freight pallets rounded up per six selected sections', () => {
+        const state = createStateFixture({
+            builderItems: [],
+            customCosts: [],
+            exchangeRate: 1,
+            gridSelections: {
+                ClickitUp: {
+                    items: {
+                        'ClickitUp Section|1000': { qty: 8, discountPct: 0 },
+                        'ClickitUp Door|1000': { qty: 4, discountPct: 0 }
+                    },
+                    customItems: [
+                        { id: 'custom_1', name: 'Egen sektion', size: '900', price: 100, qty: 2, discountPct: 0 }
+                    ],
+                    addons: {}
+                }
+            }
+        });
+        const catalogData = addClickitUpAutoScaleAddons(createCatalogFixture());
+
+        const summary = computeQuoteTotals({ state, catalogData });
+        const freight = summary.totals.find((row) => row.source.addonId === 'frakt_glas');
+
+        expect(freight.qty).toBe(3);
+        expect(freight.gross).toBe(6360);
     });
 
     it('uses global discount when an auto-scale row is explicitly marked as global', () => {

@@ -55,7 +55,7 @@ describe('GridConfig auto-scale add-ons', () => {
 
         expect(html).toContain('Svartanodiserade profiler');
         expect(html).toContain('Stoppknapp 140 cm');
-        expect((html.match(/aria-pressed=\"true\"/g) || []).length).toBe(2);
+        expect((html.match(/aria-pressed=\"true\"/g) || []).length).toBe(3);
         expect((html.match(/value=\"7\"/g) || []).length).toBeGreaterThanOrEqual(2);
     });
 
@@ -101,5 +101,25 @@ describe('GridConfig auto-scale add-ons', () => {
         expect(html).toContain('Egen profil');
         expect(html).toContain('value="680"');
         expect(html).toContain('value="2"');
+    });
+
+    it('renders freight as an auto-scaled pallet count rounded up per six sections', () => {
+        const html = renderGridConfig({
+            globalDiscountPct: 0,
+            gridSelections: {
+                ClickitUp: {
+                    items: {
+                        'ClickitUp Sektion|1500': { qty: 8, discountPct: 0 },
+                        'ClickitUp Dörr|1000': { qty: 4, discountPct: 0 },
+                        'ClickitUp Hane|1000': { qty: 2, discountPct: 0 }
+                    },
+                    addons: {}
+                }
+            }
+        });
+
+        expect(html).toContain('Glasfrakt Specialpall');
+        expect(html).toContain('aria-pressed="true"');
+        expect(html).toContain('value="3"');
     });
 });
