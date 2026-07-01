@@ -6,6 +6,7 @@ export type QuoteStatus = 'draft' | 'sent' | 'won' | 'lost' | 'archived';
 export type OrderRequestStatus = 'new' | 'reviewing' | 'completed';
 export type RetailerDocumentKind = 'color-chart' | 'installation-instructions';
 export type PdfThemeId = 'brixx' | 'custom' | 'roslagsmarkisen';
+export type QuoteExportLanguage = 'sv' | 'en';
 
 export type AccessLevel = 'guest' | 'full' | 'quote-only' | 'sketch-only' | 'retailer';
 
@@ -389,6 +390,7 @@ export interface QuoteState {
     includePaymentBox: boolean;
     hideZeroDiscountReferencesInPdf: boolean;
     pdfThemeId: PdfThemeId;
+    exportLanguage: QuoteExportLanguage;
     paymentTermsDays: number;
     quoteValidityDays: number;
 }
@@ -828,7 +830,7 @@ export interface QuoteMarginAnalysis {
 
 export type ExportSummaryState = Partial<Pick<
     QuoteState,
-    'customerInfo' | 'includesVat' | 'globalDiscountPct' | 'hideZeroDiscountReferencesInPdf'
+    'customerInfo' | 'includesVat' | 'globalDiscountPct' | 'hideZeroDiscountReferencesInPdf' | 'exportLanguage'
 >>;
 
 export type ExportSummaryInput = Partial<QuoteTotalsResult>;
@@ -845,6 +847,7 @@ export interface PdfTableOptions {
     hideDiscountColumns?: boolean;
     hideRecommendedPriceColumn?: boolean;
     includesVat?: boolean;
+    exportLanguage?: QuoteExportLanguage;
 }
 
 export type PdfTableRow = string[];
@@ -999,6 +1002,7 @@ export type QuoteReducerAction =
     | { type: 'SET_INCLUDE_SIGNATURE_BLOCK'; payload: boolean }
     | { type: 'SET_HIDE_ZERO_DISCOUNT_REFERENCES_IN_PDF'; payload: boolean }
     | { type: 'SET_PDF_THEME_ID'; payload: PdfThemeId }
+    | { type: 'SET_EXPORT_LANGUAGE'; payload: QuoteExportLanguage }
     | { type: 'SET_PAYMENT_TERMS_DAYS'; payload: number }
     | { type: 'SET_QUOTE_VALIDITY_DAYS'; payload: number }
     | { type: 'RESET_STATE' };

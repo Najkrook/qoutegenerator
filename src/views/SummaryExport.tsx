@@ -14,6 +14,7 @@ import { quoteRepository } from '../services/quoteRepositoryClient';
 import { saveQuoteToRepository } from '../services/quoteSaveService';
 import { safeLogActivity } from '../services/activityLogService';
 import { hasZeroDiscountSummary } from '../services/exportDataBuilders';
+import { normalizeExportLanguage } from '../services/exportLocalization';
 import { buildQuoteRevisionLink } from '../navigation/quoteLinks';
 import {
     getOrderRequestStatusLabel,
@@ -54,13 +55,13 @@ function sanitizeFileNamePart(value: string): string {
         .slice(0, 50);
 }
 
-function buildPdfFileName(customerInfo: QuoteState['customerInfo']): string {
+function buildPdfFileName(customerInfo: QuoteState['customerInfo'], exportLanguage: QuoteState['exportLanguage'] = 'sv'): string {
     const rawRef = customerInfo.reference?.trim();
     const rawName = customerInfo.company?.trim() || customerInfo.name?.trim();
     const date = customerInfo.date || new Date().toISOString().slice(0, 10);
-    const base = rawRef || rawName || 'Offert';
+    const base = rawRef || rawName || (exportLanguage === 'en' ? 'Quote' : 'Offert');
     const safeBase = sanitizeFileNamePart(base);
-    return `${safeBase || 'Offert'}-${date}.pdf`;
+    return `${safeBase || (exportLanguage === 'en' ? 'Quote' : 'Offert')}-${date}.pdf`;
 }
 
 function getActivityCustomerLabel(customerInfo: QuoteState['customerInfo']): string {
@@ -174,6 +175,7 @@ export function SummaryExport({ onPrev, onBackToSketch, onOpenRetailerOrderHisto
     }, [isRetailer, retailer?.pdfThemes]);
 
     const selectedPdfThemeId = normalizePdfThemeId(state.pdfThemeId);
+    const selectedExportLanguage = normalizeExportLanguage(state.exportLanguage);
 
     const effectivePdfThemeId = allowedThemeOptions.some(t => t.id === selectedPdfThemeId)
         ? selectedPdfThemeId
@@ -181,8 +183,9 @@ export function SummaryExport({ onPrev, onBackToSketch, onOpenRetailerOrderHisto
 
     const effectiveState = useMemo(() => ({
         ...state,
-        pdfThemeId: effectivePdfThemeId
-    }), [state, effectivePdfThemeId]);
+        pdfThemeId: effectivePdfThemeId,
+        exportLanguage: selectedExportLanguage
+    }), [state, effectivePdfThemeId, selectedExportLanguage]);
 
     useEffect(() => {
         if (selectedPdfThemeId && !allowedThemeOptions.some(t => t.id === selectedPdfThemeId)) {
@@ -297,13 +300,20 @@ export function SummaryExport({ onPrev, onBackToSketch, onOpenRetailerOrderHisto
         });
     };
 
+    const handleExportLanguageChange = (exportLanguage: QuoteState['exportLanguage']): void => {
+        dispatch({
+            type: 'SET_EXPORT_LANGUAGE',
+            payload: normalizeExportLanguage(exportLanguage)
+        });
+    };
+
     const handleExportPDF = async ({ allowMissingQuoteNumber = false }: PdfExportOptions = {}): Promise<void> => {
         if (exportBlockReason && !allowMissingQuoteNumber) {
             notifyError(exportBlockReason);
             return;
         }
 
-        const fileName = buildPdfFileName(state.customerInfo);
+        const fileName = buildPdfFileName(state.customerInfo, selectedExportLanguage);
         const pdfBlob = await createQuotePdfBlob(effectiveState, summaryData);
         if (!pdfBlob) {
             notifyError('Kunde inte skapa PDF.');
@@ -665,21 +675,45 @@ export function SummaryExport({ onPrev, onBackToSketch, onOpenRetailerOrderHisto
                             <h3 className="text-base font-bold text-text-primary">PDF förhandsvisning</h3>
                             <p className="text-xs text-text-secondary mt-1">Uppdateras automatiskt när offertdata ändras.</p>
                         </div>
-                        <label className="flex flex-col gap-1 text-xs font-semibold uppercase tracking-wide text-text-secondary w-full sm:w-[180px]">
-                            Offert tema
-                            <select
-                                name="pdfThemeId"
-                                value={effectivePdfThemeId}
-                                onChange={handlePdfThemeChange}
-                                className="h-[38px] w-full rounded-md border border-panel-border bg-panel-bg px-3 text-sm font-bold normal-case tracking-normal text-white outline-none transition-colors hover:bg-white/5 focus:border-primary focus:ring-2 focus:ring-primary/25"
-                            >
-                                {allowedThemeOptions.map((option) => (
-                                    <option key={option.id} value={option.id}>
-                                        {option.label}
-                                    </option>
-                                ))}
-                            </select>
-                        </label>
+                        <div className="flex w-full flex-col gap-3 sm:w-auto sm:min-w-[180px]">
+                            <label className="flex flex-col gap-1 text-xs font-semibold uppercase tracking-wide text-text-secondary">
+                                Offert tema
+                                <select
+                                    name="pdfThemeId"
+                                    value={effectivePdfThemeId}
+                                    onChange={handlePdfThemeChange}
+                                    className="h-[38px] w-full rounded-md border border-panel-border bg-panel-bg px-3 text-sm font-bold normal-case tracking-normal text-white outline-none transition-colors hover:bg-white/5 focus:border-primary focus:ring-2 focus:ring-primary/25"
+                                >
+                                    {allowedThemeOptions.map((option) => (
+                                        <option key={option.id} value={option.id}>
+                                            {option.label}
+                                        </option>
+                                    ))}
+                                </select>
+                            </label>
+
+                            <div className="flex flex-col gap-1 text-xs font-semibold uppercase tracking-wide text-text-secondary">
+                                Exportspråk
+                                <div className="grid h-[38px] grid-cols-2 overflow-hidden rounded-md border border-panel-border bg-panel-bg normal-case tracking-normal" role="group" aria-label="Exportspråk">
+                                    <button
+                                        type="button"
+                                        onClick={() => handleExportLanguageChange('sv')}
+                                        aria-pressed={selectedExportLanguage === 'sv'}
+                                        className={`text-sm font-bold transition-colors ${selectedExportLanguage === 'sv' ? 'bg-primary text-white' : 'text-text-secondary hover:bg-white/5 hover:text-white'}`}
+                                    >
+                                        SV
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => handleExportLanguageChange('en')}
+                                        aria-pressed={selectedExportLanguage === 'en'}
+                                        className={`text-sm font-bold transition-colors ${selectedExportLanguage === 'en' ? 'bg-primary text-white' : 'text-text-secondary hover:bg-white/5 hover:text-white'}`}
+                                    >
+                                        EN
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                     <div className="h-[860px] bg-white border border-panel-border rounded-md overflow-hidden">
                         {previewUrl ? (

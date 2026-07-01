@@ -116,6 +116,7 @@ import { SummaryExport } from '../src/views/SummaryExport';
 import { AuthContext } from '../src/store/AuthContext';
 import { QuoteContext } from '../src/store/QuoteContext';
 import { createInitialQuoteState } from '../src/store/quoteStateSchema';
+import { createQuotePdfBlob } from '../src/services/quotePdfService';
 
 const mountedRoots = [];
 
@@ -231,6 +232,7 @@ beforeEach(() => {
     toastState.success.mockReset();
     toastState.loading.mockReset();
     toastState.dismiss.mockReset();
+    createQuotePdfBlob.mockClear();
 
     Object.defineProperty(globalThis.navigator, 'clipboard', {
         value: {
@@ -283,6 +285,26 @@ describe('SummaryExport PDF override', () => {
         expect(dispatch).toHaveBeenCalledWith({
             type: 'SET_PDF_THEME_ID',
             payload: 'custom'
+        });
+    });
+
+    it('renders the export language selector, dispatches language changes, and uses it for preview', async () => {
+        const { container, dispatch } = await renderSummaryExport({
+            stateOverrides: { exportLanguage: 'en' }
+        });
+
+        expect(container.textContent).toContain('Exportspråk');
+        expect(findButton(container, 'EN').getAttribute('aria-pressed')).toBe('true');
+        expect(createQuotePdfBlob).toHaveBeenCalledWith(
+            expect.objectContaining({ exportLanguage: 'en' }),
+            expect.any(Object)
+        );
+
+        await clickButton(container, 'SV');
+
+        expect(dispatch).toHaveBeenCalledWith({
+            type: 'SET_EXPORT_LANGUAGE',
+            payload: 'sv'
         });
     });
 

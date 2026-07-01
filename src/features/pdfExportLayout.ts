@@ -1,6 +1,7 @@
-import autoTable, { type Color, type FontStyle, type Styles } from 'jspdf-autotable';
+﻿import autoTable, { type Color, type FontStyle, type Styles } from 'jspdf-autotable';
 import { BRIXX_LOGO_BASE64 } from '../../assets/logoData';
 import { buildPdfTableData } from '../services/exportDataBuilders';
+import { getExportLabels, formatLocalizedDays, translateGroupLabel } from '../services/exportLocalization';
 import { applyVat } from '../utils/vatHelper';
 import type {
     CustomerInfo,
@@ -141,11 +142,12 @@ export function normalizePositiveInt(value, fallback) {
     return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
 }
 
-export function createPdfTableLayout(hideDiscountReferences, pageWidth, includesVat = false, layout = PDF_LAYOUT) {
-    const vatText = includesVat ? 'Inkl. moms' : 'Exkl. moms';
+export function createPdfTableLayout(hideDiscountReferences, pageWidth, includesVat = false, layout = PDF_LAYOUT, exportLanguage = 'sv') {
+    const labels = getExportLabels(exportLanguage);
+    const vatText = includesVat ? labels.inclVat : labels.exclVat;
     const tableHead = hideDiscountReferences
-        ? [['Modell', 'Storlek', `Pris/enhet\n${vatText}`, 'Antal', `Ert Pris\n${vatText}`]]
-        : [['Modell', 'Storlek', `Pris/enhet\n${vatText}`, 'Antal', `Ert Pris\n${vatText}`, `Rek Utpris\n${vatText}`, `Rabatt\ni SEK\n(${vatText})`, 'Rabatt\ni %']];
+        ? [[labels.model, labels.size, `${labels.unitPrice}\n${vatText}`, labels.quantity, `${labels.yourPrice}\n${vatText}`]]
+        : [[labels.model, labels.size, `${labels.unitPrice}\n${vatText}`, labels.quantity, `${labels.yourPrice}\n${vatText}`, `${labels.recommendedPrice}\n${vatText}`, `${labels.discountSek}\n(${vatText})`, labels.discountPct]];
     const tableColumnStyles = (hideDiscountReferences
         ? {
             0: { halign: 'left', fontStyle: 'bold' as FontStyle, cellWidth: 54 },
@@ -251,30 +253,31 @@ function drawGroupSubtitle(doc, title, y, layout, pageMarginX) {
     doc.text(title, pageMarginX, y);
 }
 
-export function drawHeader(doc, { pageWidth, quoteDate, quoteNumber = null, customerInfo = {}, layout = PDF_LAYOUT }) {
+export function drawHeader(doc, { pageWidth, quoteDate, quoteNumber = null, customerInfo = {}, layout = PDF_LAYOUT, exportLanguage = 'sv' }) {
     const { pageMarginX, headerTopY } = layout;
     const safeCustomerInfo = normalizeCustomerInfo(customerInfo);
     const headerLineY = quoteNumber ? layout.headerLineY + 2 : layout.headerLineY;
+    const labels = getExportLabels(exportLanguage);
 
     drawBrandLogo(doc, pageMarginX, 8, layout);
 
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(20);
     doc.setTextColor(...layout.colors.darkText);
-    doc.text('OFFERT', pageWidth - pageMarginX, headerTopY, { align: 'right' });
+    doc.text(labels.quoteTitle, pageWidth - pageMarginX, headerTopY, { align: 'right' });
 
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(9);
     doc.setTextColor(...layout.colors.grayText);
-    doc.text(`Datum: ${quoteDate}`, pageWidth - pageMarginX, 22, { align: 'right' });
+    doc.text(`${labels.date}: ${quoteDate}`, pageWidth - pageMarginX, 22, { align: 'right' });
     if (quoteNumber) {
-        doc.text(`OffertNr: ${quoteNumber}`, pageWidth - pageMarginX, 26, { align: 'right' });
+        doc.text(`${labels.quoteNo}: ${quoteNumber}`, pageWidth - pageMarginX, 26, { align: 'right' });
     }
     if (safeCustomerInfo.reference) {
-        doc.text(`Projektreferens: ${safeCustomerInfo.reference}`, pageWidth - pageMarginX, quoteNumber ? 30 : 26, { align: 'right' });
+        doc.text(`${labels.projectReference}: ${safeCustomerInfo.reference}`, pageWidth - pageMarginX, quoteNumber ? 30 : 26, { align: 'right' });
     }
     if (safeCustomerInfo.customerReference) {
-        doc.text(`Er referens: ${safeCustomerInfo.customerReference}`, pageWidth - pageMarginX, quoteNumber ? 34 : 30, { align: 'right' });
+        doc.text(`${labels.customerReference}: ${safeCustomerInfo.customerReference}`, pageWidth - pageMarginX, quoteNumber ? 34 : 30, { align: 'right' });
     }
 
     doc.setDrawColor(...layout.colors.brandPrimary);
@@ -282,15 +285,16 @@ export function drawHeader(doc, { pageWidth, quoteDate, quoteNumber = null, cust
     doc.line(pageMarginX, headerLineY, pageWidth - pageMarginX, headerLineY);
 }
 
-export function renderCustomerInfoBlock(doc, { customerInfo = {}, pageWidth, layout = PDF_LAYOUT }) {
+export function renderCustomerInfoBlock(doc, { customerInfo = {}, pageWidth, layout = PDF_LAYOUT, exportLanguage = 'sv' }) {
     const safeCustomerInfo = normalizeCustomerInfo(customerInfo);
+    const labels = getExportLabels(exportLanguage);
     const customerLines = [];
     const recipient = safeCustomerInfo.company || safeCustomerInfo.name || '';
     if (recipient) {
         customerLines.push({ type: 'recipient', value: recipient });
     }
     if (safeCustomerInfo.validity) {
-        customerLines.push({ type: 'muted', value: `Giltighetstid: ${safeCustomerInfo.validity}` });
+        customerLines.push({ type: 'muted', value: `${labels.validityPeriod}: ${safeCustomerInfo.validity}` });
     }
 
     if (customerLines.length === 0) {
@@ -310,7 +314,7 @@ export function renderCustomerInfoBlock(doc, { customerInfo = {}, pageWidth, lay
         if (line.type === 'recipient') {
             doc.setTextColor(...layout.colors.darkText);
             doc.setFont('helvetica', 'bold');
-            doc.text('Till:', customerTextX, customerTextY);
+            doc.text(`${labels.to}:`, customerTextX, customerTextY);
             doc.setFont('helvetica', 'normal');
             doc.text(line.value, customerTextX + 10, customerTextY);
         } else {
@@ -324,8 +328,9 @@ export function renderCustomerInfoBlock(doc, { customerInfo = {}, pageWidth, lay
     return layout.customerBoxY + customerBoxHeight + 6;
 }
 
-export function renderExtraNotesBlock(doc, { customerInfo = {}, pageWidth, pageHeight, drawMainHeader, currentY, layout = PDF_LAYOUT }) {
+export function renderExtraNotesBlock(doc, { customerInfo = {}, pageWidth, pageHeight, drawMainHeader, currentY, layout = PDF_LAYOUT, exportLanguage = 'sv' }) {
     const safeCustomerInfo = normalizeCustomerInfo(customerInfo);
+    const labels = getExportLabels(exportLanguage);
 
     if (!safeCustomerInfo.extraNotes || !safeCustomerInfo.extraNotes.trim()) {
         return currentY;
@@ -344,7 +349,7 @@ export function renderExtraNotesBlock(doc, { customerInfo = {}, pageWidth, pageH
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(10);
     doc.setTextColor(...layout.colors.darkText);
-    doc.text('Noteringar', marginX, currentY);
+    doc.text(labels.notes, marginX, currentY);
     
     let y = currentY + 6;
     doc.setFont('helvetica', 'normal');
@@ -368,15 +373,17 @@ export function renderGroupedTables(doc, {
     includesVat,
     hideDiscountReferences,
     drawMainHeader,
-    layout = PDF_LAYOUT
+    layout = PDF_LAYOUT,
+    exportLanguage = 'sv'
 }) {
     const totals = normalizeSummaryTotals(summaryData);
     const { groupedTotals, groupKeys } = groupSummaryTotalsByLine(summaryData);
+    const labels = getExportLabels(exportLanguage);
 
     if (groupKeys.length === 0 || totals.length === 0) {
         doc.setFont('helvetica', 'bold');
         doc.setFontSize(10);
-        doc.text('Offertdetaljer', layout.pageMarginX, currentY);
+        doc.text(labels.quoteDetails, layout.pageMarginX, currentY);
         doc.setFont('helvetica', 'normal');
         doc.setFontSize(8);
         let y = currentY + 6;
@@ -399,7 +406,7 @@ export function renderGroupedTables(doc, {
         reducedTableWidth,
         tableLeftMargin,
         tableRightMargin
-    } = createPdfTableLayout(hideDiscountReferences, pageWidth, includesVat, layout);
+    } = createPdfTableLayout(hideDiscountReferences, pageWidth, includesVat, layout, exportLanguage);
 
     let finalY = currentY;
 
@@ -408,10 +415,10 @@ export function renderGroupedTables(doc, {
 
         if (index > 0) {
             currentY = startNewPage(doc, drawMainHeader, layout.contentStartY);
-            drawGroupSubtitle(doc, `Produkter - ${lineKey}`, currentY, layout, layout.pageMarginX);
+            drawGroupSubtitle(doc, `${labels.productsHeading} - ${translateGroupLabel(lineKey, exportLanguage)}`, currentY, layout, layout.pageMarginX);
             currentY += 8;
         } else if (groupKeys.length > 1 && lineKey !== 'Övrigt') {
-            drawGroupSubtitle(doc, `Produkter - ${lineKey}`, currentY, layout, layout.pageMarginX);
+            drawGroupSubtitle(doc, `${labels.productsHeading} - ${translateGroupLabel(lineKey, exportLanguage)}`, currentY, layout, layout.pageMarginX);
             currentY += 6;
         }
 
@@ -421,7 +428,8 @@ export function renderGroupedTables(doc, {
             body: buildPdfTableData(lineItems, formatSEK, {
                 hideDiscountColumns: hideDiscountReferences,
                 hideRecommendedPriceColumn: hideDiscountReferences,
-                includesVat
+                includesVat,
+                exportLanguage: exportLanguage === 'en' ? 'en' : 'sv'
             }),
             theme: 'striped',
             styles: {
@@ -483,14 +491,14 @@ export function renderGroupedTables(doc, {
             doc.setFont('helvetica', 'normal');
             doc.setFontSize(8);
             doc.setTextColor(...layout.colors.grayText);
-            doc.text('Produkter', barX + 4, currentY + 5);
+            doc.text(labels.products, barX + 4, currentY + 5);
             doc.text(`${formatSEK(applyVat(baseNet, includesVat))} SEK`, pageWidth - layout.pageMarginX - 4, currentY + 5, { align: 'right' });
             currentY += rowH;
 
             if (addonItems.length > 0) {
                 doc.setFillColor(250, 250, 250);
                 doc.rect(barX, currentY, barW, rowH, 'F');
-                doc.text('Tillval', barX + 4, currentY + 5);
+                doc.text(labels.addons, barX + 4, currentY + 5);
                 doc.text(`${formatSEK(applyVat(addonNet, includesVat))} SEK`, pageWidth - layout.pageMarginX - 4, currentY + 5, { align: 'right' });
                 currentY += rowH;
             }
@@ -501,7 +509,7 @@ export function renderGroupedTables(doc, {
             doc.setFont('helvetica', 'bold');
             doc.setFontSize(9);
             doc.setTextColor(255, 255, 255);
-            doc.text(`Delsumma ${lineKey} (Ert Pris${includesVat ? ' Inkl. moms' : ''})`, barX + 4, currentY + 6);
+            doc.text(`${labels.subtotal} ${translateGroupLabel(lineKey, exportLanguage)} (${labels.yourPrice}${includesVat ? ` ${labels.inclVat}` : ''})`, barX + 4, currentY + 6);
             doc.text(`${formatSEK(applyVat(groupNet, includesVat))} SEK`, pageWidth - layout.pageMarginX - 4, currentY + 6, { align: 'right' });
             doc.setTextColor(...layout.colors.darkText);
 
@@ -524,9 +532,11 @@ export function renderTotalsSection(doc, {
     shouldRenderPaymentBox,
     drawMainHeader,
     layout = PDF_LAYOUT,
-    hasPriceUponRequest = false
+    hasPriceUponRequest = false,
+    exportLanguage = 'sv'
 }) {
     const rightColX = pageWidth - 90;
+    const labels = getExportLabels(exportLanguage);
 
     if (finalY > pageHeight - 70) {
         finalY = startNewPage(doc, drawMainHeader, layout.contentStartY);
@@ -549,11 +559,11 @@ export function renderTotalsSection(doc, {
         let boxY = Math.max(startY - 2, 84);
         const boxWidth = Math.max(74, rightColX - layout.pageMarginX - 8);
         const lines = [
-            `Betalningsvillkor: ${normalizePositiveInt(state.paymentTermsDays, 30)} dagar`,
-            `Giltig till: ${state.validUntilDate}`
+            `${labels.paymentTerms}: ${formatLocalizedDays(normalizePositiveInt(state.paymentTermsDays, 30), exportLanguage)}`,
+            `${labels.validUntil}: ${state.validUntilDate}`
         ];
         if (state.customerInfo?.reference) {
-            lines.push(`Projektreferens: ${state.customerInfo.reference}`);
+            lines.push(`${labels.projectReference}: ${state.customerInfo.reference}`);
         }
 
         const boxHeight = 14 + (lines.length * 5);
@@ -567,7 +577,7 @@ export function renderTotalsSection(doc, {
         doc.setFont('helvetica', 'bold');
         doc.setFontSize(9);
         doc.setTextColor(...layout.colors.darkText);
-        doc.text('BETALNING & GILTIGHET', layout.pageMarginX + 3, boxY + 5);
+        doc.text(labels.paymentValidity, layout.pageMarginX + 3, boxY + 5);
 
         doc.setFont('helvetica', 'normal');
         doc.setFontSize(8.5);
@@ -584,32 +594,32 @@ export function renderTotalsSection(doc, {
         return boxY + boxHeight;
     };
 
-    drawTotalLine(state.includesVat ? 'Totalt Rek Utpris (Exkl. moms):' : 'Totalt Rek Utpris:', `${formatSEK(exportSummary.grossTotalSek)} SEK`, finalY);
+    drawTotalLine(`${state.includesVat ? labels.totalRecommendedPriceExVat : labels.totalRecommendedPrice}:`, `${formatSEK(exportSummary.grossTotalSek)} SEK`, finalY);
     finalY += 6;
 
     if (!state.hideDiscountReferences) {
         doc.setTextColor(...layout.colors.grayText);
-        drawTotalLine(state.includesVat ? 'Total Rabatt (Exkl. moms):' : 'Total Rabatt:', `-${formatSEK(exportSummary.totalDiscountSek)} SEK`, finalY);
+        drawTotalLine(`${state.includesVat ? labels.totalDiscountExVat : labels.totalDiscount}:`, `-${formatSEK(exportSummary.totalDiscountSek)} SEK`, finalY);
         finalY += 10;
     } else {
         finalY += 4;
     }
 
-    drawTotalLine('Totalt Exkl. moms:', `${formatSEK(exportSummary.finalTotalSek)} SEK`, finalY, true, layout.colors.accent);
+    drawTotalLine(`${labels.totalExVat}:`, `${formatSEK(exportSummary.finalTotalSek)} SEK`, finalY, true, layout.colors.accent);
     doc.setTextColor(255, 255, 255);
     doc.setFont('helvetica', 'bold');
-    doc.text('Totalt Exkl. moms:', rightColX, finalY);
+    doc.text(`${labels.totalExVat}:`, rightColX, finalY);
     doc.text(`${formatSEK(exportSummary.finalTotalSek)} SEK`, pageWidth - layout.pageMarginX, finalY, { align: 'right' });
     doc.setTextColor(...layout.colors.darkText);
     finalY += 10;
 
     if (state.includesVat) {
-        drawTotalLine('Moms 25%:', `${formatSEK(exportSummary.vatAmount)} SEK`, finalY);
+        drawTotalLine(`${labels.vat25}:`, `${formatSEK(exportSummary.vatAmount)} SEK`, finalY);
         finalY += 8;
-        drawTotalLine('Totalt inkl. moms:', `${formatSEK(exportSummary.totalWithVat)} SEK`, finalY, true, [35, 35, 45]);
+        drawTotalLine(`${labels.totalInclVat}:`, `${formatSEK(exportSummary.totalWithVat)} SEK`, finalY, true, [35, 35, 45]);
         doc.setTextColor(255, 255, 255);
         doc.setFont('helvetica', 'bold');
-        doc.text('Totalt inkl. moms:', rightColX, finalY);
+        doc.text(`${labels.totalInclVat}:`, rightColX, finalY);
         doc.text(`${formatSEK(exportSummary.totalWithVat)} SEK`, pageWidth - layout.pageMarginX, finalY, { align: 'right' });
         doc.setTextColor(...layout.colors.darkText);
         finalY += 10;
@@ -619,7 +629,7 @@ export function renderTotalsSection(doc, {
         doc.setFont('helvetica', 'italic');
         doc.setFontSize(8);
         doc.setTextColor(...layout.colors.grayText);
-        doc.text('* Totalsumman exkluderar artiklar med pris på förfrågan', pageWidth - layout.pageMarginX, finalY - 2, { align: 'right' });
+        doc.text(labels.totalsExcludePriceUponRequest, pageWidth - layout.pageMarginX, finalY - 2, { align: 'right' });
         finalY += 6;
         doc.setTextColor(...layout.colors.darkText);
         doc.setFontSize(9);
@@ -632,13 +642,14 @@ export function renderTotalsSection(doc, {
     return finalY;
 }
 
-export function drawTermsPageHeader(doc, { pageWidth, layout = PDF_LAYOUT }) {
+export function drawTermsPageHeader(doc, { pageWidth, layout = PDF_LAYOUT, exportLanguage = 'sv' }) {
+    const labels = getExportLabels(exportLanguage);
     drawBrandLogo(doc, layout.pageMarginX, 8, layout);
 
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(16);
     doc.setTextColor(...layout.colors.darkText);
-    doc.text('VILLKOR', pageWidth - layout.pageMarginX, 16, { align: 'right' });
+    doc.text(labels.termsTitle, pageWidth - layout.pageMarginX, 16, { align: 'right' });
 
     doc.setDrawColor(...layout.colors.brandPrimary);
     doc.setLineWidth(0.6);
@@ -649,20 +660,21 @@ export function renderTermsPages(doc, {
     state,
     pageWidth,
     pageHeight,
-    layout = PDF_LAYOUT
+    layout = PDF_LAYOUT,
+    exportLanguage = 'sv'
 }) {
     if (!state.includeTerms || !state.termsText) {
         return null;
     }
 
-    let termsY = startNewPage(doc, () => drawTermsPageHeader(doc, { pageWidth, layout }), layout.termsStartY);
+    let termsY = startNewPage(doc, () => drawTermsPageHeader(doc, { pageWidth, layout, exportLanguage }), layout.termsStartY);
     const maxWidth = pageWidth - (layout.pageMarginX * 2);
     const footerZone = pageHeight - layout.termsFooterZone;
     const ensureTermsSpace = (requiredHeight) => {
         if (termsY + requiredHeight <= footerZone) {
             return;
         }
-        termsY = startNewPage(doc, () => drawTermsPageHeader(doc, { pageWidth, layout }), layout.termsStartY);
+        termsY = startNewPage(doc, () => drawTermsPageHeader(doc, { pageWidth, layout, exportLanguage }), layout.termsStartY);
     };
 
     doc.setFont('helvetica', 'normal');
@@ -705,8 +717,10 @@ export function renderSignatureBlock(doc, {
     pageWidth,
     pageHeight,
     drawPageHeader,
-    layout = PDF_LAYOUT
+    layout = PDF_LAYOUT,
+    exportLanguage = 'sv'
 }) {
+    const labels = getExportLabels(exportLanguage);
     const blockHeight = 31;
     const footerZone = pageHeight - layout.termsFooterZone;
     let y = preferredY;
@@ -723,13 +737,13 @@ export function renderSignatureBlock(doc, {
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(10);
     doc.setTextColor(...layout.colors.darkText);
-    doc.text('Godkännande', layout.pageMarginX + 4, y + 6);
+    doc.text(labels.approval, layout.pageMarginX + 4, y + 6);
 
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(8.5);
-    doc.text('Namnförtydligande', layout.pageMarginX + 4, y + 13);
-    doc.text('Datum', layout.pageMarginX + 110, y + 13);
-    doc.text('Signatur', layout.pageMarginX + 145, y + 13);
+    doc.text(labels.printedName, layout.pageMarginX + 4, y + 13);
+    doc.text(labels.date, layout.pageMarginX + 110, y + 13);
+    doc.text(labels.signature, layout.pageMarginX + 145, y + 13);
 
     doc.setDrawColor(140, 140, 140);
     doc.line(layout.pageMarginX + 4, y + 21, layout.pageMarginX + 104, y + 21);
@@ -788,3 +802,4 @@ export function renderFooters(doc, { pageWidth, pageHeight, layout = PDF_LAYOUT 
         doc.text(`${page} / ${pageCount}`, pageWidth - layout.pageMarginX, pageHeight - 5, { align: 'right' });
     }
 }
+

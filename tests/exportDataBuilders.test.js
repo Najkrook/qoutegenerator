@@ -301,4 +301,64 @@ describe('export data builders', () => {
         const lastRow = wsData[wsData.length - 1];
         expect(lastRow[0]).toBe('* Totalsumman exkluderar artiklar med pris på förfrågan');
     });
+
+    it('localizes Excel and PDF export labels for English output', () => {
+        const state = createStateFixture({
+            exportLanguage: 'en',
+            includesVat: false,
+            globalDiscountPct: 10
+        });
+        const summary = {
+            totals: [
+                {
+                    model: 'Tillval: Speciallack',
+                    size: '-',
+                    unitPrice: 0,
+                    qty: 1,
+                    gross: 0,
+                    net: 0,
+                    discountSek: 0,
+                    discountPct: 0,
+                    priceUponRequest: true
+                },
+                {
+                    model: 'Övrigt: Extra goodwill-rabatt',
+                    size: '-',
+                    unitPrice: -100,
+                    qty: 1,
+                    gross: -100,
+                    net: -100,
+                    discountSek: 0,
+                    discountPct: 0
+                }
+            ],
+            finalTotalSek: -100,
+            grossTotalSek: -100,
+            totalDiscountSek: 0,
+            globalDiscountAmt: 25
+        };
+
+        const wsData = buildExcelSheetData(state, summary);
+        expect(wsData[0][0]).toBe('Quote');
+        expect(wsData[1][0]).toBe('Company');
+        expect(wsData[7]).toEqual([
+            'Model',
+            'Size',
+            'Unit price (Excl. VAT)',
+            'Qty',
+            'Your Price',
+            'Recommended Price',
+            'Discount in SEK',
+            'Discount in %'
+        ]);
+        expect(wsData.find((row) => row[0] === 'Add-on: Speciallack')[2]).toBe('Price on request');
+        expect(wsData.find((row) => row[0] === 'Other: Extra goodwill-rabatt')).toBeTruthy();
+        expect(wsData.some((row) => row[0] === 'Overall Discount (10%)')).toBe(true);
+        expect(wsData[wsData.length - 1][0]).toBe('* The total excludes items with price on request');
+
+        const pdfRows = buildPdfTableData(summary.totals, formatSek, { exportLanguage: 'en' });
+        expect(pdfRows[0][0]).toBe('Add-on: Speciallack');
+        expect(pdfRows[0][2]).toBe('Price on request');
+        expect(pdfRows[1][0]).toBe('Other: Extra goodwill-rabatt');
+    });
 });

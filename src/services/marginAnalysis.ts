@@ -87,7 +87,7 @@ export function analyzeQuoteMargins(
             addReviewCode(reviewCodes, 'non-positive-net');
         }
 
-        const includedInTotals = !isRequestPrice && !isOtherLine && marginPct != null && !isNonPositiveNet;
+        const includedInTotals = !isRequestPrice && !isOtherLine && marginPct != null;
         const estimatedCostSek = includedInTotals
             ? Number(row.gross || 0) * (1 - (marginPct / 100))
             : 0;

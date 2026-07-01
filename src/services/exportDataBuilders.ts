@@ -8,6 +8,7 @@ import type {
     QuoteTotalsRow
 } from '../types/contracts';
 import { applyVat } from '../utils/vatHelper';
+import { getExportLabels, translateSystemLabel } from './exportLocalization';
 
 type WorksheetCell = string | number;
 type WorksheetRow = WorksheetCell[];
@@ -62,35 +63,39 @@ export function buildExcelSheetData(
     summaryData: ExportSummaryInput = {}
 ): WorksheetRow[] {
     const customerInfo = safeCustomerInfo(state);
+    const labels = getExportLabels(state.exportLanguage);
+    const vatText = state.includesVat ? labels.inclVat : labels.exclVat;
+    const discountSekLabel = labels.discountSek.replace(/\n/g, ' ');
+    const discountPctLabel = labels.discountPct.replace(/\n/g, ' ');
     const wsData: WorksheetRow[] = [
-        ['Offert'],
-        ['Foretag', customerInfo.company || customerInfo.name || ''],
-        ['Projektreferens', customerInfo.reference || ''],
-        ['Er referens', customerInfo.customerReference || ''],
-        ['Datum', customerInfo.date || new Date().toLocaleDateString()],
-        ['Giltighetstid', customerInfo.validity || ''],
+        [labels.quote],
+        [labels.company, customerInfo.company || customerInfo.name || ''],
+        [labels.projectReference, customerInfo.reference || ''],
+        [labels.customerReference, customerInfo.customerReference || ''],
+        [labels.date, customerInfo.date || new Date().toLocaleDateString()],
+        [labels.validityPeriod, customerInfo.validity || ''],
         [],
         [
-            'Modell', 
-            'Storlek', 
-            state.includesVat ? 'Pris/enhet (Inkl. moms)' : 'Pris/enhet (Exkl. moms)', 
-            'Antal', 
-            state.includesVat ? 'Ert Pris (Inkl. moms)' : 'Ert Pris', 
-            state.includesVat ? 'Rek Utpris (Inkl. moms)' : 'Rek Utpris', 
-            state.includesVat ? 'Rabatt i SEK (Inkl. moms)' : 'Rabatt i SEK', 
-            'Rabatt i %'
+            labels.model,
+            labels.size,
+            `${labels.unitPrice} (${vatText})`,
+            labels.quantity,
+            state.includesVat ? `${labels.yourPrice} (${vatText})` : labels.yourPrice,
+            state.includesVat ? `${labels.recommendedPrice} (${vatText})` : labels.recommendedPrice,
+            state.includesVat ? `${discountSekLabel} (${vatText})` : discountSekLabel,
+            discountPctLabel
         ]
     ];
 
     (summaryData.totals || []).forEach((row) => {
         const isReq = row.priceUponRequest === true;
         wsData.push([
-            row.model,
+            translateSystemLabel(row.model, state.exportLanguage),
             row.size || '',
-            isReq ? 'Pris på förfrågan' : roundSek(applyVat(row.unitPrice, state.includesVat)),
+            isReq ? labels.priceUponRequest : roundSek(applyVat(row.unitPrice, state.includesVat)),
             row.qty,
-            isReq ? 'Pris på förfrågan' : roundSek(applyVat(row.net, state.includesVat)),
-            isReq ? 'Pris på förfrågan' : roundSek(applyVat(row.gross, state.includesVat)),
+            isReq ? labels.priceUponRequest : roundSek(applyVat(row.net, state.includesVat)),
+            isReq ? labels.priceUponRequest : roundSek(applyVat(row.gross, state.includesVat)),
             isReq ? '-' : roundSek(-applyVat(row.discountSek || 0, state.includesVat)),
             isReq ? '-' : `${row.discountPct}%`
         ]);
@@ -98,7 +103,7 @@ export function buildExcelSheetData(
 
     if ((summaryData.globalDiscountAmt || 0) > 0) {
         wsData.push([
-            `Overgripande Rabatt (${state.globalDiscountPct}%)`,
+            `${labels.globalDiscount} (${state.globalDiscountPct}%)`,
             '',
             '',
             '',
@@ -112,7 +117,7 @@ export function buildExcelSheetData(
     const totals = buildExportSummary(state, summaryData);
     wsData.push([]);
     wsData.push([
-        state.includesVat ? 'Totalt Inkl. Moms' : 'Totalt Exkl. Moms',
+        state.includesVat ? labels.totalInclVatExcel : labels.totalExVatExcel,
         '',
         '',
         '',
@@ -124,7 +129,7 @@ export function buildExcelSheetData(
 
     if (state.includesVat) {
         wsData.push([
-            'Varav Moms (25%)',
+            labels.vat25Excel,
             '',
             '',
             '',
@@ -134,7 +139,7 @@ export function buildExcelSheetData(
             ''
         ]);
         wsData.push([
-            'Totalt Exkl. Moms',
+            labels.totalExVatExcel,
             '',
             '',
             '',
@@ -149,7 +154,7 @@ export function buildExcelSheetData(
     if (hasPriceUponRequest) {
         wsData.push([]);
         wsData.push([
-            '* Totalsumman exkluderar artiklar med pris på förfrågan'
+            labels.totalsExcludePriceUponRequest
         ]);
     }
 
@@ -164,20 +169,21 @@ export function buildPdfTableData(
     const hideDiscountColumns = options.hideDiscountColumns === true;
     const hideRecommendedPriceColumn = options.hideRecommendedPriceColumn === true;
     const includesVat = options.includesVat === true;
+    const labels = getExportLabels(options.exportLanguage);
     const tableData: PdfTableRow[] = [];
 
     totalsArray.forEach((row) => {
         const isReq = row.priceUponRequest === true;
         const cells: PdfTableRow = [
-            row.model,
+            translateSystemLabel(row.model, options.exportLanguage),
             row.size || '-',
-            isReq ? 'Pris på förfrågan' : `${formatSEK(applyVat(row.unitPrice, includesVat))} SEK`,
+            isReq ? labels.priceUponRequest : `${formatSEK(applyVat(row.unitPrice, includesVat))} SEK`,
             `${row.qty}`,
-            isReq ? 'Pris på förfrågan' : `${formatSEK(applyVat(row.net, includesVat))} SEK`
+            isReq ? labels.priceUponRequest : `${formatSEK(applyVat(row.net, includesVat))} SEK`
         ];
 
         if (!hideRecommendedPriceColumn) {
-            cells.push(isReq ? 'Pris på förfrågan' : `${formatSEK(applyVat(row.gross, includesVat))} SEK`);
+            cells.push(isReq ? labels.priceUponRequest : `${formatSEK(applyVat(row.gross, includesVat))} SEK`);
         }
 
         if (!hideDiscountColumns) {

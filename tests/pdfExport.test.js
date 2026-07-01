@@ -216,6 +216,74 @@ describe('pdfExport helpers', () => {
         expect(textValues).toContain('Er referens: ER-900');
     });
 
+    it('renders English labels in the generated PDF when exportLanguage is en', () => {
+        const state = createZeroDiscountState({
+            exportLanguage: 'en',
+            quoteNumber: 'BRIXX - 260422-103',
+            includeTerms: true,
+            includePaymentBox: true,
+            includeSignatureBlock: true,
+            termsText: 'QUOTE AND PRICES\n- English standard terms.',
+            paymentTermsDays: 14,
+            customerInfo: {
+                name: '',
+                company: 'Two Forks',
+                reference: 'PROJ-1',
+                customerReference: 'ER-900',
+                date: '2026-03-19',
+                validity: '30 dagar'
+            }
+        });
+        const summary = {
+            totals: [
+                {
+                    model: 'Tillval: LED-Lighting with 4 RGBW-LED strips',
+                    size: '-',
+                    unitPrice: 0,
+                    qty: 1,
+                    gross: 0,
+                    net: 0,
+                    discountSek: 0,
+                    discountPct: 0,
+                    priceUponRequest: true,
+                    isAddon: true,
+                    line: 'BaHaMa'
+                }
+            ],
+            finalTotalSek: 0,
+            grossTotalSek: 0,
+            totalDiscountSek: 0
+        };
+
+        const pdfBlob = generatePDF(state, summary, true);
+        const textValues = pdfMockState.textCalls.map((call) => call.value);
+
+        expect(pdfBlob).toBeInstanceOf(Blob);
+        expect(textValues).toContain('QUOTE');
+        expect(textValues).toContain('Date: 2026-03-19');
+        expect(textValues).toContain('Quote No: BRIXX - 260422-103');
+        expect(textValues).toContain('Project reference: PROJ-1');
+        expect(textValues).toContain('Your reference: ER-900');
+        expect(textValues).toContain('Total excl. VAT:');
+        expect(textValues).toContain('PAYMENT & VALIDITY');
+        expect(textValues).toContain('Payment terms: 14 days');
+        expect(textValues).toContain('TERMS');
+        expect(textValues).toContain('Approval');
+        expect(textValues).toContain('* The total excludes items with price on request');
+        expect(pdfMockState.autoTableCalls[0].head[0]).toEqual([
+            'Model',
+            'Size',
+            'Unit price\nExcl. VAT',
+            'Qty',
+            'Your Price\nExcl. VAT',
+            'Recommended Price\nExcl. VAT',
+            'Discount\nin SEK\n(Excl. VAT)',
+            'Discount\nin %'
+        ]);
+        expect(pdfMockState.autoTableCalls[0].body[0][0]).toBe('Add-on: LED-Lighting with 4 RGBW-LED strips');
+        expect(pdfMockState.autoTableCalls[0].body[0][2]).toBe('Price on request');
+    });
+
     it('ignores the hide flag when discounts are present in the quote', () => {
         const state = createStateFixture({
             includeTerms: false,

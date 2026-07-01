@@ -5,6 +5,12 @@ import {
     hydrateQuoteState
 } from './quoteStateSchema';
 import { loadPersistedQuoteState, persistQuoteState } from './quoteStatePersistence';
+import {
+    getDefaultTemplateIdForLanguage,
+    getTemplateById,
+    isBuiltinTemplateId
+} from '../config/legalTemplates.shared';
+import { normalizeExportLanguage } from '../services/exportLocalization';
 
 export const QuoteContext = createContext<QuoteContextValue | undefined>(undefined);
 
@@ -25,6 +31,22 @@ function formatValidityLabel(days: number) {
 }
 
 const initialState = createInitialQuoteState();
+
+function applyExportLanguage(state: QuoteState, rawLanguage: unknown): QuoteState {
+    const exportLanguage = normalizeExportLanguage(rawLanguage);
+    const nextState = { ...state, exportLanguage };
+
+    if (!state.termsCustomized && isBuiltinTemplateId(state.termsTemplateId)) {
+        const template = getTemplateById(getDefaultTemplateIdForLanguage(exportLanguage));
+        return {
+            ...nextState,
+            termsTemplateId: template.id,
+            termsText: template.body
+        };
+    }
+
+    return nextState;
+}
 
 export function quoteReducer(state: QuoteState, action: QuoteReducerAction): QuoteState {
     switch (action.type) {
@@ -87,6 +109,8 @@ export function quoteReducer(state: QuoteState, action: QuoteReducerAction): Quo
             return { ...state, hideZeroDiscountReferencesInPdf: Boolean(action.payload) };
         case 'SET_PDF_THEME_ID':
             return hydrateQuoteState({ ...state, pdfThemeId: action.payload });
+        case 'SET_EXPORT_LANGUAGE':
+            return applyExportLanguage(state, action.payload);
         case 'SET_PAYMENT_TERMS_DAYS':
             return hydrateQuoteState({ ...state, paymentTermsDays: normalizePositiveInt(action.payload, 30) });
         case 'SET_QUOTE_VALIDITY_DAYS':

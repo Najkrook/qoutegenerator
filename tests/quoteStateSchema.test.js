@@ -14,6 +14,7 @@ describe('quoteStateSchema', () => {
         expect(hydrated.stateVersion).toBe(CURRENT_STATE_VERSION);
         expect(hydrated.hideZeroDiscountReferencesInPdf).toBe(false);
         expect(hydrated.pdfThemeId).toBe('brixx');
+        expect(hydrated.exportLanguage).toBe('sv');
         expect(hydrated.customerInfo.customerReference).toBe('');
         expect(hydrated.gridSelections).toEqual({});
     });
@@ -53,6 +54,7 @@ describe('quoteStateSchema', () => {
         expect(hydrated.inventoryData).toEqual({ bahama: [], bahamaV2: [], clickitup: {}, notes: '' });
         expect(hydrated.hideZeroDiscountReferencesInPdf).toBe(false);
         expect(hydrated.pdfThemeId).toBe('brixx');
+        expect(hydrated.exportLanguage).toBe('sv');
     });
 
     it('normalizes legacy validity and terms defaults safely', () => {
@@ -97,6 +99,41 @@ describe('quoteStateSchema', () => {
         expect(hydrateQuoteState({ pdfThemeId: 'brixx' }).pdfThemeId).toBe('brixx');
         expect(hydrateQuoteState({ pdfThemeId: 'unknown_theme' }).pdfThemeId).toBe('brixx');
         expect(hydrateQuoteState({}).pdfThemeId).toBe('brixx');
+    });
+
+    it('hydrates export language with a conservative Swedish default', () => {
+        expect(hydrateQuoteState({ exportLanguage: 'en' }).exportLanguage).toBe('en');
+        expect(hydrateQuoteState({ exportLanguage: 'sv' }).exportLanguage).toBe('sv');
+        expect(hydrateQuoteState({ exportLanguage: 'de' }).exportLanguage).toBe('sv');
+        expect(hydrateQuoteState({}).exportLanguage).toBe('sv');
+    });
+
+    it('switches built-in uncustomized terms when changing export language', () => {
+        const initial = createInitialQuoteState();
+
+        const englishState = quoteReducer(initial, {
+            type: 'SET_EXPORT_LANGUAGE',
+            payload: 'en'
+        });
+
+        expect(englishState.exportLanguage).toBe('en');
+        expect(englishState.termsTemplateId).toBe('standard_en');
+        expect(englishState.termsText).toContain('QUOTE AND PRICES');
+
+        const customState = {
+            ...englishState,
+            termsTemplateId: 'custom-template',
+            termsText: 'Custom legal text',
+            termsCustomized: true
+        };
+        const swedishState = quoteReducer(customState, {
+            type: 'SET_EXPORT_LANGUAGE',
+            payload: 'sv'
+        });
+
+        expect(swedishState.exportLanguage).toBe('sv');
+        expect(swedishState.termsTemplateId).toBe('custom-template');
+        expect(swedishState.termsText).toBe('Custom legal text');
     });
 
     it('survives malformed nested objects without crashing', () => {

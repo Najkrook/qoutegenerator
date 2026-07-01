@@ -15,14 +15,16 @@ import type {
     RawPersistedGridLineSelection,
     RawPersistedInventoryData,
     RawPersistedSketchMeta,
+    QuoteExportLanguage,
     StepInput,
     UnknownRecord
 } from '../types/contracts';
 import { DEFAULT_TEMPLATE_ID, getTemplateById, isBuiltinTemplateId } from '../config/legalTemplates.shared';
 import { DEFAULT_PDF_THEME_ID, normalizePdfThemeId } from '../config/pdfThemes';
+import { DEFAULT_EXPORT_LANGUAGE, normalizeExportLanguage } from '../services/exportLocalization';
 
 export const QUOTE_STATE_STORAGE_KEY = 'offertverktyg_state';
-export const CURRENT_STATE_VERSION = 2;
+export const CURRENT_STATE_VERSION = 3;
 
 const VALID_QUOTE_STATUSES: QuoteStatus[] = ['draft', 'sent', 'won', 'lost', 'archived'];
 const VALID_BAHAMA_STATUSES: BahamaInventoryStatus[] = ['available', 'reserved', 'needs-review', 'used', 'sold'];
@@ -348,6 +350,7 @@ function createBaseInitialState(): QuoteState {
         includePaymentBox: false,
         hideZeroDiscountReferencesInPdf: false,
         pdfThemeId: DEFAULT_PDF_THEME_ID,
+        exportLanguage: DEFAULT_EXPORT_LANGUAGE,
         paymentTermsDays: 30,
         quoteValidityDays: 30
     };
@@ -414,6 +417,7 @@ function migrateV0ToV1(rawState: UnknownRecord = {}): UnknownRecord {
         includeSignatureBlock: next.includeSignatureBlock === true,
         includePaymentBox: next.includePaymentBox === true,
         hideZeroDiscountReferencesInPdf: next.hideZeroDiscountReferencesInPdf === true,
+        exportLanguage: normalizeExportLanguage(next.exportLanguage),
         paymentTermsDays: normalizePositiveInt(next.paymentTermsDays, 30),
         quoteValidityDays: normalizePositiveInt(next.quoteValidityDays, validityFromCustomer || 30)
     };
@@ -426,6 +430,16 @@ function migrateV1ToV2(rawState: UnknownRecord = {}): UnknownRecord {
         ...next,
         stateVersion: 2,
         pdfThemeId: normalizePdfThemeId(next.pdfThemeId)
+    };
+}
+
+function migrateV2ToV3(rawState: UnknownRecord = {}): UnknownRecord {
+    const next = toRecord(rawState);
+
+    return {
+        ...next,
+        stateVersion: 3,
+        exportLanguage: normalizeExportLanguage(next.exportLanguage)
     };
 }
 
@@ -443,6 +457,12 @@ export function migrateQuoteState(fromVersion: unknown, rawState: unknown): Unkn
         if (version === 1) {
             nextState = migrateV1ToV2(nextState);
             version = 2;
+            continue;
+        }
+
+        if (version === 2) {
+            nextState = migrateV2ToV3(nextState);
+            version = 3;
             continue;
         }
 
@@ -546,6 +566,7 @@ export function hydrateQuoteState(input: HydratedQuoteStatePayload): QuoteState 
         includePaymentBox: mergedState.includePaymentBox === true,
         hideZeroDiscountReferencesInPdf: mergedState.hideZeroDiscountReferencesInPdf === true,
         pdfThemeId: normalizePdfThemeId(mergedState.pdfThemeId),
+        exportLanguage: normalizeExportLanguage(mergedState.exportLanguage) as QuoteExportLanguage,
         paymentTermsDays: normalizePositiveInt(mergedState.paymentTermsDays, initialState.paymentTermsDays),
         quoteValidityDays: normalizedValidityDays
     };

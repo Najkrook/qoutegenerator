@@ -108,12 +108,14 @@ export function generatePDF(
         const hideDiscountReferences = shouldHideDiscountReferencesInPdf(state, summaryData);
         const validUntilDate = computeValidUntilDateString(customerInfo.date, state.quoteValidityDays);
         const activeLayout = getPdfLayout(state.pdfThemeId);
+        const exportLanguage = state.exportLanguage || 'sv';
         const drawMainHeader = () => drawHeader(doc, {
             pageWidth,
             quoteDate,
             quoteNumber: state.quoteNumber || null,
             customerInfo,
-            layout: activeLayout
+            layout: activeLayout,
+            exportLanguage
         });
 
         drawMainHeader();
@@ -121,7 +123,8 @@ export function generatePDF(
         let finalY = renderCustomerInfoBlock(doc, {
             customerInfo,
             pageWidth,
-            layout: activeLayout
+            layout: activeLayout,
+            exportLanguage
         });
 
         finalY = renderGroupedTables(doc, {
@@ -133,7 +136,8 @@ export function generatePDF(
             includesVat: state.includesVat,
             hideDiscountReferences,
             drawMainHeader,
-            layout: activeLayout
+            layout: activeLayout,
+            exportLanguage
         });
 
         if ((summaryData.totals || []).length === 0 && !returnBlob) {
@@ -156,7 +160,8 @@ export function generatePDF(
             shouldRenderPaymentBox,
             drawMainHeader,
             layout: activeLayout,
-            hasPriceUponRequest: (summaryData.totals || []).some((r) => r.priceUponRequest === true)
+            hasPriceUponRequest: (summaryData.totals || []).some((r) => r.priceUponRequest === true),
+            exportLanguage
         });
 
         finalY = renderExtraNotesBlock(doc, {
@@ -165,14 +170,16 @@ export function generatePDF(
             pageHeight,
             drawMainHeader,
             currentY: finalY + 12,
-            layout: activeLayout
+            layout: activeLayout,
+            exportLanguage
         });
 
         const termsPageEndY = renderTermsPages(doc, {
             state,
             pageWidth,
             pageHeight,
-            layout: activeLayout
+            layout: activeLayout,
+            exportLanguage
         });
 
         if (shouldRenderSignatureBlock) {
@@ -182,8 +189,9 @@ export function generatePDF(
                     preferredY: termsPageEndY,
                     pageWidth,
                     pageHeight,
-                    drawPageHeader: () => drawTermsPageHeader(doc, { pageWidth, layout: activeLayout }),
-                    layout: activeLayout
+                    drawPageHeader: () => drawTermsPageHeader(doc, { pageWidth, layout: activeLayout, exportLanguage }),
+                    layout: activeLayout,
+                    exportLanguage
                 });
             } else {
                 renderSignatureBlock(doc, {
@@ -191,7 +199,8 @@ export function generatePDF(
                     pageWidth,
                     pageHeight,
                     drawPageHeader: drawMainHeader,
-                    layout: activeLayout
+                    layout: activeLayout,
+                    exportLanguage
                 });
             }
         }
