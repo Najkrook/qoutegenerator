@@ -354,6 +354,8 @@ export function SummaryExport({ onPrev, onBackToSketch, onOpenRetailerOrderHisto
     };
 
     const handleExportExcel = async (): Promise<void> => {
+        const excelFileName = effectiveState.exportLanguage === 'en' ? 'Quote.xlsx' : 'Offert.xlsx';
+
         try {
             await exportExcelWorkbook(effectiveState, summaryData);
             void safeLogActivity({
@@ -362,10 +364,10 @@ export function SummaryExport({ onPrev, onBackToSketch, onOpenRetailerOrderHisto
                 system: 'quote',
                 targetType: 'quote',
                 targetId: state.activeQuoteId || 'unsaved_quote',
-                details: 'Excel exporterad: Offert.xlsx',
+                details: `Excel exporterad: ${excelFileName}`,
                 metadata: {
                     format: 'excel',
-                    fileName: 'Offert.xlsx',
+                    fileName: excelFileName,
                     version: state.activeQuoteVersion || null,
                     customerName: getActivityCustomerLabel(state.customerInfo),
                     reference: state.customerInfo.reference || ''

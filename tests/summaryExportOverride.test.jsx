@@ -22,6 +22,10 @@ const activityState = vi.hoisted(() => ({
     safeLogActivity: vi.fn(async () => ({ ok: true }))
 }));
 
+const excelExportState = vi.hoisted(() => ({
+    generateExcel: vi.fn()
+}));
+
 const orderRequestState = vi.hoisted(() => ({
     getOrderRequestByQuoteVersion: vi.fn(async () => null),
     createOrderRequest: vi.fn(async () => ({
@@ -81,6 +85,10 @@ vi.mock('../src/utils/fileUtils', () => ({
 
 vi.mock('../src/services/quotePdfService', () => ({
     createQuotePdfBlob: vi.fn(async () => new Blob(['pdf']))
+}));
+
+vi.mock('../src/features/excelExport', () => ({
+    generateExcel: excelExportState.generateExcel
 }));
 
 vi.mock('../src/services/quoteRepositoryClient', () => ({
@@ -202,6 +210,8 @@ beforeEach(() => {
     fileUtilsState.saveBlobWithPicker.mockResolvedValue('saved');
     activityState.safeLogActivity.mockReset();
     activityState.safeLogActivity.mockResolvedValue({ ok: true });
+    excelExportState.generateExcel.mockReset();
+    excelExportState.generateExcel.mockResolvedValue(undefined);
     orderRequestState.getOrderRequestByQuoteVersion.mockReset();
     orderRequestState.getOrderRequestByQuoteVersion.mockResolvedValue(null);
     orderRequestState.createOrderRequest.mockReset();
@@ -386,6 +396,28 @@ describe('SummaryExport PDF override', () => {
         expect(activityState.safeLogActivity).toHaveBeenCalledWith(expect.objectContaining({
             metadata: expect.objectContaining({
                 missingQuoteNumber: false
+            })
+        }));
+    });
+
+    it('logs the English Excel filename when exporting in English', async () => {
+        const { container } = await renderSummaryExport({
+            stateOverrides: {
+                quoteNumber: 'BRIXX - 260423-101',
+                exportLanguage: 'en'
+            }
+        });
+
+        await clickButton(container, 'Exportera som Excel');
+
+        expect(excelExportState.generateExcel).toHaveBeenCalledWith(
+            expect.objectContaining({ exportLanguage: 'en' }),
+            expect.any(Object)
+        );
+        expect(activityState.safeLogActivity).toHaveBeenCalledWith(expect.objectContaining({
+            details: 'Excel exporterad: Quote.xlsx',
+            metadata: expect.objectContaining({
+                fileName: 'Quote.xlsx'
             })
         }));
     });

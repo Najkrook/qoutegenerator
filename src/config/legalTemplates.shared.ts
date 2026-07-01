@@ -1,4 +1,6 @@
-﻿const STANDARD_TERMS_BODY = `OFFERT OCH PRISER
+﻿import type { LegalTemplateOption, QuoteExportLanguage } from '../types/contracts';
+
+const STANDARD_TERMS_BODY = `OFFERT OCH PRISER
 - Samtliga priser i offerten anges i SEK exklusive moms om inget annat uttryckligen anges.
 - Offerten gäller under den giltighetstid som anges i offerten. Därefter förbehåller sig BRIXX rätten att justera pris och leveransvillkor.
 
@@ -56,7 +58,7 @@ OTHER
 - BRIXX reserves the right to correct typing errors, calculation errors, and obvious inaccuracies in the quote.
 - BRIXX is not responsible for delays or non-delivery caused by force majeure or other circumstances outside BRIXX's reasonable control.`;
 
-export const LEGAL_TEMPLATES = [
+export const LEGAL_TEMPLATES: LegalTemplateOption[] = [
     {
         id: 'standard',
         label: 'Standardvillkor',
@@ -74,22 +76,23 @@ export const LEGAL_TEMPLATES = [
 export const DEFAULT_TEMPLATE_ID = 'standard';
 export const DEFAULT_ENGLISH_TEMPLATE_ID = 'standard_en';
 
-export function getDefaultTemplateIdForLanguage(language) {
+export function getDefaultTemplateIdForLanguage(language: QuoteExportLanguage): string {
     return language === 'en' ? DEFAULT_ENGLISH_TEMPLATE_ID : DEFAULT_TEMPLATE_ID;
 }
 
-export function isBuiltinTemplateId(id) {
+export function isBuiltinTemplateId(id: unknown): boolean {
     return LEGAL_TEMPLATES.some((t) => t.id === id);
 }
 
-export function isLegalTemplateId(id, customTemplates = []) {
+export function isLegalTemplateId(id: unknown, customTemplates: LegalTemplateOption[] = []): boolean {
     return LEGAL_TEMPLATES.some((t) => t.id === id) ||
         customTemplates.some((t) => t.id === id);
 }
 
-export function getTemplateById(id, customTemplates = []) {
+export function getTemplateById(id: unknown, customTemplates: LegalTemplateOption[] = []): LegalTemplateOption {
     const all = [...LEGAL_TEMPLATES, ...customTemplates];
     const match = all.find((t) => t.id === id);
     if (match) return match;
     return LEGAL_TEMPLATES.find((t) => t.id === DEFAULT_TEMPLATE_ID) || LEGAL_TEMPLATES[0];
 }
+

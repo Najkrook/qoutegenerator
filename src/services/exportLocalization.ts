@@ -140,5 +140,7 @@ export function translateGroupLabel(value: unknown, language: unknown = DEFAULT_
         return raw;
     }
 
-    return raw === 'Övrigt' || raw === '\u00C3\u2013vrigt' ? EXPORT_LABELS.en.otherPrefix : raw;
+    // Saved quote data may contain older mojibake for "Övrigt"; keep English export resilient.
+    const legacyMojibakeOther = '\u00C3\u2013vrigt';
+    return raw === 'Övrigt' || raw === legacyMojibakeOther ? EXPORT_LABELS.en.otherPrefix : raw;
 }

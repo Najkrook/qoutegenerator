@@ -437,6 +437,7 @@ export interface LegalTemplateOption {
     id: string;
     label: string;
     body: string;
+    language?: QuoteExportLanguage;
     ownerUid?: string;
     ownerEmail?: string;
     createdAt?: string;
