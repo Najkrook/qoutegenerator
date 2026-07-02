@@ -3,13 +3,18 @@ import { useQuote } from '../../store/QuoteContext';
 import { catalogData } from '../../data/catalog';
 import { computeQuoteTotals } from '../../services/calculationEngine';
 import { applyVat } from '../../utils/vatHelper';
+import { hasZeroDiscountSummary } from '../../services/exportDataBuilders';
 
 export function FinalSummaryTable() {
     const { state, dispatch } = useQuote();
-    const { totals, grossTotalSek, totalDiscountSek, finalTotalSek, globalDiscountAmt } = computeQuoteTotals({
+    const summaryData = computeQuoteTotals({
         state,
         catalogData
     });
+    const { totals, grossTotalSek, totalDiscountSek, finalTotalSek, globalDiscountAmt } = summaryData;
+
+    const canHideDiscountReferences = hasZeroDiscountSummary(summaryData);
+    const hideZeroDiscount = state.hideZeroDiscountReferencesInPdf === true && canHideDiscountReferences;
 
     const formatSek = (value: number): string => Math.round(value).toLocaleString('sv-SE');
 
@@ -18,7 +23,21 @@ export function FinalSummaryTable() {
 
     return (
         <div className="space-y-6">
-            <div className="flex justify-end items-center gap-3">
+            <div className={`flex ${canHideDiscountReferences ? 'justify-between' : 'justify-end'} items-center gap-3`}>
+                {canHideDiscountReferences && (
+                    <label className="flex items-center gap-2 text-sm text-text-primary cursor-pointer">
+                        <input
+                            type="checkbox"
+                            checked={state.hideZeroDiscountReferencesInPdf === true}
+                            onChange={(event: ChangeEvent<HTMLInputElement>) => dispatch({
+                                type: 'SET_HIDE_ZERO_DISCOUNT_REFERENCES_IN_PDF',
+                                payload: event.target.checked
+                            })}
+                            className="w-4 h-4 accent-primary"
+                        />
+                        Dölj rabattreferenser i PDF när rabatten är 0%
+                    </label>
+                )}
                 <label className="flex items-center gap-2 cursor-pointer select-none">
                     <input
                         type="checkbox"
@@ -39,10 +58,19 @@ export function FinalSummaryTable() {
                         <tr className="bg-black/20 text-[10px] uppercase font-bold text-text-secondary tracking-wider">
                             <th className="p-4 border-b border-panel-border">Modell</th>
                             <th className="p-4 border-b border-panel-border">Storlek</th>
-                            <th className="p-4 border-b border-panel-border text-right whitespace-nowrap">{state.includesVat ? 'Ert pris (Inkl. moms)' : 'Ert pris'}</th>
+                            {!hideZeroDiscount && (
+                                <th className="p-4 border-b border-panel-border text-right whitespace-nowrap">{state.includesVat ? 'Ert pris (Inkl. moms)' : 'Ert pris'}</th>
+                            )}
+                            {hideZeroDiscount && (
+                                <th className="p-4 border-b border-panel-border text-right whitespace-nowrap text-primary">{state.includesVat ? 'Rek utpris (Inkl. moms)' : 'Rek utpris'}</th>
+                            )}
                             <th className="p-4 border-b border-panel-border text-center whitespace-nowrap">Antal</th>
-                            <th className="p-4 border-b border-panel-border text-right whitespace-nowrap">{state.includesVat ? 'Rek utpris (Inkl. moms)' : 'Rek utpris'}</th>
-                            <th className="p-4 border-b border-panel-border text-right whitespace-nowrap">Rabatt %</th>
+                            {!hideZeroDiscount && (
+                                <th className="p-4 border-b border-panel-border text-right whitespace-nowrap">{state.includesVat ? 'Rek utpris (Inkl. moms)' : 'Rek utpris'}</th>
+                            )}
+                            {!hideZeroDiscount && (
+                                <th className="p-4 border-b border-panel-border text-right whitespace-nowrap">Rabatt %</th>
+                            )}
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-panel-border/50">
@@ -55,16 +83,27 @@ export function FinalSummaryTable() {
                                 >
                                     <td className={`p-3 text-sm ${row.isAddon ? 'pl-8' : ''}`}>{row.model}</td>
                                     <td className="p-3 text-sm text-text-secondary">{row.size}</td>
-                                    <td className="p-3 text-sm text-right text-primary font-bold whitespace-nowrap">
-                                        {isReq ? 'Pris på förfrågan' : `${formatSek(applyVat(row.net, state.includesVat))} SEK`}
-                                    </td>
+                                    {!hideZeroDiscount && (
+                                        <td className="p-3 text-sm text-right text-primary font-bold whitespace-nowrap">
+                                            {isReq ? 'Pris på förfrågan' : `${formatSek(applyVat(row.net, state.includesVat))} SEK`}
+                                        </td>
+                                    )}
+                                    {hideZeroDiscount && (
+                                        <td className="p-3 text-sm text-right text-primary font-bold whitespace-nowrap">
+                                            {isReq ? 'Pris på förfrågan' : `${formatSek(applyVat(row.gross, state.includesVat))} SEK`}
+                                        </td>
+                                    )}
                                     <td className="p-3 text-sm text-center whitespace-nowrap">{row.qty}</td>
-                                    <td className="p-3 text-sm text-right text-text-secondary whitespace-nowrap">
-                                        {isReq ? 'Pris på förfrågan' : `${formatSek(applyVat(row.gross, state.includesVat))} SEK`}
-                                    </td>
-                                    <td className="p-3 text-sm text-right text-danger whitespace-nowrap">
-                                        {isReq ? '-' : `-${row.discountPct}%`}
-                                    </td>
+                                    {!hideZeroDiscount && (
+                                        <td className="p-3 text-sm text-right text-text-secondary whitespace-nowrap">
+                                            {isReq ? 'Pris på förfrågan' : `${formatSek(applyVat(row.gross, state.includesVat))} SEK`}
+                                        </td>
+                                    )}
+                                    {!hideZeroDiscount && (
+                                        <td className="p-3 text-sm text-right text-danger whitespace-nowrap">
+                                            {isReq ? '-' : `-${row.discountPct}%`}
+                                        </td>
+                                    )}
                                 </tr>
                             );
                         })}
@@ -73,7 +112,7 @@ export function FinalSummaryTable() {
                             <tr className="bg-black/10 italic text-text-secondary">
                                 <td colSpan={2} className="p-3 text-sm">Övergripande offertrabatt ({state.globalDiscountPct}%)</td>
                                 <td className="p-3 text-sm text-right text-danger font-bold whitespace-nowrap">-{formatSek(applyVat(globalDiscountAmt, state.includesVat))} SEK</td>
-                                <td colSpan={3}></td>
+                                <td colSpan={hideZeroDiscount ? 1 : 3}></td>
                             </tr>
                         )}
                     </tbody>
@@ -89,12 +128,12 @@ export function FinalSummaryTable() {
                                 <tr className="border-t border-panel-border/30">
                                     <td colSpan={2} className="p-2 text-right text-xs uppercase font-bold text-text-secondary">Moms 25%</td>
                                     <td className="p-2 text-right font-bold text-text-secondary whitespace-nowrap">{formatSek(vatAmount)} SEK</td>
-                                    <td colSpan={3}></td>
+                                    <td colSpan={hideZeroDiscount ? 1 : 3}></td>
                                 </tr>
                                 <tr className="bg-primary/5">
                                     <td colSpan={2} className="p-4 text-right text-lg uppercase font-black text-white">Totalt att betala (inkl. moms)</td>
                                     <td className="p-4 text-right font-black text-2xl text-primary whitespace-nowrap">{formatSek(totalWithVat)} SEK</td>
-                                    <td colSpan={3}></td>
+                                    <td colSpan={hideZeroDiscount ? 1 : 3}></td>
                                 </tr>
                             </>
                         )}

@@ -42,7 +42,6 @@ export function TermsAndPaymentPanel({ summaryData }: TermsAndPaymentPanelProps)
         ? true
         : window.FEATURE_PDF_LEGAL_TEMPLATES !== false;
     const selectedTemplateId = state.termsTemplateId || DEFAULT_TEMPLATE_ID;
-    const canHideDiscountReferences = hasZeroDiscountSummary(summaryData);
 
     const loadCustomTemplates = useCallback(async (): Promise<void> => {
         if (!user?.uid) return;
@@ -300,22 +299,6 @@ export function TermsAndPaymentPanel({ summaryData }: TermsAndPaymentPanelProps)
                         </div>
                     </div>
 
-                    <div className="flex flex-wrap gap-5 mt-4">
-                        {canHideDiscountReferences && (
-                            <label className="flex items-center gap-2 text-sm text-text-primary cursor-pointer">
-                                <input
-                                    type="checkbox"
-                                    checked={state.hideZeroDiscountReferencesInPdf === true}
-                                    onChange={(event: ChangeEvent<HTMLInputElement>) => dispatch({
-                                        type: 'SET_HIDE_ZERO_DISCOUNT_REFERENCES_IN_PDF',
-                                        payload: event.target.checked
-                                    })}
-                                    className="w-4 h-4 accent-primary"
-                                />
-                                Dölj rabattreferenser i PDF när rabatten är 0%
-                            </label>
-                        )}
-                    </div>
                 </>
             )}
         </section>

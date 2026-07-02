@@ -475,9 +475,40 @@ const rawCatalogData: CatalogData = {
                         ]
                     },
                     {
+                        name: "Valance Kvadrat",
+                        items: [
+                            { id: "xl_valance_5x5", name: "Valance 5x5", price: 450 },
+                            { id: "xl_valance_55x55", name: "Valance 5,5x5,5", price: 500 },
+                            { id: "xl_valance_6x6", name: "Valance 6x6", price: 560 },
+                            { id: "xl_valance_7x7", name: "Valance 7x7", price: 780 }
+                        ]
+                    },
+                    {
+                        name: "Valance Rektangel",
+                        items: [
+                            { id: "xl_valance_6x514", name: "Valance 6x5,14", price: 560 },
+                            { id: "xl_valance_7x5", name: "Valance 7x5", price: 670 },
+                            { id: "xl_valance_7x6", name: "Valance 7x6", price: 780 }
+                        ]
+                    },
+                    {
                         name: "Soft Foam Safeguard",
                         items: [
                             { id: "xl_soft_foam", name: "Soft Foam Safeguard", price: 600 }
+                        ]
+                    },
+                    {
+                        name: "TV & WLAN",
+                        items: [
+                            { id: "xl_tv_mod_1", name: "TV Frame Modification for 1 TV", price: 670 },
+                            { id: "xl_tv_mod_2", name: "TV Frame Modification for 2 TVs", price: 1330 },
+                            { id: "xl_wifi_mod", name: "Wifi Frame Modification", price: 1870 }
+                        ]
+                    },
+                    {
+                        name: "Hängränna – Frame Modification",
+                        items: [
+                            { id: "xl_gutter_frame_mod", name: "Frame Modification for Textile Gutter", price: 210 }
                         ]
                     }
                 ]

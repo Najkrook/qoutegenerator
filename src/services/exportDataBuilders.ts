@@ -179,7 +179,7 @@ export function buildPdfTableData(
             row.size || '-',
             isReq ? labels.priceUponRequest : `${formatSEK(applyVat(row.unitPrice, includesVat))} SEK`,
             `${row.qty}`,
-            isReq ? labels.priceUponRequest : `${formatSEK(applyVat(row.net, includesVat))} SEK`
+            isReq ? labels.priceUponRequest : `${formatSEK(applyVat(hideDiscountColumns ? row.gross : row.net, includesVat))} SEK`
         ];
 
         if (!hideRecommendedPriceColumn) {

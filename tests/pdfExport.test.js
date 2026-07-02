@@ -157,7 +157,7 @@ describe('pdfExport helpers', () => {
             'Storlek',
             'Pris/enhet\nExkl. moms',
             'Antal',
-            'Ert Pris\nExkl. moms'
+            'Rek Utpris\nExkl. moms'
         ]);
         expect(layout.reducedTableWidth).toBeGreaterThan(100);
         expect(layout.tableLeftMargin).toBe(layout.tableRightMargin);
@@ -180,7 +180,7 @@ describe('pdfExport helpers', () => {
             'Storlek',
             'Pris/enhet\nExkl. moms',
             'Antal',
-            'Ert Pris\nExkl. moms'
+            'Rek Utpris\nExkl. moms'
         ]);
         expect(pdfMockState.autoTableCalls[0].body[0]).toHaveLength(5);
         expect(pdfMockState.autoTableCalls[0].margin.left).toBeGreaterThan(10);

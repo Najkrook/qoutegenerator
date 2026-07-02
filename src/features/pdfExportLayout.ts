@@ -1,4 +1,4 @@
-﻿import autoTable, { type Color, type FontStyle, type Styles } from 'jspdf-autotable';
+import autoTable, { type Color, type FontStyle, type Styles } from 'jspdf-autotable';
 import { BRIXX_LOGO_BASE64 } from '../../assets/logoData';
 import { buildPdfTableData } from '../services/exportDataBuilders';
 import { getExportLabels, formatLocalizedDays, translateGroupLabel } from '../services/exportLocalization';
@@ -146,7 +146,7 @@ export function createPdfTableLayout(hideDiscountReferences, pageWidth, includes
     const labels = getExportLabels(exportLanguage);
     const vatText = includesVat ? labels.inclVat : labels.exclVat;
     const tableHead = hideDiscountReferences
-        ? [[labels.model, labels.size, `${labels.unitPrice}\n${vatText}`, labels.quantity, `${labels.yourPrice}\n${vatText}`]]
+        ? [[labels.model, labels.size, `${labels.unitPrice}\n${vatText}`, labels.quantity, `${labels.recommendedPrice}\n${vatText}`]]
         : [[labels.model, labels.size, `${labels.unitPrice}\n${vatText}`, labels.quantity, `${labels.yourPrice}\n${vatText}`, `${labels.recommendedPrice}\n${vatText}`, `${labels.discountSek}\n(${vatText})`, labels.discountPct]];
     const tableColumnStyles = (hideDiscountReferences
         ? {
@@ -459,6 +459,19 @@ export function renderGroupedTables(doc, {
                 if (data.section === 'body' && data.column.index === 4) {
                     data.cell.styles.fillColor = layout.colors.backgroundTint || ([235, 250, 240] as Color);
                 }
+                if (data.section === 'body' && data.column.index === 0) {
+                    const rowData = lineItems[data.row.index];
+                    if (rowData?.isAddon) {
+                        data.cell.styles.cellPadding = {
+                            top: 2.5,
+                            right: 2.5,
+                            bottom: 2.5,
+                            left: 7
+                        };
+                        data.cell.styles.fontStyle = 'italic';
+                        data.cell.styles.textColor = layout.colors.grayText as Color;
+                    }
+                }
             },
             margin: {
                 left: tableLeftMargin,
@@ -535,7 +548,9 @@ export function renderTotalsSection(doc, {
     hasPriceUponRequest = false,
     exportLanguage = 'sv'
 }) {
-    const rightColX = pageWidth - 90;
+    const { tableRightMargin } = createPdfTableLayout(state.hideDiscountReferences, pageWidth, state.includesVat, layout, exportLanguage);
+    const rightEdgeX = pageWidth - tableRightMargin;
+    const rightColX = rightEdgeX - 90 + layout.pageMarginX;
     const labels = getExportLabels(exportLanguage);
 
     if (finalY > pageHeight - 70) {
@@ -547,12 +562,12 @@ export function renderTotalsSection(doc, {
     const drawTotalLine = (label, value, y, isBold = false, bgColor = null) => {
         if (bgColor) {
             doc.setFillColor(...bgColor);
-            doc.roundedRect(rightColX - 4, y - 5, (pageWidth - layout.pageMarginX) - rightColX + 8, 8, 1, 1, 'F');
+            doc.roundedRect(rightColX - 4, y - 5, rightEdgeX - rightColX + 8, 8, 1, 1, 'F');
         }
         doc.setFont('helvetica', isBold ? 'bold' : 'normal');
         doc.setTextColor(...layout.colors.darkText);
         doc.text(label, rightColX, y);
-        doc.text(value, pageWidth - layout.pageMarginX, y, { align: 'right' });
+        doc.text(value, rightEdgeX, y, { align: 'right' });
     };
 
     const renderPaymentInfoBox = (startY) => {
@@ -609,7 +624,7 @@ export function renderTotalsSection(doc, {
     doc.setTextColor(255, 255, 255);
     doc.setFont('helvetica', 'bold');
     doc.text(`${labels.totalExVat}:`, rightColX, finalY);
-    doc.text(`${formatSEK(exportSummary.finalTotalSek)} SEK`, pageWidth - layout.pageMarginX, finalY, { align: 'right' });
+    doc.text(`${formatSEK(exportSummary.finalTotalSek)} SEK`, rightEdgeX, finalY, { align: 'right' });
     doc.setTextColor(...layout.colors.darkText);
     finalY += 10;
 
@@ -620,7 +635,7 @@ export function renderTotalsSection(doc, {
         doc.setTextColor(255, 255, 255);
         doc.setFont('helvetica', 'bold');
         doc.text(`${labels.totalInclVat}:`, rightColX, finalY);
-        doc.text(`${formatSEK(exportSummary.totalWithVat)} SEK`, pageWidth - layout.pageMarginX, finalY, { align: 'right' });
+        doc.text(`${formatSEK(exportSummary.totalWithVat)} SEK`, rightEdgeX, finalY, { align: 'right' });
         doc.setTextColor(...layout.colors.darkText);
         finalY += 10;
     }
@@ -629,7 +644,7 @@ export function renderTotalsSection(doc, {
         doc.setFont('helvetica', 'italic');
         doc.setFontSize(8);
         doc.setTextColor(...layout.colors.grayText);
-        doc.text(labels.totalsExcludePriceUponRequest, pageWidth - layout.pageMarginX, finalY - 2, { align: 'right' });
+        doc.text(labels.totalsExcludePriceUponRequest, rightEdgeX, finalY - 2, { align: 'right' });
         finalY += 6;
         doc.setTextColor(...layout.colors.darkText);
         doc.setFontSize(9);

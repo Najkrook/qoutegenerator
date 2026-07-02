@@ -139,6 +139,20 @@ describe('BaHaMa 2026 catalog data', () => {
         });
     });
 
+    it('includes Jumbrella XL valance categories from the 2026 price list', () => {
+        expectCategoryPrices('Jumbrella XL', 'valance_kvadrat', {
+            xl_valance_5x5: 450,
+            xl_valance_55x55: 500,
+            xl_valance_6x6: 560,
+            xl_valance_7x7: 780
+        });
+        expectCategoryPrices('Jumbrella XL', 'valance_rektangel', {
+            xl_valance_6x514: 560,
+            xl_valance_7x5: 670,
+            xl_valance_7x6: 780
+        });
+    });
+
     it('includes representative new Pure and Jumbrella add-ons in quote totals', () => {
         const summary = computeQuoteTotals({
             catalogData,
@@ -186,5 +200,39 @@ describe('BaHaMa 2026 catalog data', () => {
         expect(addonRows.jumb_spacer_electrics.unitPrice).toBe(4300);
         expect(addonRows.jumb_textil_valance_6x45.unitPrice).toBe(24200);
         expect(summary.grossTotalSek).toBe(86300);
+    });
+
+    it('includes Jumbrella XL valance add-ons in quote totals', () => {
+        const summary = computeQuoteTotals({
+            catalogData,
+            state: {
+                exchangeRate: 10,
+                builderItems: [
+                    {
+                        id: 'xl_1',
+                        line: 'BaHaMa',
+                        model: 'Jumbrella XL',
+                        size: '7x6 Rektangel',
+                        qty: 1,
+                        discountPct: 0,
+                        addons: [
+                            { id: 'xl_valance_7x6', qty: 1, discountPct: 0 }
+                        ]
+                    }
+                ],
+                gridSelections: {},
+                customCosts: []
+            }
+        });
+
+        const addonRows = Object.fromEntries(
+            summary.totals
+                .filter((row) => row.source.type === 'builder-addon')
+                .map((row) => [row.source.addonId, row])
+        );
+
+        expect(addonRows.xl_valance_7x6.unitPrice).toBe(7800);
+        expect(addonRows.xl_valance_7x6.gross).toBe(7800);
+        expect(summary.grossTotalSek).toBe(118800);
     });
 });
