@@ -1,15 +1,25 @@
 # QuoteGenerator
 
 ## What This Repo Is
-QuoteGenerator is an internal quote, sketch, and inventory application for BRIXX.
+QuoteGenerator is an internal portal for BRIXX that provides quoting, sketching, inventory management, project planning, activity logging, and a dedicated retailer workspace (including order requests and product documents).
 
-The primary UI is a React + Vite Single Page Application (SPA) under `src/`.
+The primary UI is a React + TypeScript + Vite Single Page Application (SPA) under `src/`.
 
-- `src/` contains the main entrypoint, views, context providers, client-facing services, configuration, and data models.
+- `src/` contains the main entrypoint, views, context providers, client-facing services, configuration, and data models. All source code in this directory has been migrated to TypeScript.
 - The application uses URL-based routing with `react-router-dom` for login, quote flow steps, history, sketch, and admin views.
 - Legacy vanilla JS files and multi-page HTML entrypoints have been removed to consolidate the architecture.
 
 This repository is a fully isolated `src/`-only React SPA environment.
+
+## Technology Stack
+- **Frontend**: React 19, TypeScript, Vite 5
+- **Styling**: Tailwind CSS v4
+- **Routing**: React Router v7
+- **Backend & Auth**: Firebase (Firestore, Auth, Hosting)
+- **Specialized Integrations**:
+  - `react-konva` for the Sketch tool
+  - `jspdf` and `xlsx` for PDF and Excel exports
+- **Testing**: Vitest
 
 ## Quick Start
 ### Prerequisites
@@ -37,7 +47,7 @@ Default Vite dev URL:
 - `http://localhost:5173` unless Vite selects a different port
 
 ## Firebase Setup
-The Firebase web app client config is currently checked into `src/services/firebase.js`.
+The Firebase web app client config is currently checked into `src/services/firebase.ts`.
 
 - This client-side config is not the same thing as Firebase Admin credentials.
 - Admin or service-account credentials are only required for admin scripts such as `scripts/backfill-quote-metadata.mjs`.
@@ -53,6 +63,7 @@ From `QuoteGenerator/`:
 - `npm run test:watch`: Run Vitest in watch mode.
 - `npm run test:confidence`: Run the fast regression suite for access control, state, sketch export, PDF/export, and text integrity.
 - `npm run test:run`: Run Vitest once with the basic reporter.
+- `npm run typecheck`: Run TypeScript compiler to validate types.
 
 ## Environment & Secrets
 Do not commit secrets or local-only credentials.
@@ -77,12 +88,20 @@ powershell -ExecutionPolicy Bypass -File .\scripts\verify-git-safety.ps1
 ## Project Structure
 Current active directories:
 
-- `src/`: React app entrypoint, views, contexts, client-side services, utilities, and catalog data. Contains migrated `features/`, `services/`, and `config/` directories.
+- `src/`: React app entrypoint, views, contexts, client-side services, utilities, and catalog data. Contains migrated `features/`, `services/`, and `config/` directories. Fully migrated to TypeScript.
 - `tests/`: Vitest coverage for calculations, repositories, exports, and UI text.
 - `scripts/`: Maintenance and safety scripts.
 
 
 The active application is fully encapsulated within the `src/` directory.
+
+## Additional Documentation
+For a deeper understanding of the project, refer to these internal documents:
+- [`AGENT_KNOWLEDGE_BASE.md`](file:///c:/Users/rooki/Documents/qoutegenerator/AGENT_KNOWLEDGE_BASE.md): The definitive guide to the runtime architecture, state models, database schema, and detailed user flows. Read this before making architectural changes.
+- [`roadmap.md`](file:///c:/Users/rooki/Documents/qoutegenerator/roadmap.md): The engineering roadmap with phased goals and cross-cutting dependencies.
+- [`TYPESCRIPT_MIGRATION_TRACKER.md`](file:///c:/Users/rooki/Documents/qoutegenerator/TYPESCRIPT_MIGRATION_TRACKER.md): Details the completed TypeScript migration process and decisions.
+- [`docs/COPY_EDITING_GUIDE.md`](file:///c:/Users/rooki/Documents/qoutegenerator/docs/COPY_EDITING_GUIDE.md): Guidelines for modifying Swedish copy and avoiding encoding issues.
+- [`retailer_plan.md`](file:///c:/Users/rooki/Documents/qoutegenerator/retailer_plan.md): Specification for the Retailer Workspace features.
 
 ## Core Workflow
 The quote flow uses semantic browser URLs:
@@ -103,6 +122,7 @@ Other active paths:
 Useful local validation commands:
 
 ```powershell
+npm run typecheck
 npm run test:run
 npm run build
 ```

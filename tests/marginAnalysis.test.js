@@ -77,7 +77,7 @@ describe('margin analysis', () => {
         expect(analysis.rows[0].reviewCodes).toContain('manual-pricing');
     });
 
-    it('excludes request-price, other-line, and non-positive rows while flagging them', () => {
+    it('excludes request-price and other-line rows but includes non-positive rows while flagging them', () => {
         const settings = normalizeQuoteMarginSettings(null);
         const analysis = analyzeQuoteMargins(createSummary([
             createRow({
@@ -97,7 +97,7 @@ describe('margin analysis', () => {
             })
         ]), settings);
 
-        expect(analysis.includedRowCount).toBe(0);
+        expect(analysis.includedRowCount).toBe(1);
         expect(analysis.reviewCounts['price-upon-request']).toBe(1);
         expect(analysis.reviewCounts['other-line']).toBe(1);
         expect(analysis.reviewCounts['non-positive-net']).toBe(1);
