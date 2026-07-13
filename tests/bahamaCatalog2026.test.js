@@ -50,7 +50,8 @@ describe('BaHaMa 2026 catalog data', () => {
             pure_spacer_tipping: 310,
             pure_pole_extension: 180,
             pure_pole_reduction: 180,
-            pure_soft_foam: 350
+            pure_soft_foam: 350,
+            pure_print_on_membrane: 1100
         });
 
         expectCategoryPrices('Pure', 'pure_textil_valance_round', {
@@ -94,7 +95,8 @@ describe('BaHaMa 2026 catalog data', () => {
             jumb_fischer_bolts: 340,
             jumb_multi_use_flange_plate: 260,
             jumb_cover_basic: 140,
-            jumb_soft_foam: 350
+            jumb_soft_foam: 350,
+            jumb_print_on_membrane: 1100
         });
 
         const jumbrellaAddons = getAddonMap('Jumbrella');
@@ -140,6 +142,9 @@ describe('BaHaMa 2026 catalog data', () => {
     });
 
     it('includes Jumbrella XL valance categories from the 2026 price list', () => {
+        expectAddonPrices('Jumbrella XL', {
+            xl_print_on_membrane: 1100
+        });
         expectCategoryPrices('Jumbrella XL', 'valance_kvadrat', {
             xl_valance_5x5: 450,
             xl_valance_55x55: 500,

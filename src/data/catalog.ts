@@ -301,7 +301,8 @@ const rawCatalogData: CatalogData = {
                             { id: "jumb_frame_custom", name: "Frame Color custom finish", price: 540 },
                             { id: "jumb_v4a_maritime", name: "V4A | Maritime Edition", price: 280 },
                             { id: "jumb_pole_extension", name: "Umbrella Center Pole Extension", price: 180 },
-                            { id: "jumb_pole_reduction", name: "Umbrella Center Pole Reduction", price: 180 }
+                            { id: "jumb_pole_reduction", name: "Umbrella Center Pole Reduction", price: 180 },
+                            { id: "jumb_print_on_membrane", name: "Print on membrane (ca pris)", price: 1100 }
                         ]
                     },
                     {
@@ -465,7 +466,8 @@ const rawCatalogData: CatalogData = {
                         name: "Cosmetic",
                         items: [
                             { id: "xl_frame_fancy", name: "Frame Color fancy designs", price: 890 },
-                            { id: "xl_frame_custom", name: "Frame Color custom finish", price: 660 }
+                            { id: "xl_frame_custom", name: "Frame Color custom finish", price: 660 },
+                            { id: "xl_print_on_membrane", name: "Print on membrane (ca pris)", price: 1100 }
                         ]
                     },
                     {
@@ -661,7 +663,8 @@ const rawCatalogData: CatalogData = {
                             { id: "pure_v4a_maritime", name: "V4A | Maritime", price: 230 },
                             { id: "pure_pole_extension", name: "Umbrella Center Pole Extension", price: 180 },
                             { id: "pure_pole_reduction", name: "Umbrella Center Pole Reduction", price: 180 },
-                            { id: "custom_edge_binding", name: "Custom Edge Binding", price: 250 }
+                            { id: "custom_edge_binding", name: "Custom Edge Binding", price: 250 },
+                            { id: "pure_print_on_membrane", name: "Print on membrane (ca pris)", price: 1100 }
                         ]
                     },
                     {
