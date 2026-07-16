@@ -690,6 +690,11 @@ export function renderTermsPages(doc, {
             return;
         }
         termsY = startNewPage(doc, () => drawTermsPageHeader(doc, { pageWidth, layout, exportLanguage }), layout.termsStartY);
+        
+        // Restore font settings after new page header which changes font to bold 16
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(9);
+        doc.setTextColor(...layout.colors.darkText);
     };
 
     doc.setFont('helvetica', 'normal');
