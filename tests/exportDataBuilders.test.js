@@ -8,6 +8,7 @@ import {
     shouldHideDiscountReferencesInPdf
 } from '../src/services/exportDataBuilders';
 import { createCatalogFixture, createStateFixture } from './fixtures/calculationFixtures';
+import { catalogData } from '../src/data/catalog';
 
 function formatSek(value) {
     return Math.round(value).toString();
@@ -341,6 +342,7 @@ describe('export data builders', () => {
         const wsData = buildExcelSheetData(state, summary);
         expect(wsData[0][0]).toBe('Quote');
         expect(wsData[1][0]).toBe('Company');
+        expect(wsData[5]).toEqual(['Validity period', '30 days']);
         expect(wsData[7]).toEqual([
             'Model',
             'Size',
@@ -360,5 +362,133 @@ describe('export data builders', () => {
         expect(pdfRows[0][0]).toBe('Add-on: Speciallack');
         expect(pdfRows[0][2]).toBe('Price on request');
         expect(pdfRows[1][0]).toBe('Other: Extra goodwill-rabatt');
+    });
+
+    it('uses source-based ClickitUp Fixed names in both Excel and PDF rows', () => {
+        const state = createStateFixture({
+            exportLanguage: 'en',
+            builderItems: [],
+            customCosts: [],
+            selectedLines: ['ClickitUpFixed'],
+            gridSelections: {
+                ClickitUpFixed: {
+                    items: {
+                        'ClickitUp Sektion|1000': { qty: 1, discountPct: 0 }
+                    },
+                    addons: {
+                        frakt_glas: { qty: 1, discountPct: 0 }
+                    },
+                    customAddonsByCategory: {}
+                }
+            }
+        });
+        const summary = computeQuoteTotals({ state, catalogData });
+
+        const excelRows = buildExcelSheetData(state, summary);
+        const pdfRows = buildPdfTableData(summary.totals, formatSek, { exportLanguage: 'en' });
+
+        expect(excelRows.some((row) => row[0] === 'CiUFixed section')).toBe(true);
+        expect(excelRows.some((row) => row[0] === 'Add-on: Glass freight – special pallet')).toBe(true);
+        expect(pdfRows.map((row) => row[0])).toEqual(expect.arrayContaining([
+            'CiUFixed section',
+            'Add-on: Glass freight – special pallet'
+        ]));
+    });
+
+    it('builds an English contracting-only Excel block without product headers or VAT', () => {
+        const state = createStateFixture({
+            exportLanguage: 'en',
+            includesVat: true,
+            builderItems: [],
+            gridSelections: {},
+            customCosts: [],
+            contractingWork: {
+                enabled: true,
+                projectName: 'Designer Village, Löddeköpinge',
+                rows: [
+                    {
+                        id: 'groundworks',
+                        workPackage: 'Groundworks and foundations',
+                        scope: 'Excavation and casting according to the supplied documentation.',
+                        unit: 'consolidated work package',
+                        priceExVatSek: 101600
+                    },
+                    {
+                        id: 'installation',
+                        workPackage: 'Installation',
+                        scope: 'Delivery and installation.',
+                        unit: 'consolidated work package',
+                        priceExVatSek: 469600
+                    }
+                ],
+                margin: { enabled: true, percent: 15 },
+                ata: { enabled: true, percent: 15 }
+            }
+        });
+        const summary = computeQuoteTotals({ state, catalogData: createCatalogFixture() });
+
+        const rows = buildExcelSheetData(state, summary);
+
+        expect(rows.some((row) => row[0] === 'Model')).toBe(false);
+        expect(rows.some((row) => row[0] === 'Total Incl. VAT')).toBe(false);
+        expect(rows).toContainEqual([
+            'Contracting works - consolidated overview for Designer Village, Löddeköpinge'
+        ]);
+        expect(rows).toContainEqual([
+            'Work package',
+            'Consolidated scope for the entire area',
+            'Unit',
+            'Your price excl. VAT'
+        ]);
+        expect(rows).toContainEqual([
+            'Groundworks and foundations',
+            'Excavation and casting according to the supplied documentation.',
+            'consolidated work package',
+            116840
+        ]);
+        expect(rows).toContainEqual([
+            'Installation',
+            'Delivery and installation.',
+            'consolidated work package',
+            540040
+        ]);
+        expect(rows).toContainEqual(['Base contract value for the entire area (excl. VAT)', '', '', 656880]);
+        expect(rows).toContainEqual(['Variation work allowance (±15%)', '', '', 98532]);
+        expect(rows).toContainEqual(['Lower indicative amount excl. VAT (-15%)', '', '', 558348]);
+        expect(rows).toContainEqual(['Upper indicative amount excl. VAT (+15%)', '', '', 755412]);
+        expect(rows.flat()).not.toEqual(expect.arrayContaining([101600, 469600]));
+        expect(rows.flat().map(String).join(' ')).not.toMatch(/marginal|margin|markup/i);
+    });
+
+    it('keeps product and contracting totals commercially separate in mixed Excel output', () => {
+        const state = createStateFixture({
+            includesVat: false,
+            contractingWork: {
+                enabled: true,
+                projectName: '',
+                rows: [{
+                    id: 'work-1',
+                    workPackage: 'Markarbete',
+                    scope: 'Schakt och gjutning',
+                    unit: 'arbete',
+                    priceExVatSek: 586180
+                }],
+                margin: { enabled: true, percent: 15 },
+                ata: { enabled: true, percent: 15 }
+            }
+        });
+        const summary = computeQuoteTotals({ state, catalogData: createCatalogFixture() });
+
+        const rows = buildExcelSheetData(state, summary);
+
+        expect(rows.some((row) => row[0] === 'Produkttotal exkl. moms' && row[4] === Math.round(summary.finalTotalSek))).toBe(true);
+        expect(rows).toContainEqual(['Entreprenadarbeten - sammanställd översikt']);
+        expect(rows).toContainEqual(['Grundkontraktsvärde för hela området (exkl. moms)', '', '', 674107]);
+        expect(rows).toContainEqual(['ÄTA-reserv (±15%)', '', '', 101116]);
+        expect(rows).toContainEqual(['Lägre indikativt belopp exkl. moms (-15%)', '', '', 572991]);
+        expect(rows).toContainEqual(['Övre indikativt belopp exkl. moms (+15%)', '', '', 775223]);
+        expect(rows.flat()).not.toContain(586180);
+        expect(rows.flat().map(String).join(' ')).not.toMatch(/marginal|margin|markup/i);
+        expect(summary.finalTotalSek).not.toBe(674107);
     });
 });

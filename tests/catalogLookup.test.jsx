@@ -16,6 +16,7 @@ import {
     getCatalogLineName,
     getGridCatalogLine
 } from '../src/data/catalogLookup';
+import { AuthContext } from '../src/store/AuthContext';
 import { QuoteContext } from '../src/store/QuoteContext';
 import { Configuration } from '../src/views/Configuration';
 
@@ -41,18 +42,35 @@ describe('catalogLookup', () => {
 
     it('partitions selected lines in the configuration flow through typed catalog helpers', () => {
         const html = renderToStaticMarkup(
-            <QuoteContext.Provider
+            <AuthContext.Provider
                 value={{
-                    state: {
-                        selectedLines: ['BaHaMa', 'ClickitUp', 'missing-line'],
-                        builderItems: [],
-                        gridSelections: {}
-                    },
-                    dispatch: vi.fn()
+                    user: { uid: 'user-1', email: 'user@example.com' },
+                    loading: false,
+                    accessLevel: 'quote-only',
+                    canViewEverything: false,
+                    canStartQuote: true,
+                    canAccessSketch: false,
+                    canAccessQuoteHistory: true,
+                    canExportSketchToQuote: false,
+                    login: vi.fn(),
+                    logout: vi.fn(),
+                    retailer: null,
+                    isRetailer: false
                 }}
             >
-                <Configuration onNext={() => {}} onPrev={() => {}} />
-            </QuoteContext.Provider>
+                <QuoteContext.Provider
+                    value={{
+                        state: {
+                            selectedLines: ['BaHaMa', 'ClickitUp', 'missing-line'],
+                            builderItems: [],
+                            gridSelections: {}
+                        },
+                        dispatch: vi.fn()
+                    }}
+                >
+                    <Configuration onNext={() => {}} onPrev={() => {}} />
+                </QuoteContext.Provider>
+            </AuthContext.Provider>
         );
 
         expect(html).toContain('Standardkonfiguration');
@@ -60,5 +78,7 @@ describe('catalogLookup', () => {
         expect(html).toContain('Sektionsval (Grid)');
         expect(html).toContain('GridConfigMock:ClickitUp');
         expect(html).not.toContain('GridConfigMock:missing-line');
+        expect(html).toContain('Exportspråk');
+        expect(html).toContain('aria-label="Exportspråk"');
     });
 });

@@ -102,4 +102,52 @@ describe('quoteStatePersistence', () => {
         expect(loaded.builderItems[0].addons[1].displayName).toBe('Speciallack Merlot');
         expect(loaded.builderItems[0].addons.map((addon) => addon.id)).toEqual(['heater', 'custom_1']);
     });
+
+    it('round-trips contracting work through persistence without changing user text', () => {
+        persistQuoteState({
+            ...createInitialQuoteState(),
+            contractingWork: {
+                enabled: true,
+                projectName: '  Designer Village  ',
+                rows: [{
+                    id: 'work_1',
+                    workPackage: 'Grundarbeten',
+                    scope: 'Schaktning\noch gjutning',
+                    unit: ' samlat paket ',
+                    priceExVatSek: 101600
+                }],
+                margin: {
+                    enabled: true,
+                    percent: 15
+                },
+                ata: {
+                    enabled: true,
+                    percent: 15
+                }
+            }
+        }, storage);
+
+        const loaded = loadPersistedQuoteState(storage);
+
+        expect(loaded.stateVersion).toBe(5);
+        expect(loaded.contractingWork).toEqual({
+            enabled: true,
+            projectName: '  Designer Village  ',
+            rows: [{
+                id: 'work_1',
+                workPackage: 'Grundarbeten',
+                scope: 'Schaktning\noch gjutning',
+                unit: ' samlat paket ',
+                priceExVatSek: 101600
+            }],
+            margin: {
+                enabled: true,
+                percent: 15
+            },
+            ata: {
+                enabled: true,
+                percent: 15
+            }
+        });
+    });
 });

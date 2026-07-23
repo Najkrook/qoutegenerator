@@ -1003,7 +1003,7 @@ const rawCatalogData: CatalogData = {
         currency: "SEK",
         gridItems: [
             {
-                model: "ClickitUp Sektion", sizes: [
+                model: "ClickitUp Sektion", exportNameEn: "ClickitUp section", sizes: [
                     { size: "700", price: 11134 },
                     { size: "1000", price: 11134 },
                     { size: "1100", price: 11379 },
@@ -1018,16 +1018,16 @@ const rawCatalogData: CatalogData = {
                     { size: "2000", price: 13582 }
                 ]
             },
-            { model: "Curved Rundat Hörn", sizes: [{ size: "500x500", price: 21200 }] },
+            { model: "Curved Rundat Hörn", exportNameEn: "ClickitUpCurved", sizes: [{ size: "500x500", price: 21200 }] },
             {
-                model: "ClickitUp Hane", sizes: [
+                model: "ClickitUp Hane", exportNameEn: "ClickitUp male section", sizes: [
                     { size: "700", price: 11869 },
                     { size: "1000", price: 11869 },
                     { size: "1100", price: 12114 }
                 ]
             },
             {
-                model: "ClickitUp Dörr", sizes: [
+                model: "ClickitUp Dörr", exportNameEn: "ClickitUp Door", sizes: [
                     { size: "700", price: 16932 },
                     { size: "1000", price: 16932 },
                     { size: "1100", price: 17177 }
@@ -1039,64 +1039,64 @@ const rawCatalogData: CatalogData = {
                 id: "freight",
                 name: "Fraktkostnad",
                 items: [
-                    { id: "frakt_glas", name: "Glasfrakt Specialpall", price: 2120, autoScale: true, autoScaleDivisor: 6 }
+                    { id: "frakt_glas", name: "Glasfrakt Specialpall", exportNameEn: "Glass freight – special pallet", price: 2120, autoScale: true, autoScaleDivisor: 6 }
                 ]
             },
             {
                 id: "required",
                 name: "Nödvändiga Tillval",
                 items: [
-                    { id: "stodben_stort", name: "Stödben stort (45°)", price: 1024 },
-                    { id: "stodben_litet", name: "Stödben litet (Slimline)", price: 364 },
-                    { id: "passbit_alu", name: "Passbit Alu stolpe (50x80mm) inkl. Täcklock", price: 1233 }
+                    { id: "stodben_stort", name: "Stödben stort (45°)", exportNameEn: "Large support leg (45°)", price: 1024 },
+                    { id: "stodben_litet", name: "Stödben litet (Slimline)", exportNameEn: "Small support leg (Slimline)", price: 364 },
+                    { id: "passbit_alu", name: "Passbit Alu stolpe (50x80mm) inkl. Täcklock", exportNameEn: "Aluminium post spacer (50 × 80 mm), incl. cover cap", price: 1233 }
                 ]
             },
             {
                 id: "recommended",
                 name: "Rekommenderade tillval",
                 items: [
-                    { id: "svartanodiserade", name: "Svartanodiserade profiler", price: 340, autoScale: true },
-                    { id: "stoppknapp", name: "Stoppknapp 140 cm", price: 564, autoScale: true }
+                    { id: "svartanodiserade", name: "Svartanodiserade profiler", exportNameEn: "Black-anodised profiles", price: 340, autoScale: true },
+                    { id: "stoppknapp", name: "Stoppknapp 140 cm", exportNameEn: "Stop button, 140 cm", price: 564, autoScale: true }
                 ]
             },
             {
                 id: "additional",
                 name: "Andra Tillval / Tillkommande",
                 items: [
-                    { id: "montering_gangjarn", name: "Montering Gångjärn Rostfritt", price: 1140 },
-                    { id: "rostfritt_vinkel", name: "Rostfritt vinkelbeslag", price: 124 },
-                    { id: "galvad_stall", name: "Galvad Ställfot (ovan mark inst)", price: 967 },
-                    { id: "vitlackerade_profiler", name: "Vitlackerade profiler", price: 680 },
-                    { id: "stallavgift_lackering", name: "Ställavgift lackering", price: 4900 },
-                    { id: "panikregel", name: "Panikregel", price: 5000 },
-                    { id: "projektering", name: "Projektering. (Fast timpris)", price: 720 }
+                    { id: "montering_gangjarn", name: "Montering Gångjärn Rostfritt", exportNameEn: "Stainless-steel hinge installation", price: 1140 },
+                    { id: "rostfritt_vinkel", name: "Rostfritt vinkelbeslag", exportNameEn: "Stainless-steel angle bracket", price: 124 },
+                    { id: "galvad_stall", name: "Galvad Ställfot (ovan mark inst)", exportNameEn: "Galvanised adjustable foot (above-ground installation)", price: 967 },
+                    { id: "vitlackerade_profiler", name: "Vitlackerade profiler", exportNameEn: "White powder-coated profiles", price: 680 },
+                    { id: "stallavgift_lackering", name: "Ställavgift lackering", exportNameEn: "Powder-coating setup fee", price: 4900 },
+                    { id: "panikregel", name: "Panikregel", exportNameEn: "Panic bar", price: 5000 },
+                    { id: "projektering", name: "Projektering. (Fast timpris)", exportNameEn: "Engineering (fixed hourly rate)", price: 720 }
                 ]
             },
             {
                 id: "blomsterlada",
                 name: "Blomsterlåda (svartlackad)",
                 items: [
-                    { id: "blomsterlada_1800", name: "Blomsterlåda 1800 mm", price: 6150 },
-                    { id: "blomsterlada_1500", name: "Blomsterlåda 1500 mm", price: 6000 },
-                    { id: "blomsterlada_1000", name: "Blomsterlåda 1000 mm", price: 5850 },
-                    { id: "tillval_hjul", name: "Tillval hjul", price: 600 },
-                    { id: "tillval_tralav", name: "Tillval Trälav", price: 2200 },
-                    { id: "startkostnad_special", name: "Startkostnad specialmått (närmast större sektionsstorlek + en startkostnad)", price: 3000 },
-                    { id: "startkostnad_ral", name: "Startkostnad RAL-lack (antal RAL + en startkostnad)", price: 4900 },
-                    { id: "ral_blomsterlador", name: "RAL (antal blomsterlådor)", price: 340 }
+                    { id: "blomsterlada_1800", name: "Blomsterlåda 1800 mm", exportNameEn: "Planter box 1800 mm", price: 6150 },
+                    { id: "blomsterlada_1500", name: "Blomsterlåda 1500 mm", exportNameEn: "Planter box 1500 mm", price: 6000 },
+                    { id: "blomsterlada_1000", name: "Blomsterlåda 1000 mm", exportNameEn: "Planter box 1000 mm", price: 5850 },
+                    { id: "tillval_hjul", name: "Tillval hjul", exportNameEn: "Wheels", price: 600 },
+                    { id: "tillval_tralav", name: "Tillval Trälav", exportNameEn: "Wooden bench", price: 2200 },
+                    { id: "startkostnad_special", name: "Startkostnad specialmått (närmast större sektionsstorlek + en startkostnad)", exportNameEn: "Custom-size setup fee", price: 3000 },
+                    { id: "startkostnad_ral", name: "Startkostnad RAL-lack (antal RAL + en startkostnad)", exportNameEn: "RAL powder-coating setup fee", price: 4900 },
+                    { id: "ral_blomsterlador", name: "RAL (antal blomsterlådor)", exportNameEn: "RAL powder coating (quantity of planter boxes)", price: 340 }
                 ]
             },
             {
                 id: "stickfotter",
                 name: "Stickfötter",
                 items: [
-                    { id: "stickfot_std_singel", name: "Stickfot Standard Singel", price: 222 },
-                    { id: "stickfot_std_dubbel", name: "Stickfot Standard Dubbel", price: 349 },
-                    { id: "stickfot_std_kapad", name: "Stickfot Standard Kapad", price: 295 },
-                    { id: "stickfot_plus30_singel", name: "Stickfot +30 Singel", price: 251 },
-                    { id: "stickfot_plus30_dubbel", name: "Stickfot +30 Dubbel", price: 412 },
-                    { id: "stickfot_plus60_singel", name: "Stickfot +60 Singel", price: 263 },
-                    { id: "stickfot_plus60_dubbel", name: "Stickfot +60 Dubbel", price: 414 }
+                    { id: "stickfot_std_singel", name: "Stickfot Standard Singel", exportNameEn: "Standard ground spike, single", price: 222 },
+                    { id: "stickfot_std_dubbel", name: "Stickfot Standard Dubbel", exportNameEn: "Standard ground spike, double", price: 349 },
+                    { id: "stickfot_std_kapad", name: "Stickfot Standard Kapad", exportNameEn: "Standard ground spike, cut to size", price: 295 },
+                    { id: "stickfot_plus30_singel", name: "Stickfot +30 Singel", exportNameEn: "+30 ground spike, single", price: 251 },
+                    { id: "stickfot_plus30_dubbel", name: "Stickfot +30 Dubbel", exportNameEn: "+30 ground spike, double", price: 412 },
+                    { id: "stickfot_plus60_singel", name: "Stickfot +60 Singel", exportNameEn: "+60 ground spike, single", price: 263 },
+                    { id: "stickfot_plus60_dubbel", name: "Stickfot +60 Dubbel", exportNameEn: "+60 ground spike, double", price: 414 }
                 ]
             }
         ]
@@ -1107,7 +1107,7 @@ const rawCatalogData: CatalogData = {
         currency: "SEK",
         gridItems: [
             {
-                model: "ClickitUp Sektion", sizes: [
+                model: "ClickitUp Sektion", exportNameEn: "CiUFixed section", sizes: [
                     { size: "700", price: 4396 },
                     { size: "1000", price: 4396 },
                     { size: "1100", price: 4516 },
@@ -1123,13 +1123,13 @@ const rawCatalogData: CatalogData = {
                 ]
             },
             {
-                model: "ClickitUp Hane", sizes: [
+                model: "ClickitUp Hane", exportNameEn: "CiUFixed male section", sizes: [
                     { size: "1000", price: 4396 },
                     { size: "1100", price: 4396 }
                 ]
             },
             {
-                model: "ClickitUp Dörr", sizes: [
+                model: "ClickitUp Dörr", exportNameEn: "CiUFixedDoor", sizes: [
                     { size: "1000", price: 11756 },
                     { size: "1100", price: 11836 }
                 ]
@@ -1140,63 +1140,63 @@ const rawCatalogData: CatalogData = {
                 id: "freight",
                 name: "Fraktkostnad",
                 items: [
-                    { id: "frakt_glas", name: "Glasfrakt Specialpall", price: 2120, autoScale: true, autoScaleDivisor: 6 }
+                    { id: "frakt_glas", name: "Glasfrakt Specialpall", exportNameEn: "Glass freight – special pallet", price: 2120, autoScale: true, autoScaleDivisor: 6 }
                 ]
             },
             {
                 id: "required",
                 name: "Nödvändiga Tillval",
                 items: [
-                    { id: "stodben_stort", name: "Stödben stort (45°)", price: 1024 },
-                    { id: "stodben_litet", name: "Stödben litet (Slimline)", price: 364 },
-                    { id: "passbit_alu", name: "Passbit Alu stolpe (50x80mm) inkl. Täcklock", price: 1233 }
+                    { id: "stodben_stort", name: "Stödben stort (45°)", exportNameEn: "Large support leg (45°)", price: 1024 },
+                    { id: "stodben_litet", name: "Stödben litet (Slimline)", exportNameEn: "Small support leg (Slimline)", price: 364 },
+                    { id: "passbit_alu", name: "Passbit Alu stolpe (50x80mm) inkl. Täcklock", exportNameEn: "Aluminium post spacer (50 × 80 mm), incl. cover cap", price: 1233 }
                 ]
             },
             {
                 id: "recommended",
                 name: "Rekommenderade tillval",
                 items: [
-                    { id: "svartanodiserade", name: "Svartanodiserade profiler", price: 340, autoScale: true }
+                    { id: "svartanodiserade", name: "Svartanodiserade profiler", exportNameEn: "Black-anodised profiles", price: 340, autoScale: true }
                 ]
             },
             {
                 id: "additional",
                 name: "Andra Tillval / Tillkommande",
                 items: [
-                    { id: "montering_gangjarn", name: "Montering Gångjärn Rostfritt", price: 1140 },
-                    { id: "rostfritt_vinkel", name: "Rostfritt vinkelbeslag", price: 124 },
-                    { id: "galvad_stall", name: "Galvad Ställfot (ovan mark inst)", price: 967 },
-                    { id: "vitlackerade_profiler", name: "Vitlackerade profiler", price: 680 },
-                    { id: "stallavgift_lackering", name: "Ställavgift lackering", price: 4900 },
-                    { id: "panikregel", name: "Panikregel", price: 5000 },
-                    { id: "projektering", name: "Projektering. (Fast timpris)", price: 720 }
+                    { id: "montering_gangjarn", name: "Montering Gångjärn Rostfritt", exportNameEn: "Stainless-steel hinge installation", price: 1140 },
+                    { id: "rostfritt_vinkel", name: "Rostfritt vinkelbeslag", exportNameEn: "Stainless-steel angle bracket", price: 124 },
+                    { id: "galvad_stall", name: "Galvad Ställfot (ovan mark inst)", exportNameEn: "Galvanised adjustable foot (above-ground installation)", price: 967 },
+                    { id: "vitlackerade_profiler", name: "Vitlackerade profiler", exportNameEn: "White powder-coated profiles", price: 680 },
+                    { id: "stallavgift_lackering", name: "Ställavgift lackering", exportNameEn: "Powder-coating setup fee", price: 4900 },
+                    { id: "panikregel", name: "Panikregel", exportNameEn: "Panic bar", price: 5000 },
+                    { id: "projektering", name: "Projektering. (Fast timpris)", exportNameEn: "Engineering (fixed hourly rate)", price: 720 }
                 ]
             },
             {
                 id: "blomsterlada",
                 name: "Blomsterlåda (svartlackad)",
                 items: [
-                    { id: "blomsterlada_1800", name: "Blomsterlåda 1800 mm", price: 6150 },
-                    { id: "blomsterlada_1500", name: "Blomsterlåda 1500 mm", price: 6000 },
-                    { id: "blomsterlada_1000", name: "Blomsterlåda 1000 mm", price: 5850 },
-                    { id: "tillval_hjul", name: "Tillval hjul", price: 600 },
-                    { id: "tillval_tralav", name: "Tillval Trälav", price: 2200 },
-                    { id: "startkostnad_special", name: "Startkostnad specialmått (närmast större sektionsstorlek + en startkostnad)", price: 3000 },
-                    { id: "startkostnad_ral", name: "Startkostnad RAL-lack (antal RAL + en startkostnad)", price: 4900 },
-                    { id: "ral_blomsterlador", name: "RAL (antal blomsterlådor)", price: 340 }
+                    { id: "blomsterlada_1800", name: "Blomsterlåda 1800 mm", exportNameEn: "Planter box 1800 mm", price: 6150 },
+                    { id: "blomsterlada_1500", name: "Blomsterlåda 1500 mm", exportNameEn: "Planter box 1500 mm", price: 6000 },
+                    { id: "blomsterlada_1000", name: "Blomsterlåda 1000 mm", exportNameEn: "Planter box 1000 mm", price: 5850 },
+                    { id: "tillval_hjul", name: "Tillval hjul", exportNameEn: "Wheels", price: 600 },
+                    { id: "tillval_tralav", name: "Tillval Trälav", exportNameEn: "Wooden bench", price: 2200 },
+                    { id: "startkostnad_special", name: "Startkostnad specialmått (närmast större sektionsstorlek + en startkostnad)", exportNameEn: "Custom-size setup fee", price: 3000 },
+                    { id: "startkostnad_ral", name: "Startkostnad RAL-lack (antal RAL + en startkostnad)", exportNameEn: "RAL powder-coating setup fee", price: 4900 },
+                    { id: "ral_blomsterlador", name: "RAL (antal blomsterlådor)", exportNameEn: "RAL powder coating (quantity of planter boxes)", price: 340 }
                 ]
             },
             {
                 id: "stickfotter",
                 name: "Stickfötter",
                 items: [
-                    { id: "stickfot_std_singel", name: "Stickfot Standard Singel", price: 222 },
-                    { id: "stickfot_std_dubbel", name: "Stickfot Standard Dubbel", price: 349 },
-                    { id: "stickfot_std_kapad", name: "Stickfot Standard Kapad", price: 295 },
-                    { id: "stickfot_plus30_singel", name: "Stickfot +30 Singel", price: 251 },
-                    { id: "stickfot_plus30_dubbel", name: "Stickfot +30 Dubbel", price: 412 },
-                    { id: "stickfot_plus60_singel", name: "Stickfot +60 Singel", price: 263 },
-                    { id: "stickfot_plus60_dubbel", name: "Stickfot +60 Dubbel", price: 414 }
+                    { id: "stickfot_std_singel", name: "Stickfot Standard Singel", exportNameEn: "Standard ground spike, single", price: 222 },
+                    { id: "stickfot_std_dubbel", name: "Stickfot Standard Dubbel", exportNameEn: "Standard ground spike, double", price: 349 },
+                    { id: "stickfot_std_kapad", name: "Stickfot Standard Kapad", exportNameEn: "Standard ground spike, cut to size", price: 295 },
+                    { id: "stickfot_plus30_singel", name: "Stickfot +30 Singel", exportNameEn: "+30 ground spike, single", price: 251 },
+                    { id: "stickfot_plus30_dubbel", name: "Stickfot +30 Dubbel", exportNameEn: "+30 ground spike, double", price: 412 },
+                    { id: "stickfot_plus60_singel", name: "Stickfot +60 Singel", exportNameEn: "+60 ground spike, single", price: 263 },
+                    { id: "stickfot_plus60_dubbel", name: "Stickfot +60 Dubbel", exportNameEn: "+60 ground spike, double", price: 414 }
                 ]
             }
         ]

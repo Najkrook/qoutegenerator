@@ -28,6 +28,34 @@ describe('computeQuoteTotals', () => {
         expect(summary.globalDiscountAmt).toBe(0);
     });
 
+    it('keeps product totals unchanged when contracting work and its margin are enabled', () => {
+        const state = createStateFixture();
+        const catalogData = createCatalogFixture();
+        const productOnly = computeQuoteTotals({ state, catalogData });
+        const mixedOffer = computeQuoteTotals({
+            state: {
+                ...state,
+                includesVat: true,
+                contractingWork: {
+                    enabled: true,
+                    projectName: 'Designer Village',
+                    rows: [{
+                        id: 'work-1',
+                        workPackage: 'Entreprenad',
+                        scope: 'Separat omfattning',
+                        unit: 'Arbetspaket',
+                        priceExVatSek: 571200
+                    }],
+                    margin: { enabled: true, percent: 15 },
+                    ata: { enabled: true, percent: 15 }
+                }
+            },
+            catalogData
+        });
+
+        expect(mixedOffer).toEqual(productOnly);
+    });
+
     it('does not apply global discount as a second discount', () => {
         const state = createStateFixture({
             globalDiscountPct: 25,

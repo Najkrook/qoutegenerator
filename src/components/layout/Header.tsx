@@ -27,7 +27,7 @@ export function Header() {
     const currentStepNumber = quoteStep ? getQuoteStepNumber(quoteStep) : null;
 
     const steps = [
-        { id: 'product-lines', label: '1. Produktlinje' },
+        { id: 'product-lines', label: '1. Offertinnehåll' },
         { id: 'configuration', label: '2. Konfiguration' },
         { id: 'pricing', label: '3. Priser & Rabatter' },
         { id: 'summary', label: '4. Offertsammanställning' }

@@ -17,6 +17,19 @@ describe('quoteStateSchema', () => {
         expect(hydrated.exportLanguage).toBe('sv');
         expect(hydrated.customerInfo.customerReference).toBe('');
         expect(hydrated.gridSelections).toEqual({});
+        expect(hydrated.contractingWork).toEqual({
+            enabled: false,
+            projectName: '',
+            rows: [],
+            margin: {
+                enabled: false,
+                percent: 15
+            },
+            ata: {
+                enabled: false,
+                percent: 15
+            }
+        });
     });
 
     it('migrates an unversioned legacy blob to the current shape', () => {
@@ -55,6 +68,133 @@ describe('quoteStateSchema', () => {
         expect(hydrated.hideZeroDiscountReferencesInPdf).toBe(false);
         expect(hydrated.pdfThemeId).toBe('brixx');
         expect(hydrated.exportLanguage).toBe('sv');
+    });
+
+    it('migrates v3 state with safe contracting-work defaults', () => {
+        const hydrated = hydrateQuoteState({
+            stateVersion: 3,
+            selectedLines: ['ClickitUp']
+        });
+
+        expect(hydrated.stateVersion).toBe(5);
+        expect(hydrated.selectedLines).toEqual(['ClickitUp']);
+        expect(hydrated.contractingWork).toEqual({
+            enabled: false,
+            projectName: '',
+            rows: [],
+            margin: {
+                enabled: false,
+                percent: 15
+            },
+            ata: {
+                enabled: false,
+                percent: 15
+            }
+        });
+    });
+
+    it('migrates v4 contracting work with safe margin defaults', () => {
+        const hydrated = hydrateQuoteState({
+            stateVersion: 4,
+            contractingWork: {
+                enabled: true,
+                projectName: 'Projekt',
+                rows: [{
+                    id: 'row_1',
+                    workPackage: 'Installation',
+                    scope: 'Text',
+                    unit: 'paket',
+                    priceExVatSek: 1000
+                }],
+                ata: {
+                    enabled: false,
+                    percent: 15
+                }
+            }
+        });
+
+        expect(hydrated.stateVersion).toBe(5);
+        expect(hydrated.contractingWork.margin).toEqual({
+            enabled: false,
+            percent: 15
+        });
+        expect(hydrated.contractingWork.rows[0].workPackage).toBe('Installation');
+    });
+
+    it('normalizes contracting work while preserving user-entered text verbatim', () => {
+        const hydrated = hydrateQuoteState({
+            stateVersion: 4,
+            contractingWork: {
+                enabled: true,
+                projectName: '  Designer Village, Löddeköpinge  ',
+                rows: [
+                    {
+                        id: '',
+                        workPackage: '  Markarbete  ',
+                        scope: 'Rad 1\nRad 2',
+                        unit: ' samlat arbetspaket ',
+                        priceExVatSek: -100
+                    },
+                    {
+                        workPackage: '',
+                        scope: '',
+                        unit: '',
+                        priceExVatSek: '395500'
+                    },
+                    {
+                        id: 'kept-id',
+                        workPackage: 'Installation',
+                        scope: 'Oförändrad text',
+                        unit: 'st',
+                        priceExVatSek: 'invalid'
+                    }
+                ],
+                margin: {
+                    enabled: true,
+                    percent: -25
+                },
+                ata: {
+                    enabled: true,
+                    percent: 125
+                }
+            }
+        });
+
+        expect(hydrated.contractingWork).toEqual({
+            enabled: true,
+            projectName: '  Designer Village, Löddeköpinge  ',
+            rows: [
+                {
+                    id: 'contracting_work_row_1',
+                    workPackage: '  Markarbete  ',
+                    scope: 'Rad 1\nRad 2',
+                    unit: ' samlat arbetspaket ',
+                    priceExVatSek: 0
+                },
+                {
+                    id: 'contracting_work_row_2',
+                    workPackage: '',
+                    scope: '',
+                    unit: '',
+                    priceExVatSek: 395500
+                },
+                {
+                    id: 'kept-id',
+                    workPackage: 'Installation',
+                    scope: 'Oförändrad text',
+                    unit: 'st',
+                    priceExVatSek: 0
+                }
+            ],
+            margin: {
+                enabled: true,
+                percent: 0
+            },
+            ata: {
+                enabled: true,
+                percent: 100
+            }
+        });
     });
 
     it('normalizes legacy validity and terms defaults safely', () => {
@@ -140,12 +280,14 @@ describe('quoteStateSchema', () => {
         const hydrated = hydrateQuoteState({
             customerInfo: null,
             gridSelections: null,
-            inventoryData: 'broken'
+            inventoryData: 'broken',
+            contractingWork: 'broken'
         });
 
         expect(hydrated.customerInfo).toEqual(createInitialQuoteState().customerInfo);
         expect(hydrated.gridSelections).toEqual({});
         expect(hydrated.inventoryData).toEqual({ bahama: [], bahamaV2: [], clickitup: {}, notes: '' });
+        expect(hydrated.contractingWork).toEqual(createInitialQuoteState().contractingWork);
     });
 
     it('normalizes persisted grid maps and clickitup stock rows into concrete numeric shapes', () => {
@@ -470,6 +612,38 @@ describe('quoteStateSchema', () => {
         });
 
         expect(nextState.hideZeroDiscountReferencesInPdf).toBe(true);
+    });
+
+    it('normalizes contracting work through its typed reducer action', () => {
+        const initial = createInitialQuoteState();
+
+        const nextState = quoteReducer(initial, {
+            type: 'SET_CONTRACTING_WORK',
+            payload: {
+                enabled: true,
+                projectName: ' Projekt ',
+                rows: [{
+                    id: 'row_1',
+                    workPackage: 'Grundarbete',
+                    scope: 'Text',
+                    unit: 'paket',
+                    priceExVatSek: -50
+                }],
+                margin: {
+                    enabled: true,
+                    percent: 150
+                },
+                ata: {
+                    enabled: true,
+                    percent: -5
+                }
+            }
+        });
+
+        expect(nextState.contractingWork.projectName).toBe(' Projekt ');
+        expect(nextState.contractingWork.rows[0].priceExVatSek).toBe(0);
+        expect(nextState.contractingWork.margin).toEqual({ enabled: true, percent: 100 });
+        expect(nextState.contractingWork.ata).toEqual({ enabled: true, percent: 0 });
     });
 
     it('supports changing the PDF theme through the reducer', () => {

@@ -91,6 +91,43 @@ export interface CustomCostRow {
     discountPct: number;
 }
 
+export interface ContractingWorkRow {
+    id: string;
+    workPackage: string;
+    scope: string;
+    unit: string;
+    priceExVatSek: number;
+}
+
+export interface ContractingWorkState {
+    enabled: boolean;
+    projectName: string;
+    rows: ContractingWorkRow[];
+    margin: {
+        enabled: boolean;
+        percent: number;
+    };
+    ata: {
+        enabled: boolean;
+        percent: number;
+    };
+}
+
+export interface ContractingWorkSummary {
+    activeRows: ContractingWorkRow[];
+    customerRows: ContractingWorkRow[];
+    costTotalSek: number;
+    baseTotalSek: number;
+    marginEnabled: boolean;
+    marginPercent: number;
+    marginAmountSek: number;
+    allowanceSek: number;
+    lowerIndicativeSek: number;
+    upperIndicativeSek: number;
+    ataEnabled: boolean;
+    ataPercent: number;
+}
+
 export interface BahamaInventoryItem {
     ID?: string;
     TYP?: string;
@@ -284,10 +321,12 @@ export interface GridCatalogSizeOption {
 
 export interface GridCatalogItemGroup {
     model: string;
+    exportNameEn?: string;
     sizes: GridCatalogSizeOption[];
 }
 
 export interface GridCatalogAddonOption extends BuilderCatalogAddonOption {
+    exportNameEn?: string;
     autoScale?: boolean;
     autoScaleDivisor?: number;
 }
@@ -367,6 +406,7 @@ export interface QuoteState {
     builderItems: BuilderItem[];
     gridSelections: GridSelections;
     customCosts: CustomCostRow[];
+    contractingWork: ContractingWorkState;
     includesVat: boolean;
     globalDiscountPct: number;
     prevGlobalDiscountPct: number;
@@ -992,6 +1032,7 @@ export type QuoteReducerAction =
     | { type: 'SET_BUILDER_ITEMS'; payload: BuilderItem[] }
     | { type: 'SET_GRID_SELECTIONS'; payload: GridSelections }
     | { type: 'SET_CUSTOM_COSTS'; payload: CustomCostRow[] }
+    | { type: 'SET_CONTRACTING_WORK'; payload: ContractingWorkState }
     | { type: 'SET_INVENTORY_DATA'; payload: InventoryData }
     | { type: 'SET_CLOUD_INVENTORY_DATA'; payload: InventoryData }
     | { type: 'SET_INVENTORY_BASKET'; payload: InventoryBasketItem[] }

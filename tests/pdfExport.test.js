@@ -264,6 +264,7 @@ describe('pdfExport helpers', () => {
         expect(textValues).toContain('Quote No: BRIXX - 260422-103');
         expect(textValues).toContain('Project reference: PROJ-1');
         expect(textValues).toContain('Your reference: ER-900');
+        expect(textValues).toContain('Validity period: 30 days');
         expect(textValues).toContain('Total excl. VAT:');
         expect(textValues).toContain('PAYMENT & VALIDITY');
         expect(textValues).toContain('Payment terms: 14 days');
@@ -497,5 +498,114 @@ describe('pdfExport helpers', () => {
         expect(pdfMockState.autoTableCalls[0].body[1][5]).toBe('Pris på förfrågan'); // gross column
         expect(pdfMockState.autoTableCalls[0].body[1][6]).toBe('-'); // discount SEK column
         expect(pdfMockState.autoTableCalls[0].body[1][7]).toBe('-'); // discount pct column
+    });
+
+    it('renders a localized contracting-only PDF without an empty product table or product totals', () => {
+        const state = createZeroDiscountState({
+            exportLanguage: 'en',
+            builderItems: [],
+            gridSelections: {},
+            customCosts: [],
+            contractingWork: {
+                enabled: true,
+                projectName: 'Designer Village, Löddeköpinge',
+                rows: [
+                    {
+                        id: 'groundworks',
+                        workPackage: 'Groundworks and foundations',
+                        scope: 'Excavation and casting according to the supplied documentation.',
+                        unit: 'consolidated work package',
+                        priceExVatSek: 101600
+                    },
+                    {
+                        id: 'installation',
+                        workPackage: 'Installation',
+                        scope: 'Delivery and installation.',
+                        unit: 'consolidated work package',
+                        priceExVatSek: 469600
+                    }
+                ],
+                margin: { enabled: true, percent: 15 },
+                ata: { enabled: true, percent: 15 }
+            }
+        });
+        const summary = computeQuoteTotals({ state, catalogData: createCatalogFixture() });
+
+        const pdfBlob = generatePDF(state, summary, true);
+        const textValues = pdfMockState.textCalls.map((call) => call.value);
+        const contractingTable = pdfMockState.autoTableCalls[0];
+
+        expect(pdfBlob).toBeInstanceOf(Blob);
+        expect(pdfMockState.autoTableCalls).toHaveLength(1);
+        expect(contractingTable.head[0]).toEqual([
+            'Work package',
+            'Consolidated scope for the entire area',
+            'Unit',
+            'Your price\nexcl. VAT'
+        ]);
+        expect(contractingTable.body[0]).toEqual([
+            'Groundworks and foundations',
+            'Excavation and casting according to the supplied documentation.',
+            'consolidated work package',
+            '116 840 SEK'
+        ]);
+        expect(contractingTable.body[1][3]).toBe('540 040 SEK');
+        expect(contractingTable.showHead).toBe('everyPage');
+        expect(contractingTable.rowPageBreak).toBe('avoid');
+        expect(textValues).toContain('Contracting works - consolidated overview for Designer Village, Löddeköpinge');
+        expect(textValues).toContain('Base contract value for the entire area (excl. VAT)');
+        expect(textValues).toContain('656 880 SEK');
+        expect(textValues).toContain('Variation work allowance (±15%)');
+        expect(textValues).toContain('98 532 SEK');
+        expect(textValues).toContain('Lower indicative amount excl. VAT (-15%)');
+        expect(textValues).toContain('558 348 SEK');
+        expect(textValues).toContain('Upper indicative amount excl. VAT (+15%)');
+        expect(textValues).toContain('755 412 SEK');
+        expect(contractingTable.body.flat()).not.toEqual(expect.arrayContaining(['101 600 SEK', '469 600 SEK']));
+        expect([...textValues, ...contractingTable.head.flat(), ...contractingTable.body.flat()].join(' '))
+            .not.toMatch(/marginal|margin|markup/i);
+        expect(textValues).not.toContain('Quote details');
+        expect(textValues).not.toContain('Total Recommended Price:');
+        expect(textValues).not.toContain('Total excl. VAT:');
+    });
+
+    it('keeps mixed product and contracting sections separate in the PDF', () => {
+        const state = createZeroDiscountState({
+            contractingWork: {
+                enabled: true,
+                projectName: '',
+                rows: [{
+                    id: 'work-1',
+                    workPackage: 'Markarbete',
+                    scope: 'Schakt och gjutning',
+                    unit: 'arbete',
+                    priceExVatSek: 586180
+                }],
+                margin: { enabled: true, percent: 15 },
+                ata: { enabled: true, percent: 15 }
+            }
+        });
+        const summary = computeQuoteTotals({ state, catalogData: createCatalogFixture() });
+
+        const pdfBlob = generatePDF(state, summary, true);
+        const textValues = pdfMockState.textCalls.map((call) => call.value);
+        const contractingTable = pdfMockState.autoTableCalls.find((call) => call.head[0][0] === 'Arbetspaket');
+
+        expect(pdfBlob).toBeInstanceOf(Blob);
+        expect(contractingTable).toBeTruthy();
+        expect(textValues).toContain('Produkttotal exkl. moms:');
+        expect(textValues).toContain('Entreprenadarbeten - sammanställd översikt');
+        expect(textValues).toContain('Grundkontraktsvärde för hela området (exkl. moms)');
+        expect(textValues).toContain('674 107 SEK');
+        expect(textValues).toContain('ÄTA-reserv (±15%)');
+        expect(textValues).toContain('101 116 SEK');
+        expect(textValues).toContain('Lägre indikativt belopp exkl. moms (-15%)');
+        expect(textValues).toContain('572 991 SEK');
+        expect(textValues).toContain('Övre indikativt belopp exkl. moms (+15%)');
+        expect(textValues).toContain('775 223 SEK');
+        expect(contractingTable.body[0][3]).toBe('674 107 SEK');
+        expect(contractingTable.body[0][3]).not.toBe('586 180 SEK');
+        expect([...textValues, ...contractingTable.head.flat(), ...contractingTable.body.flat()].join(' '))
+            .not.toMatch(/marginal|margin|markup/i);
     });
 });

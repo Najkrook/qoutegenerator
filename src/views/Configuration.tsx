@@ -1,26 +1,37 @@
 import React from 'react';
 import { useQuote } from '../store/QuoteContext';
+import { useAuth } from '../store/AuthContext';
 import { getBuilderCatalogLine, getGridCatalogLine } from '../data/catalogLookup';
 import { BuilderConfig } from '../components/features/BuilderConfig';
 import { GridConfig } from '../components/features/GridConfig';
+import { ContractingWorkEditor } from '../components/features/ContractingWorkEditor';
+import { ExportLanguageSelector } from '../components/features/ExportLanguageSelector';
+import { hasConfiguredContractingWork } from '../services/contractingWork';
 import type { ConfigurationProps } from '../types/contracts';
 
 export function Configuration({ onNext, onPrev, onBackToSketch }: ConfigurationProps) {
     const { state } = useQuote();
+    const { isRetailer } = useAuth();
     const { selectedLines, builderItems, gridSelections } = state;
 
     const builderLines = selectedLines.filter((lineId) => getBuilderCatalogLine(lineId) !== null);
     const gridLines = selectedLines.filter((lineId) => getGridCatalogLine(lineId) !== null);
 
-    const hasSelections = builderItems.length > 0 || Object.values(gridSelections).some((selection) =>
+    const hasProductSelections = builderItems.length > 0 || Object.values(gridSelections).some((selection) =>
         Object.keys(selection.items || {}).length > 0 || Object.keys(selection.addons || {}).length > 0
     );
+    const showContractingWork = !isRetailer && state.contractingWork?.enabled === true;
+    const hasContractingSelections = showContractingWork && hasConfiguredContractingWork(state.contractingWork);
+    const hasSelections = hasProductSelections || hasContractingSelections;
 
     return (
         <div className="max-w-[1200px] mx-auto animate-fade-in pb-20">
-            <div className="mb-8">
-                <h2 className="text-2xl font-bold m-0 text-text-primary">Konfigurera Produkter</h2>
-                <p className="text-text-secondary text-sm mt-1">Anpassa modeller, storlekar och tillval för dina valda produktlinjer.</p>
+            <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                    <h2 className="text-2xl font-bold m-0 text-text-primary">Konfigurera offertinnehåll</h2>
+                    <p className="text-text-secondary text-sm mt-1">Anpassa produkter och beskriv eventuella entreprenadarbeten.</p>
+                </div>
+                <ExportLanguageSelector className="w-full sm:w-[180px] sm:shrink-0" />
             </div>
 
             <div className="space-y-12">
@@ -46,7 +57,9 @@ export function Configuration({ onNext, onPrev, onBackToSketch }: ConfigurationP
                     </section>
                 )}
 
-                {!hasSelections && (
+                {showContractingWork && <ContractingWorkEditor />}
+
+                {selectedLines.length > 0 && !hasProductSelections && (
                     <div className="bg-panel-bg border border-panel-border border-dashed rounded-xl p-12 text-center">
                         <div className="text-4xl mb-4 text-text-secondary opacity-20" aria-hidden="true">📦</div>
                         <p className="text-text-secondary font-medium">Inga produkter valda ännu. Lägg till en rad ovan för att börja.</p>
@@ -61,7 +74,7 @@ export function Configuration({ onNext, onPrev, onBackToSketch }: ConfigurationP
                         onClick={onPrev}
                         className="w-full md:w-auto md:justify-self-start px-6 py-2.5 rounded-md font-medium text-text-primary bg-panel-bg border border-panel-border hover:bg-panel-border transition-colors flex items-center justify-center gap-2"
                     >
-                        &laquo; Tillbaka till Produktlinjer
+                        &laquo; Tillbaka till Offertinnehåll
                     </button>
                     {onBackToSketch ? (
                         <button

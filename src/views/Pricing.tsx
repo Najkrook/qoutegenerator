@@ -5,8 +5,10 @@ import { catalogData } from '../data/catalog';
 import { getCatalogLineName } from '../data/catalogLookup';
 import { PricingTable } from '../components/features/PricingTable';
 import { CustomCosts } from '../components/features/CustomCosts';
+import { ContractingWorkPricing } from '../components/features/ContractingWorkPricing';
 import { MarginSummaryPanel } from '../components/features/MarginSummaryPanel';
 import { computeQuoteTotals } from '../services/calculationEngine';
+import { hasConfiguredQuoteSelections } from '../navigation/routes';
 import {
     applyGlobalDiscountToGridCustomAddons,
     applyGlobalDiscountToGridCustomItems,
@@ -64,6 +66,8 @@ export function Pricing({ onNext, onPrev }: PricingProps) {
     const { canViewEverything, isRetailer, retailer } = useAuth();
     const { globalDiscountPct, exchangeRate, prevGlobalDiscountPct, selectedLines } = state;
     const selectedLineId = selectedLines[0] || '';
+    const hasProductContent = hasConfiguredQuoteSelections(state);
+    const showContractingWork = !isRetailer && state.contractingWork?.enabled === true;
     const selectedLineName = selectedLineId ? (getCatalogLineName(selectedLineId) || selectedLineId) : 'Ingen vald produktlinje';
     const retailerDiscountPct = isRetailer
         ? (Number(retailer?.productLines?.[selectedLineId]?.discountPct) || 0)
@@ -169,97 +173,106 @@ export function Pricing({ onNext, onPrev }: PricingProps) {
             <div className="mb-8">
                 <h2 className="text-2xl font-bold m-0 text-text-primary">Priser & Rabatter</h2>
                 <p className="text-text-secondary text-sm mt-1">
-                    Granska priser och applicera rabatter. Alla priser visas i <span className="text-text-primary font-bold">SEK</span>.
+                    {hasProductContent
+                        ? 'Granska produktpriser och applicera rabatter.'
+                        : 'Prissätt offertens entreprenadarbeten.'}{' '}
+                    Alla priser visas i <span className="text-text-primary font-bold">SEK</span>.
                 </p>
             </div>
 
-            {isRetailer && (
-                <div className="mb-6 rounded-xl border border-primary/20 bg-primary/5 p-5 shadow-sm">
-                    <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-                        <div>
-                            <p className="m-0 text-[11px] font-bold uppercase tracking-[0.18em] text-primary">
-                                Retailer-prissättning
-                            </p>
-                            <h3 className="mt-2 text-xl font-semibold text-text-primary">
-                                Vald produktlinje: {selectedLineName}
-                            </h3>
-                            <p className="mt-2 max-w-2xl text-sm leading-relaxed text-text-secondary">
-                                Den övergripande offertrabatten kan justeras mellan 0 och {retailerDiscountPct}%.
-                                Radrabatter kan också justeras inom samma spann, medan Övriga kostnader kan läggas till vid behov.
-                            </p>
-                        </div>
+            {hasProductContent ? (
+                <>
+                    {isRetailer && (
+                        <div className="mb-6 rounded-xl border border-primary/20 bg-primary/5 p-5 shadow-sm">
+                            <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+                                <div>
+                                    <p className="m-0 text-[11px] font-bold uppercase tracking-[0.18em] text-primary">
+                                        Retailer-prissättning
+                                    </p>
+                                    <h3 className="mt-2 text-xl font-semibold text-text-primary">
+                                        Vald produktlinje: {selectedLineName}
+                                    </h3>
+                                    <p className="mt-2 max-w-2xl text-sm leading-relaxed text-text-secondary">
+                                        Den övergripande offertrabatten kan justeras mellan 0 och {retailerDiscountPct}%.
+                                        Radrabatter kan också justeras inom samma spann, medan Övriga kostnader kan läggas till vid behov.
+                                    </p>
+                                </div>
 
-                        <div className="rounded-lg border border-primary/30 bg-white/5 px-4 py-3 text-sm">
-                            <div className="text-text-secondary">Avtalad retailer-rabatt</div>
-                            <div className="mt-1 text-2xl font-black text-primary">{retailerDiscountPct}%</div>
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            <PricingTable />
-
-            <MarginSummaryPanel summaryData={summaryData} className="mt-6" />
-
-            <CustomCosts />
-
-            <div className={`grid grid-cols-1 ${canViewEverything ? 'md:grid-cols-2' : ''} gap-6 mt-8`}>
-                <div className={`bg-panel-bg border border-panel-border rounded-lg p-6 shadow-sm ${isRetailer ? 'opacity-90' : ''}`}>
-                    <label className="flex items-center justify-between text-xs font-bold text-text-secondary uppercase mb-2">
-                        <span>Övergripande offertrabatt (%)</span>
-                        {isRetailer && (
-                            <span className="text-primary bg-primary/10 px-2 py-0.5 rounded text-[10px] tracking-wider">
-                                MAX {retailerDiscountPct}%
-                            </span>
-                        )}
-                    </label>
-                    <div className="flex items-center gap-3">
-                        <input
-                            type="range"
-                            min="0"
-                            max={globalDiscountMax}
-                            step="1"
-                            value={globalDiscountPct}
-                            onChange={handleGlobalDiscountChange}
-                            className="flex-1 accent-primary"
-                        />
-                        <input
-                            type="number"
-                            step="1"
-                            min="0"
-                            max={globalDiscountMax}
-                            value={globalDiscountPct}
-                            onChange={handleGlobalDiscountChange}
-                            className="w-20 bg-input-bg border border-panel-border text-text-primary p-2 rounded-md font-bold text-center outline-none focus:border-primary"
-                        />
-                    </div>
-                    <p className="text-[10px] text-text-secondary mt-2 italic">
-                        {isRetailer
-                            ? `* Rabatt kan sättas mellan 0 och ${retailerDiscountPct}% för ${selectedLineName}, både övergripande och per rad.`
-                            : '* Ändrar snabbt alla rader som följer standardrabatten. Manuellt justerade rader behåller sitt värde.'}
-                    </p>
-                </div>
-
-                {canViewEverything && (
-                    <div className="bg-panel-bg border border-panel-border rounded-lg p-6 shadow-sm">
-                        <label className="block text-xs font-bold text-text-secondary uppercase mb-2">Växelkurs (EUR → SEK)</label>
-                        <div className="flex items-center gap-4">
-                            <div className="flex-1 text-2xl font-black text-text-secondary flex items-center gap-2">
-                                1.00 <span className="text-xs font-normal">EUR</span>
-                                <span className="text-primary">=</span>
+                                <div className="rounded-lg border border-primary/30 bg-white/5 px-4 py-3 text-sm">
+                                    <div className="text-text-secondary">Avtalad retailer-rabatt</div>
+                                    <div className="mt-1 text-2xl font-black text-primary">{retailerDiscountPct}%</div>
+                                </div>
                             </div>
-                            <input
-                                type="number"
-                                step="0.01"
-                                value={exchangeRate}
-                                onChange={handleExchangeRateChange}
-                                className="w-32 bg-input-bg border border-panel-border text-text-primary p-3 rounded-lg font-black text-xl text-center outline-none focus:border-primary shadow-inner"
-                            />
-                            <div className="text-xs font-normal text-text-secondary uppercase">SEK</div>
                         </div>
+                    )}
+
+                    <PricingTable />
+
+                    <MarginSummaryPanel summaryData={summaryData} className="mt-6" />
+
+                    <CustomCosts />
+
+                    <div className={`grid grid-cols-1 ${canViewEverything ? 'md:grid-cols-2' : ''} gap-6 mt-8`}>
+                        <div className={`bg-panel-bg border border-panel-border rounded-lg p-6 shadow-sm ${isRetailer ? 'opacity-90' : ''}`}>
+                            <label className="flex items-center justify-between text-xs font-bold text-text-secondary uppercase mb-2">
+                                <span>Övergripande offertrabatt (%)</span>
+                                {isRetailer && (
+                                    <span className="text-primary bg-primary/10 px-2 py-0.5 rounded text-[10px] tracking-wider">
+                                        MAX {retailerDiscountPct}%
+                                    </span>
+                                )}
+                            </label>
+                            <div className="flex items-center gap-3">
+                                <input
+                                    type="range"
+                                    min="0"
+                                    max={globalDiscountMax}
+                                    step="1"
+                                    value={globalDiscountPct}
+                                    onChange={handleGlobalDiscountChange}
+                                    className="flex-1 accent-primary"
+                                />
+                                <input
+                                    type="number"
+                                    step="1"
+                                    min="0"
+                                    max={globalDiscountMax}
+                                    value={globalDiscountPct}
+                                    onChange={handleGlobalDiscountChange}
+                                    className="w-20 bg-input-bg border border-panel-border text-text-primary p-2 rounded-md font-bold text-center outline-none focus:border-primary"
+                                />
+                            </div>
+                            <p className="text-[10px] text-text-secondary mt-2 italic">
+                                {isRetailer
+                                    ? `* Rabatt kan sättas mellan 0 och ${retailerDiscountPct}% för ${selectedLineName}, både övergripande och per rad.`
+                                    : '* Ändrar snabbt alla rader som följer standardrabatten. Manuellt justerade rader behåller sitt värde.'}
+                            </p>
+                        </div>
+
+                        {canViewEverything && (
+                            <div className="bg-panel-bg border border-panel-border rounded-lg p-6 shadow-sm">
+                                <label className="block text-xs font-bold text-text-secondary uppercase mb-2">Växelkurs (EUR → SEK)</label>
+                                <div className="flex items-center gap-4">
+                                    <div className="flex-1 text-2xl font-black text-text-secondary flex items-center gap-2">
+                                        1.00 <span className="text-xs font-normal">EUR</span>
+                                        <span className="text-primary">=</span>
+                                    </div>
+                                    <input
+                                        type="number"
+                                        step="0.01"
+                                        value={exchangeRate}
+                                        onChange={handleExchangeRateChange}
+                                        className="w-32 bg-input-bg border border-panel-border text-text-primary p-3 rounded-lg font-black text-xl text-center outline-none focus:border-primary shadow-inner"
+                                    />
+                                    <div className="text-xs font-normal text-text-secondary uppercase">SEK</div>
+                                </div>
+                            </div>
+                        )}
                     </div>
-                )}
-            </div>
+                </>
+            ) : null}
+
+            {showContractingWork ? <ContractingWorkPricing /> : null}
 
             <div className="fixed bottom-0 left-0 right-0 bg-panel-bg/80 backdrop-blur-md border-t border-panel-border p-4 z-50">
                 <div className="max-w-[1200px] mx-auto flex justify-between items-center">

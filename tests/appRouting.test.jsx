@@ -133,6 +133,32 @@ vi.mock('../src/views/History', () => ({
             >
                 Open Configured History Quote
             </button>
+            <button
+                type="button"
+                onClick={() => onOpenQuote?.({
+                    selectedLines: [],
+                    builderItems: [],
+                    gridSelections: {},
+                    contractingWork: {
+                        enabled: true,
+                        projectName: 'Designer Village',
+                        rows: [{
+                            id: 'work-1',
+                            workPackage: 'Markarbete',
+                            scope: 'Schaktning och fundament',
+                            unit: 'Samlat arbetspaket',
+                            priceExVatSek: 101600
+                        }],
+                        ata: { enabled: true, percent: 15 }
+                    },
+                    customerInfo: { name: 'Ada' },
+                    activeQuoteId: 'quote-contracting',
+                    activeQuoteVersion: 1,
+                    quoteStatus: 'draft'
+                })}
+            >
+                Open Contracting History Quote
+            </button>
         </div>
     )
 }));
@@ -371,6 +397,66 @@ describe('app routing', () => {
         expect(container.textContent).toContain('SummaryView');
     });
 
+    it('allows a non-retailer to load a configured contracting-only quote route', async () => {
+        const { container, router } = await renderApp({
+            initialEntries: [APP_PATHS[APP_ROUTE_IDS.quoteSummary]],
+            quoteState: {
+                ...createInitialQuoteState(),
+                contractingWork: {
+                    enabled: true,
+                    projectName: 'Designer Village',
+                    rows: [{
+                        id: 'work-1',
+                        workPackage: 'Markarbete',
+                        scope: 'Schaktning och fundament',
+                        unit: 'Samlat arbetspaket',
+                        priceExVatSek: 101600
+                    }],
+                    margin: { enabled: false, percent: 15 },
+                    ata: { enabled: false, percent: 15 }
+                }
+            }
+        });
+
+        expect(router.state.location.pathname).toBe(APP_PATHS[APP_ROUTE_IDS.quoteSummary]);
+        expect(container.textContent).toContain('SummaryView');
+    });
+
+    it('ignores stale contracting work when guarding retailer quote routes', async () => {
+        const { container, router } = await renderApp({
+            initialEntries: [APP_PATHS[APP_ROUTE_IDS.quoteSummary]],
+            auth: {
+                accessLevel: 'retailer',
+                isRetailer: true,
+                retailer: {
+                    id: 'retailer_1',
+                    name: 'Roslagen',
+                    email: 'retailer@example.com',
+                    productLines: {}
+                }
+            },
+            quoteState: {
+                ...createInitialQuoteState(),
+                contractingWork: {
+                    enabled: true,
+                    projectName: 'Ska ignoreras',
+                    rows: [{
+                        id: 'work-1',
+                        workPackage: 'Markarbete',
+                        scope: '',
+                        unit: '',
+                        priceExVatSek: 1000
+                    }],
+                    margin: { enabled: false, percent: 15 },
+                    ata: { enabled: false, percent: 15 }
+                }
+            }
+        });
+
+        expect(router.state.location.pathname).toBe(APP_PATHS[APP_ROUTE_IDS.quoteProductLines]);
+        expect(container.textContent).toContain('ProductLinesView');
+    });
+
     it('uses the current URL instead of persisted draft step when choosing the visible screen', async () => {
         const { container, router } = await renderApp({
             initialEntries: [APP_PATHS[APP_ROUTE_IDS.quotes]],
@@ -446,6 +532,67 @@ describe('app routing', () => {
                 activeQuoteVersion: 3,
                 step: 4
             })
+        }));
+    });
+
+    it('reopens configured contracting-only history quotes into summary for non-retailers', async () => {
+        const dispatch = vi.fn();
+        const { container, router } = await renderApp({
+            initialEntries: [APP_PATHS[APP_ROUTE_IDS.quotes]],
+            quoteState: {
+                ...createInitialQuoteState(),
+                contractingWork: {
+                    enabled: true,
+                    projectName: 'Designer Village',
+                    rows: [{
+                        id: 'work-1',
+                        workPackage: 'Markarbete',
+                        scope: 'Schaktning och fundament',
+                        unit: 'Samlat arbetspaket',
+                        priceExVatSek: 101600
+                    }],
+                    margin: { enabled: false, percent: 15 },
+                    ata: { enabled: true, percent: 15 }
+                }
+            },
+            dispatch
+        });
+
+        await clickButton(container, 'Open Contracting History Quote');
+
+        expect(router.state.location.pathname).toBe(APP_PATHS[APP_ROUTE_IDS.quoteSummary]);
+        expect(dispatch).toHaveBeenCalledWith(expect.objectContaining({
+            type: 'HYDRATE_STATE',
+            payload: expect.objectContaining({
+                activeQuoteId: 'quote-contracting',
+                step: 4
+            })
+        }));
+    });
+
+    it('does not reopen contracting-only history content as a retailer quote', async () => {
+        const dispatch = vi.fn();
+        const { container, router } = await renderApp({
+            initialEntries: [APP_PATHS[APP_ROUTE_IDS.quotes]],
+            auth: {
+                accessLevel: 'retailer',
+                isRetailer: true,
+                retailer: {
+                    id: 'retailer_1',
+                    name: 'Roslagen',
+                    email: 'retailer@example.com',
+                    productLines: {}
+                }
+            },
+            dispatch
+        });
+
+        await clickButton(container, 'Open Contracting History Quote');
+
+        expect(router.state.location.pathname).toBe(APP_PATHS[APP_ROUTE_IDS.quoteProductLines]);
+        expect(dispatch).toHaveBeenCalledWith(expect.objectContaining({
+            type: 'HYDRATE_STATE',
+            payload: expect.objectContaining({ step: 1 })
         }));
     });
 

@@ -5,13 +5,20 @@ import type {
     ExportSummaryState,
     PdfTableOptions,
     PdfTableRow,
+    QuoteState,
     QuoteTotalsRow
 } from '../types/contracts';
 import { applyVat } from '../utils/vatHelper';
-import { getExportLabels, translateSystemLabel } from './exportLocalization';
+import { calculateContractingWorkSummary } from './contractingWork';
+import {
+    formatLocalizedValidityPeriod,
+    getExportLabels,
+    translateQuoteTotalsRowModel
+} from './exportLocalization';
 
 type WorksheetCell = string | number;
 type WorksheetRow = WorksheetCell[];
+type ExportStateWithContracting = ExportSummaryState & Partial<Pick<QuoteState, 'contractingWork'>>;
 
 function roundSek(value: number | string | null | undefined): number {
     return Math.round(Number(value) || 0);
@@ -59,7 +66,7 @@ export function shouldHideDiscountReferencesInPdf(
 }
 
 export function buildExcelSheetData(
-    state: ExportSummaryState = {},
+    state: ExportStateWithContracting = {},
     summaryData: ExportSummaryInput = {}
 ): WorksheetRow[] {
     const customerInfo = safeCustomerInfo(state);
@@ -67,15 +74,25 @@ export function buildExcelSheetData(
     const vatText = state.includesVat ? labels.inclVat : labels.exclVat;
     const discountSekLabel = labels.discountSek.replace(/\n/g, ' ');
     const discountPctLabel = labels.discountPct.replace(/\n/g, ' ');
+    const productRows = Array.isArray(summaryData.totals) ? summaryData.totals : [];
+    const contractingSummary = calculateContractingWorkSummary(state.contractingWork);
+    const hasContractingWork = contractingSummary.customerRows.length > 0;
+    const shouldRenderProductSection = productRows.length > 0 || !hasContractingWork;
     const wsData: WorksheetRow[] = [
         [labels.quote],
         [labels.company, customerInfo.company || customerInfo.name || ''],
         [labels.projectReference, customerInfo.reference || ''],
         [labels.customerReference, customerInfo.customerReference || ''],
         [labels.date, customerInfo.date || new Date().toLocaleDateString()],
-        [labels.validityPeriod, customerInfo.validity || ''],
-        [],
-        [
+        [labels.validityPeriod, formatLocalizedValidityPeriod(customerInfo.validity, state.exportLanguage)]
+    ];
+
+    if (shouldRenderProductSection) {
+        wsData.push([]);
+        if (hasContractingWork) {
+            wsData.push([labels.productsHeading]);
+        }
+        wsData.push([
             labels.model,
             labels.size,
             `${labels.unitPrice} (${vatText})`,
@@ -84,78 +101,132 @@ export function buildExcelSheetData(
             state.includesVat ? `${labels.recommendedPrice} (${vatText})` : labels.recommendedPrice,
             state.includesVat ? `${discountSekLabel} (${vatText})` : discountSekLabel,
             discountPctLabel
-        ]
-    ];
-
-    (summaryData.totals || []).forEach((row) => {
-        const isReq = row.priceUponRequest === true;
-        wsData.push([
-            translateSystemLabel(row.model, state.exportLanguage),
-            row.size || '',
-            isReq ? labels.priceUponRequest : roundSek(applyVat(row.unitPrice, state.includesVat)),
-            row.qty,
-            isReq ? labels.priceUponRequest : roundSek(applyVat(row.net, state.includesVat)),
-            isReq ? labels.priceUponRequest : roundSek(applyVat(row.gross, state.includesVat)),
-            isReq ? '-' : roundSek(-applyVat(row.discountSek || 0, state.includesVat)),
-            isReq ? '-' : `${row.discountPct}%`
         ]);
-    });
 
-    if ((summaryData.globalDiscountAmt || 0) > 0) {
-        wsData.push([
-            `${labels.globalDiscount} (${state.globalDiscountPct}%)`,
-            '',
-            '',
-            '',
-            '',
-            '',
-            roundSek(-applyVat(summaryData.globalDiscountAmt || 0, state.includesVat)),
-            ''
-        ]);
-    }
+        productRows.forEach((row) => {
+            const isReq = row.priceUponRequest === true;
+            wsData.push([
+                translateQuoteTotalsRowModel(row, state.exportLanguage),
+                row.size || '',
+                isReq ? labels.priceUponRequest : roundSek(applyVat(row.unitPrice, state.includesVat)),
+                row.qty,
+                isReq ? labels.priceUponRequest : roundSek(applyVat(row.net, state.includesVat)),
+                isReq ? labels.priceUponRequest : roundSek(applyVat(row.gross, state.includesVat)),
+                isReq ? '-' : roundSek(-applyVat(row.discountSek || 0, state.includesVat)),
+                isReq ? '-' : `${row.discountPct}%`
+            ]);
+        });
 
-    const totals = buildExportSummary(state, summaryData);
-    wsData.push([]);
-    wsData.push([
-        state.includesVat ? labels.totalInclVatExcel : labels.totalExVatExcel,
-        '',
-        '',
-        '',
-        roundSek(applyVat(totals.finalTotalSek, state.includesVat)),
-        roundSek(applyVat(totals.grossTotalSek, state.includesVat)),
-        roundSek(-applyVat(totals.totalDiscountSek, state.includesVat)),
-        ''
-    ]);
+        if ((summaryData.globalDiscountAmt || 0) > 0) {
+            wsData.push([
+                `${labels.globalDiscount} (${state.globalDiscountPct}%)`,
+                '',
+                '',
+                '',
+                '',
+                '',
+                roundSek(-applyVat(summaryData.globalDiscountAmt || 0, state.includesVat)),
+                ''
+            ]);
+        }
 
-    if (state.includesVat) {
-        wsData.push([
-            labels.vat25Excel,
-            '',
-            '',
-            '',
-            roundSek(totals.vatAmount),
-            '',
-            '',
-            ''
-        ]);
-        wsData.push([
-            labels.totalExVatExcel,
-            '',
-            '',
-            '',
-            roundSek(totals.finalTotalSek),
-            '',
-            '',
-            ''
-        ]);
-    }
-
-    const hasPriceUponRequest = (summaryData.totals || []).some((r) => r.priceUponRequest === true);
-    if (hasPriceUponRequest) {
+        const totals = buildExportSummary(state, summaryData);
         wsData.push([]);
         wsData.push([
-            labels.totalsExcludePriceUponRequest
+            hasContractingWork && !state.includesVat
+                ? labels.productTotalExVat
+                : (state.includesVat ? labels.totalInclVatExcel : labels.totalExVatExcel),
+            '',
+            '',
+            '',
+            roundSek(applyVat(totals.finalTotalSek, state.includesVat)),
+            roundSek(applyVat(totals.grossTotalSek, state.includesVat)),
+            roundSek(-applyVat(totals.totalDiscountSek, state.includesVat)),
+            ''
         ]);
+
+        if (state.includesVat) {
+            wsData.push([
+                labels.vat25Excel,
+                '',
+                '',
+                '',
+                roundSek(totals.vatAmount),
+                '',
+                '',
+                ''
+            ]);
+            wsData.push([
+                hasContractingWork ? labels.productTotalExVat : labels.totalExVatExcel,
+                '',
+                '',
+                '',
+                roundSek(totals.finalTotalSek),
+                '',
+                '',
+                ''
+            ]);
+        }
+
+        const hasPriceUponRequest = productRows.some((row) => row.priceUponRequest === true);
+        if (hasPriceUponRequest) {
+            wsData.push([]);
+            wsData.push([labels.totalsExcludePriceUponRequest]);
+        }
+    }
+
+    if (hasContractingWork) {
+        const projectName = String(state.contractingWork?.projectName || '');
+        const contractingTitle = projectName.trim()
+            ? `${labels.contractingHeading} ${labels.contractingFor} ${projectName}`
+            : labels.contractingHeading;
+
+        wsData.push([]);
+        wsData.push([
+            contractingTitle
+        ]);
+        wsData.push([
+            labels.contractingWorkPackage,
+            labels.contractingScope,
+            labels.contractingUnit,
+            labels.contractingPriceExVat.replace(/\n/g, ' ')
+        ]);
+        contractingSummary.customerRows.forEach((row) => {
+            wsData.push([
+                row.workPackage,
+                row.scope,
+                row.unit,
+                roundSek(row.priceExVatSek)
+            ]);
+        });
+        wsData.push([]);
+        wsData.push([
+            labels.contractingBaseValue,
+            '',
+            '',
+            roundSek(contractingSummary.baseTotalSek)
+        ]);
+
+        if (contractingSummary.ataEnabled) {
+            wsData.push([
+                `${labels.contractingAtaAllowance} (±${contractingSummary.ataPercent}%)`,
+                '',
+                '',
+                roundSek(contractingSummary.allowanceSek)
+            ]);
+            wsData.push([
+                `${labels.contractingLowerIndicative} (-${contractingSummary.ataPercent}%)`,
+                '',
+                '',
+                roundSek(contractingSummary.lowerIndicativeSek)
+            ]);
+            wsData.push([
+                `${labels.contractingUpperIndicative} (+${contractingSummary.ataPercent}%)`,
+                '',
+                '',
+                roundSek(contractingSummary.upperIndicativeSek)
+            ]);
+        }
     }
 
     return wsData;
@@ -175,7 +246,7 @@ export function buildPdfTableData(
     totalsArray.forEach((row) => {
         const isReq = row.priceUponRequest === true;
         const cells: PdfTableRow = [
-            translateSystemLabel(row.model, options.exportLanguage),
+            translateQuoteTotalsRowModel(row, options.exportLanguage),
             row.size || '-',
             isReq ? labels.priceUponRequest : `${formatSEK(applyVat(row.unitPrice, includesVat))} SEK`,
             `${row.qty}`,

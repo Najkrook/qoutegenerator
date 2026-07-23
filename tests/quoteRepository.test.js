@@ -321,6 +321,62 @@ describe('quoteRepository', () => {
         expect(latest?.metadata?.status).toBe('sent');
     });
 
+    it('round-trips contracting work through revisions without changing the product history total', async () => {
+        const { repo } = buildRepo();
+        const contractingWork = {
+            enabled: true,
+            projectName: 'Designer Village',
+            rows: [{
+                id: 'work-1',
+                workPackage: 'Fundament',
+                scope: 'Schaktning och gjutning',
+                unit: 'Samlat arbetspaket',
+                priceExVatSek: 571200
+            }],
+            margin: { enabled: true, percent: 15 },
+            ata: { enabled: true, percent: 15 }
+        };
+        const contractingOnlySummary = {
+            finalTotalSek: 0,
+            grossTotalSek: 0,
+            totalDiscountSek: 0
+        };
+
+        const created = await repo.createQuote({
+            user,
+            state: { ...baseState, contractingWork },
+            summary: contractingOnlySummary,
+            customerInfo: baseState.customerInfo,
+            status: 'draft'
+        });
+
+        expect(created.metadata.totalSek).toBe(0);
+        expect(created.revision.state.contractingWork).toEqual(contractingWork);
+
+        const revisedContractingWork = {
+            ...contractingWork,
+            margin: { enabled: true, percent: 20 },
+            rows: [{ ...contractingWork.rows[0], priceExVatSek: 600000 }]
+        };
+        await repo.saveQuoteRevision({
+            user,
+            quoteId: created.quoteId,
+            state: { ...baseState, contractingWork: revisedContractingWork },
+            summary: contractingOnlySummary,
+            customerInfo: baseState.customerInfo,
+            status: 'draft'
+        });
+
+        const latest = await repo.getQuoteLatestRevision({
+            userId: user.uid,
+            quoteId: created.quoteId
+        });
+
+        expect(latest?.metadata?.totalSek).toBe(0);
+        expect(latest?.revision?.state?.contractingWork).toEqual(revisedContractingWork);
+        expect(latest?.revision?.state?.contractingWork?.margin).toEqual({ enabled: true, percent: 20 });
+    });
+
     it('saveQuoteRevision falls back cleanly when runTransaction is unavailable', async () => {
         vi.useFakeTimers();
         vi.setSystemTime(new Date('2026-04-22T12:00:00.000Z'));

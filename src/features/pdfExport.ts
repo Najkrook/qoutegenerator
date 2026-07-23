@@ -4,6 +4,7 @@ import {
     buildExportSummary,
     shouldHideDiscountReferencesInPdf
 } from '../services/exportDataBuilders';
+import { calculateContractingWorkSummary } from '../services/contractingWork';
 import type { CustomerInfo, QuoteState, QuoteTotalsResult } from '../types/contracts';
 import {
     getPdfLayout,
@@ -11,6 +12,7 @@ import {
     drawTermsPageHeader,
     normalizePositiveInt,
     renderCustomerInfoBlock,
+    renderContractingWorkSection,
     renderExtraNotesBlock,
     renderFooters,
     renderGroupedTables,
@@ -109,6 +111,10 @@ export function generatePDF(
         const validUntilDate = computeValidUntilDateString(customerInfo.date, state.quoteValidityDays);
         const activeLayout = getPdfLayout(state.pdfThemeId);
         const exportLanguage = state.exportLanguage || 'sv';
+        const productRows = Array.isArray(summaryData.totals) ? summaryData.totals : [];
+        const hasProducts = productRows.length > 0;
+        const hasContractingWork = calculateContractingWorkSummary(state.contractingWork).activeRows.length > 0;
+        const shouldRenderLegacyEmptyProductSection = !hasProducts && !hasContractingWork;
         const drawMainHeader = () => drawHeader(doc, {
             pageWidth,
             quoteDate,
@@ -127,42 +133,79 @@ export function generatePDF(
             exportLanguage
         });
 
-        finalY = renderGroupedTables(doc, {
-            summaryData,
-            formatSEK: formatSek,
-            currentY: finalY,
-            pageWidth,
-            pageHeight,
-            includesVat: state.includesVat,
-            hideDiscountReferences,
-            drawMainHeader,
-            layout: activeLayout,
-            exportLanguage
-        });
+        if (hasProducts || shouldRenderLegacyEmptyProductSection) {
+            finalY = renderGroupedTables(doc, {
+                summaryData,
+                formatSEK: formatSek,
+                currentY: finalY,
+                pageWidth,
+                pageHeight,
+                includesVat: state.includesVat,
+                hideDiscountReferences,
+                showProductsHeading: hasContractingWork,
+                drawMainHeader,
+                layout: activeLayout,
+                exportLanguage
+            });
+        }
 
-        if ((summaryData.totals || []).length === 0 && !returnBlob) {
+        if (shouldRenderLegacyEmptyProductSection && !returnBlob) {
             notifyWarn('Avancerad PDF-tabell saknas. Exporterar med enkel layout.');
         }
 
         const exportSummary = buildExportSummary(state, summaryData);
-        finalY = renderTotalsSection(doc, {
-            state: {
-                ...state,
-                hideDiscountReferences,
-                validUntilDate,
-                customerInfo
-            },
-            exportSummary,
-            finalY,
-            pageWidth,
-            pageHeight,
-            formatSEK: formatSek,
-            shouldRenderPaymentBox,
-            drawMainHeader,
-            layout: activeLayout,
-            hasPriceUponRequest: (summaryData.totals || []).some((r) => r.priceUponRequest === true),
-            exportLanguage
-        });
+        const totalsState = {
+            ...state,
+            hideDiscountReferences,
+            validUntilDate,
+            customerInfo
+        };
+
+        if (hasProducts || shouldRenderLegacyEmptyProductSection) {
+            finalY = renderTotalsSection(doc, {
+                state: totalsState,
+                exportSummary,
+                finalY,
+                pageWidth,
+                pageHeight,
+                formatSEK: formatSek,
+                shouldRenderPaymentBox: shouldRenderPaymentBox && !hasContractingWork,
+                drawMainHeader,
+                layout: activeLayout,
+                hasPriceUponRequest: productRows.some((row) => row.priceUponRequest === true),
+                useProductTotalLabel: hasContractingWork,
+                exportLanguage
+            });
+        }
+
+        if (hasContractingWork) {
+            finalY = renderContractingWorkSection(doc, {
+                contractingWork: state.contractingWork,
+                formatSEK: formatSek,
+                currentY: hasProducts ? finalY + 12 : finalY,
+                pageWidth,
+                pageHeight,
+                drawMainHeader,
+                layout: activeLayout,
+                exportLanguage
+            });
+
+            if (shouldRenderPaymentBox) {
+                finalY = renderTotalsSection(doc, {
+                    state: totalsState,
+                    exportSummary,
+                    finalY,
+                    pageWidth,
+                    pageHeight,
+                    formatSEK: formatSek,
+                    shouldRenderPaymentBox: true,
+                    drawMainHeader,
+                    layout: activeLayout,
+                    renderProductTotals: false,
+                    exportLanguage
+                });
+            }
+        }
 
         finalY = renderExtraNotesBlock(doc, {
             customerInfo,

@@ -545,6 +545,16 @@ describe('UI text smoke', () => {
             state: {
                 ...quoteState.value.state,
                 step: 3,
+                selectedLines: ['BaHaMa'],
+                builderItems: [{
+                    id: 'item-1',
+                    line: 'BaHaMa',
+                    model: 'Jumbrella',
+                    size: '4x4 Kvadrat',
+                    qty: 1,
+                    discountPct: 10,
+                    addons: []
+                }],
                 globalDiscountPct: 10
             },
             dispatch: vi.fn()

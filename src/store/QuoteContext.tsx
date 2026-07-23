@@ -87,6 +87,8 @@ export function quoteReducer(state: QuoteState, action: QuoteReducerAction): Quo
             return { ...state, gridSelections: action.payload };
         case 'SET_CUSTOM_COSTS':
             return { ...state, customCosts: action.payload };
+        case 'SET_CONTRACTING_WORK':
+            return hydrateQuoteState({ ...state, contractingWork: action.payload });
         case 'SET_INVENTORY_DATA':
             return { ...state, inventoryData: action.payload };
         case 'SET_CLOUD_INVENTORY_DATA':

@@ -3,6 +3,7 @@ import type {
     BahamaInventoryV2Item,
     ClickitupStockEntry,
     BuilderAddon,
+    ContractingWorkState,
     GridAddonState,
     GridItemSelectionState,
     HydratedQuoteStatePayload,
@@ -24,7 +25,7 @@ import { DEFAULT_PDF_THEME_ID, normalizePdfThemeId } from '../config/pdfThemes';
 import { DEFAULT_EXPORT_LANGUAGE, normalizeExportLanguage } from '../services/exportLocalization';
 
 export const QUOTE_STATE_STORAGE_KEY = 'offertverktyg_state';
-export const CURRENT_STATE_VERSION = 3;
+export const CURRENT_STATE_VERSION = 5;
 
 const VALID_QUOTE_STATUSES: QuoteStatus[] = ['draft', 'sent', 'won', 'lost', 'archived'];
 const VALID_BAHAMA_STATUSES: BahamaInventoryStatus[] = ['available', 'reserved', 'needs-review', 'used', 'sold'];
@@ -128,6 +129,53 @@ function normalizePositiveInt(value: unknown, fallback: number): number {
 function normalizeNonNegativeInt(value: unknown, fallback = 0): number {
     const parsed = Number.parseInt(String(value), 10);
     return Number.isFinite(parsed) && parsed >= 0 ? parsed : fallback;
+}
+
+function normalizeNonNegativeNumber(value: unknown, fallback = 0): number {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? Math.max(0, parsed) : fallback;
+}
+
+function normalizePercentage(value: unknown, fallback: number): number {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? Math.min(100, Math.max(0, parsed)) : fallback;
+}
+
+function preserveText(value: unknown): string {
+    return typeof value === 'string' ? value : '';
+}
+
+function normalizeContractingWork(value: unknown): ContractingWorkState {
+    const record = toRecord(value);
+    const margin = toRecord(record.margin);
+    const ata = toRecord(record.ata);
+
+    return {
+        enabled: record.enabled === true,
+        projectName: preserveText(record.projectName),
+        rows: Array.isArray(record.rows)
+            ? record.rows.map((row, index) => {
+                const safeRow = toRecord(row);
+                const persistedId = preserveText(safeRow.id);
+
+                return {
+                    id: persistedId.trim() || `contracting_work_row_${index + 1}`,
+                    workPackage: preserveText(safeRow.workPackage),
+                    scope: preserveText(safeRow.scope),
+                    unit: preserveText(safeRow.unit),
+                    priceExVatSek: normalizeNonNegativeNumber(safeRow.priceExVatSek)
+                };
+            })
+            : [],
+        margin: {
+            enabled: margin.enabled === true,
+            percent: normalizePercentage(margin.percent, 15)
+        },
+        ata: {
+            enabled: ata.enabled === true,
+            percent: normalizePercentage(ata.percent, 15)
+        }
+    };
 }
 
 function normalizeOptionalDisplayName(value: unknown): string | undefined {
@@ -318,6 +366,19 @@ function createBaseInitialState(): QuoteState {
         builderItems: [],
         gridSelections: {},
         customCosts: [],
+        contractingWork: {
+            enabled: false,
+            projectName: '',
+            rows: [],
+            margin: {
+                enabled: false,
+                percent: 15
+            },
+            ata: {
+                enabled: false,
+                percent: 15
+            }
+        },
         includesVat: false,
         globalDiscountPct: 0,
         prevGlobalDiscountPct: 0,
@@ -443,6 +504,26 @@ function migrateV2ToV3(rawState: UnknownRecord = {}): UnknownRecord {
     };
 }
 
+function migrateV3ToV4(rawState: UnknownRecord = {}): UnknownRecord {
+    const next = toRecord(rawState);
+
+    return {
+        ...next,
+        stateVersion: 4,
+        contractingWork: normalizeContractingWork(next.contractingWork)
+    };
+}
+
+function migrateV4ToV5(rawState: UnknownRecord = {}): UnknownRecord {
+    const next = toRecord(rawState);
+
+    return {
+        ...next,
+        stateVersion: 5,
+        contractingWork: normalizeContractingWork(next.contractingWork)
+    };
+}
+
 export function migrateQuoteState(fromVersion: unknown, rawState: unknown): UnknownRecord {
     let version = Number.isFinite(Number(fromVersion)) ? Number(fromVersion) : 0;
     let nextState: UnknownRecord = isObject(rawState) ? clone(rawState) : {};
@@ -463,6 +544,18 @@ export function migrateQuoteState(fromVersion: unknown, rawState: unknown): Unkn
         if (version === 2) {
             nextState = migrateV2ToV3(nextState);
             version = 3;
+            continue;
+        }
+
+        if (version === 3) {
+            nextState = migrateV3ToV4(nextState);
+            version = 4;
+            continue;
+        }
+
+        if (version === 4) {
+            nextState = migrateV4ToV5(nextState);
+            version = 5;
             continue;
         }
 
@@ -520,6 +613,7 @@ export function hydrateQuoteState(input: HydratedQuoteStatePayload): QuoteState 
         builderItems: normalizeBuilderItems(mergedState.builderItems),
         gridSelections: normalizeGridSelections(mergedState.gridSelections),
         customCosts: cloneArray(mergedState.customCosts),
+        contractingWork: normalizeContractingWork(mergedState.contractingWork),
         includesVat: Boolean(mergedState.includesVat),
         globalDiscountPct: normalizedGlobalDiscount,
         prevGlobalDiscountPct: toNumber(mergedState.prevGlobalDiscountPct, normalizedGlobalDiscount),

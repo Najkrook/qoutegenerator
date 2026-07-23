@@ -1,9 +1,16 @@
 import autoTable, { type Color, type FontStyle, type Styles } from 'jspdf-autotable';
 import { BRIXX_LOGO_BASE64 } from '../../assets/logoData';
 import { buildPdfTableData } from '../services/exportDataBuilders';
-import { getExportLabels, formatLocalizedDays, translateGroupLabel } from '../services/exportLocalization';
+import { calculateContractingWorkSummary } from '../services/contractingWork';
+import {
+    formatLocalizedDays,
+    formatLocalizedValidityPeriod,
+    getExportLabels,
+    translateGroupLabel
+} from '../services/exportLocalization';
 import { applyVat } from '../utils/vatHelper';
 import type {
+    ContractingWorkState,
     CustomerInfo,
     ExportSummaryInput,
     QuoteState,
@@ -294,7 +301,10 @@ export function renderCustomerInfoBlock(doc, { customerInfo = {}, pageWidth, lay
         customerLines.push({ type: 'recipient', value: recipient });
     }
     if (safeCustomerInfo.validity) {
-        customerLines.push({ type: 'muted', value: `${labels.validityPeriod}: ${safeCustomerInfo.validity}` });
+        customerLines.push({
+            type: 'muted',
+            value: `${labels.validityPeriod}: ${formatLocalizedValidityPeriod(safeCustomerInfo.validity, exportLanguage)}`
+        });
     }
 
     if (customerLines.length === 0) {
@@ -372,6 +382,7 @@ export function renderGroupedTables(doc, {
     pageHeight,
     includesVat,
     hideDiscountReferences,
+    showProductsHeading = false,
     drawMainHeader,
     layout = PDF_LAYOUT,
     exportLanguage = 'sv'
@@ -417,7 +428,7 @@ export function renderGroupedTables(doc, {
             currentY = startNewPage(doc, drawMainHeader, layout.contentStartY);
             drawGroupSubtitle(doc, `${labels.productsHeading} - ${translateGroupLabel(lineKey, exportLanguage)}`, currentY, layout, layout.pageMarginX);
             currentY += 8;
-        } else if (groupKeys.length > 1 && lineKey !== 'Övrigt') {
+        } else if (showProductsHeading || (groupKeys.length > 1 && lineKey !== 'Övrigt')) {
             drawGroupSubtitle(doc, `${labels.productsHeading} - ${translateGroupLabel(lineKey, exportLanguage)}`, currentY, layout, layout.pageMarginX);
             currentY += 6;
         }
@@ -535,6 +546,192 @@ export function renderGroupedTables(doc, {
     return finalY;
 }
 
+export function renderContractingWorkSection(doc, {
+    contractingWork,
+    formatSEK,
+    currentY,
+    pageWidth,
+    pageHeight,
+    drawMainHeader,
+    layout = PDF_LAYOUT,
+    exportLanguage = 'sv'
+}: {
+    contractingWork: ContractingWorkState | null | undefined;
+    formatSEK: (value: number) => string;
+    currentY: number;
+    pageWidth: number;
+    pageHeight: number;
+    drawMainHeader: (() => void) | null;
+    layout?: PdfThemeLayout;
+    exportLanguage?: string;
+}) {
+    const summary = calculateContractingWorkSummary(contractingWork);
+    if (summary.customerRows.length === 0) {
+        return currentY;
+    }
+
+    const labels = getExportLabels(exportLanguage);
+    const projectName = String(contractingWork?.projectName || '');
+    const title = projectName.trim()
+        ? `${labels.contractingHeading} ${labels.contractingFor} ${projectName}`
+        : labels.contractingHeading;
+
+    currentY = ensurePageSpace(
+        doc,
+        currentY,
+        38,
+        pageHeight,
+        drawMainHeader,
+        layout.contentStartY,
+        layout.contentBottomSafe
+    );
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(12);
+    doc.setTextColor(...layout.colors.darkText);
+    const titleLines = doc.splitTextToSize(title, pageWidth - (layout.pageMarginX * 2));
+    titleLines.forEach((line, index) => {
+        doc.text(line, layout.pageMarginX, currentY + (index * 5));
+    });
+    currentY += (titleLines.length * 5) + 4;
+
+    autoTable(doc, {
+        startY: currentY,
+        head: [[
+            labels.contractingWorkPackage,
+            labels.contractingScope,
+            labels.contractingUnit,
+            labels.contractingPriceExVat
+        ]],
+        body: summary.customerRows.map((row) => [
+            row.workPackage,
+            row.scope,
+            row.unit,
+            `${formatSEK(Math.max(0, Number(row.priceExVatSek) || 0))} SEK`
+        ]),
+        theme: 'striped',
+        styles: {
+            fontSize: 8.5,
+            cellPadding: 2.8,
+            valign: 'middle',
+            overflow: 'linebreak',
+            textColor: layout.colors.darkText as Color,
+            lineColor: [220, 220, 220] as Color,
+            lineWidth: 0.1
+        },
+        headStyles: {
+            fillColor: [35, 35, 45] as Color,
+            textColor: [255, 255, 255] as Color,
+            fontStyle: 'bold' as FontStyle,
+            halign: 'center',
+            fontSize: 8
+        },
+        alternateRowStyles: {
+            fillColor: [248, 249, 250] as Color
+        },
+        columnStyles: {
+            0: { halign: 'left', fontStyle: 'bold' as FontStyle, cellWidth: 38 },
+            1: { halign: 'left', cellWidth: 100 },
+            2: { halign: 'center', cellWidth: 24 },
+            3: { halign: 'right', fontStyle: 'bold' as FontStyle, cellWidth: 28 }
+        },
+        didParseCell(data) {
+            if (data.section === 'head' && data.column.index === 3) {
+                data.cell.styles.fillColor = layout.colors.accent as Color;
+                data.cell.styles.textColor = [255, 255, 255] as Color;
+            }
+            if (data.section === 'body' && data.column.index === 3) {
+                data.cell.styles.fillColor = layout.colors.backgroundTint || ([235, 250, 240] as Color);
+            }
+        },
+        didDrawPage(data) {
+            if (data.pageNumber > 1 && drawMainHeader) {
+                drawMainHeader();
+            }
+        },
+        margin: {
+            left: layout.pageMarginX,
+            right: layout.pageMarginX,
+            top: layout.contentStartY + 4,
+            bottom: layout.contentBottomSafe
+        },
+        tableWidth: 'auto',
+        pageBreak: 'auto',
+        rowPageBreak: 'avoid',
+        showHead: 'everyPage'
+    });
+
+    currentY = doc.lastAutoTable?.finalY || (currentY + 24);
+    const summaryRowCount = summary.ataEnabled ? 4 : 1;
+    currentY = ensurePageSpace(
+        doc,
+        currentY + 4,
+        summaryRowCount * 8,
+        pageHeight,
+        drawMainHeader,
+        layout.contentStartY,
+        layout.contentBottomSafe
+    );
+
+    const barX = layout.pageMarginX;
+    const barWidth = pageWidth - (layout.pageMarginX * 2);
+    const valueX = pageWidth - layout.pageMarginX - 4;
+    // Keep the summary label clear of the dedicated price column. Both values
+    // are right-aligned, so sharing nearly the same x-coordinate makes longer
+    // Swedish/English labels overlap the amount.
+    const labelX = valueX - 32;
+    const drawSummaryRow = (
+        label: string,
+        value: number,
+        fillColor: [number, number, number],
+        textColor: [number, number, number],
+        isBold = false
+    ) => {
+        const rowHeight = 8;
+        doc.setFillColor(...fillColor);
+        doc.rect(barX, currentY, barWidth, rowHeight, 'F');
+        doc.setFont('helvetica', isBold ? 'bold' : 'normal');
+        doc.setFontSize(isBold ? 9 : 8.5);
+        doc.setTextColor(...textColor);
+        doc.text(label, labelX, currentY + 5.5, { align: 'right' });
+        doc.text(`${formatSEK(value)} SEK`, valueX, currentY + 5.5, { align: 'right' });
+        currentY += rowHeight;
+    };
+
+    drawSummaryRow(
+        labels.contractingBaseValue,
+        summary.baseTotalSek,
+        [50, 50, 60],
+        [255, 255, 255],
+        true
+    );
+
+    if (summary.ataEnabled) {
+        drawSummaryRow(
+            `${labels.contractingAtaAllowance} (±${summary.ataPercent}%)`,
+            summary.allowanceSek,
+            [245, 245, 245],
+            layout.colors.grayText
+        );
+        drawSummaryRow(
+            `${labels.contractingLowerIndicative} (-${summary.ataPercent}%)`,
+            summary.lowerIndicativeSek,
+            [250, 250, 250],
+            layout.colors.grayText
+        );
+        drawSummaryRow(
+            `${labels.contractingUpperIndicative} (+${summary.ataPercent}%)`,
+            summary.upperIndicativeSek,
+            [215, 215, 215],
+            layout.colors.darkText,
+            true
+        );
+    }
+
+    doc.setTextColor(...layout.colors.darkText);
+    return currentY + 4;
+}
+
 export function renderTotalsSection(doc, {
     state,
     exportSummary,
@@ -546,6 +743,8 @@ export function renderTotalsSection(doc, {
     drawMainHeader,
     layout = PDF_LAYOUT,
     hasPriceUponRequest = false,
+    renderProductTotals = true,
+    useProductTotalLabel = false,
     exportLanguage = 'sv'
 }) {
     const { tableRightMargin } = createPdfTableLayout(state.hideDiscountReferences, pageWidth, state.includesVat, layout, exportLanguage);
@@ -609,45 +808,48 @@ export function renderTotalsSection(doc, {
         return boxY + boxHeight;
     };
 
-    drawTotalLine(`${state.includesVat ? labels.totalRecommendedPriceExVat : labels.totalRecommendedPrice}:`, `${formatSEK(exportSummary.grossTotalSek)} SEK`, finalY);
-    finalY += 6;
+    if (renderProductTotals) {
+        drawTotalLine(`${state.includesVat ? labels.totalRecommendedPriceExVat : labels.totalRecommendedPrice}:`, `${formatSEK(exportSummary.grossTotalSek)} SEK`, finalY);
+        finalY += 6;
 
-    if (!state.hideDiscountReferences) {
-        doc.setTextColor(...layout.colors.grayText);
-        drawTotalLine(`${state.includesVat ? labels.totalDiscountExVat : labels.totalDiscount}:`, `-${formatSEK(exportSummary.totalDiscountSek)} SEK`, finalY);
-        finalY += 10;
-    } else {
-        finalY += 4;
-    }
+        if (!state.hideDiscountReferences) {
+            doc.setTextColor(...layout.colors.grayText);
+            drawTotalLine(`${state.includesVat ? labels.totalDiscountExVat : labels.totalDiscount}:`, `-${formatSEK(exportSummary.totalDiscountSek)} SEK`, finalY);
+            finalY += 10;
+        } else {
+            finalY += 4;
+        }
 
-    drawTotalLine(`${labels.totalExVat}:`, `${formatSEK(exportSummary.finalTotalSek)} SEK`, finalY, true, layout.colors.accent);
-    doc.setTextColor(255, 255, 255);
-    doc.setFont('helvetica', 'bold');
-    doc.text(`${labels.totalExVat}:`, rightColX, finalY);
-    doc.text(`${formatSEK(exportSummary.finalTotalSek)} SEK`, rightEdgeX, finalY, { align: 'right' });
-    doc.setTextColor(...layout.colors.darkText);
-    finalY += 10;
-
-    if (state.includesVat) {
-        drawTotalLine(`${labels.vat25}:`, `${formatSEK(exportSummary.vatAmount)} SEK`, finalY);
-        finalY += 8;
-        drawTotalLine(`${labels.totalInclVat}:`, `${formatSEK(exportSummary.totalWithVat)} SEK`, finalY, true, [35, 35, 45]);
+        const totalExVatLabel = useProductTotalLabel ? labels.productTotalExVat : labels.totalExVat;
+        drawTotalLine(`${totalExVatLabel}:`, `${formatSEK(exportSummary.finalTotalSek)} SEK`, finalY, true, layout.colors.accent);
         doc.setTextColor(255, 255, 255);
         doc.setFont('helvetica', 'bold');
-        doc.text(`${labels.totalInclVat}:`, rightColX, finalY);
-        doc.text(`${formatSEK(exportSummary.totalWithVat)} SEK`, rightEdgeX, finalY, { align: 'right' });
+        doc.text(`${totalExVatLabel}:`, rightColX, finalY);
+        doc.text(`${formatSEK(exportSummary.finalTotalSek)} SEK`, rightEdgeX, finalY, { align: 'right' });
         doc.setTextColor(...layout.colors.darkText);
         finalY += 10;
-    }
 
-    if (hasPriceUponRequest) {
-        doc.setFont('helvetica', 'italic');
-        doc.setFontSize(8);
-        doc.setTextColor(...layout.colors.grayText);
-        doc.text(labels.totalsExcludePriceUponRequest, rightEdgeX, finalY - 2, { align: 'right' });
-        finalY += 6;
-        doc.setTextColor(...layout.colors.darkText);
-        doc.setFontSize(9);
+        if (state.includesVat) {
+            drawTotalLine(`${labels.vat25}:`, `${formatSEK(exportSummary.vatAmount)} SEK`, finalY);
+            finalY += 8;
+            drawTotalLine(`${labels.totalInclVat}:`, `${formatSEK(exportSummary.totalWithVat)} SEK`, finalY, true, [35, 35, 45]);
+            doc.setTextColor(255, 255, 255);
+            doc.setFont('helvetica', 'bold');
+            doc.text(`${labels.totalInclVat}:`, rightColX, finalY);
+            doc.text(`${formatSEK(exportSummary.totalWithVat)} SEK`, rightEdgeX, finalY, { align: 'right' });
+            doc.setTextColor(...layout.colors.darkText);
+            finalY += 10;
+        }
+
+        if (hasPriceUponRequest) {
+            doc.setFont('helvetica', 'italic');
+            doc.setFontSize(8);
+            doc.setTextColor(...layout.colors.grayText);
+            doc.text(labels.totalsExcludePriceUponRequest, rightEdgeX, finalY - 2, { align: 'right' });
+            finalY += 6;
+            doc.setTextColor(...layout.colors.darkText);
+            doc.setFontSize(9);
+        }
     }
 
     if (shouldRenderPaymentBox) {

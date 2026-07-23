@@ -32,7 +32,7 @@ import {
     getQuoteDraftGuardRedirect,
     getQuoteStepNumber,
     getRetailerResumeQuoteStep,
-    hasConfiguredQuoteSelections,
+    hasConfiguredQuoteContent,
     hasRetailerStartDraftData,
     parseSketchReturnTarget,
     resolveLoginRedirectTarget,
@@ -40,7 +40,11 @@ import {
     type QuoteRouteStepId
 } from './navigation/routes';
 import { useAppNavigation } from './navigation/useAppNavigation';
-import type { GridSelections, HistoryOpenQuotePayload } from './types/contracts';
+import type {
+    ContractingWorkState,
+    GridSelections,
+    HistoryOpenQuotePayload
+} from './types/contracts';
 
 const SummaryExport = lazy(() => import('./views/SummaryExport').then((module) => ({ default: module.SummaryExport })));
 const InventoryManager = lazy(() => import('./views/InventoryManager').then((module) => ({ default: module.InventoryManager })));
@@ -221,7 +225,8 @@ function RouteAccessBoundary({ children, routeId }: RouteAccessBoundaryProps) {
 
 function QuoteDraftBoundary({ children, routeId }: RouteAccessBoundaryProps) {
     const { state } = useQuote();
-    const redirectPath = getQuoteDraftGuardRedirect(routeId, state);
+    const { isRetailer } = useAuth();
+    const redirectPath = getQuoteDraftGuardRedirect(routeId, state, { isRetailer });
 
     if (redirectPath) {
         return <Navigate to={redirectPath} replace />;
@@ -369,14 +374,16 @@ function PlannerPage() {
 function HistoryPage() {
     const navigation = useAppNavigation();
     const { dispatch } = useQuote();
+    const { isRetailer } = useAuth();
 
     const handleOpenQuote = (payload: HistoryOpenQuotePayload) => {
-        const targetStep = hasConfiguredQuoteSelections({
+        const targetStep = hasConfiguredQuoteContent({
             builderItems: Array.isArray(payload.builderItems) ? payload.builderItems : [],
             gridSelections: payload.gridSelections && typeof payload.gridSelections === 'object'
                 ? payload.gridSelections as GridSelections
-                : {}
-        }) ? 'summary' : 'product-lines';
+                : {},
+            contractingWork: payload.contractingWork as ContractingWorkState | undefined
+        }, { isRetailer }) ? 'summary' : 'product-lines';
         flushSync(() => {
             dispatch({
                 type: 'HYDRATE_STATE',

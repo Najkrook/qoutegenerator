@@ -3,6 +3,7 @@ import { useQuote } from '../../store/QuoteContext';
 import { useAuth } from '../../store/AuthContext';
 import { catalogData } from '../../data/catalog';
 import { computeQuoteTotals } from '../../services/calculationEngine';
+import { translateQuoteTotalsRowModel } from '../../services/exportLocalization';
 import { DEFAULT_UNKNOWN_ADDON_NAME, formatAddonLabel } from '../../utils/addonLabels';
 import { buildEffectiveGridSelections } from '../../utils/gridAutoScale';
 import type {
@@ -627,7 +628,7 @@ export function PricingTable() {
                                                 />
                                             </div>
                                         ) : (
-                                            row.model
+                                            translateQuoteTotalsRowModel(row, state.exportLanguage)
                                         )}
                                     </td>
                                     <td className={`p-4 text-sm text-text-secondary ${dropIndicatorClass}`}>{row.size}</td>

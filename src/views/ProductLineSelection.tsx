@@ -2,6 +2,7 @@ import React, { useEffect } from 'react';
 import { useQuote } from '../store/QuoteContext';
 import { useAuth } from '../store/AuthContext';
 import { getCatalogLineIds, getCatalogLineName } from '../data/catalogLookup';
+import { createContractingWorkRow } from '../components/features/ContractingWorkEditor';
 import type { ProductLineSelectionProps, RetailerRecord } from '../types/contracts';
 
 export interface ProductLineOption {
@@ -59,13 +60,23 @@ export function getFirstEnabledProductLineId(productLines: ProductLineOption[]):
 
 export function ProductLineSelection({ onNext }: ProductLineSelectionProps) {
     const { state, dispatch } = useQuote();
-    const { isRetailer, retailer } = useAuth();
+    const { accessLevel, isRetailer, retailer } = useAuth();
     const { selectedLines } = state;
+    const contractingWork = state.contractingWork || {
+        enabled: false,
+        projectName: '',
+        rows: [],
+        ata: { enabled: false, percent: 15 },
+        margin: { enabled: false, percent: 15 }
+    };
     const productLines = buildProductLineOptions(isRetailer, retailer);
     const hasRetailerLines = !isRetailer || productLines.length > 0;
     const selectedLineId = selectedLines[0] || '';
     const selectedLine = productLines.find((line) => line.id === selectedLineId) || null;
     const nextRetailerDiscount = selectedLine?.retailerDiscountPct ?? 0;
+    const canSelectContractingWork = !isRetailer && (accessLevel === 'full' || accessLevel === 'quote-only');
+    const contractingWorkEnabled = canSelectContractingWork && contractingWork.enabled;
+    const hasSelectedQuoteContent = selectedLines.length > 0 || contractingWorkEnabled;
 
     const toggleLine = (lineId: string): void => {
         if (isRetailer) {
@@ -86,6 +97,24 @@ export function ProductLineSelection({ onNext }: ProductLineSelectionProps) {
         }
 
         dispatch({ type: 'SET_SELECTED_LINES', payload: nextSelection });
+    };
+
+    const toggleContractingWork = (): void => {
+        if (!canSelectContractingWork) {
+            return;
+        }
+
+        const enabled = !contractingWork.enabled;
+        dispatch({
+            type: 'SET_CONTRACTING_WORK',
+            payload: {
+                ...contractingWork,
+                enabled,
+                rows: enabled && contractingWork.rows.length === 0
+                    ? [createContractingWorkRow()]
+                    : contractingWork.rows
+            }
+        });
     };
 
     const handleNext = (): void => {
@@ -126,7 +155,10 @@ export function ProductLineSelection({ onNext }: ProductLineSelectionProps) {
     return (
         <div className="max-w-[1200px] mx-auto animate-fade-in">
             <div className="mb-8">
-                <h2 className="text-2xl font-bold m-0 text-text-primary">Välj Produktlinje</h2>
+                <h2 className="text-2xl font-bold m-0 text-text-primary">Välj offertinnehåll</h2>
+                <p className="mb-0 mt-2 text-sm text-text-secondary">
+                    Välj en eller flera produktlinjer, entreprenadarbete eller kombinera båda i samma offert.
+                </p>
             </div>
 
             {isRetailer && (
@@ -197,6 +229,31 @@ export function ProductLineSelection({ onNext }: ProductLineSelectionProps) {
                             </label>
                         );
                     })}
+
+                    {canSelectContractingWork && (
+                        <label
+                            data-testid="contracting-work-option"
+                            className={`flex items-start gap-4 rounded-lg border bg-panel-bg p-6 transition-all ${
+                                contractingWorkEnabled
+                                    ? 'cursor-pointer border-primary ring-1 ring-primary hover:-translate-y-0.5'
+                                    : 'cursor-pointer border-panel-border hover:-translate-y-0.5 hover:border-primary'
+                            }`}
+                        >
+                            <input
+                                type="checkbox"
+                                checked={contractingWorkEnabled}
+                                onChange={toggleContractingWork}
+                                aria-describedby="contracting-work-option-description"
+                                className="mt-1 h-5 w-5 cursor-pointer accent-primary"
+                            />
+                            <div className="min-w-0 flex-1">
+                                <h3 className="m-0 text-lg font-semibold text-text-primary">Entreprenadarbete</h3>
+                                <p id="contracting-work-option-description" className="mb-0 mt-2 text-sm leading-relaxed text-text-secondary">
+                                    Fria arbetspaket med egen omfattning, enhet och pris exkl. moms.
+                                </p>
+                            </div>
+                        </label>
+                    )}
                 </div>
             )}
 
@@ -212,13 +269,13 @@ export function ProductLineSelection({ onNext }: ProductLineSelectionProps) {
                 <button
                     type="button"
                     onClick={handleNext}
-                    disabled={selectedLines.length === 0}
-                    className={`px-8 py-3 rounded-md font-medium text-base transition-colors shadow shadow-primary/20 ${selectedLines.length === 0
+                    disabled={!hasSelectedQuoteContent}
+                    className={`px-8 py-3 rounded-md font-medium text-base transition-colors shadow shadow-primary/20 ${!hasSelectedQuoteContent
                         ? 'bg-gray-600 cursor-not-allowed text-gray-400'
                         : 'bg-primary hover:bg-primary-hover text-white cursor-pointer'
                     }`}
                 >
-                    Fortsätt till Offertskapande &raquo;
+                    Fortsätt till Konfiguration &raquo;
                 </button>
             </div>
         </div>

@@ -5,6 +5,7 @@ import {
     canStartQuoteLevel,
     canViewEverythingLevel
 } from '../config/accessControl.shared';
+import { hasConfiguredContractingWork } from '../services/contractingWork';
 import type { AccessLevel, QuoteState } from '../types/contracts';
 
 export const APP_ROUTE_IDS = Object.freeze({
@@ -232,6 +233,21 @@ export function hasConfiguredQuoteSelections(
         ));
 }
 
+interface QuoteDraftOptions {
+    isRetailer?: boolean;
+}
+
+type QuoteDraftState = Pick<QuoteState, 'selectedLines' | 'builderItems' | 'gridSelections'>
+    & Partial<Pick<QuoteState, 'contractingWork'>>;
+
+export function hasConfiguredQuoteContent(
+    state: Pick<QuoteState, 'builderItems' | 'gridSelections'> & Partial<Pick<QuoteState, 'contractingWork'>>,
+    options: QuoteDraftOptions = {}
+): boolean {
+    return hasConfiguredQuoteSelections(state)
+        || (!options.isRetailer && hasConfiguredContractingWork(state.contractingWork));
+}
+
 export function hasRetailerStartDraftData(
     state: Pick<
         QuoteState,
@@ -290,7 +306,7 @@ export function getRetailerResumeQuoteStep(
     const currentStep = getQuoteStepFromStateStep(state.step);
     if (currentStep) {
         const currentRouteId = getQuoteStepRouteId(currentStep);
-        if (!getQuoteDraftGuardRedirect(currentRouteId, state)) {
+        if (!getQuoteDraftGuardRedirect(currentRouteId, state, { isRetailer: true })) {
             return currentStep;
         }
     }
@@ -300,14 +316,16 @@ export function getRetailerResumeQuoteStep(
 
 export function getQuoteDraftGuardRedirect(
     routeId: AppRouteId,
-    state: Pick<QuoteState, 'selectedLines' | 'builderItems' | 'gridSelections'>
+    state: QuoteDraftState,
+    options: QuoteDraftOptions = {}
 ): string | null {
     if (routeId === APP_ROUTE_IDS.quoteProductLines) {
         return null;
     }
 
     const hasSelectedLines = Array.isArray(state.selectedLines) && state.selectedLines.length > 0;
-    if (!hasSelectedLines) {
+    const hasSelectedContractingWork = !options.isRetailer && state.contractingWork?.enabled === true;
+    if (!hasSelectedLines && !hasSelectedContractingWork) {
         return getQuoteStepPath('product-lines');
     }
 
@@ -315,7 +333,7 @@ export function getQuoteDraftGuardRedirect(
         return null;
     }
 
-    const hasSelections = hasConfiguredQuoteSelections(state);
+    const hasSelections = hasConfiguredQuoteContent(state, options);
     if (!hasSelections) {
         return getQuoteStepPath('configuration');
     }

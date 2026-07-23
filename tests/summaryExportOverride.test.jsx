@@ -26,6 +26,19 @@ const excelExportState = vi.hoisted(() => ({
     generateExcel: vi.fn()
 }));
 
+const quoteSaveState = vi.hoisted(() => ({
+    saveQuoteToRepository: vi.fn(async () => ({
+        saved: { quoteId: 'quote-1' },
+        isNewQuote: false,
+        statePatch: {
+            activeQuoteId: 'quote-1',
+            activeQuoteVersion: 3,
+            quoteNumber: 'BRIXX - 260423-101',
+            quoteStatus: 'draft'
+        }
+    }))
+}));
+
 const orderRequestState = vi.hoisted(() => ({
     getOrderRequestByQuoteVersion: vi.fn(async () => null),
     createOrderRequest: vi.fn(async () => ({
@@ -96,7 +109,7 @@ vi.mock('../src/services/quoteRepositoryClient', () => ({
 }));
 
 vi.mock('../src/services/quoteSaveService', () => ({
-    saveQuoteToRepository: vi.fn()
+    saveQuoteToRepository: quoteSaveState.saveQuoteToRepository
 }));
 
 vi.mock('../src/services/activityLogService', () => ({
@@ -212,6 +225,17 @@ beforeEach(() => {
     activityState.safeLogActivity.mockResolvedValue({ ok: true });
     excelExportState.generateExcel.mockReset();
     excelExportState.generateExcel.mockResolvedValue(undefined);
+    quoteSaveState.saveQuoteToRepository.mockReset();
+    quoteSaveState.saveQuoteToRepository.mockResolvedValue({
+        saved: { quoteId: 'quote-1' },
+        isNewQuote: false,
+        statePatch: {
+            activeQuoteId: 'quote-1',
+            activeQuoteVersion: 3,
+            quoteNumber: 'BRIXX - 260423-101',
+            quoteStatus: 'draft'
+        }
+    });
     orderRequestState.getOrderRequestByQuoteVersion.mockReset();
     orderRequestState.getOrderRequestByQuoteVersion.mockResolvedValue(null);
     orderRequestState.createOrderRequest.mockReset();
@@ -277,6 +301,15 @@ afterEach(() => {
 });
 
 describe('SummaryExport PDF override', () => {
+    it('renders the shared export language selector beside the PDF preview', async () => {
+        const { container } = await renderSummaryExport();
+        const languageGroup = container.querySelector('[role="group"][aria-label="Exportspråk"]');
+
+        expect(container.textContent).toContain('Exportspråk');
+        expect(languageGroup).toBeTruthy();
+        expect(languageGroup.querySelectorAll('button')).toHaveLength(2);
+    });
+
     it('renders the offer theme dropdown and dispatches theme changes', async () => {
         const { container, dispatch } = await renderSummaryExport();
         const select = container.querySelector('select[name="pdfThemeId"]');
@@ -420,6 +453,94 @@ describe('SummaryExport PDF override', () => {
                 fileName: 'Quote.xlsx'
             })
         }));
+    });
+
+    it('removes persisted contracting work from retailer preview and export payloads', async () => {
+        const { container } = await renderSummaryExport({
+            authOverrides: {
+                accessLevel: 'retailer',
+                isRetailer: true,
+                retailer: {
+                    id: 'retailer-1',
+                    name: 'Nordvind',
+                    email: 'retailer@example.com',
+                    pdfThemes: []
+                }
+            },
+            stateOverrides: {
+                activeQuoteId: 'quote-1',
+                quoteNumber: 'BRIXX - 260423-101',
+                activeQuoteVersion: 2,
+                contractingWork: {
+                    enabled: true,
+                    projectName: 'Hidden retailer project',
+                    rows: [{
+                        id: 'hidden-work',
+                        workPackage: 'Hidden retailer work',
+                        scope: 'Must not be exported',
+                        unit: 'work',
+                        priceExVatSek: 50000
+                    }],
+                    margin: { enabled: true, percent: 40 },
+                    ata: { enabled: true, percent: 15 }
+                }
+            }
+        });
+
+        expect(container.textContent).not.toContain('Hidden retailer work');
+        expect(createQuotePdfBlob).toHaveBeenCalledWith(
+            expect.objectContaining({
+                contractingWork: {
+                    enabled: false,
+                    projectName: '',
+                    rows: [],
+                    margin: { enabled: false, percent: 15 },
+                    ata: { enabled: false, percent: 15 }
+                }
+            }),
+            expect.any(Object)
+        );
+
+        await clickButton(container, 'Exportera som Excel');
+
+        expect(excelExportState.generateExcel).toHaveBeenCalledWith(
+            expect.objectContaining({
+                contractingWork: expect.objectContaining({
+                    enabled: false,
+                    rows: [],
+                    margin: { enabled: false, percent: 15 }
+                })
+            }),
+            expect.any(Object)
+        );
+
+        await clickButton(container, 'Spara offert');
+
+        expect(quoteSaveState.saveQuoteToRepository).toHaveBeenCalledWith(
+            expect.objectContaining({
+                state: expect.objectContaining({
+                    contractingWork: expect.objectContaining({
+                        enabled: false,
+                        rows: [],
+                        margin: { enabled: false, percent: 15 }
+                    })
+                })
+            })
+        );
+
+        await clickButton(container, 'Skicka orderförfrågan');
+
+        expect(orderRequestState.createOrderRequest).toHaveBeenCalledWith(
+            expect.objectContaining({
+                state: expect.objectContaining({
+                    contractingWork: expect.objectContaining({
+                        enabled: false,
+                        rows: [],
+                        margin: { enabled: false, percent: 15 }
+                    })
+                })
+            })
+        );
     });
 
     it('shows the retailer order request CTA only for retailer users', async () => {

@@ -30,6 +30,51 @@ describe('historyPayload', () => {
         expect(payload.quoteStatus).toBe('sent');
     });
 
+    it('preserves contracting work when reopening or duplicating a revision', () => {
+        const contractingWork = {
+            enabled: true,
+            projectName: ' Designer Village ',
+            rows: [{
+                id: 'work-1',
+                workPackage: 'Markarbete',
+                scope: 'Schaktning\nGjutning',
+                unit: 'Samlat arbetspaket',
+                priceExVatSek: 101600
+            }],
+            margin: {
+                enabled: true,
+                percent: 15
+            },
+            ata: {
+                enabled: true,
+                percent: 15
+            }
+        };
+
+        const reopened = buildHistoryOpenQuotePayload(
+            { customerInfo: {}, contractingWork },
+            'quote-contracting',
+            'BRIXX - 260422-108',
+            3,
+            'sent'
+        );
+        const duplicated = buildHistoryOpenQuotePayload(
+            { customerInfo: {}, contractingWork },
+            null,
+            null,
+            0,
+            'draft'
+        );
+
+        expect(reopened.contractingWork).toEqual(contractingWork);
+        expect(duplicated.contractingWork).toEqual(contractingWork);
+        expect(reopened.contractingWork.margin).toEqual({ enabled: true, percent: 15 });
+        expect(duplicated.contractingWork.margin).toEqual({ enabled: true, percent: 15 });
+        expect(duplicated.activeQuoteId).toBeNull();
+        expect(duplicated.quoteNumber).toBeNull();
+        expect(duplicated.activeQuoteVersion).toBe(1);
+    });
+
     it('falls back to an empty customer info patch when customerInfo is missing', () => {
         const payload = buildHistoryOpenQuotePayload(
             {

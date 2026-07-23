@@ -6,8 +6,10 @@ import { PDF_THEME_OPTIONS, normalizePdfThemeId, DEFAULT_PDF_THEME_ID } from '..
 import { computeQuoteTotals } from '../services/calculationEngine';
 import { CustomerInfoForm } from '../components/features/CustomerInfoForm';
 import { FinalSummaryTable } from '../components/features/FinalSummaryTable';
+import { ContractingWorkSummaryTable } from '../components/features/ContractingWorkSummaryTable';
 import { TermsAndPaymentPanel } from '../components/features/TermsAndPaymentPanel';
 import { MarginSummaryPanel } from '../components/features/MarginSummaryPanel';
+import { ExportLanguageSelector } from '../components/features/ExportLanguageSelector';
 import { downloadBlob, saveBlobWithPicker } from '../utils/fileUtils';
 import { createQuotePdfBlob } from '../services/quotePdfService';
 import { quoteRepository } from '../services/quoteRepositoryClient';
@@ -15,6 +17,7 @@ import { saveQuoteToRepository } from '../services/quoteSaveService';
 import { safeLogActivity } from '../services/activityLogService';
 import { hasZeroDiscountSummary } from '../services/exportDataBuilders';
 import { normalizeExportLanguage } from '../services/exportLocalization';
+import { calculateContractingWorkSummary } from '../services/contractingWork';
 import { buildQuoteRevisionLink } from '../navigation/quoteLinks';
 import {
     getOrderRequestStatusLabel,
@@ -44,6 +47,20 @@ interface ActivityLogResultLike {
 interface PdfExportOptions {
     allowMissingQuoteNumber?: boolean;
 }
+
+const RETAILER_SAFE_CONTRACTING_WORK: QuoteState['contractingWork'] = {
+    enabled: false,
+    projectName: '',
+    rows: [],
+    margin: {
+        enabled: false,
+        percent: 15
+    },
+    ata: {
+        enabled: false,
+        percent: 15
+    }
+};
 
 function sanitizeFileNamePart(value: string): string {
     return String(value || '')
@@ -176,6 +193,9 @@ export function SummaryExport({ onPrev, onBackToSketch, onOpenRetailerOrderHisto
 
     const selectedPdfThemeId = normalizePdfThemeId(state.pdfThemeId);
     const selectedExportLanguage = normalizeExportLanguage(state.exportLanguage);
+    const hasProducts = summaryData.totals.length > 0;
+    const hasContractingWork = !isRetailer
+        && calculateContractingWorkSummary(state.contractingWork).activeRows.length > 0;
 
     const effectivePdfThemeId = allowedThemeOptions.some(t => t.id === selectedPdfThemeId)
         ? selectedPdfThemeId
@@ -184,8 +204,9 @@ export function SummaryExport({ onPrev, onBackToSketch, onOpenRetailerOrderHisto
     const effectiveState = useMemo(() => ({
         ...state,
         pdfThemeId: effectivePdfThemeId,
-        exportLanguage: selectedExportLanguage
-    }), [state, effectivePdfThemeId, selectedExportLanguage]);
+        exportLanguage: selectedExportLanguage,
+        contractingWork: isRetailer ? RETAILER_SAFE_CONTRACTING_WORK : state.contractingWork
+    }), [state, effectivePdfThemeId, selectedExportLanguage, isRetailer]);
 
     useEffect(() => {
         if (selectedPdfThemeId && !allowedThemeOptions.some(t => t.id === selectedPdfThemeId)) {
@@ -297,13 +318,6 @@ export function SummaryExport({ onPrev, onBackToSketch, onOpenRetailerOrderHisto
         dispatch({
             type: 'SET_PDF_THEME_ID',
             payload: normalizePdfThemeId(event.target.value)
-        });
-    };
-
-    const handleExportLanguageChange = (exportLanguage: QuoteState['exportLanguage']): void => {
-        dispatch({
-            type: 'SET_EXPORT_LANGUAGE',
-            payload: normalizeExportLanguage(exportLanguage)
         });
     };
 
@@ -518,8 +532,11 @@ export function SummaryExport({ onPrev, onBackToSketch, onOpenRetailerOrderHisto
                             <h3 className="text-lg font-bold mb-6 flex items-center gap-2">
                                 <span className="text-primary text-xl" aria-hidden="true">📋</span> Summering
                             </h3>
-                            <FinalSummaryTable />
-                            <MarginSummaryPanel summaryData={summaryData} className="mt-6" />
+                            {hasProducts ? <FinalSummaryTable isMixedOffer={hasContractingWork} /> : null}
+                            {hasContractingWork ? (
+                                <ContractingWorkSummaryTable className={hasProducts ? 'mt-8' : ''} />
+                            ) : null}
+                            {hasProducts ? <MarginSummaryPanel summaryData={summaryData} className="mt-6" /> : null}
                             <section className="mt-8 flex flex-col gap-6">
                                 {exportBlockReason && (
                                     <div className="flex items-start gap-4 rounded-xl border border-amber-500/30 bg-amber-500/10 px-6 py-5 shadow-sm">
@@ -694,27 +711,7 @@ export function SummaryExport({ onPrev, onBackToSketch, onOpenRetailerOrderHisto
                                 </select>
                             </label>
 
-                            <div className="flex flex-col gap-1 text-xs font-semibold uppercase tracking-wide text-text-secondary">
-                                Exportspråk
-                                <div className="grid h-[38px] grid-cols-2 overflow-hidden rounded-md border border-panel-border bg-panel-bg normal-case tracking-normal" role="group" aria-label="Exportspråk">
-                                    <button
-                                        type="button"
-                                        onClick={() => handleExportLanguageChange('sv')}
-                                        aria-pressed={selectedExportLanguage === 'sv'}
-                                        className={`text-sm font-bold transition-colors ${selectedExportLanguage === 'sv' ? 'bg-primary text-white' : 'text-text-secondary hover:bg-white/5 hover:text-white'}`}
-                                    >
-                                        SV
-                                    </button>
-                                    <button
-                                        type="button"
-                                        onClick={() => handleExportLanguageChange('en')}
-                                        aria-pressed={selectedExportLanguage === 'en'}
-                                        className={`text-sm font-bold transition-colors ${selectedExportLanguage === 'en' ? 'bg-primary text-white' : 'text-text-secondary hover:bg-white/5 hover:text-white'}`}
-                                    >
-                                        EN
-                                    </button>
-                                </div>
-                            </div>
+                            <ExportLanguageSelector />
                         </div>
                     </div>
                     <div className="h-[860px] bg-white border border-panel-border rounded-md overflow-hidden">

@@ -10,6 +10,7 @@ import {
     getQuoteStepPath,
     getRetailerResumeQuoteStep,
     getSketchReturnPath,
+    hasConfiguredQuoteContent,
     hasConfiguredQuoteSelections,
     hasRetailerStartDraftData,
     parseSketchReturnTarget,
@@ -74,6 +75,46 @@ describe('navigation routes', () => {
         expect(getQuoteDraftGuardRedirect(APP_ROUTE_IDS.quoteConfiguration, emptyState)).toBe(APP_PATHS[APP_ROUTE_IDS.quoteProductLines]);
         expect(getQuoteDraftGuardRedirect(APP_ROUTE_IDS.quotePricing, selectedLinesOnly)).toBe(APP_PATHS[APP_ROUTE_IDS.quoteConfiguration]);
         expect(getQuoteDraftGuardRedirect(APP_ROUTE_IDS.quoteSummary, configuredState)).toBeNull();
+    });
+
+    it('allows a configured contracting-only quote through draft guards while retailers ignore it', () => {
+        const selectedContractingState = {
+            ...createInitialQuoteState(),
+            contractingWork: {
+                enabled: true,
+                projectName: 'Designer Village',
+                rows: [{
+                    id: 'work-1',
+                    workPackage: '',
+                    scope: '',
+                    unit: '',
+                    priceExVatSek: 0
+                }],
+                margin: { enabled: false, percent: 15 },
+                ata: { enabled: false, percent: 15 }
+            }
+        };
+        const configuredContractingState = {
+            ...selectedContractingState,
+            contractingWork: {
+                ...selectedContractingState.contractingWork,
+                rows: [{
+                    ...selectedContractingState.contractingWork.rows[0],
+                    workPackage: 'Markarbete och fundament'
+                }]
+            }
+        };
+
+        expect(getQuoteDraftGuardRedirect(APP_ROUTE_IDS.quoteConfiguration, selectedContractingState)).toBeNull();
+        expect(getQuoteDraftGuardRedirect(APP_ROUTE_IDS.quotePricing, selectedContractingState)).toBe(APP_PATHS[APP_ROUTE_IDS.quoteConfiguration]);
+        expect(getQuoteDraftGuardRedirect(APP_ROUTE_IDS.quotePricing, configuredContractingState)).toBeNull();
+        expect(getQuoteDraftGuardRedirect(APP_ROUTE_IDS.quoteSummary, configuredContractingState)).toBeNull();
+        expect(hasConfiguredQuoteContent(configuredContractingState)).toBe(true);
+
+        const retailerOptions = { isRetailer: true };
+        expect(getQuoteDraftGuardRedirect(APP_ROUTE_IDS.quoteConfiguration, configuredContractingState, retailerOptions))
+            .toBe(APP_PATHS[APP_ROUTE_IDS.quoteProductLines]);
+        expect(hasConfiguredQuoteContent(configuredContractingState, retailerOptions)).toBe(false);
     });
 
     it('detects configured quote selections', () => {

@@ -137,6 +137,7 @@ describe('Retailer workspace', () => {
         expect(html).toContain('Förhandsvisning: 12% retailer-rabatt');
         expect((html.match(/type="radio"/g) || []).length).toBe(1);
         expect(html).not.toContain('disabled=""');
+        expect(html).not.toContain('Entreprenadarbete');
     });
 
     it('shows a retailer empty state when no product lines are enabled', () => {
@@ -174,6 +175,15 @@ describe('Retailer workspace', () => {
                 state: {
                     step: 3,
                     selectedLines: ['BaHaMa'],
+                    builderItems: [{
+                        id: 'item-1',
+                        line: 'BaHaMa',
+                        model: 'Jumbrella',
+                        size: '4x4 Kvadrat',
+                        qty: 1,
+                        discountPct: 12,
+                        addons: []
+                    }],
                     globalDiscountPct: 12
                 }
             }

@@ -175,3 +175,31 @@ describe('PricingTable priceUponRequest rendering', () => {
         expect(html).toContain('* Totalsumman exkluderar artiklar med pris på förfrågan');
     });
 });
+
+describe('PricingTable ClickitUp export language rendering', () => {
+    it('translates only ClickitUp article content while keeping pricing controls Swedish', () => {
+        const html = renderPricingTable({
+            builderItems: [],
+            selectedLines: ['ClickitUp'],
+            exportLanguage: 'en',
+            gridSelections: {
+                ClickitUp: {
+                    items: {
+                        'ClickitUp Sektion|1000': { qty: 1, discountPct: 0 }
+                    },
+                    addons: {
+                        frakt_glas: { qty: 1, discountPct: 0 }
+                    },
+                    customAddonsByCategory: {}
+                }
+            }
+        });
+
+        expect(html).toContain('ClickitUp section');
+        expect(html).toContain('Add-on: Glass freight – special pallet');
+        expect(html).toContain('Modell/Beskrivning');
+        expect(html).toContain('Rabatt %');
+        expect(html).toContain('Summa brutto');
+        expect(html).not.toContain('Model/Description');
+    });
+});
