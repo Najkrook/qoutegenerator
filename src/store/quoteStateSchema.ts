@@ -602,6 +602,8 @@ export function hydrateQuoteState(input: HydratedQuoteStatePayload): QuoteState 
         : clone(inventoryData);
     const normalizedGlobalDiscount = toNumber(mergedState.globalDiscountPct, initialState.globalDiscountPct);
     const sketchMeta = toRecord<RawPersistedSketchMeta>(mergedState.sketchMeta);
+    delete mergedState.crmDealId;
+    delete mergedState.quoteOwnerUid;
 
     return {
         ...mergedState,

@@ -166,7 +166,13 @@ function logPdfExportActivity({
     }).then((result) => warnIfActivityLogFailed(result, 'PDF-exporten lyckades, men aktivitetsloggen kunde inte uppdateras.'));
 }
 
-export function SummaryExport({ onPrev, onBackToSketch, onOpenRetailerOrderHistory }: SummaryExportProps) {
+export function SummaryExport({
+    onPrev,
+    onBackToSketch,
+    onOpenRetailerOrderHistory,
+    crmDealId = null,
+    quoteOwnerUid = null
+}: SummaryExportProps) {
     const { state, dispatch } = useQuote();
     const { user, retailer, isRetailer } = useAuth();
     const summaryData = useMemo(
@@ -423,7 +429,9 @@ export function SummaryExport({ onPrev, onBackToSketch, onOpenRetailerOrderHisto
                 user,
                 retailer,
                 state: effectiveState,
-                summary: summaryData
+                summary: summaryData,
+                crmDealId,
+                quoteOwnerUid
             });
             const saveStatePatch: SavedQuoteStatePatch = statePatch;
 
@@ -431,6 +439,32 @@ export function SummaryExport({ onPrev, onBackToSketch, onOpenRetailerOrderHisto
                 type: 'UPDATE_STATE',
                 payload: saveStatePatch
             });
+
+            const linkedCrmDealId = crmDealId || saved.metadata?.crmDealId || null;
+            if (linkedCrmDealId && user?.uid && saveStatePatch.activeQuoteId) {
+                try {
+                    const { syncCrmDealFromQuote } = await import('../services/crmQuoteWorkflow');
+                    await syncCrmDealFromQuote({
+                        metadata: {
+                            quoteId: saveStatePatch.activeQuoteId,
+                            quoteNumber: saved.metadata?.quoteNumber ?? saveStatePatch.quoteNumber ?? null,
+                            latestRevisionId: saved.metadata?.latestRevisionId || '',
+                            latestVersion: saved.metadata?.latestVersion || saveStatePatch.activeQuoteVersion || 1,
+                            totalSek: saved.metadata?.totalSek ?? summaryData.finalTotalSek ?? 0,
+                            status: saved.metadata?.status || saveStatePatch.quoteStatus || 'draft',
+                            crmDealId: linkedCrmDealId
+                        },
+                        quoteOwnerUid: quoteOwnerUid || user.uid,
+                        actor: {
+                            uid: user.uid,
+                            email: user.email || ''
+                        }
+                    });
+                } catch (crmError) {
+                    console.error('Failed to synchronize saved quote with CRM:', crmError);
+                    notifyWarn('Offerten sparades, men CRM-affären kunde inte uppdateras. Försök spara igen.');
+                }
+            }
 
             void safeLogActivity({
                 user,

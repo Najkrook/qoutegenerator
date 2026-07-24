@@ -5,15 +5,387 @@ service cloud.firestore {
       return request.auth != null;
     }
 
+    function hasRecognizedRole() {
+      return isSignedIn()
+        && exists(/databases/$(database)/documents/user_roles/$(request.auth.uid))
+        && get(/databases/$(database)/documents/user_roles/$(request.auth.uid)).data.role
+          in ['admin', 'sketch_only', 'quote_only'];
+    }
+
     function isAdmin() {
       return isSignedIn() && (
-        request.auth.uid in [
+        (
+          hasRecognizedRole()
+          && get(/databases/$(database)/documents/user_roles/$(request.auth.uid)).data.role == 'admin'
+        )
+        || (
+          !hasRecognizedRole()
+          && request.auth.uid in [
           "ZPxZusAiyfY6cf2LSn1ynP5A7rG3",
           "XolYJ2aOCdZPgiTg4WKVSOcRPmO2",
           "cNXpQsFClscsPGURl0gedehYcFo2"
-        ] || 
-        (exists(/databases/$(database)/documents/user_roles/$(request.auth.uid)) && get(/databases/$(database)/documents/user_roles/$(request.auth.uid)).data.role == 'admin')
+          ]
+        )
       );
+    }
+
+    function isNullableCrmString(value) {
+      return value == null || value is string;
+    }
+
+    function isNullableCrmInt(value) {
+      return value == null || value is int;
+    }
+
+    function hasValidCrmSearchFields(data) {
+      return data.searchText is string
+        && data.searchPrefixes is list
+        && data.searchPrefixes.size() <= 500;
+    }
+
+    function isValidCrmTagAt(tags, index) {
+      return tags.size() <= index
+        || (tags[index] is string && tags[index].size() <= 40);
+    }
+
+    function hasValidCrmTags(data) {
+      return data.tags is list
+        && data.tags.size() <= 20
+        && isValidCrmTagAt(data.tags, 0)
+        && isValidCrmTagAt(data.tags, 1)
+        && isValidCrmTagAt(data.tags, 2)
+        && isValidCrmTagAt(data.tags, 3)
+        && isValidCrmTagAt(data.tags, 4)
+        && isValidCrmTagAt(data.tags, 5)
+        && isValidCrmTagAt(data.tags, 6)
+        && isValidCrmTagAt(data.tags, 7)
+        && isValidCrmTagAt(data.tags, 8)
+        && isValidCrmTagAt(data.tags, 9)
+        && isValidCrmTagAt(data.tags, 10)
+        && isValidCrmTagAt(data.tags, 11)
+        && isValidCrmTagAt(data.tags, 12)
+        && isValidCrmTagAt(data.tags, 13)
+        && isValidCrmTagAt(data.tags, 14)
+        && isValidCrmTagAt(data.tags, 15)
+        && isValidCrmTagAt(data.tags, 16)
+        && isValidCrmTagAt(data.tags, 17)
+        && isValidCrmTagAt(data.tags, 18)
+        && isValidCrmTagAt(data.tags, 19);
+    }
+
+    function hasValidCrmArchiveFields(data) {
+      return data.archived is bool
+        && isNullableCrmInt(data.archivedAtMs)
+        && data.archivedByUid is string
+        && (
+          (
+            data.archived == false
+            && data.archivedAtMs == null
+            && data.archivedByUid == ''
+          )
+          || (
+            data.archived == true
+            && data.archivedAtMs is int
+            && data.archivedByUid.size() > 0
+          )
+        );
+    }
+
+    function hasValidCrmAuditFields(data) {
+      return data.schemaVersion == 1
+        && data.createdAtMs is int
+        && data.updatedAtMs is int
+        && data.updatedAtMs >= data.createdAtMs
+        && data.createdByUid is string
+        && data.createdByName is string
+        && data.updatedByUid is string
+        && data.updatedByName is string
+        && data.updatedByUid == request.auth.uid
+        && hasValidCrmArchiveFields(data);
+    }
+
+    function hasValidCrmCreateAudit(data) {
+      return hasValidCrmAuditFields(data)
+        && data.createdByUid == request.auth.uid
+        && data.archived == false;
+    }
+
+    function hasValidCrmUpdateAudit(data, previous) {
+      return hasValidCrmAuditFields(data)
+        && data.createdAtMs == previous.createdAtMs
+        && data.createdByUid == previous.createdByUid
+        && data.createdByName == previous.createdByName
+        && data.updatedAtMs >= previous.updatedAtMs;
+    }
+
+    function isValidCrmCompany(data, companyId) {
+      return data.keys().hasOnly([
+          'schemaVersion',
+          'id',
+          'name',
+          'normalizedName',
+          'orgNumber',
+          'email',
+          'phone',
+          'website',
+          'address',
+          'tags',
+          'notes',
+          'searchText',
+          'searchPrefixes',
+          'archived',
+          'archivedAtMs',
+          'archivedByUid',
+          'createdAtMs',
+          'updatedAtMs',
+          'createdByUid',
+          'createdByName',
+          'updatedByUid',
+          'updatedByName'
+        ])
+        && data.id == companyId
+        && data.name is string
+        && data.name.size() > 0
+        && data.normalizedName is string
+        && data.orgNumber is string
+        && data.email is string
+        && data.phone is string
+        && data.website is string
+        && data.address is map
+        && data.address.keys().hasOnly(['street', 'postalCode', 'city', 'country'])
+        && data.address.street is string
+        && data.address.postalCode is string
+        && data.address.city is string
+        && data.address.country is string
+        && data.notes is string
+        && hasValidCrmTags(data)
+        && hasValidCrmSearchFields(data);
+    }
+
+    function isValidCrmContact(data, contactId) {
+      return data.keys().hasOnly([
+          'schemaVersion',
+          'id',
+          'companyId',
+          'name',
+          'normalizedName',
+          'firstName',
+          'lastName',
+          'email',
+          'normalizedEmail',
+          'phone',
+          'role',
+          'tags',
+          'notes',
+          'searchText',
+          'searchPrefixes',
+          'archived',
+          'archivedAtMs',
+          'archivedByUid',
+          'createdAtMs',
+          'updatedAtMs',
+          'createdByUid',
+          'createdByName',
+          'updatedByUid',
+          'updatedByName'
+        ])
+        && data.id == contactId
+        && isNullableCrmString(data.companyId)
+        && data.name is string
+        && data.name.size() > 0
+        && data.normalizedName is string
+        && data.firstName is string
+        && data.lastName is string
+        && data.email is string
+        && data.normalizedEmail is string
+        && data.phone is string
+        && data.role is string
+        && data.notes is string
+        && hasValidCrmTags(data)
+        && hasValidCrmSearchFields(data);
+    }
+
+    function hasValidCrmDealQuoteLink(data) {
+      return (
+          data.quoteOwnerUid == null
+          && data.quoteId == null
+          && data.quoteNumber == null
+          && data.quoteRevisionId == null
+          && data.quoteVersion == null
+        )
+        || (
+          data.quoteOwnerUid is string
+          && data.quoteOwnerUid.size() > 0
+          && data.quoteId is string
+          && data.quoteId.size() > 0
+          && isNullableCrmString(data.quoteNumber)
+          && isNullableCrmString(data.quoteRevisionId)
+          && isNullableCrmInt(data.quoteVersion)
+          && (data.quoteVersion == null || data.quoteVersion > 0)
+        );
+    }
+
+    function isValidCrmDeal(data, dealId) {
+      return data.keys().hasOnly([
+          'schemaVersion',
+          'id',
+          'title',
+          'companyId',
+          'primaryContactId',
+          'ownerId',
+          'ownerName',
+          'stage',
+          'valueSek',
+          'expectedCloseAtMs',
+          'lostReason',
+          'quoteOwnerUid',
+          'quoteId',
+          'quoteNumber',
+          'quoteRevisionId',
+          'quoteVersion',
+          'lastActivityAtMs',
+          'nextActivityAtMs',
+          'tags',
+          'searchText',
+          'searchPrefixes',
+          'archived',
+          'archivedAtMs',
+          'archivedByUid',
+          'createdAtMs',
+          'updatedAtMs',
+          'createdByUid',
+          'createdByName',
+          'updatedByUid',
+          'updatedByName'
+        ])
+        && data.id == dealId
+        && data.title is string
+        && data.title.size() > 0
+        && isNullableCrmString(data.companyId)
+        && isNullableCrmString(data.primaryContactId)
+        && isNullableCrmString(data.ownerId)
+        && data.ownerName is string
+        && data.stage in ['lead', 'quote', 'won', 'lost']
+        && (data.valueSek is int || data.valueSek is float)
+        && data.valueSek >= 0
+        && isNullableCrmInt(data.expectedCloseAtMs)
+        && data.lostReason is string
+        && (data.stage == 'lost' || data.lostReason == '')
+        && isNullableCrmInt(data.lastActivityAtMs)
+        && isNullableCrmInt(data.nextActivityAtMs)
+        && hasValidCrmDealQuoteLink(data)
+        && (data.stage != 'quote' || data.quoteId is string)
+        && hasValidCrmTags(data)
+        && hasValidCrmSearchFields(data);
+    }
+
+    function hasValidCrmActivityState(data) {
+      return (
+          data.type == 'task'
+          && data.status in ['open', 'completed']
+          && (
+            (
+              data.status == 'open'
+              && data.dueAtMs is int
+            )
+            || (
+              data.status == 'completed'
+              && isNullableCrmInt(data.dueAtMs)
+            )
+          )
+        )
+        || (
+          data.type in ['note', 'call', 'email', 'meeting']
+          && data.status == 'completed'
+          && data.dueAtMs == null
+        );
+    }
+
+    function isValidCrmActivity(data, activityId) {
+      return data.keys().hasOnly([
+          'schemaVersion',
+          'id',
+          'type',
+          'status',
+          'subject',
+          'notes',
+          'companyId',
+          'contactId',
+          'dealId',
+          'assignedToId',
+          'assignedToName',
+          'occurredAtMs',
+          'dueAtMs',
+          'completedAtMs',
+          'searchText',
+          'searchPrefixes',
+          'archived',
+          'archivedAtMs',
+          'archivedByUid',
+          'createdAtMs',
+          'updatedAtMs',
+          'createdByUid',
+          'createdByName',
+          'updatedByUid',
+          'updatedByName'
+        ])
+        && data.id == activityId
+        && data.type in ['note', 'call', 'email', 'meeting', 'task']
+        && data.status in ['open', 'completed']
+        && data.subject is string
+        && data.subject.size() > 0
+        && data.notes is string
+        && isNullableCrmString(data.companyId)
+        && isNullableCrmString(data.contactId)
+        && isNullableCrmString(data.dealId)
+        && isNullableCrmString(data.assignedToId)
+        && data.assignedToName is string
+        && data.occurredAtMs is int
+        && isNullableCrmInt(data.dueAtMs)
+        && isNullableCrmInt(data.completedAtMs)
+        && hasValidCrmActivityState(data)
+        && (
+          (
+            data.status == 'open'
+            && data.completedAtMs == null
+          )
+          || (
+            data.status == 'completed'
+            && data.completedAtMs is int
+          )
+        )
+        && hasValidCrmSearchFields(data);
+    }
+
+    function isValidCrmMember(data, memberId) {
+      return data.keys().hasOnly([
+          'schemaVersion',
+          'id',
+          'name',
+          'email',
+          'normalizedEmail',
+          'phone',
+          'title',
+          'searchText',
+          'searchPrefixes',
+          'archived',
+          'archivedAtMs',
+          'archivedByUid',
+          'createdAtMs',
+          'updatedAtMs',
+          'createdByUid',
+          'createdByName',
+          'updatedByUid',
+          'updatedByName'
+        ])
+        && data.id == memberId
+        && data.name is string
+        && data.name.size() > 0
+        && data.email is string
+        && data.normalizedEmail is string
+        && data.phone is string
+        && data.title is string
+        && hasValidCrmSearchFields(data);
     }
 
     function isOwnActivityLogCreate() {
@@ -64,11 +436,52 @@ service cloud.firestore {
     }
 
     match /users/{userId}/quotes/{quoteId} {
-      allow read, create, update, delete: if isSignedIn() && (request.auth.uid == userId || isAdmin());
+      allow read: if isSignedIn() && (request.auth.uid == userId || isAdmin());
+      allow delete: if isAdmin() || (
+        isSignedIn()
+        && request.auth.uid == userId
+        && resource.data.get('crmDealId', null) == null
+      );
+      allow create: if isAdmin() || (
+        isSignedIn()
+        && request.auth.uid == userId
+        && request.resource.data.get('crmDealId', null) == null
+      );
+      allow update: if isAdmin() || (
+        isSignedIn()
+        && request.auth.uid == userId
+        && resource.data.get('crmDealId', null) == null
+        && request.resource.data.get('crmDealId', null) == resource.data.get('crmDealId', null)
+      );
+    }
+
+    function isCrmFreeQuoteRevision() {
+      return request.resource.data.get('state', {}).get('crmDealId', null) == null
+        && request.resource.data.get('state', {}).get('quoteOwnerUid', null) == null;
     }
 
     match /users/{userId}/quotes/{quoteId}/revisions/{revisionId} {
-      allow read, create, update, delete: if isSignedIn() && (request.auth.uid == userId || isAdmin());
+      allow read: if isSignedIn() && (request.auth.uid == userId || isAdmin());
+      allow create: if isCrmFreeQuoteRevision() && (
+        isAdmin() || (
+          isSignedIn()
+          && request.auth.uid == userId
+          && existsAfter(/databases/$(database)/documents/users/$(userId)/quotes/$(quoteId))
+          && getAfter(/databases/$(database)/documents/users/$(userId)/quotes/$(quoteId)).data.get('crmDealId', null) == null
+        )
+      );
+      allow update: if isCrmFreeQuoteRevision() && (
+        isAdmin() || (
+          isSignedIn()
+          && request.auth.uid == userId
+          && get(/databases/$(database)/documents/users/$(userId)/quotes/$(quoteId)).data.get('crmDealId', null) == null
+        )
+      );
+      allow delete: if isAdmin() || (
+        isSignedIn()
+        && request.auth.uid == userId
+        && get(/databases/$(database)/documents/users/$(userId)/quotes/$(quoteId)).data.get('crmDealId', null) == null
+      );
     }
 
     match /stock/{docId} {
@@ -116,6 +529,61 @@ service cloud.firestore {
 
     match /app_settings/{docId} {
       allow read, write: if isAdmin();
+    }
+
+    match /crm_companies/{companyId} {
+      allow read: if isAdmin();
+      allow create: if isAdmin()
+        && isValidCrmCompany(request.resource.data, companyId)
+        && hasValidCrmCreateAudit(request.resource.data);
+      allow update: if isAdmin()
+        && isValidCrmCompany(request.resource.data, companyId)
+        && hasValidCrmUpdateAudit(request.resource.data, resource.data);
+      allow delete: if false;
+    }
+
+    match /crm_contacts/{contactId} {
+      allow read: if isAdmin();
+      allow create: if isAdmin()
+        && isValidCrmContact(request.resource.data, contactId)
+        && hasValidCrmCreateAudit(request.resource.data);
+      allow update: if isAdmin()
+        && isValidCrmContact(request.resource.data, contactId)
+        && hasValidCrmUpdateAudit(request.resource.data, resource.data);
+      allow delete: if false;
+    }
+
+    match /crm_deals/{dealId} {
+      allow read: if isAdmin();
+      allow create: if isAdmin()
+        && isValidCrmDeal(request.resource.data, dealId)
+        && hasValidCrmCreateAudit(request.resource.data);
+      allow update: if isAdmin()
+        && isValidCrmDeal(request.resource.data, dealId)
+        && hasValidCrmUpdateAudit(request.resource.data, resource.data);
+      allow delete: if false;
+    }
+
+    match /crm_activities/{activityId} {
+      allow read: if isAdmin();
+      allow create: if isAdmin()
+        && isValidCrmActivity(request.resource.data, activityId)
+        && hasValidCrmCreateAudit(request.resource.data);
+      allow update: if isAdmin()
+        && isValidCrmActivity(request.resource.data, activityId)
+        && hasValidCrmUpdateAudit(request.resource.data, resource.data);
+      allow delete: if false;
+    }
+
+    match /crm_members/{memberId} {
+      allow read: if isAdmin();
+      allow create: if isAdmin()
+        && isValidCrmMember(request.resource.data, memberId)
+        && hasValidCrmCreateAudit(request.resource.data);
+      allow update: if isAdmin()
+        && isValidCrmMember(request.resource.data, memberId)
+        && hasValidCrmUpdateAudit(request.resource.data, resource.data);
+      allow delete: if false;
     }
 
     // Allow admins to read all templates via collectionGroup queries

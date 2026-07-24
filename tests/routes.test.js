@@ -37,11 +37,15 @@ describe('navigation routes', () => {
         expect(getAuthorizedRouteForAccess(APP_ROUTE_IDS.retailerDocuments, ACCESS_LEVELS.FULL)).toBe(APP_PATHS[APP_ROUTE_IDS.retailerDocuments]);
         expect(getAuthorizedRouteForAccess(APP_ROUTE_IDS.retailerDocuments, ACCESS_LEVELS.QUOTE_ONLY)).toBe(APP_PATHS[APP_ROUTE_IDS.dashboard]);
         expect(getAuthorizedRouteForAccess(APP_ROUTE_IDS.quoteSummary, ACCESS_LEVELS.RETAILER)).toBe(APP_PATHS[APP_ROUTE_IDS.quoteSummary]);
+        expect(getAuthorizedRouteForAccess(APP_ROUTE_IDS.crmDashboard, ACCESS_LEVELS.FULL)).toBe(APP_PATHS[APP_ROUTE_IDS.crmDashboard]);
+        expect(getAuthorizedRouteForAccess(APP_ROUTE_IDS.crmDashboard, ACCESS_LEVELS.QUOTE_ONLY)).toBe(APP_PATHS[APP_ROUTE_IDS.dashboard]);
+        expect(getAuthorizedRouteForAccess(APP_ROUTE_IDS.crmDealDetail, ACCESS_LEVELS.RETAILER)).toBe(APP_PATHS[APP_ROUTE_IDS.dashboard]);
     });
 
     it('encodes login next targets and resolves them safely', () => {
         expect(getNextLoginRedirectTarget('/sketch', '?return=quote-summary')).toBe('%2Fsketch%3Freturn%3Dquote-summary');
         expect(resolveLoginRedirectTarget('/sketch?return=quote-summary')).toBe('/sketch?return=quote-summary');
+        expect(resolveLoginRedirectTarget('/crm/deals/deal-1')).toBe('/crm/deals/deal-1');
         expect(resolveLoginRedirectTarget('//evil.example.com')).toBe(APP_PATHS.dashboard);
         expect(resolveLoginRedirectTarget('/login')).toBe(APP_PATHS.dashboard);
     });
@@ -217,6 +221,10 @@ describe('navigation routes', () => {
         expect(getAppRouteIdFromPath('/retailer-orders')).toBe(APP_ROUTE_IDS.retailerOrders);
         expect(getAppRouteIdFromPath('/retailer-order-requests')).toBe(APP_ROUTE_IDS.retailerOrderHistory);
         expect(getAppRouteIdFromPath('/retailer-documents')).toBe(APP_ROUTE_IDS.retailerDocuments);
+        expect(getAppRouteIdFromPath('/crm')).toBe(APP_ROUTE_IDS.crmDashboard);
+        expect(getAppRouteIdFromPath('/crm/customers/company-1')).toBe(APP_ROUTE_IDS.crmCompanyDetail);
+        expect(getAppRouteIdFromPath('/crm/contacts/contact-1')).toBe(APP_ROUTE_IDS.crmContactDetail);
+        expect(getAppRouteIdFromPath('/crm/deals/deal-1')).toBe(APP_ROUTE_IDS.crmDealDetail);
         expect(getAppRouteIdFromPath('/missing')).toBeNull();
     });
 });

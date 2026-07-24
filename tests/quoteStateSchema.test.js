@@ -70,6 +70,18 @@ describe('quoteStateSchema', () => {
         expect(hydrated.exportLanguage).toBe('sv');
     });
 
+    it('strips CRM linkage fields from hydrated quote state', () => {
+        const hydrated = hydrateQuoteState({
+            customerInfo: { name: 'Ada' },
+            crmDealId: 'deal-should-not-persist',
+            quoteOwnerUid: 'owner-should-not-persist'
+        });
+
+        expect(hydrated.customerInfo.name).toBe('Ada');
+        expect(hydrated).not.toHaveProperty('crmDealId');
+        expect(hydrated).not.toHaveProperty('quoteOwnerUid');
+    });
+
     it('migrates v3 state with safe contracting-work defaults', () => {
         const hydrated = hydrateQuoteState({
             stateVersion: 3,

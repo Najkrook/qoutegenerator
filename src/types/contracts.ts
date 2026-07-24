@@ -461,6 +461,11 @@ export interface HistoryOpenQuotePayload extends QuoteIdentityPatch {
     [key: string]: unknown;
 }
 
+export interface HistoryOpenQuoteContext {
+    crmDealId?: string | null;
+    quoteOwnerUid?: string | null;
+}
+
 export interface SketchDraftStatePatch {
     sketchDraft?: SketchDraft | null;
     advancedSketchDraft?: AdvancedSketchDraft | null;
@@ -544,6 +549,7 @@ export interface QuoteMetadata {
     summary?: RepositoryQuoteSummaryPayload | null;
     latestChangeNote?: string;
     originType?: 'retailer' | 'internal';
+    crmDealId?: string | null;
 }
 
 export interface QuoteRevision {
@@ -628,6 +634,7 @@ export interface QuoteFilters {
 
 export interface QuoteRevisionSaveInput {
     user: AccessUser;
+    ownerUid?: string;
     quoteId: string;
     state: RepositoryQuoteStatePayload;
     summary: Partial<QuoteSummary> | RawQuoteSummary;
@@ -636,6 +643,7 @@ export interface QuoteRevisionSaveInput {
     changeNote?: string;
     retailerName?: string | null;
     originType?: 'retailer' | 'internal';
+    crmDealId?: string | null;
 }
 
 export interface CreateQuoteInput extends Omit<QuoteRevisionSaveInput, 'quoteId'> {}
@@ -712,6 +720,7 @@ export interface RawQuoteMetadataDoc extends UnknownRecord {
     summary?: RepositoryQuoteSummaryPayload | null;
     latestChangeNote?: unknown;
     originType?: unknown;
+    crmDealId?: unknown;
 }
 
 export interface RawQuoteRevisionDoc extends UnknownRecord {
@@ -744,6 +753,8 @@ export interface SaveQuoteToRepositoryParams {
     retailer?: RetailerRecord | null;
     state: QuoteState;
     summary: QuoteSummary | QuoteTotalsResult;
+    crmDealId?: string | null;
+    quoteOwnerUid?: string | null;
 }
 
 export interface CreateOrderRequestInput {
@@ -1064,6 +1075,7 @@ export interface DashboardProps {
     onOpenInventory?: () => void;
     onOpenSketch?: () => void;
     onOpenPlanner?: () => void;
+    onOpenCrm?: () => void;
     onOpenActivity?: () => void;
     onOpenRetailers?: () => void;
     onOpenRetailerOrders?: () => void;
@@ -1102,11 +1114,13 @@ export interface SummaryExportProps {
     onPrev?: () => void;
     onBackToSketch?: () => void;
     onOpenRetailerOrderHistory?: () => void;
+    crmDealId?: string | null;
+    quoteOwnerUid?: string | null;
 }
 
 export interface HistoryProps {
     onBack?: () => void;
-    onOpenQuote?: (payload: HistoryOpenQuotePayload) => void;
+    onOpenQuote?: (payload: HistoryOpenQuotePayload, context?: HistoryOpenQuoteContext) => void;
 }
 
 export interface PlannerProps {

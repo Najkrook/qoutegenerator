@@ -321,6 +321,44 @@ describe('quoteRepository', () => {
         expect(latest?.metadata?.status).toBe('sent');
     });
 
+    it('stores the CRM deal link only in quote metadata and preserves it across revisions', async () => {
+        vi.useFakeTimers();
+        vi.setSystemTime(new Date('2026-04-22T09:30:00.000Z'));
+
+        const { repo, mock } = buildRepo();
+        const created = await repo.createQuote({
+            user,
+            state: {
+                ...baseState,
+                crmDealId: 'malicious-state-link',
+                quoteOwnerUid: 'malicious-owner'
+            },
+            summary: baseSummary,
+            customerInfo: baseState.customerInfo,
+            status: 'draft',
+            crmDealId: 'deal-1'
+        });
+
+        expect(created.metadata.crmDealId).toBe('deal-1');
+        expect(created.revision.state).not.toHaveProperty('crmDealId');
+        expect(created.revision.state).not.toHaveProperty('quoteOwnerUid');
+
+        const updated = await repo.saveQuoteRevision({
+            user,
+            quoteId: created.quoteId,
+            state: baseState,
+            summary: { ...baseSummary, finalTotalSek: 15000 },
+            customerInfo: baseState.customerInfo,
+            status: 'sent'
+        });
+
+        expect(updated.metadata.crmDealId).toBe('deal-1');
+        expect(updated.revision.state).not.toHaveProperty('crmDealId');
+        expect(mock.__docs.get(`users/${user.uid}/quotes/${created.quoteId}`)).toMatchObject({
+            crmDealId: 'deal-1'
+        });
+    });
+
     it('round-trips contracting work through revisions without changing the product history total', async () => {
         const { repo } = buildRepo();
         const contractingWork = {

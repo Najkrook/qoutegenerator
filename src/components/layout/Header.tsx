@@ -25,6 +25,7 @@ export function Header() {
     const quoteStep = getQuoteRouteStepFromPath(location.pathname);
     const showQuoteStepper = quoteStep !== null;
     const currentStepNumber = quoteStep ? getQuoteStepNumber(quoteStep) : null;
+    const isCrmRoute = Boolean(routeId?.startsWith('crm-'));
 
     const steps = [
         { id: 'product-lines', label: '1. Offertinnehåll' },
@@ -101,6 +102,20 @@ export function Header() {
                             }`}
                         >
                             Mina Ordrar
+                        </button>
+                    )}
+
+                    {canViewEverything && (
+                        <button
+                            type="button"
+                            onClick={() => navigation.goToCrm()}
+                            className={`text-text-primary no-underline font-medium text-sm px-3 py-1.5 rounded-md border transition-colors cursor-pointer ${
+                                isCrmRoute
+                                    ? 'bg-panel-border border-panel-border'
+                                    : 'bg-panel-bg border-panel-border hover:bg-panel-border'
+                            }`}
+                        >
+                            CRM
                         </button>
                     )}
 

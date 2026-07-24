@@ -26,7 +26,8 @@ export async function saveQuoteToRepository({
     user,
     retailer,
     state,
-    summary
+    summary,
+    quoteOwnerUid
 }: SaveQuoteToRepositoryParams): Promise<SaveQuoteToRepositoryResult> {
     if (!user?.uid) {
         throw new Error('Du måste vara inloggad för att spara offerter.');
@@ -34,6 +35,7 @@ export async function saveQuoteToRepository({
 
     const basePayload: Omit<CreateQuoteInput, 'quoteId'> = {
         user,
+        ownerUid: quoteOwnerUid || undefined,
         state,
         summary,
         customerInfo: state.customerInfo || {},
