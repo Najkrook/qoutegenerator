@@ -71,6 +71,77 @@ describe('quoteSaveService', () => {
         expect(result.statePatch.quoteStatus).toBe('sent');
     });
 
+    it('leaves CRM linking to the transactional workflow without adding it to quote state', async () => {
+        const createQuote = vi.fn(async () => ({
+            quoteId: 'quote_crm',
+            metadata: {
+                latestVersion: 1,
+                status: 'draft',
+                quoteNumber: 'BRIXX - 260422-102',
+                crmDealId: 'deal-1'
+            },
+            revision: { version: 1 }
+        }));
+
+        const state = {
+            activeQuoteId: null,
+            quoteStatus: 'draft',
+            customerInfo: { name: 'CRM-kund' }
+        };
+
+        await saveQuoteToRepository({
+            quoteRepository: { createQuote, saveQuoteRevision: vi.fn() },
+            user: { uid: 'user-1', email: 'sales@example.com' },
+            state,
+            summary: {
+                finalTotalSek: 1000,
+                grossTotalSek: 1000,
+                totalDiscountSek: 0
+            },
+            crmDealId: 'deal-1'
+        });
+
+        expect(createQuote).toHaveBeenCalledWith(expect.objectContaining({
+            state
+        }));
+        expect(createQuote.mock.calls[0][0]).not.toHaveProperty('crmDealId');
+        expect(state).not.toHaveProperty('crmDealId');
+    });
+
+    it('saves an opened linked quote under its original owner', async () => {
+        const saveQuoteRevision = vi.fn().mockResolvedValue({
+            metadata: {
+                quoteId: 'quote-shared',
+                latestVersion: 3,
+                status: 'sent',
+                quoteNumber: 'BRIXX - 260723-201'
+            },
+            revision: { version: 3 }
+        });
+
+        await saveQuoteToRepository({
+            quoteRepository: { createQuote: vi.fn(), saveQuoteRevision },
+            user: { uid: 'admin-editor', email: 'editor@brixx.se' },
+            quoteOwnerUid: 'admin-owner',
+            state: {
+                activeQuoteId: 'quote-shared',
+                quoteStatus: 'sent',
+                customerInfo: { name: 'Delad kund' }
+            },
+            summary: {
+                finalTotalSek: 2000,
+                grossTotalSek: 2000,
+                totalDiscountSek: 0
+            }
+        });
+
+        expect(saveQuoteRevision).toHaveBeenCalledWith(expect.objectContaining({
+            quoteId: 'quote-shared',
+            ownerUid: 'admin-owner',
+            user: { uid: 'admin-editor', email: 'editor@brixx.se' }
+        }));
+    });
+
     it('throws when the user is missing', async () => {
         await expect(() => saveQuoteToRepository({
             quoteRepository: {},

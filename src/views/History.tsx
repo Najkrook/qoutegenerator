@@ -3,7 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import { useAuth } from '../store/AuthContext';
 import { quoteRepository } from '../services/quoteRepositoryClient';
 import { normalizeQuoteStatus, applyQuoteFilters, sortQuotes } from '../services/quoteRepository';
-import { notifyError, notifyInfo, notifySuccess, confirmAction } from '../services/notificationService';
+import { notifyError, notifyInfo, notifySuccess, notifyWarn, confirmAction } from '../services/notificationService';
 import { db, collection, getDocs } from '../services/firebase';
 import { getErrorMessage } from '../utils/runtime';
 import { buildQuoteRevisionLink, parseQuoteRevisionLinkParams } from '../navigation/quoteLinks';
@@ -134,7 +134,14 @@ export function History({ onBack, onOpenQuote }: HistoryProps) {
                     latestPayload.metadata.status
                 );
 
-                onOpenQuote?.(nextState);
+                if (latestPayload.metadata.crmDealId) {
+                    onOpenQuote?.(nextState, {
+                        crmDealId: latestPayload.metadata.crmDealId,
+                        quoteOwnerUid: ownerUid
+                    });
+                } else {
+                    onOpenQuote?.(nextState);
+                }
             } catch (openError) {
                 console.error('Failed to open quote link:', openError);
                 notifyError(`Kunde inte \u00f6ppna offerten: ${getErrorMessage(openError, 'ok\u00e4nt fel')}`);
@@ -315,11 +322,33 @@ export function History({ onBack, onOpenQuote }: HistoryProps) {
 
         const ownerUid = getQuoteOwnerUid(quote);
         try {
-            const updated = await quoteRepository.updateQuoteStatus({
-                userId: ownerUid,
-                quoteId: quote.quoteId,
-                status: nextStatus
-            });
+            let updated: HistoryQuoteRow;
+            if (canViewEverything && quote.crmDealId) {
+                const normalizedStatus = normalizeQuoteStatus(nextStatus);
+                const { syncCrmDealFromQuote } = await import('../services/crmQuoteWorkflow');
+                await syncCrmDealFromQuote({
+                    metadata: {
+                        ...quote,
+                        status: normalizedStatus
+                    },
+                    quoteOwnerUid: ownerUid,
+                    actor: {
+                        uid: user.uid,
+                        email: user.email || ''
+                    }
+                });
+                updated = {
+                    ...quote,
+                    status: normalizedStatus,
+                    updatedAtMs: Date.now()
+                };
+            } else {
+                updated = await quoteRepository.updateQuoteStatus({
+                    userId: ownerUid,
+                    quoteId: quote.quoteId,
+                    status: nextStatus
+                });
+            }
             setQuotes((previous) => previous.map((row) => (
                 row.quoteId === quote.quoteId
                     ? { ...updated, ownerUid: quote.ownerUid }
@@ -361,7 +390,11 @@ export function History({ onBack, onOpenQuote }: HistoryProps) {
         }
     };
 
-    const openRevisionPayload = async (quoteId: string, revision: QuoteRevision): Promise<void> => {
+    const openRevisionPayload = async (
+        quoteId: string,
+        revision: QuoteRevision,
+        quoteOwnerUid: string
+    ): Promise<void> => {
         if (!revision.state) {
             notifyInfo('Revisionen saknar sparat tillstånd.');
             return;
@@ -376,7 +409,11 @@ export function History({ onBack, onOpenQuote }: HistoryProps) {
             metadata?.status || 'draft'
         );
 
-        onOpenQuote?.(nextState);
+        if (metadata?.crmDealId) {
+            onOpenQuote?.(nextState, { crmDealId: metadata.crmDealId, quoteOwnerUid });
+        } else {
+            onOpenQuote?.(nextState);
+        }
     };
 
     const openLatestQuote = async (quote: HistoryQuoteRow): Promise<void> => {
@@ -394,7 +431,7 @@ export function History({ onBack, onOpenQuote }: HistoryProps) {
                 return;
             }
 
-            await openRevisionPayload(quote.quoteId, payload.revision);
+            await openRevisionPayload(quote.quoteId, payload.revision, ownerUid);
         } catch (openError) {
             console.error('Failed to open quote:', openError);
             notifyError(`Kunde inte öppna offerten: ${getErrorMessage(openError, 'okänt fel')}`);
@@ -444,7 +481,7 @@ export function History({ onBack, onOpenQuote }: HistoryProps) {
             return;
         }
 
-        await openRevisionPayload(quote.quoteId, revision);
+        await openRevisionPayload(quote.quoteId, revision, getQuoteOwnerUid(quote));
     };
 
     const deleteQuote = async (quote: HistoryQuoteRow): Promise<void> => {
@@ -461,6 +498,21 @@ export function History({ onBack, onOpenQuote }: HistoryProps) {
         try {
             await quoteRepository.deleteQuote({ userId: ownerUid, quoteId: quote.quoteId });
             notifySuccess('Offerten togs bort.');
+            if (canViewEverything && quote.crmDealId) {
+                try {
+                    const { crmRepository } = await import('../services/crmRepository');
+                    await crmRepository.unlinkDealFromQuote({
+                        dealId: quote.crmDealId,
+                        user: {
+                            uid: user.uid,
+                            email: user.email || ''
+                        }
+                    });
+                } catch (crmError) {
+                    console.error('Failed to unlink deleted quote from CRM:', crmError);
+                    notifyWarn('Offerten togs bort, men CRM-länken kunde inte rensas automatiskt.');
+                }
+            }
             void loadQuotes(statusFilter, searchFilter, dateFilter, originFilter, sortBy);
         } catch (deleteError) {
             console.error('Failed to delete quote:', deleteError);

@@ -34,18 +34,29 @@ const firebaseMocks = vi.hoisted(() => ({
 
 const notificationMocks = vi.hoisted(() => ({
     confirmAction: vi.fn(async () => true),
-    confirmChoiceAction: vi.fn(async () => 'confirm')
+    confirmChoiceAction: vi.fn(async () => 'confirm'),
+    notifyWarn: vi.fn()
+}));
+
+const crmMocks = vi.hoisted(() => ({
+    getDeal: vi.fn(async () => null),
+    getCompany: vi.fn(async () => null),
+    getContact: vi.fn(async () => null)
 }));
 
 vi.mock('../src/services/firebase', () => firebaseMocks);
 vi.mock('../src/services/notificationService', () => notificationMocks);
+vi.mock('../src/services/crmRepository', () => ({
+    crmRepository: crmMocks
+}));
 
 vi.mock('../src/views/Dashboard', () => ({
-    Dashboard: ({ onStartQuote, onOpenHistory, onOpenRetailerOrders, onOpenRetailerOrderHistory, onOpenRetailerDocuments }) => (
+    Dashboard: ({ onStartQuote, onOpenHistory, onOpenCrm, onOpenRetailerOrders, onOpenRetailerOrderHistory, onOpenRetailerDocuments }) => (
         <div>
             <div>DashboardView</div>
             <button type="button" onClick={() => onStartQuote?.()}>Starta Ny Offert</button>
             <button type="button" onClick={() => onOpenHistory?.()}>Mina Offerter</button>
+            <button type="button" onClick={() => onOpenCrm?.()}>CRM</button>
             <button type="button" onClick={() => onOpenRetailerOrders?.()}>Orderförfrågningar</button>
             <button type="button" onClick={() => onOpenRetailerOrderHistory?.()}>Skickade Ordrar</button>
             <button type="button" onClick={() => onOpenRetailerDocuments?.()}>Produktdokument</button>
@@ -79,6 +90,34 @@ vi.mock('../src/views/InventoryManager', () => ({
 
 vi.mock('../src/views/Planner', () => ({
     Planner: () => <div>PlannerView</div>
+}));
+
+vi.mock('../src/views/crm/CrmDashboard', () => ({
+    CrmDashboardPage: () => <div>CrmDashboardView</div>
+}));
+
+vi.mock('../src/views/crm/CrmPipeline', () => ({
+    CrmPipelinePage: () => <div>CrmPipelineView</div>
+}));
+
+vi.mock('../src/views/crm/CrmCustomers', () => ({
+    CrmCustomersPage: () => <div>CrmCustomersView</div>
+}));
+
+vi.mock('../src/views/crm/CrmCompanyDetail', () => ({
+    CrmCompanyDetailPage: () => <div>CrmCompanyDetailView</div>
+}));
+
+vi.mock('../src/views/crm/CrmContactDetail', () => ({
+    CrmContactDetailPage: () => <div>CrmContactDetailView</div>
+}));
+
+vi.mock('../src/views/crm/CrmDealDetail', () => ({
+    CrmDealDetailPage: () => <div>CrmDealDetailView</div>
+}));
+
+vi.mock('../src/views/crm/CrmActivities', () => ({
+    CrmActivitiesPage: () => <div>CrmActivitiesView</div>
 }));
 
 vi.mock('../src/views/RetailerManager', () => ({
@@ -249,9 +288,45 @@ afterEach(() => {
     vi.clearAllMocks();
     notificationMocks.confirmAction.mockResolvedValue(true);
     notificationMocks.confirmChoiceAction.mockResolvedValue('confirm');
+    crmMocks.getDeal.mockResolvedValue(null);
+    crmMocks.getCompany.mockResolvedValue(null);
+    crmMocks.getContact.mockResolvedValue(null);
 });
 
 describe('app routing', () => {
+    it('allows full admins to open CRM and redirects quote-only users', async () => {
+        const admin = await renderApp({
+            initialEntries: [APP_PATHS[APP_ROUTE_IDS.crmDashboard]],
+            auth: {
+                accessLevel: 'full',
+                canViewEverything: true
+            }
+        });
+
+        expect(admin.router.state.location.pathname).toBe(APP_PATHS[APP_ROUTE_IDS.crmDashboard]);
+        expect(admin.container.textContent).toContain('CrmDashboardView');
+
+        const quoteOnly = await renderApp({
+            initialEntries: [APP_PATHS[APP_ROUTE_IDS.crmDashboard]]
+        });
+
+        expect(quoteOnly.router.state.location.pathname).toBe(APP_PATHS[APP_ROUTE_IDS.dashboard]);
+        expect(quoteOnly.container.textContent).toContain('DashboardView');
+    });
+
+    it('opens dynamic CRM detail routes for full admins', async () => {
+        const { container, router } = await renderApp({
+            initialEntries: ['/crm/deals/deal-1'],
+            auth: {
+                accessLevel: 'full',
+                canViewEverything: true
+            }
+        });
+
+        expect(router.state.location.pathname).toBe('/crm/deals/deal-1');
+        expect(container.textContent).toContain('CrmDealDetailView');
+    });
+
     it('redirects unauthenticated users to login and preserves the full next URL', async () => {
         const { container, router } = await renderApp({
             initialEntries: ['/sketch?return=quote-summary'],
@@ -789,5 +864,60 @@ describe('app routing', () => {
         expect(notificationMocks.confirmChoiceAction).not.toHaveBeenCalled();
         expect(dispatch).not.toHaveBeenCalledWith({ type: 'RESET_STATE' });
         expect(router.state.location.pathname).toBe(APP_PATHS[APP_ROUTE_IDS.quoteProductLines]);
+    });
+
+    it('starts a clean quote from a CRM deal and prefills the customer without persisting the CRM id in quote state', async () => {
+        crmMocks.getDeal.mockResolvedValueOnce({
+            id: 'deal-1',
+            title: 'Uteservering Stortorget',
+            companyId: 'company-1',
+            primaryContactId: 'contact-1'
+        });
+        crmMocks.getCompany.mockResolvedValueOnce({
+            id: 'company-1',
+            name: 'Testbolaget AB',
+            email: 'info@testbolaget.se'
+        });
+        crmMocks.getContact.mockResolvedValueOnce({
+            id: 'contact-1',
+            name: 'Ada Andersson',
+            email: 'ada@testbolaget.se'
+        });
+        const dispatch = vi.fn();
+        const { router } = await renderApp({
+            initialEntries: ['/quote/new/product-lines?crmDealId=deal-1&start=1'],
+            auth: {
+                accessLevel: 'full',
+                canViewEverything: true
+            },
+            quoteState: {
+                ...createInitialQuoteState(),
+                activeQuoteId: 'old-quote',
+                customerInfo: {
+                    ...createInitialQuoteState().customerInfo,
+                    company: 'Gammal kund'
+                }
+            },
+            dispatch
+        });
+
+        await act(async () => {
+            await Promise.resolve();
+            await Promise.resolve();
+        });
+
+        expect(dispatch).toHaveBeenCalledWith({ type: 'RESET_STATE' });
+        expect(dispatch).toHaveBeenCalledWith({
+            type: 'SET_CUSTOMER_INFO',
+            payload: {
+                company: 'Testbolaget AB',
+                name: 'Ada Andersson',
+                email: 'ada@testbolaget.se',
+                reference: 'Uteservering Stortorget',
+                customerReference: 'Ada Andersson'
+            }
+        });
+        expect(router.state.location.search).toBe('?crmDealId=deal-1');
+        expect(dispatch.mock.calls.some(([action]) => action?.payload?.crmDealId)).toBe(false);
     });
 });

@@ -21,6 +21,13 @@ export const APP_ROUTE_IDS = Object.freeze({
     inventoryLogs: 'inventory-logs',
     activity: 'activity',
     planner: 'planner',
+    crmDashboard: 'crm-dashboard',
+    crmPipeline: 'crm-pipeline',
+    crmCompanies: 'crm-companies',
+    crmCompanyDetail: 'crm-company-detail',
+    crmContactDetail: 'crm-contact-detail',
+    crmDealDetail: 'crm-deal-detail',
+    crmActivities: 'crm-activities',
     retailers: 'retailers',
     retailerOrders: 'retailer-orders',
     retailerOrderHistory: 'retailer-order-history',
@@ -42,6 +49,13 @@ export const APP_PATHS: Record<AppRouteId, string> = Object.freeze({
     [APP_ROUTE_IDS.inventoryLogs]: '/inventory/logs',
     [APP_ROUTE_IDS.activity]: '/activity',
     [APP_ROUTE_IDS.planner]: '/planner',
+    [APP_ROUTE_IDS.crmDashboard]: '/crm',
+    [APP_ROUTE_IDS.crmPipeline]: '/crm/pipeline',
+    [APP_ROUTE_IDS.crmCompanies]: '/crm/customers',
+    [APP_ROUTE_IDS.crmCompanyDetail]: '/crm/customers/:companyId',
+    [APP_ROUTE_IDS.crmContactDetail]: '/crm/contacts/:contactId',
+    [APP_ROUTE_IDS.crmDealDetail]: '/crm/deals/:dealId',
+    [APP_ROUTE_IDS.crmActivities]: '/crm/activities',
     [APP_ROUTE_IDS.retailers]: '/retailers',
     [APP_ROUTE_IDS.retailerOrders]: '/retailer-orders',
     [APP_ROUTE_IDS.retailerOrderHistory]: '/retailer-order-requests',
@@ -86,6 +100,13 @@ const ROUTE_ACCESS: Record<AppRouteId, AppRouteAccess> = {
     [APP_ROUTE_IDS.inventoryLogs]: 'admin',
     [APP_ROUTE_IDS.activity]: 'admin',
     [APP_ROUTE_IDS.planner]: 'admin',
+    [APP_ROUTE_IDS.crmDashboard]: 'admin',
+    [APP_ROUTE_IDS.crmPipeline]: 'admin',
+    [APP_ROUTE_IDS.crmCompanies]: 'admin',
+    [APP_ROUTE_IDS.crmCompanyDetail]: 'admin',
+    [APP_ROUTE_IDS.crmContactDetail]: 'admin',
+    [APP_ROUTE_IDS.crmDealDetail]: 'admin',
+    [APP_ROUTE_IDS.crmActivities]: 'admin',
     [APP_ROUTE_IDS.retailers]: 'admin',
     [APP_ROUTE_IDS.retailerOrders]: 'admin',
     [APP_ROUTE_IDS.retailerOrderHistory]: 'retailer',
@@ -119,7 +140,35 @@ export function getRequiredAccessForRoute(routeId: AppRouteId): AppRouteAccess {
 }
 
 export function getAppRouteIdFromPath(pathname: string | null | undefined): AppRouteId | null {
-    return PATH_TO_ROUTE_ID.get(normalizePathname(pathname)) ?? null;
+    const normalizedPathname = normalizePathname(pathname);
+    const exactMatch = PATH_TO_ROUTE_ID.get(normalizedPathname);
+    if (exactMatch) {
+        return exactMatch;
+    }
+
+    if (/^\/crm\/customers\/[^/]+$/.test(normalizedPathname)) {
+        return APP_ROUTE_IDS.crmCompanyDetail;
+    }
+    if (/^\/crm\/contacts\/[^/]+$/.test(normalizedPathname)) {
+        return APP_ROUTE_IDS.crmContactDetail;
+    }
+    if (/^\/crm\/deals\/[^/]+$/.test(normalizedPathname)) {
+        return APP_ROUTE_IDS.crmDealDetail;
+    }
+
+    return null;
+}
+
+export function getCrmCompanyPath(companyId: string): string {
+    return APP_PATHS[APP_ROUTE_IDS.crmCompanyDetail].replace(':companyId', encodeURIComponent(companyId));
+}
+
+export function getCrmContactPath(contactId: string): string {
+    return APP_PATHS[APP_ROUTE_IDS.crmContactDetail].replace(':contactId', encodeURIComponent(contactId));
+}
+
+export function getCrmDealPath(dealId: string): string {
+    return APP_PATHS[APP_ROUTE_IDS.crmDealDetail].replace(':dealId', encodeURIComponent(dealId));
 }
 
 export function getQuoteStepPath(step: QuoteRouteStepId): string {

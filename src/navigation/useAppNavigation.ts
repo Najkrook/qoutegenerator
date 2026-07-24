@@ -1,4 +1,4 @@
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import {
     APP_PATHS,
     APP_ROUTE_IDS,
@@ -16,13 +16,49 @@ interface NavigateOptions {
 
 export function useAppNavigation() {
     const navigate = useNavigate();
+    const location = useLocation();
+
+    const getActiveCrmDealSearch = (): string => {
+        const crmDealId = new URLSearchParams(location.search).get('crmDealId')?.trim();
+        if (!crmDealId) return '';
+
+        const params = new URLSearchParams({ crmDealId });
+        const quoteOwnerUid = new URLSearchParams(location.search).get('quoteOwnerUid')?.trim();
+        if (quoteOwnerUid) {
+            params.set('quoteOwnerUid', quoteOwnerUid);
+        }
+        return `?${params.toString()}`;
+    };
 
     return {
         goToDashboard(options?: NavigateOptions) {
             navigate(APP_PATHS[APP_ROUTE_IDS.dashboard], options);
         },
         goToQuoteStep(step: QuoteRouteStepId, options?: NavigateOptions) {
-            navigate(getQuoteStepPath(step), options);
+            navigate(`${getQuoteStepPath(step)}${getActiveCrmDealSearch()}`, options);
+        },
+        goToLinkedQuoteStep(
+            step: QuoteRouteStepId,
+            crmDealId: string,
+            quoteOwnerUid?: string | null,
+            options?: NavigateOptions
+        ) {
+            const normalizedDealId = String(crmDealId || '').trim();
+            const params = new URLSearchParams();
+            if (normalizedDealId) {
+                params.set('crmDealId', normalizedDealId);
+            }
+            const normalizedOwnerUid = String(quoteOwnerUid || '').trim();
+            if (normalizedOwnerUid) {
+                params.set('quoteOwnerUid', normalizedOwnerUid);
+            }
+            const search = params.size > 0 ? `?${params.toString()}` : '';
+            navigate(`${getQuoteStepPath(step)}${search}`, options);
+        },
+        goToQuoteFromDeal(crmDealId: string, options?: NavigateOptions) {
+            const normalizedDealId = String(crmDealId || '').trim();
+            const search = normalizedDealId ? `?crmDealId=${encodeURIComponent(normalizedDealId)}&start=1` : '';
+            navigate(`${getQuoteStepPath('product-lines')}${search}`, options);
         },
         goToHistory(options?: NavigateOptions) {
             navigate(APP_PATHS[APP_ROUTE_IDS.quotes], options);
@@ -38,6 +74,18 @@ export function useAppNavigation() {
         },
         goToPlanner(options?: NavigateOptions) {
             navigate(APP_PATHS[APP_ROUTE_IDS.planner], options);
+        },
+        goToCrm(options?: NavigateOptions) {
+            navigate(APP_PATHS[APP_ROUTE_IDS.crmDashboard], options);
+        },
+        goToCrmPipeline(options?: NavigateOptions) {
+            navigate(APP_PATHS[APP_ROUTE_IDS.crmPipeline], options);
+        },
+        goToCrmCompanies(options?: NavigateOptions) {
+            navigate(APP_PATHS[APP_ROUTE_IDS.crmCompanies], options);
+        },
+        goToCrmActivities(options?: NavigateOptions) {
+            navigate(APP_PATHS[APP_ROUTE_IDS.crmActivities], options);
         },
         goToRetailers(options?: NavigateOptions) {
             navigate(APP_PATHS[APP_ROUTE_IDS.retailers], options);

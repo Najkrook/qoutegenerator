@@ -71,6 +71,7 @@ export function Dashboard({
     onOpenInventory,
     onOpenSketch,
     onOpenPlanner,
+    onOpenCrm,
     onOpenActivity,
     onOpenRetailers,
     onOpenRetailerOrders,
@@ -267,6 +268,20 @@ export function Dashboard({
                         <h3 className="text-2xl font-semibold text-text-primary mb-2">Skapa Ny Offert</h3>
                         <p className="text-text-secondary leading-relaxed m-0">
                             Starta ett nytt offertflöde för kund. Konfigurera produkter, priser och generera PDF.
+                        </p>
+                    </button>
+                )}
+
+                {canViewEverything && onOpenCrm && (
+                    <button
+                        type="button"
+                        onClick={onOpenCrm}
+                        className="flex-1 min-w-[300px] max-w-[400px] bg-panel-bg border border-panel-border rounded-xl p-12 cursor-pointer text-center transition-all hover:-translate-y-1 hover:shadow-lg hover:border-primary group"
+                    >
+                        <div className="text-5xl mb-4 group-hover:scale-110 transition-transform" aria-hidden="true">◎</div>
+                        <h3 className="text-2xl font-semibold text-text-primary mb-2">Sälj-CRM</h3>
+                        <p className="text-text-secondary leading-relaxed m-0">
+                            Samla kunder, affärer, offerter och nästa uppföljning i en gemensam pipeline.
                         </p>
                     </button>
                 )}

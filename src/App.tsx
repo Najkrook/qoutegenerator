@@ -20,7 +20,7 @@ import { Login } from './views/Login';
 import { useQuote } from './store/QuoteContext';
 import { useAuth } from './store/AuthContext';
 import { db, doc, getDoc } from './services/firebase';
-import { confirmChoiceAction } from './services/notificationService';
+import { confirmChoiceAction, notifyWarn } from './services/notificationService';
 import { cloneInventoryData, createDefaultInventoryData, normalizeStoredInventoryData } from './views/inventoryData';
 import {
     APP_PATHS,
@@ -51,6 +51,13 @@ const InventoryManager = lazy(() => import('./views/InventoryManager').then((mod
 const SketchTool = lazy(() => import('./views/SketchTool').then((module) => ({ default: module.SketchTool })));
 const Planner = lazy(() => import('./views/Planner').then((module) => ({ default: module.Planner })));
 const History = lazy(() => import('./views/History').then((module) => ({ default: module.History })));
+const CrmDashboardPage = lazy(() => import('./views/crm/CrmDashboard').then((module) => ({ default: module.CrmDashboardPage })));
+const CrmPipelinePage = lazy(() => import('./views/crm/CrmPipeline').then((module) => ({ default: module.CrmPipelinePage })));
+const CrmCustomersPage = lazy(() => import('./views/crm/CrmCustomers').then((module) => ({ default: module.CrmCustomersPage })));
+const CrmCompanyDetailPage = lazy(() => import('./views/crm/CrmCompanyDetail').then((module) => ({ default: module.CrmCompanyDetailPage })));
+const CrmContactDetailPage = lazy(() => import('./views/crm/CrmContactDetail').then((module) => ({ default: module.CrmContactDetailPage })));
+const CrmDealDetailPage = lazy(() => import('./views/crm/CrmDealDetail').then((module) => ({ default: module.CrmDealDetailPage })));
+const CrmActivitiesPage = lazy(() => import('./views/crm/CrmActivities').then((module) => ({ default: module.CrmActivitiesPage })));
 const RetailerManager = lazy(() => import('./views/RetailerManager').then((module) => ({ default: module.RetailerManager })));
 const RetailerOrderRequests = lazy(() => import('./views/RetailerOrderRequests').then((module) => ({ default: module.RetailerOrderRequests })));
 const RetailerOrderHistory = lazy(() => import('./views/RetailerOrderHistory').then((module) => ({ default: module.RetailerOrderHistory })));
@@ -226,10 +233,23 @@ function RouteAccessBoundary({ children, routeId }: RouteAccessBoundaryProps) {
 function QuoteDraftBoundary({ children, routeId }: RouteAccessBoundaryProps) {
     const { state } = useQuote();
     const { isRetailer } = useAuth();
+    const location = useLocation();
     const redirectPath = getQuoteDraftGuardRedirect(routeId, state, { isRetailer });
 
     if (redirectPath) {
-        return <Navigate to={redirectPath} replace />;
+        const currentSearch = new URLSearchParams(location.search);
+        const crmDealId = currentSearch.get('crmDealId')?.trim();
+        const linkedQuoteSearch = new URLSearchParams();
+        if (crmDealId) {
+            linkedQuoteSearch.set('crmDealId', crmDealId);
+            const quoteOwnerUid = currentSearch.get('quoteOwnerUid')?.trim();
+            if (quoteOwnerUid) {
+                linkedQuoteSearch.set('quoteOwnerUid', quoteOwnerUid);
+            }
+        }
+        const serializedSearch = linkedQuoteSearch.toString();
+        const search = serializedSearch ? `?${serializedSearch}` : '';
+        return <Navigate to={`${redirectPath}${search}`} replace />;
     }
 
     return <>{children}</>;
@@ -279,6 +299,7 @@ function DashboardPage() {
             onOpenInventory={() => navigation.goToInventory()}
             onOpenSketch={() => navigation.goToSketch('dashboard')}
             onOpenPlanner={() => navigation.goToPlanner()}
+            onOpenCrm={() => navigation.goToCrm()}
             onOpenActivity={() => navigation.goToActivity()}
             onOpenRetailers={() => navigation.goToRetailers()}
             onOpenRetailerOrders={() => navigation.goToRetailerOrders()}
@@ -303,7 +324,67 @@ function useSyncQuoteRouteStep(step: QuoteRouteStepId) {
 
 function ProductLineSelectionPage() {
     const navigation = useAppNavigation();
+    const { dispatch } = useQuote();
+    const [searchParams, setSearchParams] = useSearchParams();
+    const initializedCrmDealRef = useRef<string | null>(null);
     useSyncQuoteRouteStep('product-lines');
+
+    useEffect(() => {
+        const crmDealId = searchParams.get('crmDealId')?.trim();
+        if (
+            !crmDealId
+            || searchParams.get('start') !== '1'
+            || initializedCrmDealRef.current === crmDealId
+        ) {
+            return;
+        }
+
+        initializedCrmDealRef.current = crmDealId;
+        dispatch({ type: 'RESET_STATE' });
+        const nextSearchParams = new URLSearchParams(searchParams);
+        nextSearchParams.delete('start');
+        setSearchParams(nextSearchParams, { replace: true });
+
+        void (async () => {
+            const clearInvalidCrmLink = () => {
+                const cleanSearchParams = new URLSearchParams(searchParams);
+                cleanSearchParams.delete('crmDealId');
+                cleanSearchParams.delete('quoteOwnerUid');
+                cleanSearchParams.delete('start');
+                setSearchParams(cleanSearchParams, { replace: true });
+            };
+
+            try {
+                const { crmRepository } = await import('./services/crmRepository');
+                const deal = await crmRepository.getDeal(crmDealId);
+                if (!deal) {
+                    clearInvalidCrmLink();
+                    notifyWarn('CRM-affären kunde inte hittas. Ett tomt offertutkast har startats.');
+                    return;
+                }
+
+                const [company, contact] = await Promise.all([
+                    deal.companyId ? crmRepository.getCompany(deal.companyId) : Promise.resolve(null),
+                    deal.primaryContactId ? crmRepository.getContact(deal.primaryContactId) : Promise.resolve(null)
+                ]);
+
+                dispatch({
+                    type: 'SET_CUSTOMER_INFO',
+                    payload: {
+                        company: company?.name || '',
+                        name: contact?.name || '',
+                        email: contact?.email || company?.email || '',
+                        reference: deal.title || '',
+                        customerReference: contact?.name || ''
+                    }
+                });
+            } catch (error) {
+                console.error('Failed to prefill quote from CRM:', error);
+                clearInvalidCrmLink();
+                notifyWarn('CRM-uppgifterna kunde inte förifyllas. Offerten kan fortfarande skapas.');
+            }
+        })();
+    }, [dispatch, searchParams, setSearchParams]);
 
     return <ProductLineSelection onNext={() => navigation.goToQuoteStep('configuration')} />;
 }
@@ -336,7 +417,12 @@ function PricingPage() {
 
 function SummaryExportPage() {
     const navigation = useAppNavigation();
-    const { canAccessSketch } = useAuth();
+    const { canAccessSketch, canViewEverything } = useAuth();
+    const [searchParams] = useSearchParams();
+    const crmDealId = canViewEverything ? searchParams.get('crmDealId')?.trim() || null : null;
+    const quoteOwnerUid = crmDealId
+        ? searchParams.get('quoteOwnerUid')?.trim() || null
+        : null;
     useSyncQuoteRouteStep('summary');
 
     return (
@@ -344,6 +430,8 @@ function SummaryExportPage() {
             onPrev={() => navigation.goToQuoteStep('pricing')}
             onBackToSketch={canAccessSketch ? () => navigation.goToSketch('quote-summary') : undefined}
             onOpenRetailerOrderHistory={() => navigation.goToRetailerOrderHistory()}
+            crmDealId={crmDealId}
+            quoteOwnerUid={quoteOwnerUid}
         />
     );
 }
@@ -376,7 +464,10 @@ function HistoryPage() {
     const { dispatch } = useQuote();
     const { isRetailer } = useAuth();
 
-    const handleOpenQuote = (payload: HistoryOpenQuotePayload) => {
+    const handleOpenQuote = (
+        payload: HistoryOpenQuotePayload,
+        context?: { crmDealId?: string | null; quoteOwnerUid?: string | null }
+    ) => {
         const targetStep = hasConfiguredQuoteContent({
             builderItems: Array.isArray(payload.builderItems) ? payload.builderItems : [],
             gridSelections: payload.gridSelections && typeof payload.gridSelections === 'object'
@@ -393,6 +484,10 @@ function HistoryPage() {
                 }
             });
         });
+        if (context?.crmDealId) {
+            navigation.goToLinkedQuoteStep(targetStep, context.crmDealId, context.quoteOwnerUid);
+            return;
+        }
         navigation.goToQuoteStep(targetStep);
     };
 
@@ -525,6 +620,62 @@ export const appRoutes: RouteObject[] = [
                 element: (
                     <RouteAccessBoundary routeId={APP_ROUTE_IDS.planner}>
                         <PlannerPage />
+                    </RouteAccessBoundary>
+                )
+            },
+            {
+                path: APP_PATHS[APP_ROUTE_IDS.crmDashboard].slice(1),
+                element: (
+                    <RouteAccessBoundary routeId={APP_ROUTE_IDS.crmDashboard}>
+                        <CrmDashboardPage />
+                    </RouteAccessBoundary>
+                )
+            },
+            {
+                path: APP_PATHS[APP_ROUTE_IDS.crmPipeline].slice(1),
+                element: (
+                    <RouteAccessBoundary routeId={APP_ROUTE_IDS.crmPipeline}>
+                        <CrmPipelinePage />
+                    </RouteAccessBoundary>
+                )
+            },
+            {
+                path: APP_PATHS[APP_ROUTE_IDS.crmCompanies].slice(1),
+                element: (
+                    <RouteAccessBoundary routeId={APP_ROUTE_IDS.crmCompanies}>
+                        <CrmCustomersPage />
+                    </RouteAccessBoundary>
+                )
+            },
+            {
+                path: APP_PATHS[APP_ROUTE_IDS.crmCompanyDetail].slice(1),
+                element: (
+                    <RouteAccessBoundary routeId={APP_ROUTE_IDS.crmCompanyDetail}>
+                        <CrmCompanyDetailPage />
+                    </RouteAccessBoundary>
+                )
+            },
+            {
+                path: APP_PATHS[APP_ROUTE_IDS.crmContactDetail].slice(1),
+                element: (
+                    <RouteAccessBoundary routeId={APP_ROUTE_IDS.crmContactDetail}>
+                        <CrmContactDetailPage />
+                    </RouteAccessBoundary>
+                )
+            },
+            {
+                path: APP_PATHS[APP_ROUTE_IDS.crmDealDetail].slice(1),
+                element: (
+                    <RouteAccessBoundary routeId={APP_ROUTE_IDS.crmDealDetail}>
+                        <CrmDealDetailPage />
+                    </RouteAccessBoundary>
+                )
+            },
+            {
+                path: APP_PATHS[APP_ROUTE_IDS.crmActivities].slice(1),
+                element: (
+                    <RouteAccessBoundary routeId={APP_ROUTE_IDS.crmActivities}>
+                        <CrmActivitiesPage />
                     </RouteAccessBoundary>
                 )
             },

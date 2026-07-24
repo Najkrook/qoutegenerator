@@ -64,6 +64,7 @@ interface BuildQuoteMetadataInput {
     quoteNumber?: string | null;
     quoteDateKey?: string | null;
     quoteSequence?: number | null;
+    crmDealId?: string | null;
 }
 
 type RevisionSaveContext = QuoteRevisionSaveInput & { retailerName?: string | null };
@@ -82,7 +83,11 @@ function toRecord<T extends UnknownRecord = UnknownRecord>(value: unknown): T {
 }
 
 function toStatePayload(value: unknown): RepositoryQuoteStatePayload {
-    return isObject(value) ? clone(value) as RepositoryQuoteStatePayload : {};
+    if (!isObject(value)) return {};
+    const payload = clone(value) as RepositoryQuoteStatePayload & UnknownRecord;
+    delete payload.crmDealId;
+    delete payload.quoteOwnerUid;
+    return payload;
 }
 
 function toSummaryPayload(value: unknown): RepositoryQuoteSummaryPayload {
@@ -162,6 +167,7 @@ export function normalizeQuoteMetadata(quoteId: string, raw: RawQuoteMetadataDoc
     const latestRevisionId = String(safeRaw.latestRevisionId || '');
     const latestChangeNote = String(safeRaw.latestChangeNote || fallbackState.changeNote || '');
     const originType = String(safeRaw.originType || fallbackState.originType || 'internal') as 'retailer' | 'internal';
+    const crmDealId = safeRaw.crmDealId ? String(safeRaw.crmDealId) : null;
 
     return {
         quoteId,
@@ -181,6 +187,7 @@ export function normalizeQuoteMetadata(quoteId: string, raw: RawQuoteMetadataDoc
         latestRevisionId,
         latestChangeNote,
         originType,
+        crmDealId,
         totalSek,
         retailerName: safeRaw.retailerName != null ? String(safeRaw.retailerName) : null,
         searchText: String(
@@ -234,7 +241,8 @@ function buildQuoteMetadata({
     quoteDateKey,
     quoteSequence,
     latestChangeNote = '',
-    originType = 'internal'
+    originType = 'internal',
+    crmDealId
 }: BuildQuoteMetadataInput & { latestChangeNote?: string; originType?: string }): QuoteMetadata {
     const safeCustomerInfo = toRecord<RawPersistedCustomerInfo>(customerInfo);
     const safeSummary = toRecord<RawQuoteSummary>(summary);
@@ -253,6 +261,9 @@ function buildQuoteMetadata({
         : normalizeQuoteSequence(existingMetadata.quoteSequence);
     const reference = String(safeCustomerInfo.reference || existingMetadata.reference || '-');
     const customerReference = String(safeCustomerInfo.customerReference || existingMetadata.customerReference || '');
+    const normalizedCrmDealId = crmDealId !== undefined
+        ? (crmDealId ? String(crmDealId) : null)
+        : (existingMetadata.crmDealId ? String(existingMetadata.crmDealId) : null);
 
     return {
         quoteId,
@@ -272,6 +283,7 @@ function buildQuoteMetadata({
         latestRevisionId: String(latestRevisionId || existingMetadata.latestRevisionId || ''),
         latestChangeNote: String(latestChangeNote || existingMetadata.latestChangeNote || ''),
         originType: String(originType || existingMetadata.originType || 'internal') as 'retailer' | 'internal',
+        crmDealId: normalizedCrmDealId,
         totalSek: toNumber(safeSummary.finalTotalSek, existingMetadata.totalSek || 0) || 0,
         retailerName: retailerName != null ? String(retailerName) : (existingMetadata.retailerName || null),
         searchText: buildQuoteSearchText({
@@ -316,6 +328,7 @@ function buildMetadataWriteDoc(metadata: QuoteMetadata): RawQuoteMetadataDoc {
         totalSek: metadata.totalSek,
         retailerName: metadata.retailerName,
         searchText: metadata.searchText,
+        crmDealId: metadata.crmDealId || null,
     };
 }
 
@@ -413,6 +426,7 @@ export function createQuoteRepository(deps: QuoteRepositoryDeps = {} as QuoteRep
 
     const saveRevisionFallback = async ({
         user,
+        ownerUid,
         quoteId,
         state,
         summary,
@@ -420,9 +434,11 @@ export function createQuoteRepository(deps: QuoteRepositoryDeps = {} as QuoteRep
         status = 'draft',
         changeNote,
         retailerName = null,
-        originType
+        originType,
+        crmDealId
     }: RevisionSaveContext): Promise<{ metadata: QuoteMetadata; revision: QuoteRevision }> => {
-        const quoteRef = quoteDocRef(String(user.uid), quoteId);
+        const quoteOwnerUid = String(ownerUid || user.uid);
+        const quoteRef = quoteDocRef(quoteOwnerUid, quoteId);
         const nowMs = Date.now();
         const quoteSnap = await getDoc(quoteRef);
         const existing = quoteSnap.exists()
@@ -431,7 +447,7 @@ export function createQuoteRepository(deps: QuoteRepositoryDeps = {} as QuoteRep
 
         const version = Math.max(1, (toNumber(existing?.latestVersion, 0) || 0) + 1);
         const revisionId = `v${String(version).padStart(4, '0')}_${nowMs}`;
-        const revisionRef = doc(db, 'users', String(user.uid), 'quotes', quoteId, 'revisions', revisionId);
+        const revisionRef = doc(db, 'users', quoteOwnerUid, 'quotes', quoteId, 'revisions', revisionId);
         const revisionData = buildRevisionData({
             quoteId,
             version,
@@ -453,7 +469,8 @@ export function createQuoteRepository(deps: QuoteRepositoryDeps = {} as QuoteRep
             existing,
             retailerName,
             latestChangeNote: changeNote,
-            originType: originType || existing?.originType
+            originType: originType || existing?.originType,
+            crmDealId
         });
         const revisionWriteDoc = buildRevisionWriteDoc(revisionData);
         const metadataWriteDoc = buildMetadataWriteDoc(metadata);
@@ -466,6 +483,7 @@ export function createQuoteRepository(deps: QuoteRepositoryDeps = {} as QuoteRep
 
     async function saveQuoteRevision({
         user,
+        ownerUid,
         quoteId,
         state,
         summary,
@@ -473,13 +491,15 @@ export function createQuoteRepository(deps: QuoteRepositoryDeps = {} as QuoteRep
         status = 'draft',
         changeNote = '',
         retailerName = null,
-        originType
+        originType,
+        crmDealId
     }: QuoteRevisionSaveInput): Promise<{ metadata: QuoteMetadata; revision: QuoteRevision }> {
         if (!user?.uid) throw new Error('Missing authenticated user.');
         if (!quoteId) throw new Error('quoteId is required.');
 
         const revisionInput: RevisionSaveContext = {
             user,
+            ownerUid,
             quoteId,
             state,
             summary,
@@ -487,14 +507,16 @@ export function createQuoteRepository(deps: QuoteRepositoryDeps = {} as QuoteRep
             status,
             changeNote,
             retailerName,
-            originType
+            originType,
+            crmDealId
         };
 
         if (typeof runTransaction !== 'function') {
             return saveRevisionFallback(revisionInput);
         }
 
-        const quoteRef = quoteDocRef(String(user.uid), quoteId);
+        const quoteOwnerUid = String(ownerUid || user.uid);
+        const quoteRef = quoteDocRef(quoteOwnerUid, quoteId);
 
         return runTransaction<{ metadata: QuoteMetadata; revision: QuoteRevision }>(db, async (transaction) => {
             const nowMs = Date.now();
@@ -505,7 +527,7 @@ export function createQuoteRepository(deps: QuoteRepositoryDeps = {} as QuoteRep
 
             const version = Math.max(1, (toNumber(existing?.latestVersion, 0) || 0) + 1);
             const revisionId = `v${String(version).padStart(4, '0')}_${nowMs}`;
-            const revisionRef = doc(db, 'users', String(user.uid), 'quotes', quoteId, 'revisions', revisionId);
+            const revisionRef = doc(db, 'users', quoteOwnerUid, 'quotes', quoteId, 'revisions', revisionId);
 
             const revisionData = buildRevisionData({
                 quoteId,
@@ -528,7 +550,8 @@ export function createQuoteRepository(deps: QuoteRepositoryDeps = {} as QuoteRep
                 existing,
                 retailerName,
                 latestChangeNote: changeNote,
-                originType: originType || existing?.originType
+                originType: originType || existing?.originType,
+                crmDealId
             });
             const revisionWriteDoc = buildRevisionWriteDoc(revisionData);
             const metadataWriteDoc = buildMetadataWriteDoc(metadata);
@@ -542,17 +565,20 @@ export function createQuoteRepository(deps: QuoteRepositoryDeps = {} as QuoteRep
 
     async function createQuote({
         user,
+        ownerUid,
         state,
         summary,
         customerInfo = {},
         status = 'draft',
         changeNote = 'Initial save',
         retailerName = null,
-        originType
+        originType,
+        crmDealId
     }: CreateQuoteInput): Promise<{ quoteId: string; metadata: QuoteMetadata; revision: QuoteRevision }> {
         if (!user?.uid) throw new Error('Missing authenticated user.');
+        const quoteOwnerUid = String(ownerUid || user.uid);
         const quoteId = `quote_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-        const quoteRef = quoteDocRef(String(user.uid), quoteId);
+        const quoteRef = quoteDocRef(quoteOwnerUid, quoteId);
         const nowMs = Date.now();
         const dateKey = formatQuoteDateKey(nowMs);
         const counterRef = doc(db, QUOTE_COUNTER_COLLECTION, dateKey);
@@ -560,7 +586,7 @@ export function createQuoteRepository(deps: QuoteRepositoryDeps = {} as QuoteRep
         const buildCreatePayload = (quoteSequence: number) => {
             const quoteNumber = buildQuoteNumber(dateKey, quoteSequence);
             const revisionId = `v0001_${nowMs}`;
-            const revisionRef = doc(db, 'users', String(user.uid), 'quotes', quoteId, 'revisions', revisionId);
+            const revisionRef = doc(db, 'users', quoteOwnerUid, 'quotes', quoteId, 'revisions', revisionId);
             const revisionData = buildRevisionData({
                 quoteId,
                 version: 1,
@@ -584,7 +610,8 @@ export function createQuoteRepository(deps: QuoteRepositoryDeps = {} as QuoteRep
                 quoteSequence,
                 retailerName,
                 latestChangeNote: changeNote,
-                originType
+                originType,
+                crmDealId
             });
 
             return {
