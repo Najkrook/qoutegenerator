@@ -73,12 +73,11 @@ describe('catalogLookup', () => {
             </AuthContext.Provider>
         );
 
-        expect(html).toContain('Standardkonfiguration');
+        expect(html).toContain('Standardprodukter');
         expect(html).toContain('BuilderConfigMock');
-        expect(html).toContain('Sektionsval (Grid)');
+        expect(html).toContain('Glaspartier och sektioner');
         expect(html).toContain('GridConfigMock:ClickitUp');
         expect(html).not.toContain('GridConfigMock:missing-line');
-        expect(html).toContain('Exportspråk');
-        expect(html).toContain('aria-label="Exportspråk"');
+        expect(html).not.toContain('Exportspråk');
     });
 });

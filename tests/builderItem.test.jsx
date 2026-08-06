@@ -2,7 +2,7 @@ import React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { QuoteProvider } from '../src/store/QuoteContext';
-import { QUOTE_STATE_STORAGE_KEY } from '../src/store/quoteStateSchema';
+import { getQuoteStateStorageKey } from '../src/store/quoteStatePersistence';
 import { BuilderItem } from '../src/components/features/BuilderItem';
 import { catalogData } from '../src/data/catalog';
 
@@ -14,6 +14,7 @@ const baseItem = {
     qty: 1,
     addons: []
 };
+const OWNER_UID = 'builder-item-test-user';
 
 const installationItems = catalogData.BaHaMa.models.Jumbrella.addonCategories.find(
     (category) => category.name === 'Installationsalternativ'
@@ -28,7 +29,7 @@ const miscItems = catalogData.BaHaMa.models.Jumbrella.addonCategories.find(
 function stubLocalStorage(serializedState) {
     const storage = new Map();
     if (serializedState !== undefined) {
-        storage.set(QUOTE_STATE_STORAGE_KEY, serializedState);
+        storage.set(getQuoteStateStorageKey(OWNER_UID), serializedState);
     }
 
     const localStorageMock = {
@@ -54,7 +55,7 @@ function renderBuilderItem(item) {
     }));
 
     return renderToStaticMarkup(
-        <QuoteProvider>
+        <QuoteProvider ownerUid={OWNER_UID}>
             <BuilderItem item={item} index={0} onRemove={vi.fn()} />
         </QuoteProvider>
     );

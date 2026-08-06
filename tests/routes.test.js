@@ -7,11 +7,14 @@ import {
     getAuthorizedRouteForAccess,
     getNextLoginRedirectTarget,
     getQuoteDraftGuardRedirect,
+    getQuoteResumeStep,
+    getQuoteStepNavigationItems,
     getQuoteStepPath,
     getRetailerResumeQuoteStep,
     getSketchReturnPath,
     hasConfiguredQuoteContent,
     hasConfiguredQuoteSelections,
+    hasQuoteStartDraftData,
     hasRetailerStartDraftData,
     parseSketchReturnTarget,
     resolveLoginRedirectTarget
@@ -79,6 +82,60 @@ describe('navigation routes', () => {
         expect(getQuoteDraftGuardRedirect(APP_ROUTE_IDS.quoteConfiguration, emptyState)).toBe(APP_PATHS[APP_ROUTE_IDS.quoteProductLines]);
         expect(getQuoteDraftGuardRedirect(APP_ROUTE_IDS.quotePricing, selectedLinesOnly)).toBe(APP_PATHS[APP_ROUTE_IDS.quoteConfiguration]);
         expect(getQuoteDraftGuardRedirect(APP_ROUTE_IDS.quoteSummary, configuredState)).toBeNull();
+    });
+
+    it('derives quote progress states and blockers from the same draft guards', () => {
+        const selectedLinesOnly = {
+            ...createInitialQuoteState(),
+            selectedLines: ['BaHaMa']
+        };
+        const configuredState = {
+            ...selectedLinesOnly,
+            builderItems: [{
+                id: 'item-1',
+                line: 'BaHaMa',
+                model: 'Jumbrella',
+                size: '4x4 Kvadrat',
+                qty: 1,
+                discountPct: 0,
+                addons: []
+            }]
+        };
+
+        expect(getQuoteStepNavigationItems(createInitialQuoteState(), 'product-lines')).toEqual([
+            expect.objectContaining({ step: 'product-lines', status: 'current' }),
+            expect.objectContaining({
+                step: 'configuration',
+                status: 'locked',
+                blocker: expect.objectContaining({
+                    code: 'quote-content-required',
+                    step: 'product-lines',
+                    path: APP_PATHS[APP_ROUTE_IDS.quoteProductLines]
+                })
+            }),
+            expect.objectContaining({ step: 'pricing', status: 'locked' }),
+            expect.objectContaining({ step: 'summary', status: 'locked' })
+        ]);
+        expect(getQuoteStepNavigationItems(selectedLinesOnly, 'configuration')).toEqual([
+            expect.objectContaining({ step: 'product-lines', status: 'past' }),
+            expect.objectContaining({ step: 'configuration', status: 'current' }),
+            expect.objectContaining({
+                step: 'pricing',
+                status: 'locked',
+                blocker: expect.objectContaining({
+                    code: 'configuration-required',
+                    step: 'configuration',
+                    path: APP_PATHS[APP_ROUTE_IDS.quoteConfiguration]
+                })
+            }),
+            expect.objectContaining({ step: 'summary', status: 'locked' })
+        ]);
+        expect(getQuoteStepNavigationItems(configuredState, 'pricing')).toEqual([
+            expect.objectContaining({ step: 'product-lines', status: 'past' }),
+            expect.objectContaining({ step: 'configuration', status: 'past' }),
+            expect.objectContaining({ step: 'pricing', status: 'current' }),
+            expect.objectContaining({ step: 'summary', status: 'available' })
+        ]);
     });
 
     it('allows a configured contracting-only quote through draft guards while retailers ignore it', () => {
@@ -178,6 +235,31 @@ describe('navigation routes', () => {
         expect(getRetailerResumeQuoteStep(emptyState)).toBe('product-lines');
     });
 
+    it('resolves non-retailer contracting drafts through the same resume flow', () => {
+        const contractingState = {
+            ...createInitialQuoteState(),
+            step: 3,
+            contractingWork: {
+                enabled: true,
+                projectName: 'Designer Village',
+                rows: [{
+                    id: 'work-1',
+                    workPackage: 'Markarbete och fundament',
+                    scope: '',
+                    unit: '',
+                    priceExVatSek: 0
+                }],
+                margin: { enabled: false, percent: 15 },
+                ata: { enabled: false, percent: 15 }
+            }
+        };
+
+        expect(hasQuoteStartDraftData(contractingState)).toBe(true);
+        expect(hasQuoteStartDraftData(contractingState, { isRetailer: true })).toBe(false);
+        expect(getQuoteResumeStep(contractingState)).toBe('pricing');
+        expect(getQuoteResumeStep(contractingState, { isRetailer: true })).toBe('product-lines');
+    });
+
     it('detects whether retailer start should warn about draft data', () => {
         const emptyState = createInitialQuoteState();
         const selectedLinesState = {
@@ -213,6 +295,8 @@ describe('navigation routes', () => {
         expect(hasRetailerStartDraftData(customerInfoState)).toBe(true);
         expect(hasRetailerStartDraftData(quoteIdentityState)).toBe(true);
         expect(hasRetailerStartDraftData(inventoryOnlyState)).toBe(false);
+        expect(hasQuoteStartDraftData(selectedLinesState)).toBe(true);
+        expect(hasQuoteStartDraftData(inventoryOnlyState)).toBe(false);
     });
 
     it('maps normalized paths back to route ids', () => {

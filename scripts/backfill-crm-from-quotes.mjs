@@ -1,5 +1,3 @@
-#!/usr/bin/env node
-
 /**
  * Builds the initial CRM dataset from saved quotes.
  *

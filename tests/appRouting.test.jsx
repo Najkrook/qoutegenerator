@@ -51,15 +51,22 @@ vi.mock('../src/services/crmRepository', () => ({
 }));
 
 vi.mock('../src/views/Dashboard', () => ({
-    Dashboard: ({ onStartQuote, onOpenHistory, onOpenCrm, onOpenRetailerOrders, onOpenRetailerOrderHistory, onOpenRetailerDocuments }) => (
+    Dashboard: ({
+        onStartQuote,
+        onContinueQuote,
+        onOpenCrm,
+        onOpenInventory,
+        onOpenPlanner
+    }) => (
         <div>
             <div>DashboardView</div>
             <button type="button" onClick={() => onStartQuote?.()}>Starta Ny Offert</button>
-            <button type="button" onClick={() => onOpenHistory?.()}>Mina Offerter</button>
-            <button type="button" onClick={() => onOpenCrm?.()}>CRM</button>
-            <button type="button" onClick={() => onOpenRetailerOrders?.()}>Orderförfrågningar</button>
-            <button type="button" onClick={() => onOpenRetailerOrderHistory?.()}>Skickade Ordrar</button>
-            <button type="button" onClick={() => onOpenRetailerDocuments?.()}>Produktdokument</button>
+            {onContinueQuote && (
+                <button type="button" onClick={() => onContinueQuote()}>Fortsätt offert</button>
+            )}
+            <button type="button" onClick={() => onOpenCrm?.()}>Öppna CRM</button>
+            <button type="button" onClick={() => onOpenInventory?.()}>Öppna lager</button>
+            <button type="button" onClick={() => onOpenPlanner?.()}>Öppna planering</button>
         </div>
     )
 }));
@@ -294,6 +301,66 @@ afterEach(() => {
 });
 
 describe('app routing', () => {
+    it('uses the focus shell without global navigation only on the sketch route', async () => {
+        const sketch = await renderApp({
+            initialEntries: [APP_PATHS[APP_ROUTE_IDS.sketch]],
+            auth: {
+                accessLevel: 'full',
+                canViewEverything: true,
+                canAccessSketch: true,
+                canExportSketchToQuote: true
+            }
+        });
+
+        const focusShell = sketch.container.querySelector('[data-app-shell="focus"]');
+        expect(focusShell).toBeTruthy();
+        expect(focusShell.classList.contains('h-dvh')).toBe(true);
+        expect(focusShell.classList.contains('min-h-0')).toBe(true);
+        expect(focusShell.classList.contains('overflow-hidden')).toBe(true);
+        expect(focusShell.firstElementChild.classList.contains('max-w-[1920px]')).toBe(true);
+        expect(focusShell.querySelector('header')).toBeNull();
+        expect(focusShell.querySelector('#main-content').classList.contains('overflow-hidden')).toBe(true);
+
+        const dashboard = await renderApp({
+            auth: {
+                accessLevel: 'full',
+                canViewEverything: true,
+                canAccessSketch: true,
+                canExportSketchToQuote: true
+            }
+        });
+
+        const defaultShell = dashboard.container.querySelector('[data-app-shell="default"]');
+        expect(defaultShell).toBeTruthy();
+        expect(defaultShell.classList.contains('min-h-dvh')).toBe(true);
+        expect(defaultShell.classList.contains('h-dvh')).toBe(false);
+        expect(defaultShell.querySelector('header')).toBeTruthy();
+        expect(defaultShell.firstElementChild.classList.contains('max-w-[1400px]')).toBe(true);
+    });
+
+    it('only bootstraps shared inventory for full-access users', async () => {
+        await renderApp();
+        await act(async () => {
+            await Promise.resolve();
+            await Promise.resolve();
+        });
+        expect(firebaseMocks.getDoc).not.toHaveBeenCalled();
+
+        await renderApp({
+            auth: {
+                accessLevel: 'full',
+                canViewEverything: true,
+                canAccessSketch: true,
+                canExportSketchToQuote: true
+            }
+        });
+        await act(async () => {
+            await Promise.resolve();
+            await Promise.resolve();
+        });
+        expect(firebaseMocks.getDoc).toHaveBeenCalledTimes(1);
+    });
+
     it('allows full admins to open CRM and redirects quote-only users', async () => {
         const admin = await renderApp({
             initialEntries: [APP_PATHS[APP_ROUTE_IDS.crmDashboard]],
@@ -312,6 +379,30 @@ describe('app routing', () => {
 
         expect(quoteOnly.router.state.location.pathname).toBe(APP_PATHS[APP_ROUTE_IDS.dashboard]);
         expect(quoteOnly.container.textContent).toContain('DashboardView');
+    });
+
+    it.each([
+        ['Öppna CRM', APP_PATHS[APP_ROUTE_IDS.crmDashboard], 'CrmDashboardView'],
+        ['Öppna lager', APP_PATHS[APP_ROUTE_IDS.inventory], 'InventoryView'],
+        ['Öppna planering', APP_PATHS[APP_ROUTE_IDS.planner], 'PlannerView']
+    ])('wires the admin dashboard action %s to its route', async (
+        actionLabel,
+        expectedPath,
+        expectedView
+    ) => {
+        const { container, router } = await renderApp({
+            auth: {
+                accessLevel: 'full',
+                canViewEverything: true,
+                canAccessSketch: true,
+                canExportSketchToQuote: true
+            }
+        });
+
+        await clickButton(container, actionLabel);
+
+        expect(router.state.location.pathname).toBe(expectedPath);
+        expect(container.textContent).toContain(expectedView);
     });
 
     it('opens dynamic CRM detail routes for full admins', async () => {
@@ -610,6 +701,30 @@ describe('app routing', () => {
         }));
     });
 
+    it('keeps the current draft when opening a history quote is cancelled', async () => {
+        notificationMocks.confirmAction.mockResolvedValueOnce(false);
+        const dispatch = vi.fn();
+        const { container, router } = await renderApp({
+            initialEntries: [APP_PATHS[APP_ROUTE_IDS.quotes]],
+            quoteState: {
+                ...createInitialQuoteState(),
+                selectedLines: ['BaHaMa']
+            },
+            dispatch
+        });
+
+        await clickButton(container, 'Open Configured History Quote');
+
+        expect(notificationMocks.confirmAction).toHaveBeenCalledWith(expect.objectContaining({
+            title: 'Öppna sparad offert?',
+            cancelText: 'Behåll utkast'
+        }));
+        expect(dispatch).not.toHaveBeenCalledWith(expect.objectContaining({
+            type: 'HYDRATE_STATE'
+        }));
+        expect(router.state.location.pathname).toBe(APP_PATHS[APP_ROUTE_IDS.quotes]);
+    });
+
     it('reopens configured contracting-only history quotes into summary for non-retailers', async () => {
         const dispatch = vi.fn();
         const { container, router } = await renderApp({
@@ -671,9 +786,9 @@ describe('app routing', () => {
         }));
     });
 
-    it('returns from sketch using the encoded return target and keeps export-to-quote on configuration', async () => {
+    it('returns sketch saves and transfers to their quote origin while preserving CRM context', async () => {
         const { container, router } = await renderApp({
-            initialEntries: ['/sketch?return=quote-summary'],
+            initialEntries: ['/sketch?return=quote-summary&crmDealId=deal-1&quoteOwnerUid=owner-1'],
             auth: {
                 accessLevel: 'full',
                 canViewEverything: true,
@@ -697,14 +812,16 @@ describe('app routing', () => {
 
         await clickButton(container, 'Back From Sketch');
         expect(router.state.location.pathname).toBe(APP_PATHS[APP_ROUTE_IDS.quoteSummary]);
+        expect(router.state.location.search).toBe('?crmDealId=deal-1&quoteOwnerUid=owner-1');
 
         await act(async () => {
-            await router.navigate('/sketch?return=quote-summary');
+            await router.navigate('/sketch?return=quote-summary&crmDealId=deal-1&quoteOwnerUid=owner-1');
             await Promise.resolve();
         });
 
         await clickButton(container, 'Export From Sketch');
-        expect(router.state.location.pathname).toBe(APP_PATHS[APP_ROUTE_IDS.quoteConfiguration]);
+        expect(router.state.location.pathname).toBe(APP_PATHS[APP_ROUTE_IDS.quoteSummary]);
+        expect(router.state.location.search).toBe('?crmDealId=deal-1&quoteOwnerUid=owner-1');
     });
 
     it('starts a retailer quote immediately when there is no draft data to clear', async () => {
@@ -730,7 +847,7 @@ describe('app routing', () => {
         await clickButton(container, 'Starta Ny Offert');
 
         expect(notificationMocks.confirmChoiceAction).not.toHaveBeenCalled();
-        expect(dispatch).toHaveBeenCalledWith({ type: 'RESET_STATE' });
+        expect(dispatch).toHaveBeenCalledWith({ type: 'RESET_QUOTE_DRAFT' });
         expect(router.state.location.pathname).toBe(APP_PATHS[APP_ROUTE_IDS.quoteProductLines]);
     });
 
@@ -763,9 +880,9 @@ describe('app routing', () => {
             title: 'Starta ny offert?',
             confirmText: 'Starta ny offert',
             cancelText: 'Avbryt',
-            secondaryText: 'Fortsätt till nuvarande offert'
+            secondaryText: 'Fortsätt utkast'
         }));
-        expect(dispatch).toHaveBeenCalledWith({ type: 'RESET_STATE' });
+        expect(dispatch).toHaveBeenCalledWith({ type: 'RESET_QUOTE_DRAFT' });
         expect(router.state.location.pathname).toBe(APP_PATHS[APP_ROUTE_IDS.quoteProductLines]);
     });
 
@@ -799,7 +916,7 @@ describe('app routing', () => {
         await clickButton(container, 'Starta Ny Offert');
 
         expect(notificationMocks.confirmChoiceAction).toHaveBeenCalledTimes(1);
-        expect(dispatch).not.toHaveBeenCalledWith({ type: 'RESET_STATE' });
+        expect(dispatch).not.toHaveBeenCalledWith({ type: 'RESET_QUOTE_DRAFT' });
         expect(router.state.location.pathname).toBe(APP_PATHS[APP_ROUTE_IDS.dashboard]);
     });
 
@@ -840,11 +957,11 @@ describe('app routing', () => {
         await clickButton(container, 'Starta Ny Offert');
 
         expect(notificationMocks.confirmChoiceAction).toHaveBeenCalledTimes(1);
-        expect(dispatch).not.toHaveBeenCalledWith({ type: 'RESET_STATE' });
+        expect(dispatch).not.toHaveBeenCalledWith({ type: 'RESET_QUOTE_DRAFT' });
         expect(router.state.location.pathname).toBe(APP_PATHS[APP_ROUTE_IDS.quoteSummary]);
     });
 
-    it('keeps non-retailer start behavior direct without reset confirmation', async () => {
+    it('asks non-retailers to confirm before replacing an existing draft', async () => {
         const dispatch = vi.fn();
         const { container, router } = await renderApp({
             initialEntries: [APP_PATHS[APP_ROUTE_IDS.dashboard]],
@@ -861,9 +978,44 @@ describe('app routing', () => {
 
         await clickButton(container, 'Starta Ny Offert');
 
-        expect(notificationMocks.confirmChoiceAction).not.toHaveBeenCalled();
-        expect(dispatch).not.toHaveBeenCalledWith({ type: 'RESET_STATE' });
+        expect(notificationMocks.confirmChoiceAction).toHaveBeenCalledWith(expect.objectContaining({
+            title: 'Starta ny offert?',
+            secondaryText: 'Fortsätt utkast'
+        }));
+        expect(dispatch).toHaveBeenCalledWith({ type: 'RESET_QUOTE_DRAFT' });
         expect(router.state.location.pathname).toBe(APP_PATHS[APP_ROUTE_IDS.quoteProductLines]);
+    });
+
+    it('lets non-retailers continue the latest valid draft without clearing it', async () => {
+        const dispatch = vi.fn();
+        const { container, router } = await renderApp({
+            initialEntries: [APP_PATHS[APP_ROUTE_IDS.dashboard]],
+            auth: {
+                accessLevel: 'quote-only',
+                isRetailer: false
+            },
+            quoteState: {
+                ...createInitialQuoteState(),
+                step: 4,
+                selectedLines: ['BaHaMa'],
+                builderItems: [{
+                    id: 'item-1',
+                    line: 'BaHaMa',
+                    model: 'Jumbrella',
+                    size: '4x4 Kvadrat',
+                    qty: 1,
+                    discountPct: 0,
+                    addons: []
+                }]
+            },
+            dispatch
+        });
+
+        await clickButton(container, 'Fortsätt offert');
+
+        expect(notificationMocks.confirmChoiceAction).not.toHaveBeenCalled();
+        expect(dispatch).not.toHaveBeenCalledWith({ type: 'RESET_QUOTE_DRAFT' });
+        expect(router.state.location.pathname).toBe(APP_PATHS[APP_ROUTE_IDS.quoteSummary]);
     });
 
     it('starts a clean quote from a CRM deal and prefills the customer without persisting the CRM id in quote state', async () => {
@@ -906,7 +1058,12 @@ describe('app routing', () => {
             await Promise.resolve();
         });
 
-        expect(dispatch).toHaveBeenCalledWith({ type: 'RESET_STATE' });
+        expect(notificationMocks.confirmChoiceAction).toHaveBeenCalledWith(expect.objectContaining({
+            title: 'Starta offert från CRM-affären?',
+            confirmText: 'Ersätt utkast',
+            secondaryText: 'Fortsätt utkast'
+        }));
+        expect(dispatch).toHaveBeenCalledWith({ type: 'RESET_QUOTE_DRAFT' });
         expect(dispatch).toHaveBeenCalledWith({
             type: 'SET_CUSTOMER_INFO',
             payload: {
@@ -919,5 +1076,68 @@ describe('app routing', () => {
         });
         expect(router.state.location.search).toBe('?crmDealId=deal-1');
         expect(dispatch.mock.calls.some(([action]) => action?.payload?.crmDealId)).toBe(false);
+    });
+
+    it('continues the current draft instead of replacing it from a CRM start link', async () => {
+        notificationMocks.confirmChoiceAction.mockResolvedValueOnce('secondary');
+        const dispatch = vi.fn();
+        const { router } = await renderApp({
+            initialEntries: ['/quote/new/product-lines?crmDealId=deal-1&start=1'],
+            auth: {
+                accessLevel: 'full',
+                canViewEverything: true
+            },
+            quoteState: {
+                ...createInitialQuoteState(),
+                step: 4,
+                selectedLines: ['BaHaMa'],
+                builderItems: [{
+                    id: 'item-1',
+                    line: 'BaHaMa',
+                    model: 'Jumbrella',
+                    size: '4x4 Kvadrat',
+                    qty: 1,
+                    discountPct: 0,
+                    addons: []
+                }]
+            },
+            dispatch
+        });
+
+        await act(async () => {
+            await Promise.resolve();
+            await Promise.resolve();
+        });
+
+        expect(router.state.location.pathname).toBe(APP_PATHS[APP_ROUTE_IDS.quoteSummary]);
+        expect(router.state.location.search).toBe('');
+        expect(dispatch).not.toHaveBeenCalledWith({ type: 'RESET_QUOTE_DRAFT' });
+        expect(crmMocks.getDeal).not.toHaveBeenCalled();
+    });
+
+    it('returns to the CRM deal when replacing a current draft is cancelled', async () => {
+        notificationMocks.confirmChoiceAction.mockResolvedValueOnce('cancel');
+        const dispatch = vi.fn();
+        const { router } = await renderApp({
+            initialEntries: ['/quote/new/product-lines?crmDealId=deal-1&start=1'],
+            auth: {
+                accessLevel: 'full',
+                canViewEverything: true
+            },
+            quoteState: {
+                ...createInitialQuoteState(),
+                selectedLines: ['BaHaMa']
+            },
+            dispatch
+        });
+
+        await act(async () => {
+            await Promise.resolve();
+            await Promise.resolve();
+        });
+
+        expect(router.state.location.pathname).toBe('/crm/deals/deal-1');
+        expect(dispatch).not.toHaveBeenCalledWith({ type: 'RESET_QUOTE_DRAFT' });
+        expect(crmMocks.getDeal).not.toHaveBeenCalled();
     });
 });

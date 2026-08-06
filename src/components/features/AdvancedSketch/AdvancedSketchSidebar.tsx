@@ -2,7 +2,10 @@ import React, { useState, useEffect } from 'react';
 import type { AdvancedNode, AdvancedEdge } from '../../../types/contracts';
 import { calculateSectionsForEdge, parseSection } from '../../../utils/sectionCalculator';
 
+export type AdvancedSketchSidebarTab = 'drawing' | 'properties' | 'material';
+
 interface AdvancedSketchSidebarProps {
+    activeTab?: AdvancedSketchSidebarTab;
     selectedNode: AdvancedNode | null;
     selectedEdge: AdvancedEdge | null;
     nodes: AdvancedNode[];
@@ -21,11 +24,13 @@ interface AdvancedSketchSidebarProps {
     // New props for selection and quote export
     onSelectEdge: (edgeId: string | null) => void;
     onExportToQuote: () => void;
+    canExportToQuote: boolean;
     onUpdateEdgeProperties: (edgeId: string, updates: Partial<AdvancedEdge>) => void;
     onSplitEdge: (edgeId: string) => void;
 }
 
 export function AdvancedSketchSidebar({
+    activeTab = 'drawing',
     selectedNode,
     selectedEdge,
     nodes,
@@ -43,6 +48,7 @@ export function AdvancedSketchSidebar({
     scale,
     onSelectEdge,
     onExportToQuote,
+    canExportToQuote,
     onUpdateEdgeProperties,
     onSplitEdge
 }: AdvancedSketchSidebarProps) {
@@ -110,45 +116,44 @@ export function AdvancedSketchSidebar({
         return len < 1000;
     });
 
-    // Aggregates for all edges (when nothing is selected)
+    // Aggregates for all edges. The material tab remains complete even while
+    // a node or edge is selected on the canvas.
     const bomCounts: Record<number, number> = {};
     const bomDoorCounts: Record<number, number> = {};
     let totalGlassLengthMm = 0;
     let totalSlimlineCount = 0;
     const nodeEdgeCounts: Record<string, number> = {};
 
-    if (!selectedEdge && !selectedNode) {
-        edges.forEach((edge) => {
-            const sNode = nodes.find(n => n.id === edge.startNodeId);
-            const eNode = nodes.find(n => n.id === edge.endNodeId);
-            if (sNode && eNode) {
-                const len = Math.round(Math.sqrt((eNode.x - sNode.x) ** 2 + (eNode.y - sNode.y) ** 2) * scale);
-                if (len >= 1000) {
-                    nodeEdgeCounts[edge.startNodeId] = (nodeEdgeCounts[edge.startNodeId] || 0) + 1;
-                    nodeEdgeCounts[edge.endNodeId] = (nodeEdgeCounts[edge.endNodeId] || 0) + 1;
+    edges.forEach((edge) => {
+        const sNode = nodes.find(n => n.id === edge.startNodeId);
+        const eNode = nodes.find(n => n.id === edge.endNodeId);
+        if (sNode && eNode) {
+            const len = Math.round(Math.sqrt((eNode.x - sNode.x) ** 2 + (eNode.y - sNode.y) ** 2) * scale);
+            if (len >= 1000) {
+                nodeEdgeCounts[edge.startNodeId] = (nodeEdgeCounts[edge.startNodeId] || 0) + 1;
+                nodeEdgeCounts[edge.endNodeId] = (nodeEdgeCounts[edge.endNodeId] || 0) + 1;
 
-                    const sections = calculateSectionsForEdge(len, edge.hasDoor || false, {
-                        prioMode: edge.prioMode || 'symmetrical',
-                        targetLength: edge.targetLength || 1500,
-                        doorSize: edge.doorSize || 1000
-                    });
-                    sections.forEach((sec) => {
-                        const parsed = parseSection(sec);
-                        if (parsed.kind === 'door') {
-                            bomDoorCounts[parsed.length] = (bomDoorCounts[parsed.length] || 0) + 1;
-                            totalSlimlineCount += 1;
-                        } else {
-                            const size = parsed.length;
-                            if (size > 0) {
-                                bomCounts[size] = (bomCounts[size] || 0) + 1;
-                                totalGlassLengthMm += size;
-                            }
+                const sections = calculateSectionsForEdge(len, edge.hasDoor || false, {
+                    prioMode: edge.prioMode || 'symmetrical',
+                    targetLength: edge.targetLength || 1500,
+                    doorSize: edge.doorSize || 1000
+                });
+                sections.forEach((sec) => {
+                    const parsed = parseSection(sec);
+                    if (parsed.kind === 'door') {
+                        bomDoorCounts[parsed.length] = (bomDoorCounts[parsed.length] || 0) + 1;
+                        totalSlimlineCount += 1;
+                    } else {
+                        const size = parsed.length;
+                        if (size > 0) {
+                            bomCounts[size] = (bomCounts[size] || 0) + 1;
+                            totalGlassLengthMm += size;
                         }
-                    });
-                }
+                    }
+                });
             }
-        });
-    }
+        }
+    });
 
     // Count support posts (stödben) for free ends (exactly 1 connected edge)
     let stodbenCount = 0;
@@ -157,19 +162,27 @@ export function AdvancedSketchSidebar({
     });
 
     return (
-        <aside className="w-80 flex-none flex flex-col bg-panel-bg/95 backdrop-blur-sm border-l border-panel-border overflow-y-auto">
-            <div className="p-5 flex flex-col gap-6">
+        <div className="flex flex-col gap-6">
                 <div>
                     <h3 className="text-sm font-semibold text-text-primary uppercase tracking-wider mb-2">
-                        Inspektör (Friform)
+                        {activeTab === 'drawing'
+                            ? 'Ritning'
+                            : activeTab === 'properties'
+                              ? 'Egenskaper'
+                              : 'Material'}
                     </h3>
                     <p className="text-xs text-text-secondary leading-relaxed">
-                        Skapa premiumritningar genom att rita väggar eller använda färdiga mallar.
+                        {activeTab === 'drawing'
+                            ? 'Ställ in ritstödet, välj väggar och använd färdiga mallar.'
+                            : activeTab === 'properties'
+                              ? 'Redigera den markerade väggens eller punktens egenskaper.'
+                              : 'Granska varningar, materiallista och offertunderlag.'}
                     </p>
                 </div>
 
                 {/* Snapping toggles */}
-                <div className="flex flex-col gap-2 p-4 bg-panel-hover rounded-xl border border-panel-border">
+                {activeTab === 'drawing' && (
+                    <div className="flex flex-col gap-2 p-4 bg-panel-hover rounded-xl border border-panel-border">
                     <h4 className="text-xs font-semibold text-text-primary uppercase tracking-wider mb-1">
                         Hjälpmedel
                     </h4>
@@ -191,10 +204,11 @@ export function AdvancedSketchSidebar({
                         />
                         <span>Lås Raka Vinklar (90° Ortho)</span>
                     </label>
-                </div>
+                    </div>
+                )}
 
                 {/* Selected Edge Inspector */}
-                {selectedEdge && startNode && endNode && (
+                {activeTab === 'properties' && selectedEdge && startNode && endNode && (
                     <div className="flex flex-col gap-4 p-4 bg-panel-hover rounded-xl border border-panel-border border-l-4 border-l-primary animate-slide-in">
                         <div>
                             <span className="text-[10px] font-bold text-primary uppercase tracking-widest">Vald Vägg</span>
@@ -292,20 +306,20 @@ export function AdvancedSketchSidebar({
                                         return (
                                             <span
                                                 key={idx}
-                                                className={`px-2 py-1 text-xs font-bold rounded-lg border shadow-sm ${
+                                                className={`px-2 py-1 text-xs font-bold rounded-lg border ${
                                                     isDoor
                                                         ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
                                                         : 'bg-primary/10 text-primary border-primary/20'
                                                 }`}
                                             >
-                                                {isDoor ? `🚪 Dörr ${parsed.length} mm` : `${parsed.length} mm`}
+                                                {isDoor ? `Dörr ${parsed.length} mm` : `${parsed.length} mm`}
                                             </span>
                                         );
                                     })}
                                 </div>
                             ) : (
                                 <p className="text-xs text-red-400 mt-1">
-                                    ⚠️ Längden är för kort för sektionsdelning (minst 1000 mm).
+                                    Varning: Längden är för kort för sektionsdelning (minst 1000 mm).
                                 </p>
                             )}
                         </div>
@@ -339,7 +353,7 @@ export function AdvancedSketchSidebar({
                 )}
 
                 {/* Selected Node Inspector */}
-                {selectedNode && !selectedEdge && (
+                {activeTab === 'properties' && selectedNode && !selectedEdge && (
                     <div className="flex flex-col gap-4 p-4 bg-panel-hover rounded-xl border border-panel-border border-l-4 border-l-secondary animate-slide-in">
                         <div>
                             <span className="text-[10px] font-bold text-secondary uppercase tracking-widest text-[#64b5f6]">Vald Punkt</span>
@@ -384,11 +398,20 @@ export function AdvancedSketchSidebar({
                     </div>
                 )}
 
-                {/* No Selection: Help, Walls list & BOM summary */}
-                {!selectedNode && !selectedEdge && (
+                {activeTab === 'properties' && !selectedNode && !selectedEdge && (
+                    <div className="flex min-h-[180px] flex-col items-center justify-center rounded-xl border border-dashed border-panel-border bg-panel-hover p-5 text-center">
+                        <h4 className="text-sm font-semibold text-text-primary">Inget markerat</h4>
+                        <p className="mt-2 max-w-[240px] text-xs leading-relaxed text-text-secondary">
+                            Välj en vägg eller punkt i ritningen för att redigera dess egenskaper.
+                        </p>
+                    </div>
+                )}
+
+                {/* Drawing helpers and material summary */}
+                {(activeTab === 'drawing' || activeTab === 'material') && (
                     <div className="flex flex-col gap-6 animate-slide-in">
                         {/* Klickbar Vägglista */}
-                        {edges.length > 0 && (
+                        {activeTab === 'drawing' && edges.length > 0 && (
                             <div className="flex flex-col gap-2 p-4 bg-panel-hover rounded-xl border border-panel-border">
                                 <h4 className="text-xs font-semibold text-text-primary uppercase tracking-wider mb-2">
                                     Väggar i ritningen ({edges.length} st)
@@ -406,14 +429,13 @@ export function AdvancedSketchSidebar({
                                             <button
                                                 key={edge.id}
                                                 onClick={() => onSelectEdge(edge.id)}
-                                                className={`flex justify-between items-center px-3 py-2 bg-black/20 hover:bg-white/5 border rounded-lg text-left text-xs transition-all hover:scale-[1.01] ${
+                                                className={`flex justify-between items-center px-3 py-2 bg-black/20 hover:bg-white/5 border rounded-lg text-left text-xs transition-colors ${
                                                     isWarning
                                                         ? 'border-red-500/40 hover:border-red-500 text-red-200'
                                                         : 'border-panel-border/60 hover:border-panel-border'
                                                 }`}
                                             >
                                                 <span className="font-medium flex items-center gap-1">
-                                                    {isWarning && <span>⚠️</span>}
                                                     <span className={isWarning ? 'text-red-400 font-bold' : 'text-text-secondary'}>Vägg {idx + 1}</span>
                                                 </span>
                                                 <span className={`font-mono font-semibold ${isWarning ? 'text-red-400' : 'text-primary'}`}>{len} mm</span>
@@ -425,7 +447,7 @@ export function AdvancedSketchSidebar({
                         )}
 
                         {/* BOM Summary Card */}
-                        {edges.length > 0 && (
+                        {activeTab === 'material' && edges.length > 0 && (
                             <div className="flex flex-col gap-4 p-4 bg-panel-hover rounded-xl border border-panel-border border-l-4 border-l-secondary">
                                 <div>
                                     <span className="text-[10px] font-bold text-secondary uppercase tracking-widest text-[#64b5f6]">Materiallista (BOM)</span>
@@ -434,7 +456,6 @@ export function AdvancedSketchSidebar({
 
                                 {hasTooShortEdges && (
                                     <div className="p-3 bg-red-500/10 border border-red-500/30 rounded-lg flex items-start gap-2 animate-pulse">
-                                        <span className="text-xs leading-none">⚠️</span>
                                         <div className="flex flex-col gap-0.5">
                                             <span className="text-[11px] font-bold text-red-400">För korta väggar</span>
                                             <p className="text-[10px] text-text-secondary leading-relaxed m-0">
@@ -466,7 +487,7 @@ export function AdvancedSketchSidebar({
                                             .map(([size, count]) => (
                                                 <div key={`door-${size}`} className="flex justify-between items-center text-xs py-0.5 border-t border-panel-border/20 pt-2 mt-1">
                                                     <span className="text-emerald-400 font-medium flex items-center gap-1">
-                                                        <span>🚪</span> ClickitUp Dörr {size} mm
+                                                        ClickitUp Dörr {size} mm
                                                     </span>
                                                     <span className="px-2 py-0.5 bg-emerald-500/15 text-emerald-400 font-bold rounded text-[11px] border border-emerald-500/20">
                                                         {count} st
@@ -503,22 +524,24 @@ export function AdvancedSketchSidebar({
                                     </div>
                                 </div>
 
-                                {/* Export to Quote Button */}
-                                <button
-                                    onClick={onExportToQuote}
-                                    className="mt-3 w-full py-2.5 bg-[#10b981] hover:bg-[#059669] text-white text-xs font-bold rounded-xl shadow-lg hover:shadow-emerald-500/20 transition-all flex items-center justify-center gap-2"
-                                >
-                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" strokeWidth="0" />
-                                        <path d="M12 9v12m0 0l-3-3m3 3l3-3m-9-6h12" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                                    </svg>
-                                    <span>Exportera till offert</span>
-                                </button>
+                                {canExportToQuote ? (
+                                    <button
+                                        type="button"
+                                        onClick={onExportToQuote}
+                                        className="mt-3 flex min-h-10 w-full items-center justify-center rounded-control border border-action bg-action px-4 py-2.5 text-xs font-bold text-on-action transition-colors hover:bg-action-hover"
+                                    >
+                                        Överför till offert
+                                    </button>
+                                ) : (
+                                    <p className="mt-3 rounded-lg border border-panel-border bg-panel-hover p-3 text-xs leading-relaxed text-text-secondary">
+                                        Ritningen kan sparas, men ditt konto har inte behörighet att överföra den till en offert.
+                                    </p>
+                                )}
                             </div>
                         )}
 
                         {/* Blank slate description */}
-                        {edges.length === 0 && (
+                        {activeTab === 'drawing' && edges.length === 0 && (
                             <div className="bg-panel-hover p-4 rounded-lg border border-panel-border border-dashed flex flex-col items-center justify-center min-h-[100px] text-center">
                                 <span className="text-xs text-text-muted">Inget ritat ännu</span>
                                 <span className="text-[10px] text-text-secondary mt-1 max-w-[200px]">
@@ -528,9 +551,10 @@ export function AdvancedSketchSidebar({
                         )}
 
                         {/* Templates section */}
-                        <div className="flex flex-col gap-3">
+                        {activeTab === 'drawing' && (
+                            <div className="flex flex-col gap-3">
                             <h4 className="text-xs font-semibold text-text-primary uppercase tracking-wider">
-                                Snabbmallar (Templates)
+                                Snabbmallar
                             </h4>
                             <p className="text-[11px] text-text-secondary leading-relaxed">
                                 Skapa snabbt en grundritning med standardformer och anpassa sedan efter behov.
@@ -539,12 +563,10 @@ export function AdvancedSketchSidebar({
                             <div className="flex flex-col gap-2 mt-1">
                                 <button
                                     onClick={() => onApplyTemplate('rect')}
-                                    className="flex items-center gap-3 p-3 bg-panel-hover hover:bg-white/5 border border-panel-border rounded-xl transition-all hover:scale-[1.02] text-left group"
+                                    className="flex items-center gap-3 p-3 bg-panel-hover hover:bg-white/5 border border-panel-border rounded-xl transition-colors text-left group"
                                 >
-                                    <div className="w-10 h-10 rounded-lg bg-primary/10 border border-primary/20 flex items-center justify-center group-hover:bg-primary/25 transition-colors">
-                                        <svg className="w-6 h-6 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <rect x="4" y="6" width="16" height="12" rx="1.5" strokeWidth="2" />
-                                        </svg>
+                                    <div className="flex min-h-10 min-w-16 items-center justify-center rounded-control border border-action/30 bg-action-soft px-2 text-[10px] font-bold uppercase text-action-soft-text transition-colors">
+                                        4 sidor
                                     </div>
                                     <div className="flex-1 min-w-0">
                                         <h5 className="text-xs font-semibold text-text-primary truncate">Rektangulär Form</h5>
@@ -554,12 +576,10 @@ export function AdvancedSketchSidebar({
 
                                 <button
                                     onClick={() => onApplyTemplate('lshape')}
-                                    className="flex items-center gap-3 p-3 bg-panel-hover hover:bg-white/5 border border-panel-border rounded-xl transition-all hover:scale-[1.02] text-left group"
+                                    className="flex items-center gap-3 p-3 bg-panel-hover hover:bg-white/5 border border-panel-border rounded-xl transition-colors text-left group"
                                 >
-                                    <div className="w-10 h-10 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center group-hover:bg-emerald-500/25 transition-colors">
-                                        <svg className="w-6 h-6 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path d="M5 5v14h14v-6H11V5H5z" strokeWidth="2" strokeLinejoin="round" />
-                                        </svg>
+                                    <div className="flex min-h-10 min-w-16 items-center justify-center rounded-control border border-success-border bg-success-bg px-2 text-[10px] font-bold uppercase text-success-text transition-colors">
+                                        L-form
                                     </div>
                                     <div className="flex-1 min-w-0">
                                         <h5 className="text-xs font-semibold text-text-primary truncate">L-Formad Yta</h5>
@@ -569,12 +589,10 @@ export function AdvancedSketchSidebar({
 
                                 <button
                                     onClick={() => onApplyTemplate('ushape')}
-                                    className="flex items-center gap-3 p-3 bg-panel-hover hover:bg-white/5 border border-panel-border rounded-xl transition-all hover:scale-[1.02] text-left group"
+                                    className="flex items-center gap-3 p-3 bg-panel-hover hover:bg-white/5 border border-panel-border rounded-xl transition-colors text-left group"
                                 >
-                                    <div className="w-10 h-10 rounded-lg bg-[#64b5f6]/10 border border-[#64b5f6]/20 flex items-center justify-center group-hover:bg-[#64b5f6]/25 transition-colors">
-                                        <svg className="w-6 h-6 text-[#64b5f6]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path d="M5 5v14h14V5h-4v8H9V5H5z" strokeWidth="2" strokeLinejoin="round" />
-                                        </svg>
+                                    <div className="flex min-h-10 min-w-16 items-center justify-center rounded-control border border-info-border bg-info-bg px-2 text-[10px] font-bold uppercase text-info-text transition-colors">
+                                        U-form
                                     </div>
                                     <div className="flex-1 min-w-0">
                                         <h5 className="text-xs font-semibold text-text-primary truncate">U-Formad Yta</h5>
@@ -582,20 +600,19 @@ export function AdvancedSketchSidebar({
                                     </div>
                                 </button>
                             </div>
-                        </div>
+                            </div>
+                        )}
 
-                        {/* Reset / Actions */}
-                        <div className="border-t border-panel-border pt-4 flex flex-col gap-2">
-                            <button
-                                onClick={onClearAll}
-                                className="w-full py-2 bg-red-500/10 hover:bg-red-500 text-red-400 hover:text-white border border-red-500/20 text-xs font-semibold rounded-xl transition-all"
-                            >
-                                Rensa Hela Ritningen
-                            </button>
-                        </div>
+                        {activeTab === 'material' && edges.length === 0 && (
+                            <div className="flex min-h-[180px] flex-col items-center justify-center rounded-xl border border-dashed border-panel-border bg-panel-hover p-5 text-center">
+                                <h4 className="text-sm font-semibold text-text-primary">Ingen materiallista ännu</h4>
+                                <p className="mt-2 max-w-[240px] text-xs leading-relaxed text-text-secondary">
+                                    Rita minst en vägg för att se material, varningar och offertunderlag.
+                                </p>
+                            </div>
+                        )}
                     </div>
                 )}
-            </div>
-        </aside>
+        </div>
     );
 }

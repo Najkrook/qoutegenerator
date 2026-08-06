@@ -215,6 +215,6 @@ describe('RetailerManager document admin', () => {
         });
 
         expect(baHaMaSection.textContent).not.toContain('Installationsguide');
-        expect(baHaMaSection.textContent).toContain('Lägg till de PDF-länkar som ska visas för retailers med denna produktlinje.');
+        expect(baHaMaSection.textContent).toContain('Lägg till de PDF-länkar som ska visas för återförsäljare med denna produktlinje.');
     });
 });

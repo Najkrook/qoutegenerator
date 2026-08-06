@@ -6,7 +6,6 @@ import { InventoryTable } from '../components/features/InventoryTable';
 import { ClickitupStockGrid } from '../components/features/ClickitupStockGrid';
 import { InventoryItemModal } from '../components/features/InventoryItemModal';
 import { PendingChangesPanel } from '../components/features/PendingChangesPanel';
-import ThemeToggle from '../components/ThemeToggle';
 import {
     BAHAMA_INVENTORY_STATUSES,
     cloneInventoryData,
@@ -98,7 +97,7 @@ function getUserUid(user: { uid?: string | null } | null): string {
     return user?.uid || '';
 }
 
-export function InventoryManager({ onBack }: InventoryManagerProps) {
+export function InventoryManager(_props: InventoryManagerProps) {
     const { state, dispatch } = useQuote();
     const { user } = useAuth();
     const [activeLine, setActiveLine] = useState<ProductLine>('bahama');
@@ -401,7 +400,7 @@ export function InventoryManager({ onBack }: InventoryManagerProps) {
 
     if (isLoading) {
         return (
-            <div className="flex min-h-screen items-center justify-center bg-[#0d1115]">
+            <div className="flex min-h-[50vh] items-center justify-center rounded-xl border border-panel-border bg-[#0d1115]">
                 <div className="text-center">
                     <div className="mx-auto mb-4 h-10 w-10 animate-spin rounded-full border-4 border-[#e8e1d4] border-t-transparent" />
                     <p className="m-0 text-sm text-slate-400">Laddar lagersaldo...</p>
@@ -411,14 +410,14 @@ export function InventoryManager({ onBack }: InventoryManagerProps) {
     }
 
     return (
-        <div className="flex min-h-screen bg-[#0d1115] text-slate-100">
+        <div className="flex h-full min-h-[40rem] overflow-hidden rounded-xl border border-panel-border bg-[#0d1115] text-slate-100">
             <aside className="hidden w-[248px] shrink-0 border-r border-white/10 bg-[#10161b] p-5 lg:flex lg:flex-col">
                 <div className="mb-8">
                     <p className="m-0 text-xs font-semibold uppercase text-slate-500">Brixx</p>
                     <h1 className="m-0 mt-1 text-2xl font-semibold tracking-normal text-slate-50">Lagersaldo</h1>
                 </div>
 
-                <nav className="space-y-6 text-sm">
+                <nav aria-label="Produktlinjer i lager" className="space-y-6 text-sm">
                     <div>
                         <p className="mb-2 text-[11px] font-semibold uppercase text-slate-600">Produktlinjer</p>
                         <button
@@ -443,27 +442,10 @@ export function InventoryManager({ onBack }: InventoryManagerProps) {
                         </button>
                     </div>
 
-                    <div>
-                        <p className="mb-2 text-[11px] font-semibold uppercase text-slate-600">Navigering</p>
-                        <button type="button" onClick={onBack} className="block w-full rounded-md px-3 py-2 text-left font-semibold text-slate-300 transition-colors hover:bg-white/5">
-                            Start
-                        </button>
-                        <a href="/inventory-logs" className="block rounded-md px-3 py-2 font-semibold text-slate-300 no-underline transition-colors hover:bg-white/5">
-                            Lagerloggar
-                        </a>
-                    </div>
                 </nav>
-
-                <div className="mt-auto space-y-3">
-                    <ThemeToggle />
-                    <div className="rounded-lg border border-white/10 bg-white/[0.03] p-3">
-                        <p className="m-0 text-[11px] uppercase text-slate-500">Inloggad</p>
-                        <p className="m-0 mt-1 truncate text-sm text-slate-300">{user?.email || '-'}</p>
-                    </div>
-                </div>
             </aside>
 
-            <main className="flex min-w-0 flex-1 flex-col">
+            <div className="flex min-w-0 flex-1 flex-col">
                 <header className="border-b border-white/10 bg-[#0f1418] px-4 py-4 md:px-6">
                     <div className="flex flex-wrap items-center justify-between gap-4">
                         <div>
@@ -483,7 +465,7 @@ export function InventoryManager({ onBack }: InventoryManagerProps) {
                                     Ny artikel
                                 </button>
                             )}
-                            <div className="flex rounded-lg border border-white/10 bg-[#12191f] p-1">
+                            <div className="flex rounded-lg border border-white/10 bg-[#12191f] p-1 lg:hidden">
                                 <button
                                     type="button"
                                     onClick={() => setActiveLine('bahama')}
@@ -629,7 +611,7 @@ export function InventoryManager({ onBack }: InventoryManagerProps) {
                         </div>
                     </div>
                 )}
-            </main>
+            </div>
         </div>
     );
 }

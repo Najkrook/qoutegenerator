@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo, useRef, type CSSProperties, type DragEvent, type KeyboardEvent, type MouseEvent } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef, type CSSProperties, type DragEvent, type KeyboardEvent } from 'react';
 import { useAuth } from '../store/AuthContext';
 import {
     db,
@@ -14,6 +14,7 @@ import {
     notifyAction,
     notifyError
 } from '../services/notificationService';
+import { Button } from '../components/ui/Button';
 import { normalizeAllowedValue, readSnapshotData } from '../utils/runtime';
 import type {
     PlannerContractor,
@@ -23,6 +24,7 @@ import type {
     PlannerProps,
     SnapshotSource
 } from '../types/contracts';
+import { Modal } from '../components/ui/Modal';
 
 interface PlannerProjectDocument extends Omit<PlannerProject, 'id'> {}
 
@@ -242,7 +244,7 @@ export function normalizePlannerProject(snapshot: SnapshotSource & { id?: unknow
     };
 }
 
-export function Planner({ onBack }: PlannerProps) {
+export function Planner(_props: PlannerProps) {
     const { user } = useAuth();
     const [allProjects, setAllProjects] = useState<PlannerProject[]>([]);
     const [newTitle, setNewTitle] = useState('');
@@ -302,9 +304,10 @@ export function Planner({ onBack }: PlannerProps) {
     }, [currentWeek, selectedWeek, weekSummaries]);
 
     useEffect(() => {
+        const reduceMotion = globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
         selectedWeekButtonRef.current?.scrollIntoView({
             block: 'center',
-            behavior: 'smooth'
+            behavior: reduceMotion ? 'auto' : 'smooth'
         });
     }, [selectedWeek]);
 
@@ -456,14 +459,8 @@ export function Planner({ onBack }: PlannerProps) {
     })();
 
     return (
-        <div className="flex flex-col md:flex-row animate-slide-in h-full w-full min-h-[800px] -m-8">
+        <div className="flex h-full min-h-[44rem] w-full flex-col animate-slide-in md:flex-row">
             <div className="w-full md:w-64 border-b md:border-r md:border-b-0 border-panel-border bg-bg p-6 flex flex-col gap-4 overflow-y-auto shrink-0">
-                <button
-                    onClick={onBack}
-                    className="w-full bg-panel-bg border border-panel-border text-text-primary text-sm font-medium px-4 py-2 rounded-lg cursor-pointer hover:bg-panel-border transition-all mb-4"
-                >
-                    Tillbaka
-                </button>
                 <div className="flex justify-between items-center px-1">
                     <h3 className="text-text-primary font-semibold m-0 text-sm uppercase tracking-widest opacity-60">Veckor</h3>
                 </div>
@@ -598,19 +595,13 @@ export function Planner({ onBack }: PlannerProps) {
                                                 style={{ minWidth: '180px' }}
                                             >
                                                 <div
-                                                    className={`relative z-10 w-8 h-8 rounded-full border-2 flex items-center justify-center transition-all ${
+                                                    className={`relative z-10 flex h-8 min-w-8 items-center justify-center rounded-full border-2 px-2 text-xs font-bold transition-all ${
                                                         allDone
-                                                            ? 'bg-success border-success text-white scale-100'
-                                                            : 'bg-bg border-primary text-primary'
+                                                            ? 'border-success-solid bg-success-solid text-on-action'
+                                                            : 'border-action bg-surface-raised text-action'
                                                     }`}
                                                 >
-                                                    {allDone ? (
-                                                        <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                                                            <path d="M2.5 7L5.5 10L11.5 4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                                                        </svg>
-                                                    ) : (
-                                                        <span className="text-xs font-bold">{index + 1}</span>
-                                                    )}
+                                                    {allDone ? 'Klar' : index + 1}
                                                 </div>
 
                                                 <div className={`w-[2px] h-6 transition-colors ${allDone ? 'bg-success' : 'bg-panel-border'}`} />
@@ -633,16 +624,15 @@ export function Planner({ onBack }: PlannerProps) {
                                                                         event.stopPropagation();
                                                                         void handleToggle(project);
                                                                     }}
-                                                                    className={`absolute -top-3 -right-3 w-7 h-7 rounded-full border-2 flex items-center justify-center shadow-sm cursor-pointer transition-all z-10 ${
+                                                                    className={`absolute -right-3 -top-3 z-10 flex min-h-8 items-center justify-center rounded-full border-2 px-2 text-[10px] font-bold shadow-sm transition-colors ${
                                                                         project.done
-                                                                            ? 'bg-success border-success text-white'
-                                                                            : 'bg-bg border-panel-border hover:border-primary text-transparent hover:text-primary/40'
+                                                                            ? 'border-success-solid bg-success-solid text-on-action'
+                                                                            : 'border-control-border bg-surface-raised text-text-muted hover:border-action hover:text-action'
                                                                     }`}
                                                                     title={project.done ? 'Markera som ofärdig' : 'Markera som klar'}
+                                                                    aria-label={project.done ? `Markera ${project.title} som ofärdig` : `Markera ${project.title} som klar`}
                                                                 >
-                                                                    <svg width="12" height="12" viewBox="0 0 14 14" fill="none" className="ml-0.5 mt-0.5">
-                                                                        <path d="M2.5 7L5.5 10L11.5 4" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
-                                                                    </svg>
+                                                                    {project.done ? 'Klar' : 'Markera'}
                                                                 </button>
 
                                                                 <p
@@ -733,10 +723,6 @@ export function ProjectDetailsModal({ project, onClose, onSave }: ProjectDetails
         onClose();
     };
 
-    const handleModalClick = (event: MouseEvent<HTMLDivElement>) => {
-        event.stopPropagation();
-    };
-
     const handleAssigneeDragStart = (event: DragEvent<HTMLButtonElement>, email: string) => {
         event.dataTransfer.setData('text/plain', email);
         event.dataTransfer.effectAllowed = 'move';
@@ -763,18 +749,50 @@ export function ProjectDetailsModal({ project, onClose, onSave }: ProjectDetails
         setAssignees((current) => addPlannerAssignee(current, droppedEmail));
     };
 
-    return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4" onClick={onClose}>
-            <div className="bg-bg border border-panel-border rounded-xl shadow-2xl w-full max-w-lg flex flex-col overflow-hidden" onClick={handleModalClick}>
-                <div className="px-6 py-4 flex justify-between items-center border-b border-panel-border bg-panel-bg">
-                    <h3 className="text-lg font-semibold text-text-primary m-0 pr-4 truncate">{project.title}</h3>
-                    <button onClick={onClose} className="text-text-secondary hover:text-text-primary bg-transparent border-none cursor-pointer text-xl leading-none">X</button>
-                </div>
+    const toggleAssignee = (email: string): void => {
+        setAssignees((current) => (
+            current.includes(email)
+                ? removePlannerAssignee(current, email)
+                : addPlannerAssignee(current, email)
+        ));
+    };
 
-                <div className="p-6 flex flex-col gap-4">
+    return (
+        <Modal
+            onClose={onClose}
+            title={project.title}
+            description="Projektuppgifter och ansvariga."
+            maxWidthClassName="max-w-lg"
+            footer={(
+                <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+                    <Button onClick={onClose}>
+                        Avbryt
+                    </Button>
+                    <Button
+                        onClick={() => void handleSave()}
+                        disabled={saving}
+                        variant="primary"
+                        data-testid="planner-assignee-save"
+                    >
+                        {saving ? 'Sparar...' : 'Spara'}
+                    </Button>
+                </div>
+            )}
+        >
+                <div className="flex flex-col gap-4 p-6">
                     <div className="flex flex-col gap-2">
-                        <label className="text-xs font-semibold uppercase tracking-wider text-text-secondary">{'Tillg\u00E4ngliga anv\u00E4ndare'}</label>
-                        <div className="flex flex-wrap gap-2" data-testid="planner-assignee-pool">
+                        <p id="planner-assignee-pool-label" className="m-0 text-xs font-semibold uppercase tracking-wider text-text-muted">
+                            {'Tillg\u00E4ngliga anv\u00E4ndare'}
+                        </p>
+                        <p className="m-0 text-xs text-text-muted">
+                            Klicka för att tilldela eller ta bort. Du kan även dra en användare till listan.
+                        </p>
+                        <div
+                            role="group"
+                            aria-labelledby="planner-assignee-pool-label"
+                            className="flex flex-wrap gap-2"
+                            data-testid="planner-assignee-pool"
+                        >
                             {PLANNER_ASSIGNEE_OPTIONS.map((option) => {
                                 const isAssigned = assignees.includes(option.email);
 
@@ -783,8 +801,11 @@ export function ProjectDetailsModal({ project, onClose, onSave }: ProjectDetails
                                         key={option.email}
                                         type="button"
                                         draggable
+                                        aria-label={`${isAssigned ? 'Ta bort' : 'Tilldela'} ${option.label}`}
+                                        aria-pressed={isAssigned}
+                                        onClick={() => toggleAssignee(option.email)}
                                         onDragStart={(event) => handleAssigneeDragStart(event, option.email)}
-                                        className={`rounded-full border px-3 py-2 text-left transition-colors ${isAssigned ? 'border-primary/40 bg-primary/10 text-primary' : 'border-panel-border bg-panel-bg text-text-primary hover:border-primary/50'}`}
+                                        className={`rounded-full border px-3 py-2 text-left transition-colors ${isAssigned ? 'border-action bg-action-soft text-action-soft-text' : 'border-control-border bg-surface-raised text-text hover:border-action/50 hover:bg-surface-hover'}`}
                                         title={option.email}
                                         data-testid={`planner-assignee-option-${option.email}`}
                                     >
@@ -797,12 +818,16 @@ export function ProjectDetailsModal({ project, onClose, onSave }: ProjectDetails
                     </div>
 
                     <div className="flex flex-col gap-2">
-                        <label className="text-xs font-semibold uppercase tracking-wider text-text-secondary">{'Tilldelade anv\u00E4ndare'}</label>
+                        <p id="planner-assignee-selected-label" className="m-0 text-xs font-semibold uppercase tracking-wider text-text-muted">
+                            {'Tilldelade anv\u00E4ndare'}
+                        </p>
                         <div
+                            role="group"
+                            aria-labelledby="planner-assignee-selected-label"
                             onDragOver={handleAssigneeDragOver}
                             onDragLeave={handleAssigneeDragLeave}
                             onDrop={handleAssigneeDrop}
-                            className={`min-h-24 rounded-xl border border-dashed p-3 transition-all ${isAssigneeDragOver ? 'border-primary bg-primary/10 shadow-[0_0_0_1px_rgba(59,130,246,0.15)]' : 'border-panel-border bg-panel-bg/60'}`}
+                            className={`min-h-24 rounded-panel border border-dashed p-3 transition-colors ${isAssigneeDragOver ? 'border-action bg-action-soft' : 'border-border bg-surface'}`}
                             data-testid="planner-assignee-dropzone"
                         >
                             {assignees.length > 0 ? (
@@ -810,60 +835,68 @@ export function ProjectDetailsModal({ project, onClose, onSave }: ProjectDetails
                                     {assignees.map((assignee) => (
                                         <span
                                             key={assignee}
-                                            className="inline-flex items-center gap-2 rounded-full border border-primary/25 bg-primary/10 px-3 py-1 text-xs font-semibold text-primary"
+                                            className="inline-flex items-center gap-2 rounded-full border border-action/35 bg-action-soft px-3 py-1 text-xs font-semibold text-action-soft-text"
                                             title={assignee}
                                         >
                                             <span>{getPlannerAssigneeLabel(assignee)}</span>
                                             <button
                                                 type="button"
                                                 onClick={() => setAssignees((current) => removePlannerAssignee(current, assignee))}
-                                                className="bg-transparent border-none p-0 text-primary/70 hover:text-primary cursor-pointer"
+                                                className="cursor-pointer rounded px-1 py-0.5 text-action-soft-text underline-offset-2 hover:underline"
                                                 aria-label={`Ta bort ${assignee}`}
                                                 data-testid={`planner-assignee-remove-${assignee}`}
                                             >
-                                                X
+                                                Ta bort
                                             </button>
                                         </span>
                                     ))}
                                 </div>
                             ) : (
-                                <p className="m-0 text-sm text-text-secondary italic">
-                                    {'Dra en anv\u00E4ndare hit f\u00F6r att tilldela tasket.'}
+                                <p className="m-0 text-sm text-text-muted">
+                                    Välj en användare ovan eller dra hit för att tilldela.
                                 </p>
                             )}
                         </div>
                     </div>
 
                     <div className="flex flex-col gap-1.5">
-                        <label className="text-xs font-semibold uppercase tracking-wider text-text-secondary">Adress</label>
+                        <label htmlFor="planner-project-address" className="text-xs font-semibold uppercase tracking-wider text-text-muted">Adress</label>
                         <input
+                            id="planner-project-address"
+                            name="projectAddress"
                             type="text"
+                            autoComplete="street-address"
                             value={address}
                             onChange={(event) => setAddress(event.target.value)}
                             placeholder="Gatunamn 1 123..."
-                            className="bg-panel-bg border border-panel-border text-text-primary rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-primary transition-colors"
+                            className="rounded-control border border-control-border bg-input px-3 py-2 text-sm text-text"
                         />
                     </div>
 
                     <div className="flex flex-col gap-1.5">
-                        <label className="text-xs font-semibold uppercase tracking-wider text-text-secondary">Telefon</label>
+                        <label htmlFor="planner-project-phone" className="text-xs font-semibold uppercase tracking-wider text-text-muted">Telefon</label>
                         <input
-                            type="text"
+                            id="planner-project-phone"
+                            name="projectPhone"
+                            type="tel"
+                            autoComplete="tel"
                             value={phone}
                             onChange={(event) => setPhone(event.target.value)}
                             placeholder="070-123 45 67..."
-                            className="bg-panel-bg border border-panel-border text-text-primary rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-primary transition-colors"
+                            className="rounded-control border border-control-border bg-input px-3 py-2 text-sm text-text"
                         />
                     </div>
 
                     <div className="flex flex-col gap-1.5">
-                        <label className="text-xs font-semibold uppercase tracking-wider text-text-secondary">Anteckningar / Offertlänk</label>
+                        <label htmlFor="planner-project-notes" className="text-xs font-semibold uppercase tracking-wider text-text-muted">Anteckningar / Offertlänk</label>
                         <textarea
+                            id="planner-project-notes"
+                            name="projectNotes"
                             value={notes}
                             onChange={(event) => setNotes(event.target.value)}
                             placeholder="Mer information..."
                             rows={4}
-                            className="bg-panel-bg border border-panel-border text-text-primary rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-primary transition-colors resize-none"
+                            className="resize-none rounded-control border border-control-border bg-input px-3 py-2 text-sm text-text"
                         />
                         {project.createdBy && (
                             <p className="text-[10px] text-text-secondary m-0 mt-2 italic">
@@ -873,23 +906,6 @@ export function ProjectDetailsModal({ project, onClose, onSave }: ProjectDetails
                     </div>
                 </div>
 
-                <div className="p-4 border-t border-panel-border bg-panel-bg/50 flex justify-end gap-3">
-                    <button
-                        onClick={onClose}
-                        className="px-4 py-2 rounded-lg text-sm font-medium text-text-secondary hover:text-text-primary hover:bg-panel-border transition-colors border-none bg-transparent cursor-pointer"
-                    >
-                        Avbryt
-                    </button>
-                    <button
-                        onClick={() => void handleSave()}
-                        disabled={saving}
-                        className="px-6 py-2 rounded-lg text-sm font-medium text-white bg-primary hover:bg-primary-hover border-none cursor-pointer transition-colors"
-                        data-testid="planner-assignee-save"
-                    >
-                        {saving ? 'Sparar...' : 'Spara'}
-                    </button>
-                </div>
-            </div>
-        </div>
+        </Modal>
     );
 }

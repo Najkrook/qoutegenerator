@@ -141,7 +141,7 @@ vi.mock('../src/services/activityLogService', () => ({
     },
     formatActivityMetadata: vi.fn(() => ''),
     getActivityEventDefinition: vi.fn(() => ({ label: 'Offert skapad' })),
-    getActivityLogVisual: vi.fn(() => ({ icon: '??', color: 'var(--color-primary)', label: 'Offert skapad' })),
+    getActivityLogVisual: vi.fn(() => ({ color: 'var(--color-primary)', label: 'Offert skapad' })),
     getActivitySystemLabel: vi.fn(() => 'Offert'),
     normalizeActivityLog: vi.fn((value) => value),
     safeLogActivity: vi.fn()
@@ -256,17 +256,43 @@ describe('UI text smoke', () => {
         const html = renderWithProviders(
             <Dashboard
                 onStartQuote={() => {}}
-                onOpenHistory={() => {}}
-                onOpenInventory={() => {}}
-                onOpenSketch={() => {}}
-                onOpenPlanner={() => {}}
-                onOpenActivity={() => {}}
-                onOpenRetailers={() => {}}
             />
         );
 
-        expect(html).toContain('Skapa Ny Offert');
+        expect(html).toContain('Skapa ny offert');
         expect(html).not.toContain('Rita Uteservering');
+    });
+
+    it('shows a resumable quote separately from starting a clean quote', () => {
+        authState.value = {
+            canViewEverything: false,
+            canStartQuote: true,
+            canAccessSketch: false,
+            canAccessQuoteHistory: true,
+            canExportSketchToQuote: false
+        };
+
+        const html = renderWithProviders(
+            <Dashboard
+                onStartQuote={() => {}}
+                onContinueQuote={() => {}}
+                quoteDraftSummary={{
+                    customerLabel: 'Testbolaget AB',
+                    reference: 'Uteservering Stortorget',
+                    stepLabel: 'Steg 3 av 4 · Prissättning',
+                    updatedAtMs: 1720000000123
+                }}
+            />
+        );
+
+        expect(html).toContain('Pågående offertutkast');
+        expect(html).toContain('Fortsätt offert');
+        expect(html).toContain('Testbolaget AB');
+        expect(html).toContain('Steg 3 av 4 · Prissättning');
+        expect(html).toContain('Senast ändrad');
+        expect(html).toContain('dateTime=');
+        expect(html).toContain('Ny offert');
+        expect(html).not.toContain('Skapa ny offert');
     });
 
     it('renders sketch-only dashboard copy correctly', () => {
@@ -280,18 +306,12 @@ describe('UI text smoke', () => {
 
         const html = renderWithProviders(
             <Dashboard
-                onStartQuote={() => {}}
-                onOpenHistory={() => {}}
-                onOpenInventory={() => {}}
                 onOpenSketch={() => {}}
-                onOpenPlanner={() => {}}
-                onOpenActivity={() => {}}
-                onOpenRetailers={() => {}}
             />
         );
 
-        expect(html).toContain('Rita Uteservering');
-        expect(html).not.toContain('Skapa Ny Offert');
+        expect(html).toContain('Öppna skissverktyget');
+        expect(html).not.toContain('Skapa ny offert');
     });
 
     it('renders full-access dashboard header copy correctly', () => {
@@ -306,31 +326,26 @@ describe('UI text smoke', () => {
         const html = renderWithProviders(
             <Dashboard
                 onStartQuote={() => {}}
-                onOpenHistory={() => {}}
+                onOpenCrm={() => {}}
                 onOpenInventory={() => {}}
                 onOpenSketch={() => {}}
-                onOpenPlanner={() => {}}
                 onOpenActivity={() => {}}
-                onOpenRetailers={() => {}}
+                onOpenPlanner={() => {}}
+                onOpenRetailerOrders={() => {}}
             />
         );
 
         expect(html).toContain('Välkommen till Brixx portal');
-        expect(html).toContain('📄');
-        expect(html).toContain('📦');
-        expect(html).toContain('✏️');
-        expect(html).toContain('🕘');
-        expect(html).toContain('📋');
-        expect(html).toContain('🏪');
-        expect(html).not.toContain('aria-hidden="true">Dok<');
-        expect(html).not.toContain('aria-hidden="true">Inv<');
-        expect(html).not.toContain('aria-hidden="true">Pen<');
-        expect(html).not.toContain('aria-hidden="true">Log<');
-        expect(html).not.toContain('aria-hidden="true">Plan<');
-        expect(html).not.toContain('aria-hidden="true">AF<');
-        expect(html).toContain('Skapa Ny Offert');
-        expect(html).toContain('Rita Uteservering');
-        expect(html).toContain('Inga loggade händelser ännu. Nya sparade offerter och exporter visas här.');
+        expect(html).toContain('Skapa ny offert');
+        expect(html).toContain('Sälj-CRM');
+        expect(html).toContain('Lagersaldo');
+        expect(html).toContain('Rita uteservering');
+        expect(html).toContain('Aktivitetslogg');
+        expect(html).toContain('Planering');
+        expect(html).toContain('Senaste orderförfrågningar');
+        expect(html).toContain('Senaste aktivitet');
+        expect(html).not.toContain('Återförsäljare');
+        expect(html).toContain('Laddar aktivitet…');
     });
 
     it('renders activity log empty state for an untouched log list', () => {
@@ -394,7 +409,7 @@ describe('UI text smoke', () => {
         const html = renderWithProviders(<RetailerManager onBack={() => {}} />);
 
         expect(html).toContain('Återförsäljare');
-        expect(html).toContain('Laddar återförsäljare...');
+        expect(html).toContain('Laddar återförsäljare…');
     });
 
     it('renders retailer documents loading state copy', () => {
@@ -455,7 +470,7 @@ describe('UI text smoke', () => {
         expect(html).toContain('Export till Offert ej tillgänglig');
     });
 
-    it('renders Mina Offerter for quote-only users without Lagerloggar', () => {
+    it('renders the role-aware quote navigation without admin links', () => {
         authState.value = {
             canViewEverything: false,
             canStartQuote: true,
@@ -466,9 +481,14 @@ describe('UI text smoke', () => {
         };
         const html = renderWithProviders(<Header />, { route: '/quote/new/product-lines' });
 
-        expect(html).toContain('🏠');
-        expect(html).toContain('🗑️');
-        expect(html).toContain('Mina Offerter');
+        expect(html).toContain('aria-label="Huvudnavigation"');
+        expect(html).toContain('Hem');
+        expect(html).toContain('Rensa utkast');
+        expect(html).toContain('Offerter');
+        expect(html).toContain('aria-current="step"');
+        expect(html).toContain('aria-disabled="true"');
+        expect(html).toContain('Slutför steg 1, Offertinnehåll');
+        expect(html).not.toContain('min-w-max');
         expect(html).not.toContain('Lagerloggar');
     });
 
@@ -483,13 +503,17 @@ describe('UI text smoke', () => {
 
         const html = renderWithProviders(<SketchTool onBack={() => {}} />);
 
-        expect(html).toContain('Rita Uteservering');
-        expect(html).toContain('Till offert');
+        expect(html).toContain('Rita uteservering');
+        expect(html).toContain('Överför till offert');
         expect(html).toContain('SketchSetupPanelMock');
-        expect(html).toContain('SketchReviewPanelMock');
-        expect(html).toContain('animate-slide-in flex flex-col w-full');
-        expect(html).toContain('flex-1 flex overflow-hidden relative bg-panel-bg');
-        expect(html).toContain('hidden xl:flex w-[350px] flex-none');
+        expect(html).toContain('Egenskaper');
+        expect(html).toContain('Material');
+        expect(html).toContain('data-surface="simple-sketch-editor"');
+        expect(html).toContain('flex h-full min-h-0');
+        expect(html).toContain('data-surface="simple-sketch-workspace"');
+        expect(html).toContain('relative flex min-h-0 flex-1 basis-0 flex-col overflow-hidden');
+        expect(html).toContain('data-surface="simple-sketch-viewport"');
+        expect(html).not.toContain('animate-slide-in flex h-full');
     });
 
     it('renders SummaryExport labels for save, preview, and export actions', () => {
@@ -521,11 +545,11 @@ describe('UI text smoke', () => {
         expect(html).toContain('Offertsammanställning');
         expect(html).toContain('Spara offert');
         expect(html).toContain('Offert tema');
-        expect(html).toContain('PDF förhandsvisning');
-        expect(html).toContain('Exportera som PDF');
+        expect(html).toContain('PDF-förhandsvisning');
         expect(html).toContain('Offerten saknar offertnummer');
-        expect(html).toContain('Exportera ändå');
-        expect(html).toContain('Exportera som Excel');
+        expect(html).toContain('Exportera PDF utan offertnummer');
+        expect(html).not.toContain('Skapa PDF');
+        expect(html).not.toContain('Exportera Excel');
     });
 
     it('returns a clear save-first message when PDF export is attempted before quote numbering', () => {
@@ -562,10 +586,10 @@ describe('UI text smoke', () => {
 
         const html = renderWithProviders(<Pricing onNext={() => {}} onPrev={() => {}} />);
 
-        expect(html).toContain('Priser &amp; Rabatter');
+        expect(html).toContain('Priser och rabatter');
         expect(html).toContain('Övergripande offertrabatt (%)');
-        expect(html).toContain('Växelkurs (EUR → SEK)');
-        expect(html).toContain('Granska Offert');
+        expect(html).toContain('Växelkurs (EUR till SEK)');
+        expect(html).toContain('Granska offert');
     });
 
     it('renders History labels for filters and loading state', () => {

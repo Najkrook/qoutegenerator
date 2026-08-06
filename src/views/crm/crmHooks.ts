@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState, type SetStateAction } from 'react';
 import { crmRepository } from '../../services/crmRepository';
 import { useAuth } from '../../store/AuthContext';
 import type { AccessUser } from '../../types/contracts';
@@ -16,6 +16,7 @@ export interface CrmAsyncState<T> {
     loading: boolean;
     error: string;
     reload: () => void;
+    updateData: (updater: SetStateAction<T>) => void;
 }
 
 async function ensureCurrentCrmMember(user: AccessUser | null): Promise<void> {
@@ -54,6 +55,9 @@ export function useCrmLoader<T>(
     const [reloadKey, setReloadKey] = useState(0);
 
     const reload = useCallback(() => setReloadKey((current) => current + 1), []);
+    const updateData = useCallback((updater: SetStateAction<T>) => {
+        setData(updater);
+    }, []);
 
     useEffect(() => {
         let cancelled = false;
@@ -64,9 +68,10 @@ export function useCrmLoader<T>(
             ? ensureCurrentCrmMember(user)
             : Promise.resolve();
 
-        void prepareMember
-            .then(load)
-            .then((nextData) => {
+        const loadData = Promise.resolve().then(load);
+
+        void Promise.all([prepareMember, loadData])
+            .then(([, nextData]) => {
                 if (!cancelled) setData(nextData);
             })
             .catch((loadError) => {
@@ -90,5 +95,5 @@ export function useCrmLoader<T>(
         user?.uid
     ]);
 
-    return { data, loading, error, reload };
+    return { data, loading, error, reload, updateData };
 }

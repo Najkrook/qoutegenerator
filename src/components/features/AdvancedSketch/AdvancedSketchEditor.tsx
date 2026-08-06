@@ -1,11 +1,37 @@
-import React, { useRef, useState, useEffect, useCallback } from 'react';
+import React, { useRef, useState, useEffect, useCallback, useMemo } from 'react';
 import { Stage, Layer, Circle, Line, Group, Rect, Text, Arc } from 'react-konva';
+import type Konva from 'konva';
+import {
+    IconArrowBackUp,
+    IconArrowForwardUp,
+    IconArrowsMaximize,
+    IconDownload,
+    IconLine,
+    IconPointer,
+    IconRefresh,
+    IconRulerMeasure,
+    IconStack2
+} from '@tabler/icons-react';
 import { useQuote } from '../../../store/QuoteContext';
-import type { SketchToolProps, AdvancedNode, AdvancedEdge, SketchCamera, GridCustomAddonRow, GridLineSelection } from '../../../types/contracts';
+import { useAuth } from '../../../store/AuthContext';
+import type { SketchToolProps, AdvancedNode, AdvancedEdge, SketchCamera } from '../../../types/contracts';
 import { AdvancedSketchSidebar } from './AdvancedSketchSidebar';
 import { toast } from 'react-hot-toast';
 import { calculateSectionsForEdge, parseSection } from '../../../utils/sectionCalculator';
-import { buildSketchExportState } from '../../../features/sketchExportState';
+import {
+    confirmAction,
+    notifyError,
+    notifySuccess,
+    notifyWarn
+} from '../../../services/notificationService';
+import { buildAdvancedSketchDraft, buildAdvancedSketchTransfer } from './advancedSketchTransfer';
+import { downloadBlob } from '../../../utils/fileUtils';
+import {
+    SketchResponsivePanel,
+    SketchWorkspaceHeader,
+    type SketchPanelTab
+} from '../SketchWorkspace/SketchWorkspaceChrome';
+import { useSketchDraftAutosave } from '../SketchWorkspace/useSketchDraftAutosave';
 
 const SCALE = 10; // 1 pixel = 10 mm
 const GRID_SIZE = 40; // 40 pixels = 400 mm grid line spacing
@@ -18,14 +44,27 @@ interface GuideLine {
     type: 'ortho' | 'align';
 }
 
-export function AdvancedSketchEditor({ onBack, modeToggleNode }: SketchToolProps) {
+export function AdvancedSketchEditor({ onBack, onExportToQuoteComplete, modeToggleNode }: SketchToolProps) {
     const { state, dispatch } = useQuote();
+    const { canExportSketchToQuote } = useAuth();
     const containerRef = useRef<HTMLDivElement>(null);
+    const stageRef = useRef<Konva.Stage>(null);
+    const initialNodesRef = useRef<AdvancedNode[]>(
+        (state.advancedSketchDraft?.config.nodes || []).map((node) => ({ ...node }))
+    );
+    const initialEdgesRef = useRef<AdvancedEdge[]>(
+        (state.advancedSketchDraft?.config.edges || []).map((edge) => ({ ...edge }))
+    );
+    const initialCameraRef = useRef<SketchCamera>(
+        state.advancedSketchDraft?.workspace.camera
+            ? { ...state.advancedSketchDraft.workspace.camera }
+            : { zoom: 1, panX: 100, panY: 100 }
+    );
     const [dimensions, setDimensions] = useState({ width: 800, height: 600 });
     
     // Core drawing states
-    const [nodes, setNodes] = useState<AdvancedNode[]>([]);
-    const [edges, setEdges] = useState<AdvancedEdge[]>([]);
+    const [nodes, setNodes] = useState<AdvancedNode[]>(() => initialNodesRef.current);
+    const [edges, setEdges] = useState<AdvancedEdge[]>(() => initialEdgesRef.current);
     const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
     const [selectedEdgeId, setSelectedEdgeId] = useState<string | null>(null);
     
@@ -33,6 +72,8 @@ export function AdvancedSketchEditor({ onBack, modeToggleNode }: SketchToolProps
     const [drawMode, setDrawMode] = useState<'select' | 'draw'>('select');
     const [gridActive, setGridActive] = useState<boolean>(true);
     const [orthoActive, setOrthoActive] = useState<boolean>(true);
+    const [activePanelTab, setActivePanelTab] = useState<SketchPanelTab>('drawing');
+    const [panelOpen, setPanelOpen] = useState(true);
     
     // Interactive drawing states
     const [activeDrawNodeId, setActiveDrawNodeId] = useState<string | null>(null);
@@ -42,33 +83,33 @@ export function AdvancedSketchEditor({ onBack, modeToggleNode }: SketchToolProps
     const [hoveredEdgeId, setHoveredEdgeId] = useState<string | null>(null);
 
     // Zoom and pan state
-    const [camera, setCamera] = useState<SketchCamera>({ zoom: 1, panX: 100, panY: 100 });
+    const [camera, setCamera] = useState<SketchCamera>(() => initialCameraRef.current);
+    const autosaveSnapshot = useMemo(
+        () => buildAdvancedSketchDraft(nodes, edges, camera),
+        [camera, edges, nodes]
+    );
+    const commitAutosaveSnapshot = useCallback((snapshot: typeof autosaveSnapshot) => {
+        dispatch({
+            type: 'UPDATE_STATE',
+            payload: {
+                advancedSketchDraft: snapshot
+            }
+        });
+    }, [dispatch]);
+    const {
+        status: autosaveStatus,
+        flush: flushAutosave
+    } = useSketchDraftAutosave({
+        snapshot: autosaveSnapshot,
+        onSave: commitAutosaveSnapshot
+    });
 
     // History for Undo/Redo
-    const [history, setHistory] = useState<Array<{ nodes: AdvancedNode[]; edges: AdvancedEdge[] }>>([]);
-    const [historyIndex, setHistoryIndex] = useState(-1);
-
-    // Populate initial state from global QuoteState if available
-    useEffect(() => {
-        if (state.advancedSketchDraft?.config) {
-            const initialNodes = state.advancedSketchDraft.config.nodes || [];
-            const initialEdges = state.advancedSketchDraft.config.edges || [];
-            setNodes(initialNodes);
-            setEdges(initialEdges);
-            
-            // Set initial history
-            setHistory([{ nodes: initialNodes, edges: initialEdges }]);
-            setHistoryIndex(0);
-        } else {
-            // Start fresh
-            setHistory([{ nodes: [], edges: [] }]);
-            setHistoryIndex(0);
-        }
-
-        if (state.advancedSketchDraft?.workspace?.camera) {
-            setCamera(state.advancedSketchDraft.workspace.camera);
-        }
-    }, []);
+    const [history, setHistory] = useState<Array<{ nodes: AdvancedNode[]; edges: AdvancedEdge[] }>>(() => [{
+        nodes: initialNodesRef.current,
+        edges: initialEdgesRef.current
+    }]);
+    const [historyIndex, setHistoryIndex] = useState(0);
 
     // Resize observer to keep Stage responsive
     useEffect(() => {
@@ -141,6 +182,12 @@ export function AdvancedSketchEditor({ onBack, modeToggleNode }: SketchToolProps
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
     }, [activeDrawNodeId, handleUndo, handleRedo]);
+
+    useEffect(() => {
+        if (!selectedNodeId && !selectedEdgeId) return;
+        setActivePanelTab('properties');
+        setPanelOpen(true);
+    }, [selectedEdgeId, selectedNodeId]);
 
     // Aborts drawing and cleans up the active dangling node if it has no edges
     const cancelDrawingChain = () => {
@@ -394,7 +441,7 @@ export function AdvancedSketchEditor({ onBack, modeToggleNode }: SketchToolProps
                     pushState(nodes, nextEdges);
                     setActiveDrawNodeId(null);
                     setGuideLines([]);
-                    toast.success('Sluten slinga ritad!', { icon: '🎉' });
+                    toast.success('Sluten slinga ritad!');
                     return;
                 }
 
@@ -488,7 +535,7 @@ export function AdvancedSketchEditor({ onBack, modeToggleNode }: SketchToolProps
         let finalLengthMm = Math.round(newLengthMm / 100) * 100;
         if (finalLengthMm < 1000) {
             finalLengthMm = 1000;
-            toast('Minsta vägglängd är 1000 mm. Värdet har justerats.', { icon: '⚠️', id: 'min-length-warn' });
+            toast('Minsta vägglängd är 1000 mm. Värdet har justerats.', { id: 'min-length-warn' });
         } else if (finalLengthMm !== newLengthMm) {
             toast.success(`Längden har avrundats till närmaste 100 mm (${finalLengthMm} mm).`, { id: 'round-length-info' });
         }
@@ -644,170 +691,80 @@ export function AdvancedSketchEditor({ onBack, modeToggleNode }: SketchToolProps
         toast.success('Mallen har applicerats!');
     };
 
-    const handleClearAll = () => {
+    const handleClearAll = async () => {
         if (nodes.length === 0) return;
-        if (window.confirm('Är du säker på att du vill rensa hela ritningen? Detta går inte att ångra.')) {
-            setNodes([]);
-            setEdges([]);
-            pushState([], []);
-            setSelectedNodeId(null);
-            setSelectedEdgeId(null);
-            setActiveDrawNodeId(null);
-            toast.success('Ritningen har rensats');
-        }
+        const confirmed = await confirmAction({
+            title: 'Börja om med ritningen?',
+            message: 'Alla väggar och punkter i den avancerade ritningen tas bort. Det här går inte att ångra.',
+            confirmText: 'Börja om',
+            cancelText: 'Behåll ritningen',
+            tone: 'danger'
+        });
+        if (!confirmed) return;
+
+        setNodes([]);
+        setEdges([]);
+        pushState([], []);
+        setSelectedNodeId(null);
+        setSelectedEdgeId(null);
+        setActiveDrawNodeId(null);
+        toast.success('Ritningen har rensats');
     };
 
-    // Export layout results to global QuoteState
-    const handleExportToQuote = useCallback((silent = false) => {
-        if (edges.length === 0) {
-            if (!silent) {
-                toast.error('Ritningen är tom. Lägg till minst en vägg för att exportera.');
-            }
+    const handleExportToQuote = useCallback(() => {
+        flushAutosave();
+        if (!canExportSketchToQuote) {
+            notifyError('Du har inte behörighet att överföra ritningen till en offert.');
             return;
         }
 
-        // Filter out very short or invalid edges (under 1000 mm)
-        const validEdges = edges.filter(edge => {
-            const start = nodes.find(n => n.id === edge.startNodeId);
-            const end = nodes.find(n => n.id === edge.endNodeId);
-            if (!start || !end) return false;
-            const len = Math.sqrt((end.x - start.x) ** 2 + (end.y - start.y) ** 2) * SCALE;
-            return len >= 1000;
+        const result = buildAdvancedSketchTransfer({
+            nodes,
+            edges,
+            camera,
+            quoteState: state
         });
+        if (result.error === 'empty-sketch') {
+            notifyError('Ritningen är tom. Lägg till minst en vägg för att överföra den.');
+            return;
+        }
+        if (result.error === 'no-valid-edges' || !result.patch) {
+            notifyError('Ritningen innehåller inga väggar som uppfyller minimilängden på 1000 mm.');
+            return;
+        }
+        if (result.excludedEdgeCount > 0) {
+            notifyWarn(`${result.excludedEdgeCount} väggar under 1000 mm har inte tagits med i offerten.`);
+        }
 
-        const hasExcludedEdges = edges.length > validEdges.length;
+        dispatch({ type: 'UPDATE_STATE', payload: result.patch });
+        notifySuccess('Ritningen har överförts till offerten.');
+        onExportToQuoteComplete?.();
+    }, [camera, canExportSketchToQuote, dispatch, edges, flushAutosave, nodes, onExportToQuoteComplete, state]);
 
-        if (validEdges.length === 0) {
-            if (!silent) {
-                toast.error('Ritningen innehåller inga väggar som uppfyller minimilängden på 1000 mm.');
-            }
+    const handleExportImage = useCallback(async () => {
+        flushAutosave();
+        const stage = stageRef.current;
+        if (!stage || edges.length === 0) {
+            notifyError('Ritningen är tom. Rita minst en vägg innan du laddar ner bilden.');
             return;
         }
 
-        if (hasExcludedEdges && !silent) {
-            toast('Vissa väggar var för korta (< 1000 mm) och exkluderades från beräkningen.', { icon: '⚠️' });
+        try {
+            const dataUrl = stage.toDataURL({ pixelRatio: 2 });
+            const response = await fetch(dataUrl);
+            const blob = await response.blob();
+            downloadBlob(blob, `Uteservering_Avancerad_${edges.length}_vaggar.png`);
+            notifySuccess('Ritningsbilden har laddats ner.');
+        } catch (error) {
+            console.error('Failed to export advanced sketch image', error);
+            notifyError('Kunde inte skapa en bild av ritningen.');
         }
+    }, [edges.length, flushAutosave]);
 
-        const bomCounts: Record<number, number> = {};
-        const bomDoorCounts: Record<number, number> = {};
-        let totalSlimlineCount = 0;
-        const nodeEdgeCounts: Record<string, number> = {};
-
-        validEdges.forEach((edge) => {
-            nodeEdgeCounts[edge.startNodeId] = (nodeEdgeCounts[edge.startNodeId] || 0) + 1;
-            nodeEdgeCounts[edge.endNodeId] = (nodeEdgeCounts[edge.endNodeId] || 0) + 1;
-
-            const sNode = nodes.find(n => n.id === edge.startNodeId);
-            const eNode = nodes.find(n => n.id === edge.endNodeId);
-            if (sNode && eNode) {
-                const len = Math.round(Math.sqrt((eNode.x - sNode.x) ** 2 + (eNode.y - sNode.y) ** 2) * SCALE);
-                const sections = calculateSectionsForEdge(len, edge.hasDoor || false, {
-                    prioMode: edge.prioMode || 'symmetrical',
-                    targetLength: edge.targetLength || 1500,
-                    doorSize: edge.doorSize || 1000
-                });
-                sections.forEach((sec) => {
-                    const parsed = parseSection(sec);
-                    if (parsed.kind === 'door') {
-                        bomDoorCounts[parsed.length] = (bomDoorCounts[parsed.length] || 0) + 1;
-                        totalSlimlineCount += 1;
-                    } else {
-                        const size = parsed.length;
-                        if (size > 0) {
-                            bomCounts[size] = (bomCounts[size] || 0) + 1;
-                        }
-                    }
-                });
-            }
-        });
-
-        let stodbenCount = 0;
-        Object.values(nodeEdgeCounts).forEach((count) => {
-            if (count === 1) stodbenCount += 1;
-        });
-
-        const nextSketchExportState = buildSketchExportState({
-            selectedLines: state.selectedLines,
-            builderItems: state.builderItems || [],
-            globalDiscountPct: state.globalDiscountPct || 0,
-            sketchMeta: state.sketchMeta || {},
-            parasols: [],
-            fiestaItems: []
-        });
-
-        const gridSelections = { ...state.gridSelections };
-        const preservedCustomAddons = Object.entries(state.gridSelections?.ClickitUp?.customAddonsByCategory || {}).reduce<Record<string, GridCustomAddonRow[]>>((acc, [categoryId, rows]) => {
-            acc[categoryId] = Array.isArray(rows) ? rows.map((row) => ({ ...row })) : [];
-            return acc;
-        }, {});
-        
-        const cuGrid: GridLineSelection = {
-            items: {},
-            addons: {},
-            customAddonsByCategory: preservedCustomAddons
-        };
-
-        // Export glass sections
-        Object.entries(bomCounts).forEach(([size, qty]) => {
-            const key = `ClickitUp Sektion|${size}`;
-            cuGrid.items[key] = { qty, discountPct: 0 };
-        });
-
-        // Export doors
-        Object.entries(bomDoorCounts).forEach(([size, qty]) => {
-            const key = `ClickitUp Dörr|${size}`;
-            cuGrid.items[key] = { qty, discountPct: 0 };
-        });
-
-        // Export slimlines
-        if (totalSlimlineCount > 0) {
-            cuGrid.addons.stodben_litet = { qty: totalSlimlineCount, discountPct: 0 };
-        }
-
-        // Export supporting posts
-        if (stodbenCount > 0) {
-            cuGrid.addons.stodben_stort = { qty: stodbenCount, discountPct: 0 };
-        }
-
-        gridSelections.ClickitUp = cuGrid;
-
-        dispatch({ type: 'SET_SELECTED_LINES', payload: nextSketchExportState.selectedLines });
-        dispatch({ type: 'SET_GRID_SELECTIONS', payload: gridSelections });
-        dispatch({ type: 'SET_BUILDER_ITEMS', payload: nextSketchExportState.builderItems });
-        
-        dispatch({
-            type: 'UPDATE_STATE',
-            payload: {
-                advancedSketchDraft: {
-                    config: { nodes, edges },
-                    workspace: { camera, uiDensity: 'desktop' }
-                },
-                sketchMeta: nextSketchExportState.sketchMeta
-            }
-        });
-
-        if (!silent) {
-            toast.success('Ritningen har exporterats till din offert!', { icon: '🎉' });
-        }
-    }, [edges, nodes, camera, state, dispatch]);
-
-    // Save state on back navigation
-    const handleBackClick = () => {
-        if (edges.length > 0) {
-            handleExportToQuote(true);
-        } else {
-            dispatch({
-                type: 'UPDATE_STATE',
-                payload: {
-                    advancedSketchDraft: {
-                        config: { nodes, edges },
-                        workspace: { camera, uiDensity: 'desktop' }
-                    }
-                }
-            });
-        }
+    const handleBackClick = useCallback(() => {
+        flushAutosave();
         onBack?.();
-    };
+    }, [flushAutosave, onBack]);
 
     // Dynamic grid line rendering
     const renderGridLines = () => {
@@ -996,7 +953,7 @@ export function AdvancedSketchEditor({ onBack, modeToggleNode }: SketchToolProps
             const isWarning = lengthMm < 1000;
             const pillWidth = isWarning ? 94 : 76;
             const pillX = -pillWidth / 2;
-            const labelText = isWarning ? `⚠️ ${Math.round(lengthMm)} mm` : `${Math.round(lengthMm)} mm`;
+            const labelText = isWarning ? `För kort: ${Math.round(lengthMm)} mm` : `${Math.round(lengthMm)} mm`;
 
             return (
                 <Group key={`dim-${edge.id}`} x={mx + nx * 20} y={my + ny * 20} rotation={rotation}>
@@ -1036,71 +993,134 @@ export function AdvancedSketchEditor({ onBack, modeToggleNode }: SketchToolProps
     // Currently selected objects helper
     const selectedNode = nodes.find(n => n.id === selectedNodeId) || null;
     const selectedEdge = edges.find(e => e.id === selectedEdgeId) || null;
+    let shortEdgeCount = 0;
+    let sectionCount = 0;
+    edges.forEach((edge) => {
+        const startNode = nodes.find((node) => node.id === edge.startNodeId);
+        const endNode = nodes.find((node) => node.id === edge.endNodeId);
+        if (!startNode || !endNode) return;
+        const lengthMm = Math.hypot(endNode.x - startNode.x, endNode.y - startNode.y) * SCALE;
+        if (lengthMm < 1000) {
+            shortEdgeCount += 1;
+            return;
+        }
+        sectionCount += calculateSectionsForEdge(lengthMm, edge.hasDoor || false, {
+            prioMode: edge.prioMode || 'symmetrical',
+            targetLength: edge.targetLength || 1500,
+            doorSize: edge.doorSize || 1000
+        }).length;
+    });
+    const readinessTone = edges.length === 0
+        ? 'danger' as const
+        : shortEdgeCount > 0
+            ? 'warning' as const
+            : 'success' as const;
+    const readinessLabel = edges.length === 0
+        ? (canExportSketchToQuote ? 'Kan inte överföras' : 'Kan inte laddas ner')
+        : shortEdgeCount > 0
+            ? `Kontrollera ${shortEdgeCount} problem`
+            : (canExportSketchToQuote ? 'Redo att överföra' : 'Redo att ladda ner');
+    const openMaterialPanel = () => {
+        setActivePanelTab('material');
+        setPanelOpen(true);
+    };
 
     return (
-        <div className="animate-slide-in flex flex-col w-full h-[calc(100vh-100px)] min-h-[700px] bg-panel-bg rounded-xl overflow-hidden border border-panel-border shadow-2xl">
-            {/* Header */}
-            <header className="flex-none flex flex-wrap items-center justify-between px-6 py-3 border-b border-panel-border bg-panel-bg/95 backdrop-blur-sm z-20">
-                <div className="flex flex-col gap-0.5">
-                    <div className="flex items-center gap-3">
-                        <h2 className="text-xl md:text-2xl font-semibold text-text-primary m-0 tracking-tight">Rita Uteservering</h2>
-                        {modeToggleNode}
-                    </div>
-                    <p className="text-text-secondary text-xs m-0">
-                        Skissa fritt med det nya avancerade verktyget. Panorera med högerklick/pekare.
-                    </p>
-                </div>
-                <div className="flex gap-2">
-                    <button
-                        onClick={handleBackClick}
-                        className="px-4 py-1.5 rounded-md text-sm font-medium transition-colors border border-panel-border text-text-secondary hover:text-text-primary hover:bg-white/5"
-                    >
-                        Spara & Tillbaka
-                    </button>
-                </div>
-            </header>
+        <div
+            data-surface="advanced-sketch-editor"
+            className="flex h-full min-h-0 w-full flex-1 flex-col overflow-hidden rounded-xl border border-panel-border bg-panel-bg"
+        >
+            <SketchWorkspaceHeader
+                modeToggleNode={modeToggleNode}
+                onBack={handleBackClick}
+                saveStatus={autosaveStatus}
+                readiness={{
+                    label: readinessLabel,
+                    tone: readinessTone,
+                    onClick: openMaterialPanel
+                }}
+                primaryAction={canExportSketchToQuote
+                    ? {
+                        label: 'Överför till offert',
+                        onClick: handleExportToQuote,
+                        disabled: edges.length === 0
+                    }
+                    : {
+                        label: 'Ladda ner bild',
+                        onClick: () => {
+                            void handleExportImage();
+                        },
+                        disabled: edges.length === 0
+                    }}
+                secondaryAction={canExportSketchToQuote
+                    ? {
+                        label: 'Ladda ner bild',
+                        onClick: () => {
+                            void handleExportImage();
+                        },
+                        disabled: edges.length === 0
+                    }
+                    : undefined}
+                overflowActions={[
+                    {
+                        label: 'Ladda ner bild',
+                        icon: <IconDownload aria-hidden="true" size={17} stroke={1.8} />,
+                        onClick: () => {
+                            void handleExportImage();
+                        },
+                        disabled: edges.length === 0
+                    },
+                    {
+                        label: 'Börja om',
+                        icon: <IconRefresh aria-hidden="true" size={17} stroke={1.8} />,
+                        onClick: () => {
+                            void handleClearAll();
+                        },
+                        disabled: edges.length === 0,
+                        tone: 'danger'
+                    }
+                ]}
+            />
 
             {/* Stage Action Toolbar */}
-            <div className="flex-none flex items-center justify-between px-6 py-2 border-b border-panel-border bg-panel-bg/50">
-                <div className="flex items-center gap-1 bg-black/20 p-1 rounded-lg border border-panel-border">
+            <div className="flex min-h-12 flex-none items-center justify-between gap-2 overflow-x-auto border-b border-panel-border bg-panel-bg px-2 py-1.5 sm:px-3">
+                <div className="flex shrink-0 items-center gap-1 rounded-control border border-control-border bg-surface p-1">
                     <button
+                        type="button"
                         onClick={() => {
                             if (activeDrawNodeId) cancelDrawingChain();
                             setDrawMode('select');
                         }}
-                        className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${
+                        className={`inline-flex min-h-8 items-center gap-2 rounded-control px-3 text-xs font-semibold transition-colors ${
                             drawMode === 'select'
-                                ? 'bg-primary text-white shadow-md'
-                                : 'text-text-secondary hover:text-text-primary hover:bg-white/5'
+                                ? 'bg-action-soft text-action-soft-text'
+                                : 'text-text-muted hover:bg-surface-hover hover:text-text'
                         }`}
                         title="Välj och flytta hörn (Esc)"
                     >
-                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path d="M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                        </svg>
-                        <span>Pekare (Välj)</span>
+                        <IconPointer aria-hidden="true" size={17} stroke={1.8} />
+                        <span>Pekare</span>
                     </button>
                     <button
+                        type="button"
                         onClick={() => setDrawMode('draw')}
-                        className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${
+                        className={`inline-flex min-h-8 items-center gap-2 rounded-control px-3 text-xs font-semibold transition-colors ${
                             drawMode === 'draw'
-                                ? 'bg-primary text-white shadow-md'
-                                : 'text-text-secondary hover:text-text-primary hover:bg-white/5'
+                                ? 'bg-action-soft text-action-soft-text'
+                                : 'text-text-muted hover:bg-surface-hover hover:text-text'
                         }`}
                         title="Rita nya väggar"
                     >
-                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                        </svg>
+                        <IconLine aria-hidden="true" size={17} stroke={1.8} />
                         <span>Rita väggar</span>
                     </button>
                 </div>
 
                 {/* Draw Helper Status Message */}
-                <div className="hidden md:block text-xs font-medium text-text-secondary">
+                <div className="hidden min-w-0 flex-1 truncate text-center text-xs font-medium text-text-muted lg:block">
                     {drawMode === 'draw' ? (
                         activeDrawNodeId ? (
-                            <span className="text-primary animate-pulse">
+                            <span className="text-action-soft-text">
                                 Klicka på startpunkten för att stänga, Esc för att avsluta väggkedjan.
                             </span>
                         ) : (
@@ -1111,69 +1131,76 @@ export function AdvancedSketchEditor({ onBack, modeToggleNode }: SketchToolProps
                     )}
                 </div>
 
-                <div className="flex items-center gap-2">
+                <div className="flex shrink-0 items-center gap-1">
                     {/* Undo/Redo */}
-                    <div className="flex bg-black/20 p-1 rounded-lg border border-panel-border">
+                    <div className="flex rounded-control border border-control-border bg-surface p-1">
                         <button
+                            type="button"
+                            aria-label="Ångra"
                             onClick={handleUndo}
                             disabled={historyIndex <= 0}
-                            className={`p-1.5 rounded-md transition-colors ${
-                                historyIndex > 0 ? 'text-text-primary hover:bg-white/5' : 'text-text-muted opacity-40 cursor-not-allowed'
-                            }`}
+                            className="inline-flex min-h-8 min-w-8 items-center justify-center rounded-control text-text-muted transition-colors hover:bg-surface-hover hover:text-text disabled:cursor-not-allowed disabled:opacity-35"
                             title="Ångra (Ctrl+Z)"
                         >
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                            </svg>
+                            <IconArrowBackUp aria-hidden="true" size={17} stroke={1.8} />
                         </button>
                         <button
+                            type="button"
+                            aria-label="Gör om"
                             onClick={handleRedo}
                             disabled={historyIndex >= history.length - 1}
-                            className={`p-1.5 rounded-md transition-colors ${
-                                historyIndex < history.length - 1 ? 'text-text-primary hover:bg-white/5' : 'text-text-muted opacity-40 cursor-not-allowed'
-                            }`}
+                            className="inline-flex min-h-8 min-w-8 items-center justify-center rounded-control text-text-muted transition-colors hover:bg-surface-hover hover:text-text disabled:cursor-not-allowed disabled:opacity-35"
                             title="Gör om (Ctrl+Y)"
                         >
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path d="M21 10h-10a8 8 0 00-8 8v2M21 10l-6 6m6-6l-6-6" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                            </svg>
+                            <IconArrowForwardUp aria-hidden="true" size={17} stroke={1.8} />
                         </button>
                     </div>
 
                     {/* Fit View */}
                     <button
+                        type="button"
+                        aria-label="Anpassa vy"
                         onClick={() => setCamera({ zoom: 1, panX: 100, panY: 100 })}
-                        className="p-1.5 bg-black/20 border border-panel-border rounded-lg text-text-secondary hover:text-text-primary transition-all"
+                        className="inline-flex min-h-10 min-w-10 items-center justify-center rounded-control border border-control-border bg-surface text-text-muted transition-colors hover:bg-surface-hover hover:text-text"
                         title="Återställ vy"
                     >
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                        </svg>
+                        <IconArrowsMaximize aria-hidden="true" size={18} stroke={1.8} />
                     </button>
                 </div>
             </div>
 
             {/* Main Area */}
-            <div className="flex-1 flex overflow-hidden">
-                {/* Canvas Area */}
-                <div ref={containerRef} className="flex-1 bg-[#090b11] relative overflow-hidden">
-                    <Stage
-                        width={dimensions.width}
-                        height={dimensions.height}
-                        scaleX={camera.zoom}
-                        scaleY={camera.zoom}
-                        x={camera.panX}
-                        y={camera.panY}
-                        draggable={drawMode === 'select' && !selectedNodeId}
-                        onWheel={handleStageWheel}
-                        onClick={handleStageClick}
-                        onMouseMove={handleStageMouseMove}
-                        onDragEnd={handleStageDragEnd}
-                        onContextMenu={(e) => {
-                            e.evt.preventDefault();
-                            if (activeDrawNodeId) cancelDrawingChain();
-                        }}
+            <div
+                data-surface="advanced-sketch-workspace"
+                className="relative flex min-h-0 flex-1 basis-0 flex-col overflow-hidden md:flex-row"
+            >
+                <div
+                    className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-[#090b11]"
+                >
+                    <div
+                        ref={containerRef}
+                        id="sketch-workspace-canvas"
+                        data-surface="advanced-sketch-canvas"
+                        className="relative min-h-0 min-w-0 flex-1 overflow-hidden"
                     >
+                        <Stage
+                            ref={stageRef}
+                            width={dimensions.width}
+                            height={dimensions.height}
+                            scaleX={camera.zoom}
+                            scaleY={camera.zoom}
+                            x={camera.panX}
+                            y={camera.panY}
+                            draggable={drawMode === 'select' && !selectedNodeId}
+                            onWheel={handleStageWheel}
+                            onClick={handleStageClick}
+                            onMouseMove={handleStageMouseMove}
+                            onDragEnd={handleStageDragEnd}
+                            onContextMenu={(e) => {
+                                e.evt.preventDefault();
+                                if (activeDrawNodeId) cancelDrawingChain();
+                            }}
+                        >
                         <Layer>
                             {/* Gridlines */}
                             {renderGridLines()}
@@ -1274,7 +1301,7 @@ export function AdvancedSketchEditor({ onBack, modeToggleNode }: SketchToolProps
                                                             opacity={0.9}
                                                         />
                                                         <Text
-                                                            text={isDoor ? `🚪 Dörr ${Math.round(size)}` : `${Math.round(size)}`}
+                                                            text={isDoor ? `Dörr ${Math.round(size)}` : `${Math.round(size)}`}
                                                             fontSize={isDoor ? 6.5 : 7.5}
                                                             fontStyle="bold"
                                                             fontFamily="Outfit, Inter, sans-serif"
@@ -1402,32 +1429,69 @@ export function AdvancedSketchEditor({ onBack, modeToggleNode }: SketchToolProps
                                     />
                                 );
                             })}
-                        </Layer>
-                    </Stage>
+                            </Layer>
+                        </Stage>
+                    </div>
+
+                    <div className="flex min-h-11 flex-none items-center gap-4 overflow-x-auto border-t border-panel-border bg-panel-bg px-3 text-xs text-text-muted sm:gap-6 sm:px-5">
+                        <span className="inline-flex shrink-0 items-center gap-2">
+                            <IconRulerMeasure aria-hidden="true" size={17} stroke={1.8} />
+                            <span className="hidden sm:inline">Väggar</span>
+                            <b className="tabular-nums text-text">{edges.length} st</b>
+                        </span>
+                        <span className="inline-flex shrink-0 items-center gap-2">
+                            <IconStack2 aria-hidden="true" size={17} stroke={1.8} />
+                            <span className="hidden sm:inline">Sektioner</span>
+                            <b className="tabular-nums text-text">{sectionCount} st</b>
+                        </span>
+                        <button
+                            type="button"
+                            onClick={openMaterialPanel}
+                            className={`ml-auto inline-flex min-h-8 shrink-0 items-center rounded-full border px-2.5 font-semibold transition-colors hover:brightness-110 ${readinessTone === 'success'
+                                ? 'border-success-border bg-success-bg text-success-text'
+                                : readinessTone === 'warning'
+                                    ? 'border-warning-border bg-warning-bg text-warning-text'
+                                    : 'border-danger-border bg-danger-bg text-danger-text'
+                            }`}
+                        >
+                            {readinessLabel}
+                        </button>
+                    </div>
                 </div>
 
-                {/* Sidebar Component */}
-                <AdvancedSketchSidebar
-                    selectedNode={selectedNode}
-                    selectedEdge={selectedEdge}
-                    nodes={nodes}
-                    edges={edges}
-                    onUpdateNode={handleUpdateNode}
-                    onDeleteNode={handleDeleteNode}
-                    onUpdateEdgeLength={handleUpdateEdgeLength}
-                    onDeleteEdge={handleDeleteEdge}
-                    onApplyTemplate={handleApplyTemplate}
-                    onClearAll={handleClearAll}
-                    gridActive={gridActive}
-                    setGridActive={setGridActive}
-                    orthoActive={orthoActive}
-                    setOrthoActive={setOrthoActive}
-                    scale={SCALE}
-                    onSelectEdge={(edgeId) => setSelectedEdgeId(edgeId)}
-                    onExportToQuote={() => handleExportToQuote(false)}
-                    onUpdateEdgeProperties={handleUpdateEdgeProperties}
-                    onSplitEdge={handleSplitEdge}
-                />
+                <SketchResponsivePanel
+                    activeTab={activePanelTab}
+                    materialCount={shortEdgeCount}
+                    onTabChange={setActivePanelTab}
+                    open={panelOpen}
+                    onOpenChange={setPanelOpen}
+                >
+                    <AdvancedSketchSidebar
+                        activeTab={activePanelTab}
+                        selectedNode={selectedNode}
+                        selectedEdge={selectedEdge}
+                        nodes={nodes}
+                        edges={edges}
+                        onUpdateNode={handleUpdateNode}
+                        onDeleteNode={handleDeleteNode}
+                        onUpdateEdgeLength={handleUpdateEdgeLength}
+                        onDeleteEdge={handleDeleteEdge}
+                        onApplyTemplate={handleApplyTemplate}
+                        onClearAll={() => {
+                            void handleClearAll();
+                        }}
+                        gridActive={gridActive}
+                        setGridActive={setGridActive}
+                        orthoActive={orthoActive}
+                        setOrthoActive={setOrthoActive}
+                        scale={SCALE}
+                        onSelectEdge={(edgeId) => setSelectedEdgeId(edgeId)}
+                        onExportToQuote={handleExportToQuote}
+                        canExportToQuote={canExportSketchToQuote}
+                        onUpdateEdgeProperties={handleUpdateEdgeProperties}
+                        onSplitEdge={handleSplitEdge}
+                    />
+                </SketchResponsivePanel>
             </div>
         </div>
     );

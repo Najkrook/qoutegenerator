@@ -2,13 +2,15 @@ import React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { QuoteProvider } from '../src/store/QuoteContext';
-import { QUOTE_STATE_STORAGE_KEY } from '../src/store/quoteStateSchema';
+import { getQuoteStateStorageKey } from '../src/store/quoteStatePersistence';
 import { GridConfig } from '../src/components/features/GridConfig';
+
+const OWNER_UID = 'grid-config-test-user';
 
 function stubLocalStorage(serializedState) {
     const storage = new Map();
     if (serializedState !== undefined) {
-        storage.set(QUOTE_STATE_STORAGE_KEY, serializedState);
+        storage.set(getQuoteStateStorageKey(OWNER_UID), serializedState);
     }
 
     const localStorageMock = {
@@ -28,7 +30,7 @@ function stubLocalStorage(serializedState) {
 function renderGridConfig(state) {
     stubLocalStorage(JSON.stringify(state));
     return renderToStaticMarkup(
-        <QuoteProvider>
+        <QuoteProvider ownerUid={OWNER_UID}>
             <GridConfig lineId="ClickitUp" />
         </QuoteProvider>
     );

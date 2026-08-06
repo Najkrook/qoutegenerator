@@ -77,7 +77,7 @@ export function CrmDealDetailPage() {
         };
     }, [dealId]);
 
-    const { data, loading, error, reload } = useCrmLoader<DealDetailData>(
+    const { data, loading, error, reload, updateData } = useCrmLoader<DealDetailData>(
         load,
         { deal: null, companies: [], contacts: [], deals: [], activities: [], members: [] },
         'Kunde inte ladda affären.'
@@ -342,7 +342,14 @@ export function CrmDealDetailPage() {
                             activities={activities}
                             onComplete={(activity) => void handleComplete(activity)}
                             completingId={completingId}
-                            onRescheduled={() => reload()}
+                            onRescheduled={(updatedActivity) => {
+                                updateData((current) => ({
+                                    ...current,
+                                    activities: current.activities.map((activity) => (
+                                        activity.id === updatedActivity.id ? updatedActivity : activity
+                                    ))
+                                }));
+                            }}
                         />
                     </CrmPanel>
                 </>

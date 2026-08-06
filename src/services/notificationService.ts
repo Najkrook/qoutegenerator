@@ -181,16 +181,10 @@ function showNotification(type: NotificationType, message: string, options: Noti
         case 'error':
             return toast.error(message, toastOptions);
         case 'warn':
-            return toast(message, {
-                ...toastOptions,
-                icon: '⚠️'
-            });
+            return toast(message, toastOptions);
         case 'info':
         default:
-            return toast(message, {
-                ...toastOptions,
-                icon: '!'
-            });
+            return toast(message, toastOptions);
     }
 }
 

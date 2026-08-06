@@ -1,19 +1,65 @@
 import React, { useCallback, useEffect, useState } from 'react';
+import {
+    IconChevronRight,
+    IconClipboardList,
+    IconFileText,
+    IconHistory,
+    IconPackage,
+    IconPencil,
+    IconTargetArrow,
+    type TablerIcon
+} from '@tabler/icons-react';
+import { Button } from '../components/ui/Button';
+import { PageHeader } from '../components/ui/PageHeader';
+import { Panel } from '../components/ui/Panel';
+import { StatusChip } from '../components/ui/StatusChip';
 import { getCatalogLineIds, getCatalogLineName } from '../data/catalogLookup';
-import { useAuth } from '../store/AuthContext';
-import { db, collection, query, orderBy, limit, getDocs } from '../services/firebase';
 import {
     formatActivityMetadata,
     getActivityLogVisual,
     normalizeActivityLog
 } from '../services/activityLogService';
+import { db, collection, query, orderBy, limit, getDocs } from '../services/firebase';
 import {
     getOrderRequestStatusLabel,
     orderRequestService
 } from '../services/orderRequestService';
-import type { DashboardProps, OrderRequestRecord, RetailerRecord } from '../types/contracts';
+import { useAuth } from '../store/AuthContext';
+import type {
+    DashboardProps,
+    DashboardQuoteDraftSummary,
+    OrderRequestRecord,
+    RetailerRecord
+} from '../types/contracts';
 
 type ActivityLogEntry = ReturnType<typeof normalizeActivityLog>;
+type StatusTone = 'neutral' | 'success' | 'warning';
+
+const ADMIN_DASHBOARD_LIMIT = 3;
+
+interface FormattedDateTime {
+    dateTime: string;
+    label: string;
+}
+
+interface RetailerLineSummary {
+    id: string;
+    name: string;
+    discountPct: number;
+}
+
+interface QuoteDraftPanelProps {
+    onContinueQuote?: () => void;
+    onStartQuote?: () => void;
+    quoteDraftSummary?: DashboardQuoteDraftSummary | null;
+}
+
+interface DashboardLauncherCardProps {
+    description: string;
+    icon: TablerIcon;
+    label: string;
+    onClick?: () => void;
+}
 
 function formatCurrencySek(value: number): string {
     return new Intl.NumberFormat('sv-SE', {
@@ -23,27 +69,51 @@ function formatCurrencySek(value: number): string {
     }).format(Number(value) || 0);
 }
 
-function formatOrderRequestDateTime(value: number): string {
-    const date = new Date(value || Date.now());
-    return `${date.toLocaleDateString('sv-SE', { month: 'short', day: 'numeric' })} ${date.toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit' })}`;
+function formatFeedDateTime(value: number | null | undefined): FormattedDateTime | null {
+    if (!Number.isFinite(value) || Number(value) <= 0) {
+        return null;
+    }
+
+    const date = new Date(Number(value));
+    if (Number.isNaN(date.getTime())) {
+        return null;
+    }
+
+    return {
+        dateTime: date.toISOString(),
+        label: `${date.toLocaleDateString('sv-SE', { month: 'short', day: 'numeric' })} ${date.toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit' })}`
+    };
 }
 
-function getOrderRequestStatusClasses(status: string): string {
+function formatDraftUpdatedAt(value: number | null | undefined): FormattedDateTime | null {
+    if (!Number.isFinite(value) || Number(value) <= 0) {
+        return null;
+    }
+
+    const date = new Date(Number(value));
+    if (Number.isNaN(date.getTime())) {
+        return null;
+    }
+
+    return {
+        dateTime: date.toISOString(),
+        label: new Intl.DateTimeFormat('sv-SE', {
+            dateStyle: 'medium',
+            timeStyle: 'short'
+        }).format(date)
+    };
+}
+
+function getOrderRequestStatusTone(status: string): StatusTone {
     switch (status) {
         case 'completed':
-            return 'border border-success/40 bg-success/10 text-success';
-        case 'reviewing':
-            return 'border border-primary/40 bg-primary/10 text-primary';
+            return 'success';
         case 'new':
+            return 'warning';
+        case 'reviewing':
         default:
-            return 'border border-warning/40 bg-warning/10 text-warning';
+            return 'neutral';
     }
-}
-
-interface RetailerLineSummary {
-    id: string;
-    name: string;
-    discountPct: number;
 }
 
 function getRetailerLineSummaries(retailer: RetailerRecord | null): RetailerLineSummary[] {
@@ -65,32 +135,139 @@ function getRetailerLineSummaries(retailer: RetailerRecord | null): RetailerLine
     });
 }
 
+function QuoteDraftPanel({
+    onContinueQuote,
+    onStartQuote,
+    quoteDraftSummary
+}: QuoteDraftPanelProps) {
+    const draftUpdatedAt = formatDraftUpdatedAt(quoteDraftSummary?.updatedAtMs);
+
+    return (
+        <Panel
+            title={quoteDraftSummary ? 'Pågående offertutkast' : 'Skapa en offert'}
+            description={quoteDraftSummary
+                ? 'Fortsätt där du slutade eller starta om med ett tomt utkast.'
+                : 'Välj produkter, konfigurera, prissätt och skapa kundens offert.'}
+        >
+            <div className="p-5 sm:p-6">
+                {quoteDraftSummary && (
+                    <div className="mb-5 rounded-panel border border-action/30 bg-action/10 p-4">
+                        <div className="flex flex-wrap items-start justify-between gap-3">
+                            <div>
+                                <p className="m-0 text-base font-semibold text-text">
+                                    {quoteDraftSummary.customerLabel}
+                                </p>
+                                <p className="mb-0 mt-1 text-sm text-text-muted">
+                                    {quoteDraftSummary.stepLabel}
+                                </p>
+                            </div>
+                            <StatusChip>Utkast</StatusChip>
+                        </div>
+                        {(quoteDraftSummary.reference || quoteDraftSummary.quoteNumber) && (
+                            <p className="mb-0 mt-3 text-sm text-text-muted">
+                                {quoteDraftSummary.reference ? `Referens: ${quoteDraftSummary.reference}` : null}
+                                {quoteDraftSummary.reference && quoteDraftSummary.quoteNumber ? ' · ' : null}
+                                {quoteDraftSummary.quoteNumber ? `Offert ${quoteDraftSummary.quoteNumber}` : null}
+                            </p>
+                        )}
+                        {draftUpdatedAt && (
+                            <time
+                                className="mt-2 block text-xs text-text-muted"
+                                dateTime={draftUpdatedAt.dateTime}
+                            >
+                                Senast ändrad {draftUpdatedAt.label}
+                            </time>
+                        )}
+                    </div>
+                )}
+
+                <div className="flex flex-wrap gap-3">
+                    {quoteDraftSummary && onContinueQuote && (
+                        <Button onClick={onContinueQuote} size="lg" variant="primary">
+                            Fortsätt offert
+                        </Button>
+                    )}
+                    {onStartQuote && (
+                        <Button
+                            onClick={onStartQuote}
+                            size="lg"
+                            variant={quoteDraftSummary ? 'secondary' : 'primary'}
+                        >
+                            {quoteDraftSummary ? 'Ny offert' : 'Skapa ny offert'}
+                        </Button>
+                    )}
+                </div>
+            </div>
+        </Panel>
+    );
+}
+
+function DashboardLauncherCard({
+    description,
+    icon: Icon,
+    label,
+    onClick
+}: DashboardLauncherCardProps) {
+    return (
+        <button
+            type="button"
+            onClick={onClick}
+            disabled={!onClick}
+            className={[
+                'group grid min-h-36 w-full grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-4',
+                'rounded-panel border border-border bg-surface-raised p-5 text-left text-text',
+                'transition-colors hover:border-control-border hover:bg-surface-hover',
+                'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring',
+                'disabled:cursor-not-allowed disabled:opacity-60 sm:gap-5'
+            ].join(' ')}
+        >
+            <Icon
+                aria-hidden="true"
+                className="shrink-0 text-text"
+                size={40}
+                stroke={1.7}
+            />
+            <span className="min-w-0">
+                <span className="block text-lg font-semibold tracking-tight text-text">
+                    {label}
+                </span>
+                <span className="mt-2 line-clamp-2 block break-words text-sm leading-6 text-text-muted">
+                    {description}
+                </span>
+            </span>
+            <IconChevronRight
+                aria-hidden="true"
+                className="shrink-0 text-text-muted transition-colors group-hover:text-text"
+                size={24}
+                stroke={1.8}
+            />
+        </button>
+    );
+}
+
 export function Dashboard({
     onStartQuote,
-    onOpenHistory,
-    onOpenInventory,
-    onOpenSketch,
-    onOpenPlanner,
+    onContinueQuote,
     onOpenCrm,
+    onOpenInventory,
+    onOpenPlanner,
+    onOpenSketch,
     onOpenActivity,
-    onOpenRetailers,
     onOpenRetailerOrders,
-    onOpenRetailerOrderHistory,
-    onOpenRetailerDocuments
+    quoteDraftSummary
 }: DashboardProps) {
     const {
         canViewEverything,
         canStartQuote,
         canAccessSketch,
-        canAccessQuoteHistory,
         isRetailer,
         retailer
     } = useAuth();
     const [logs, setLogs] = useState<ActivityLogEntry[]>([]);
-    const [logsLoading, setLogsLoading] = useState(false);
+    const [logsLoading, setLogsLoading] = useState(canViewEverything);
     const [logsError, setLogsError] = useState(false);
     const [recentOrderRequests, setRecentOrderRequests] = useState<OrderRequestRecord[]>([]);
-    const [orderRequestsLoading, setOrderRequestsLoading] = useState(false);
+    const [orderRequestsLoading, setOrderRequestsLoading] = useState(canViewEverything);
     const [orderRequestsError, setOrderRequestsError] = useState(false);
 
     const fetchLogs = useCallback(async (): Promise<void> => {
@@ -105,7 +282,11 @@ export function Dashboard({
         setLogsError(false);
         try {
             const logsRef = collection(db, 'activity_logs');
-            const snapshot = await getDocs(query(logsRef, orderBy('createdAt', 'desc'), limit(20)));
+            const snapshot = await getDocs(query(
+                logsRef,
+                orderBy('createdAt', 'desc'),
+                limit(ADMIN_DASHBOARD_LIMIT)
+            ));
             const nextLogs = snapshot.docs.map((docSnap) => normalizeActivityLog(docSnap));
             nextLogs.sort((left, right) => right.resolvedMs - left.resolvedMs);
             setLogs(nextLogs);
@@ -133,7 +314,9 @@ export function Dashboard({
         setOrderRequestsLoading(true);
         setOrderRequestsError(false);
         try {
-            const nextRequests = await orderRequestService.listRecentOrderRequests({ limit: 5 });
+            const nextRequests = await orderRequestService.listRecentOrderRequests({
+                limit: ADMIN_DASHBOARD_LIMIT
+            });
             setRecentOrderRequests(nextRequests);
         } catch (error) {
             console.error('Failed to fetch recent order requests:', error);
@@ -149,333 +332,356 @@ export function Dashboard({
     }, [fetchRecentOrderRequests]);
 
     const retailerLineSummaries = getRetailerLineSummaries(retailer);
-    const retailerName = retailer?.name || 'Er retailerprofil';
 
     if (isRetailer) {
         return (
-            <div className="mx-auto flex max-w-6xl flex-col gap-8 animate-slide-in">
-                <section className="w-full rounded-2xl border border-panel-border bg-panel-bg p-8 shadow-lg">
-                    <div>
-                        <div className="max-w-3xl">
-                            <span className="inline-flex rounded-full border border-primary/30 bg-primary/10 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.2em] text-primary">
-                                Retailer Workspace
-                            </span>
-                            <h2 className="mt-4 text-4xl font-semibold tracking-tight text-text-primary">
-                                Välkommen, {retailerName}
-                            </h2>
-                            <p className="mt-3 max-w-2xl text-sm leading-relaxed text-text-secondary">
-                                Här kan ni se och skapa offerter från de produktlinjer och sortiment ni har tillgång till hos BRIXX.
-                            </p>
-                        </div>
-                    </div>
+            <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 animate-slide-in">
+                <PageHeader
+                    eyebrow="Återförsäljarportal"
+                    title={`Välkommen, ${retailer?.name || 'er retailerprofil'}`}
+                    description="Skapa offerter från de produktlinjer och rabatter som ingår i ert avtal."
+                />
 
-                    <div className="mt-6 flex flex-wrap gap-3">
-                        {canStartQuote && (
-                            <button
-                                type="button"
-                                onClick={onStartQuote}
-                                className="rounded-md bg-primary px-6 py-3 text-sm font-bold text-white shadow-lg shadow-primary/20 transition-colors hover:bg-primary-hover"
-                            >
-                                Starta Ny Offert
-                            </button>
-                        )}
-                        {canAccessQuoteHistory && onOpenHistory && (
-                            <button
-                                type="button"
-                                onClick={onOpenHistory}
-                                className="rounded-md border border-panel-border bg-black/10 px-6 py-3 text-sm font-medium text-text-primary transition-colors hover:bg-white/5"
-                            >
-                                Mina Offerter
-                            </button>
-                        )}
-                        {onOpenRetailerOrderHistory && (
-                            <button
-                                type="button"
-                                onClick={onOpenRetailerOrderHistory}
-                                className="rounded-md border border-panel-border bg-black/10 px-6 py-3 text-sm font-medium text-text-primary transition-colors hover:bg-white/5"
-                            >
-                                Skickade Ordrar
-                            </button>
-                        )}
-                        {onOpenRetailerDocuments && (
-                            <button
-                                type="button"
-                                onClick={onOpenRetailerDocuments}
-                                className="rounded-md border border-panel-border bg-black/10 px-6 py-3 text-sm font-medium text-text-primary transition-colors hover:bg-white/5"
-                            >
-                                Produktdokument
-                            </button>
-                        )}
-                    </div>
-                </section>
+                <QuoteDraftPanel
+                    onContinueQuote={onContinueQuote}
+                    onStartQuote={canStartQuote ? onStartQuote : undefined}
+                    quoteDraftSummary={quoteDraftSummary}
+                />
 
-                <section className="w-full rounded-2xl border border-panel-border bg-panel-bg p-8 shadow-sm">
-                    <div className="flex items-center justify-between gap-4 border-b border-panel-border pb-4">
-                        <div>
-                            <h3 className="m-0 text-xl font-semibold text-text-primary">Aktiva produktlinjer och rabatter</h3>
-                            <p className="mt-1 text-sm text-text-secondary">
-                                Rabatten appliceras som standard när du väljer en av era aktiva linjer i offertflödet.
-                            </p>
-                        </div>
-                    </div>
-
+                <Panel
+                    title="Aktiva produktlinjer och rabatter"
+                    description="Rabatten används som utgångspunkt när ni väljer produktlinje i offertflödet."
+                >
                     {retailerLineSummaries.length === 0 ? (
-                        <div className="mt-6 rounded-xl border border-warning/30 bg-warning/10 p-4 text-sm text-text-secondary">
-                            Inga produktlinjer är aktiva för det här retailer-kontot ännu. Kontakta Brixx om ni behöver
-                            utöka ert sortiment.
-                        </div>
+                        <p className="m-5 rounded-panel border border-warning/35 bg-warning-bg p-4 text-sm text-warning-text sm:m-6">
+                            Inga produktlinjer är aktiva för kontot ännu. Kontakta Brixx om ni behöver utöka sortimentet.
+                        </p>
                     ) : (
-                        <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+                        <div className="grid grid-cols-1 gap-4 p-5 sm:p-6 md:grid-cols-2 xl:grid-cols-3">
                             {retailerLineSummaries.map((line) => (
-                                <div
+                                <article
                                     key={line.id}
-                                    className="rounded-xl border border-panel-border bg-black/10 p-5"
+                                    className="rounded-panel border border-border bg-surface p-5"
                                 >
                                     <div className="flex items-start justify-between gap-3">
-                                        <div>
-                                            <h4 className="m-0 text-lg font-semibold text-text-primary">{line.name}</h4>
-                                            <p className="mt-2 text-sm text-text-secondary">
-                                                Standardrabatt för nya offerter inom denna produktlinje.
-                                            </p>
-                                        </div>
-                                        <span className="rounded-full border border-primary/30 bg-primary/10 px-3 py-1 text-xs font-bold text-primary">
-                                            {line.discountPct}% rabatt
-                                        </span>
+                                        <h2 className="m-0 text-base font-semibold text-text">{line.name}</h2>
+                                        <StatusChip tone="success">{line.discountPct}% rabatt</StatusChip>
                                     </div>
-                                </div>
+                                    <p className="mb-0 mt-3 text-sm text-text-muted">
+                                        Standardrabatt för nya offerter inom produktlinjen.
+                                    </p>
+                                </article>
                             ))}
                         </div>
                     )}
-                </section>
+                </Panel>
+            </div>
+        );
+    }
+
+    if (canAccessSketch && !canStartQuote) {
+        return (
+            <div className="mx-auto flex w-full max-w-3xl flex-col gap-6 animate-slide-in">
+                <PageHeader
+                    eyebrow="Din arbetsyta"
+                    title="Skissverktyg"
+                    description="Rita uteserveringar och beräkna lämpliga ClickitUp-sektioner."
+                />
+                <Panel>
+                    <div className="p-6">
+                        <h2 className="m-0 text-xl font-semibold text-text">Fortsätt till ritbordet</h2>
+                        <p className="mb-5 mt-2 text-sm text-text-muted">
+                            Skapa en ny skiss eller fortsätt på det senast sparade utkastet.
+                        </p>
+                        <Button onClick={onOpenSketch} size="lg" variant="primary">
+                            Öppna skissverktyget
+                        </Button>
+                    </div>
+                </Panel>
+            </div>
+        );
+    }
+
+    if (!canStartQuote && !canAccessSketch) {
+        return (
+            <div className="mx-auto w-full max-w-3xl animate-slide-in">
+                <Panel title="Ingen arbetsyta tilldelad">
+                    <p className="m-0 p-6 text-sm text-text-muted">
+                        Kontakta administratören för att få åtkomst till en arbetsyta.
+                    </p>
+                </Panel>
+            </div>
+        );
+    }
+
+    if (canViewEverything) {
+        const hasResumableDraft = Boolean(quoteDraftSummary && onContinueQuote);
+        const launcherItems: DashboardLauncherCardProps[] = [
+            {
+                description: hasResumableDraft && quoteDraftSummary
+                    ? `${quoteDraftSummary.customerLabel} · ${quoteDraftSummary.stepLabel}`
+                    : 'Starta ett nytt offertflöde.',
+                icon: IconFileText,
+                label: hasResumableDraft ? 'Fortsätt offert' : 'Skapa ny offert',
+                onClick: hasResumableDraft ? onContinueQuote : onStartQuote
+            },
+            {
+                description: 'Samla kunder, affärer och erbjudanden.',
+                icon: IconTargetArrow,
+                label: 'Sälj-CRM',
+                onClick: onOpenCrm
+            },
+            {
+                description: 'Uppdatera lagersaldon och historik.',
+                icon: IconPackage,
+                label: 'Lagersaldo',
+                onClick: onOpenInventory
+            },
+            {
+                description: 'Skissa snabbt och beräkna optimalt.',
+                icon: IconPencil,
+                label: 'Rita uteservering',
+                onClick: onOpenSketch
+            },
+            {
+                description: 'Se skapade offerter och exporter.',
+                icon: IconHistory,
+                label: 'Aktivitetslogg',
+                onClick: onOpenActivity
+            },
+            {
+                description: 'Planera och följ upp projekt.',
+                icon: IconClipboardList,
+                label: 'Planering',
+                onClick: onOpenPlanner
+            }
+        ];
+
+        return (
+            <div className="mx-auto flex w-full max-w-7xl flex-col gap-7 pb-4 animate-slide-in sm:gap-8">
+                <header className="px-2 pt-3 text-center sm:pt-5">
+                    <h1 className="m-0 text-3xl font-semibold tracking-tight text-text sm:text-4xl">
+                        Välkommen till Brixx portal
+                    </h1>
+                </header>
+
+                <nav
+                    aria-label="Administrationsverktyg"
+                    className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3"
+                >
+                    {launcherItems.map((item) => (
+                        <DashboardLauncherCard key={item.label} {...item} />
+                    ))}
+                </nav>
+
+                <div className="grid grid-cols-1 border-t border-border lg:grid-cols-2">
+                    <section
+                        aria-busy={orderRequestsLoading}
+                        aria-labelledby="recent-order-requests-title"
+                        className="min-w-0 py-5 lg:pr-8"
+                    >
+                        <header className="mb-2 flex min-h-10 items-center justify-between gap-4 px-1">
+                            <h2
+                                id="recent-order-requests-title"
+                                className="m-0 text-lg font-semibold text-text"
+                            >
+                                Senaste orderförfrågningar
+                            </h2>
+                            {onOpenRetailerOrders && (
+                                <Button onClick={onOpenRetailerOrders} size="sm" variant="ghost">
+                                    Visa alla
+                                </Button>
+                            )}
+                        </header>
+
+                        {orderRequestsLoading ? (
+                            <p role="status" className="m-0 py-8 text-center text-sm text-text-muted">
+                                Laddar orderförfrågningar…
+                            </p>
+                        ) : orderRequestsError ? (
+                            <div
+                                role="alert"
+                                className="flex flex-wrap items-center justify-between gap-3 py-5 text-sm text-danger-text"
+                            >
+                                <span>Kunde inte ladda orderförfrågningar just nu.</span>
+                                <Button
+                                    onClick={() => {
+                                        void fetchRecentOrderRequests();
+                                    }}
+                                    size="sm"
+                                    variant="ghost"
+                                >
+                                    Försök igen
+                                </Button>
+                            </div>
+                        ) : recentOrderRequests.length === 0 ? (
+                            <p className="m-0 py-8 text-center text-sm text-text-muted">
+                                Inga orderförfrågningar har registrerats ännu.
+                            </p>
+                        ) : (
+                            <ul className="m-0 list-none p-0">
+                                {recentOrderRequests.slice(0, ADMIN_DASHBOARD_LIMIT).map((request) => {
+                                    const createdAt = formatFeedDateTime(request.createdAtMs);
+                                    const customerLabel = request.company
+                                        || request.customerName
+                                        || 'Okänd kund';
+
+                                    return (
+                                        <li
+                                            key={request.id}
+                                            className="grid min-w-0 grid-cols-1 gap-2 border-b border-border px-1 py-4 last:border-b-0 sm:grid-cols-[minmax(0,1fr)_auto_auto] sm:items-center sm:gap-5"
+                                        >
+                                            <div className="min-w-0">
+                                                <div className="flex flex-wrap items-center gap-2">
+                                                    <span className="text-sm font-semibold text-text">
+                                                        {request.quoteNumber}
+                                                    </span>
+                                                    <StatusChip tone={getOrderRequestStatusTone(request.status)}>
+                                                        {getOrderRequestStatusLabel(request.status)}
+                                                    </StatusChip>
+                                                </div>
+                                                <p className="mb-0 mt-1 break-words text-xs text-text-muted">
+                                                    {request.retailerName} · {customerLabel}
+                                                </p>
+                                            </div>
+                                            <span
+                                                className={[
+                                                    'whitespace-nowrap text-sm font-semibold tabular-nums',
+                                                    request.totalSek < 0 ? 'text-danger-text' : 'text-text'
+                                                ].join(' ')}
+                                            >
+                                                {formatCurrencySek(request.totalSek)}
+                                            </span>
+                                            {createdAt ? (
+                                                <time
+                                                    className="whitespace-nowrap text-xs text-text-muted"
+                                                    dateTime={createdAt.dateTime}
+                                                >
+                                                    {createdAt.label}
+                                                </time>
+                                            ) : (
+                                                <span className="whitespace-nowrap text-xs text-text-muted">
+                                                    Okänd tid
+                                                </span>
+                                            )}
+                                        </li>
+                                    );
+                                })}
+                            </ul>
+                        )}
+                    </section>
+
+                    <section
+                        aria-busy={logsLoading}
+                        aria-labelledby="recent-activity-title"
+                        className="min-w-0 border-t border-border py-5 lg:border-l lg:border-t-0 lg:pl-8"
+                    >
+                        <header className="mb-2 flex min-h-10 items-center justify-between gap-4 px-1">
+                            <h2
+                                id="recent-activity-title"
+                                className="m-0 text-lg font-semibold text-text"
+                            >
+                                Senaste aktivitet
+                            </h2>
+                            {onOpenActivity && (
+                                <Button onClick={onOpenActivity} size="sm" variant="ghost">
+                                    Visa alla
+                                </Button>
+                            )}
+                        </header>
+
+                        {logsLoading ? (
+                            <p role="status" className="m-0 py-8 text-center text-sm text-text-muted">
+                                Laddar aktivitet…
+                            </p>
+                        ) : logsError ? (
+                            <div
+                                role="alert"
+                                className="flex flex-wrap items-center justify-between gap-3 py-5 text-sm text-danger-text"
+                            >
+                                <span>Kunde inte ladda senaste aktivitet just nu.</span>
+                                <Button
+                                    onClick={() => {
+                                        void fetchLogs();
+                                    }}
+                                    size="sm"
+                                    variant="ghost"
+                                >
+                                    Försök igen
+                                </Button>
+                            </div>
+                        ) : logs.length === 0 ? (
+                            <p className="m-0 py-8 text-center text-sm text-text-muted">
+                                Inga loggade händelser ännu. Nya sparade offerter och exporter visas här.
+                            </p>
+                        ) : (
+                            <ul className="m-0 list-none p-0">
+                                {logs.slice(0, ADMIN_DASHBOARD_LIMIT).map((entry, index) => {
+                                    const occurredAt = formatFeedDateTime(entry.resolvedMs);
+                                    const { label } = getActivityLogVisual(entry);
+                                    const metadataSummary = formatActivityMetadata(entry.metadata);
+                                    const targetIdLabel = entry.metadata?.reference
+                                        || (entry.targetId && entry.targetId !== '-' ? entry.targetId : '');
+                                    const targetLabel = targetIdLabel || entry.targetType;
+                                    const details = [
+                                        entry.user || '-',
+                                        targetLabel || '',
+                                        entry.details || '',
+                                        metadataSummary || ''
+                                    ].filter(Boolean).join(' · ');
+
+                                    return (
+                                        <li
+                                            key={entry.id || `${entry.resolvedMs}-${index}`}
+                                            className="grid min-w-0 grid-cols-[auto_minmax(0,1fr)] gap-3 border-b border-border px-1 py-4 last:border-b-0 sm:grid-cols-[auto_minmax(0,1fr)_auto]"
+                                        >
+                                            <span
+                                                aria-hidden="true"
+                                                className="mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full bg-action"
+                                            />
+                                            <div className="min-w-0">
+                                                <h3 className="m-0 text-sm font-semibold text-text">{label}</h3>
+                                                <p className="mb-0 mt-1 line-clamp-2 break-words text-xs leading-5 text-text-muted">
+                                                    {details}
+                                                </p>
+                                            </div>
+                                            {occurredAt ? (
+                                                <time
+                                                    className="col-start-2 whitespace-nowrap text-xs text-text-muted sm:col-start-auto"
+                                                    dateTime={occurredAt.dateTime}
+                                                >
+                                                    {occurredAt.label}
+                                                </time>
+                                            ) : (
+                                                <span className="col-start-2 whitespace-nowrap text-xs text-text-muted sm:col-start-auto">
+                                                    Okänd tid
+                                                </span>
+                                            )}
+                                        </li>
+                                    );
+                                })}
+                            </ul>
+                        )}
+                    </section>
+                </div>
             </div>
         );
     }
 
     return (
-        <div className="flex flex-col items-center animate-slide-in">
-            <h2 className="text-center mb-12 text-4xl font-semibold tracking-tight text-text-primary">
-                Välkommen till Brixx portal
-            </h2>
+        <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 animate-slide-in">
+            <PageHeader
+                eyebrow="Din arbetsöversikt"
+                title="Välkommen till Brixx portal"
+                description="Fortsätt med det viktigaste arbetet och följ de senaste händelserna."
+            />
 
-            <div className="flex gap-8 justify-center flex-wrap w-full max-w-5xl">
-                {canStartQuote && (
-                    <button
-                        type="button"
-                        onClick={onStartQuote}
-                        className="flex-1 min-w-[300px] max-w-[400px] bg-panel-bg border border-panel-border rounded-xl p-12 cursor-pointer text-center transition-all hover:-translate-y-1 hover:shadow-lg hover:border-primary group"
-                    >
-                        <div className="text-5xl mb-4 group-hover:scale-110 transition-transform" aria-hidden="true">📄</div>
-                        <h3 className="text-2xl font-semibold text-text-primary mb-2">Skapa Ny Offert</h3>
-                        <p className="text-text-secondary leading-relaxed m-0">
-                            Starta ett nytt offertflöde för kund. Konfigurera produkter, priser och generera PDF.
-                        </p>
-                    </button>
-                )}
-
-                {canViewEverything && onOpenCrm && (
-                    <button
-                        type="button"
-                        onClick={onOpenCrm}
-                        className="flex-1 min-w-[300px] max-w-[400px] bg-panel-bg border border-panel-border rounded-xl p-12 cursor-pointer text-center transition-all hover:-translate-y-1 hover:shadow-lg hover:border-primary group"
-                    >
-                        <div className="text-5xl mb-4 group-hover:scale-110 transition-transform" aria-hidden="true">◎</div>
-                        <h3 className="text-2xl font-semibold text-text-primary mb-2">Sälj-CRM</h3>
-                        <p className="text-text-secondary leading-relaxed m-0">
-                            Samla kunder, affärer, offerter och nästa uppföljning i en gemensam pipeline.
-                        </p>
-                    </button>
-                )}
-
-                {canViewEverything && (
-                    <button
-                        type="button"
-                        onClick={onOpenInventory}
-                        className="flex-1 min-w-[250px] max-w-[350px] bg-panel-bg border border-panel-border rounded-xl p-12 cursor-pointer text-center transition-all hover:-translate-y-1 hover:shadow-lg hover:border-primary group"
-                    >
-                        <div className="text-5xl mb-4 group-hover:scale-110 transition-transform" aria-hidden="true">📦</div>
-                        <h3 className="text-2xl font-semibold text-text-primary mb-2">Hantera Lagersaldo</h3>
-                        <p className="text-text-secondary leading-relaxed m-0">
-                            Uppdatera lagersaldon för BaHaMa och ClickitUp. Se loggar och historik.
-                        </p>
-                    </button>
-                )}
-
-                {canAccessSketch && (
-                    <button
-                        type="button"
-                        onClick={onOpenSketch}
-                        className="flex-1 min-w-[250px] max-w-[350px] bg-panel-bg border border-panel-border rounded-xl p-12 cursor-pointer text-center transition-all hover:-translate-y-1 hover:shadow-lg hover:border-primary group"
-                    >
-                        <div className="text-5xl mb-4 group-hover:scale-110 transition-transform" aria-hidden="true">✏️</div>
-                        <h3 className="text-2xl font-semibold text-text-primary mb-2">Rita Uteservering</h3>
-                        <p className="text-text-secondary leading-relaxed m-0">
-                            Skissa snabbt en rektangel för att automatiskt beräkna optimala ClickitUp-sektioner.
-                        </p>
-                    </button>
-                )}
-
-                {canViewEverything && onOpenActivity && (
-                    <button
-                        type="button"
-                        onClick={onOpenActivity}
-                        className="flex-1 min-w-[250px] max-w-[350px] bg-panel-bg border border-panel-border rounded-xl p-12 cursor-pointer text-center transition-all hover:-translate-y-1 hover:shadow-lg hover:border-primary group"
-                    >
-                        <div className="text-5xl mb-4 group-hover:scale-110 transition-transform" aria-hidden="true">🕘</div>
-                        <h3 className="text-2xl font-semibold text-text-primary mb-2">Aktivitetslog</h3>
-                        <p className="text-text-secondary leading-relaxed m-0">
-                            Se vem som skapade offerter, exporterade filer och använde ritverktyget.
-                        </p>
-                    </button>
-                )}
-
-                {canViewEverything && onOpenPlanner && (
-                    <button
-                        type="button"
-                        onClick={onOpenPlanner}
-                        className="flex-1 min-w-[250px] max-w-[350px] bg-panel-bg border border-panel-border rounded-xl p-12 cursor-pointer text-center transition-all hover:-translate-y-1 hover:shadow-lg hover:border-primary group"
-                    >
-                        <div className="text-5xl mb-4 group-hover:scale-110 transition-transform" aria-hidden="true">📋</div>
-                        <h3 className="text-2xl font-semibold text-text-primary mb-2">Projektplanerare</h3>
-                        <p className="text-text-secondary leading-relaxed m-0">
-                            Planera och följ upp projekt. Lägg till, checka av och håll koll på framsteg.
-                        </p>
-                    </button>
-                )}
-
-                {canViewEverything && onOpenRetailers && (
-                    <button
-                        type="button"
-                        onClick={onOpenRetailers}
-                        className="flex-1 min-w-[250px] max-w-[350px] bg-panel-bg border border-panel-border rounded-xl p-12 cursor-pointer text-center transition-all hover:-translate-y-1 hover:shadow-lg hover:border-primary group"
-                    >
-                        <div className="text-5xl mb-4 group-hover:scale-110 transition-transform" aria-hidden="true">🏪</div>
-                        <h3 className="text-2xl font-semibold text-text-primary mb-2">Återförsäljare</h3>
-                        <p className="text-text-secondary leading-relaxed m-0">
-                            Hantera återförsäljare, produktlinjer och rabatter.
-                        </p>
-                    </button>
-                )}
-            </div>
-
-            {!canStartQuote && !canAccessSketch && (
-                <div className="mt-8 w-full max-w-3xl bg-panel-bg border border-panel-border rounded-xl p-8 text-center">
-                    <p className="m-0 text-text-secondary">
-                        Ditt konto har för närvarande ingen tilldelad arbetsyta. Kontakta administratör.
-                    </p>
-                </div>
-            )}
-
-            {canViewEverything && (
-                <div className="mt-16 w-full max-w-[980px]">
-                    <div className="mb-6 flex items-center justify-between gap-4 border-b border-panel-border pb-4">
-                        <div>
-                            <h3 className="m-0 text-xl font-semibold text-text-primary">Inkomna orderförfrågningar</h3>
-                            <p className="mt-1 text-sm text-text-secondary">
-                                Senaste retailerförfrågningarna som väntar på hantering i BRIXX.
-                            </p>
-                        </div>
-                        {onOpenRetailerOrders && (
-                            <button
-                                type="button"
-                                onClick={onOpenRetailerOrders}
-                                className="rounded-md border border-panel-border bg-panel-bg px-4 py-2 text-sm font-medium text-text-primary transition-colors hover:bg-panel-border"
-                            >
-                                Öppna inbox
-                            </button>
-                        )}
-                    </div>
-                    <div className="flex flex-col gap-3">
-                        {orderRequestsLoading ? (
-                            <p className="text-text-secondary text-center italic">Laddar orderförfrågningar...</p>
-                        ) : orderRequestsError ? (
-                            <p className="text-text-secondary text-center italic">Kunde inte ladda orderförfrågningar just nu.</p>
-                        ) : recentOrderRequests.length === 0 ? (
-                            <p className="text-text-secondary text-center italic">Inga orderförfrågningar har registrerats ännu.</p>
-                        ) : (
-                            recentOrderRequests.map((request) => (
-                                <button
-                                    key={request.id}
-                                    type="button"
-                                    onClick={() => onOpenRetailerOrders?.()}
-                                    className="grid w-full grid-cols-1 gap-3 rounded-xl border border-panel-border bg-panel-bg/70 p-4 text-left transition-colors hover:bg-white/5 lg:grid-cols-[minmax(0,1.6fr)_auto_auto]"
-                                >
-                                    <div className="min-w-0">
-                                        <div className="flex flex-wrap items-center gap-2">
-                                            <span className="text-sm font-semibold text-text-primary">{request.quoteNumber}</span>
-                                            <span className={`rounded-full px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide ${getOrderRequestStatusClasses(request.status)}`}>
-                                                {getOrderRequestStatusLabel(request.status)}
-                                            </span>
-                                        </div>
-                                        <div className="mt-2 text-sm text-text-secondary">
-                                            {request.retailerName} · {request.company || request.customerName || 'Okänd kund'}
-                                        </div>
-                                        <div className="mt-1 text-xs text-text-secondary">
-                                            {request.reference ? `Ref: ${request.reference}` : 'Ingen referens'} · v{request.quoteVersion}
-                                        </div>
-                                    </div>
-                                    <div className="text-sm font-semibold text-text-primary lg:text-right">
-                                        {formatCurrencySek(request.totalSek)}
-                                    </div>
-                                    <div className="text-xs text-text-secondary lg:text-right">
-                                        {formatOrderRequestDateTime(request.createdAtMs)}
-                                    </div>
-                                </button>
-                            ))
-                        )}
-                    </div>
-                </div>
-            )}
-
-            {canViewEverything && (
-                <div className="mt-16 w-full max-w-[800px]">
-                    <div className="flex justify-between items-center gap-4 border-b border-panel-border pb-4 mb-6">
-                        <h3 className="text-xl font-semibold text-text-primary m-0">Senaste Händelser</h3>
-                    </div>
-                    <div className="flex flex-col gap-3">
-                        {logsLoading ? (
-                            <p className="text-text-secondary text-center italic">Laddar loggar...</p>
-                        ) : logsError ? (
-                            <p className="text-text-secondary text-center italic">Kunde inte ladda senaste händelser just nu.</p>
-                        ) : logs.length === 0 ? (
-                            <p className="text-text-secondary text-center italic">Inga loggade händelser ännu. Nya sparade offerter och exporter visas här.</p>
-                        ) : (
-                            logs.slice(0, 10).map((entry, index) => {
-                                const date = new Date(entry.resolvedMs || Date.now());
-                                const { icon, color, label } = getActivityLogVisual(entry);
-                                const metadataSummary = formatActivityMetadata(entry.metadata);
-                                const targetIdLabel = entry.metadata?.reference || (entry.targetId && entry.targetId !== '-' ? entry.targetId : '');
-                                const targetLabel = targetIdLabel || entry.targetType;
-
-                                return (
-                                    <div
-                                        key={entry.id || `${entry.resolvedMs}-${index}`}
-                                        className="rounded-lg p-4 flex items-start gap-4"
-                                        style={{ background: 'rgba(255,255,255,0.03)', borderLeft: `3px solid ${color}` }}
-                                    >
-                                        <div className="text-xl leading-none">{icon}</div>
-                                        <div className="flex-1 min-w-0">
-                                            <div className="flex justify-between mb-1">
-                                                <span className="font-semibold text-text-primary text-sm">
-                                                    {label}
-                                                </span>
-                                                <span className="text-xs text-text-secondary whitespace-nowrap">
-                                                    {date.toLocaleDateString('sv-SE', { month: 'short', day: 'numeric' })}{' '}
-                                                    {date.toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit' })}
-                                                </span>
-                                            </div>
-                                            <div className="text-sm text-text-primary">
-                                                {entry.user || '-'}{targetLabel ? ` · ${targetLabel}` : ''}
-                                            </div>
-                                            <div className="text-xs text-text-secondary">
-                                                {entry.details || '-'}{metadataSummary ? ` · ${metadataSummary}` : ''}
-                                            </div>
-                                        </div>
-                                    </div>
-                                );
-                            })
-                        )}
-                    </div>
-                </div>
+            {canStartQuote && (
+                <QuoteDraftPanel
+                    onContinueQuote={onContinueQuote}
+                    onStartQuote={onStartQuote}
+                    quoteDraftSummary={quoteDraftSummary}
+                />
             )}
         </div>
     );

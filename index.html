@@ -7,11 +7,16 @@
     <title>Brixx portal</title>
 
     <script>
-        document.documentElement.dataset.theme = localStorage.getItem('quote-generator-theme') || 'portal-dark';
+        try {
+            const storedTheme = localStorage.getItem('quote-generator-theme');
+            document.documentElement.dataset.theme = storedTheme === 'brixx-light' ? 'brixx-light' : 'portal-dark';
+        } catch {
+            document.documentElement.dataset.theme = 'portal-dark';
+        }
     </script>
 </head>
 
-<body class="select-none">
+<body>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
 </body>

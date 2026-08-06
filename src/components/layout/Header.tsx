@@ -1,41 +1,108 @@
-import React, { Suspense, lazy, useState } from 'react';
+import React, { Suspense, lazy, useCallback, useEffect, useRef, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useQuote } from '../../store/QuoteContext';
 import { useAuth } from '../../store/AuthContext';
 import {
+    APP_PATHS,
     APP_ROUTE_IDS,
-    getAppRouteIdFromPath,
     getQuoteRouteStepFromPath,
-    getQuoteStepNumber
+    hasQuoteStartDraftData
 } from '../../navigation/routes';
 import { useAppNavigation } from '../../navigation/useAppNavigation';
-import ThemeToggle from '../ThemeToggle';
+import { useQuoteDraftActions } from '../../navigation/useQuoteDraftActions';
+import { confirmAction } from '../../services/notificationService';
+import { AppTopBar } from './AppTopBar';
+import { QuoteContextBar } from './QuoteContextBar';
+import { RoleNavigation } from './RoleNavigation';
 
 const AdminSettingsModal = lazy(() => import('../features/AdminSettingsModal').then((module) => ({
     default: module.AdminSettingsModal
 })));
 
+function getAccessLabel(accessLevel: string): string {
+    switch (accessLevel) {
+        case 'full':
+            return 'Administration';
+        case 'retailer':
+            return 'Återförsäljarportal';
+        case 'sketch-only':
+            return 'Skissverktyg';
+        case 'quote-only':
+            return 'Offertarbete';
+        default:
+            return 'Arbetsyta';
+    }
+}
+
+function getSketchHref(
+    quoteStep: ReturnType<typeof getQuoteRouteStepFromPath>,
+    currentSearch: string
+): string {
+    const params = new URLSearchParams();
+    params.set('return', quoteStep === 'summary' ? 'quote-summary' : quoteStep ? 'quote-configuration' : 'dashboard');
+
+    if (quoteStep) {
+        const currentParams = new URLSearchParams(currentSearch);
+        const crmDealId = currentParams.get('crmDealId')?.trim();
+        if (crmDealId) {
+            params.set('crmDealId', crmDealId);
+            const quoteOwnerUid = currentParams.get('quoteOwnerUid')?.trim();
+            if (quoteOwnerUid) {
+                params.set('quoteOwnerUid', quoteOwnerUid);
+            }
+        }
+    }
+
+    return `${APP_PATHS[APP_ROUTE_IDS.sketch]}?${params.toString()}`;
+}
+
 export function Header() {
-    const { dispatch } = useQuote();
-    const { user, logout, canViewEverything, canAccessQuoteHistory, isRetailer } = useAuth();
+    const { state, dispatch } = useQuote();
+    const {
+        accessLevel,
+        user,
+        logout,
+        canStartQuote,
+        canViewEverything,
+        canAccessSketch,
+        canAccessQuoteHistory,
+        isRetailer
+    } = useAuth();
     const [settingsOpen, setSettingsOpen] = useState(false);
+    const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+    const menuButtonRef = useRef<HTMLButtonElement | null>(null);
     const location = useLocation();
     const navigation = useAppNavigation();
-    const routeId = getAppRouteIdFromPath(location.pathname);
+    const { startQuote } = useQuoteDraftActions();
     const quoteStep = getQuoteRouteStepFromPath(location.pathname);
-    const showQuoteStepper = quoteStep !== null;
-    const currentStepNumber = quoteStep ? getQuoteStepNumber(quoteStep) : null;
-    const isCrmRoute = Boolean(routeId?.startsWith('crm-'));
 
-    const steps = [
-        { id: 'product-lines', label: '1. Offertinnehåll' },
-        { id: 'configuration', label: '2. Konfiguration' },
-        { id: 'pricing', label: '3. Priser & Rabatter' },
-        { id: 'summary', label: '4. Offertsammanställning' }
-    ] as const;
+    useEffect(() => {
+        setMobileMenuOpen(false);
+    }, [location.pathname, location.search]);
 
-    const resetToStart = (): void => {
-        dispatch({ type: 'RESET_STATE' });
+    const closeMobileMenu = useCallback(() => {
+        setMobileMenuOpen(false);
+        window.requestAnimationFrame(() => {
+            menuButtonRef.current?.focus();
+        });
+    }, []);
+
+    const resetQuote = async (): Promise<void> => {
+        if (hasQuoteStartDraftData(state, { isRetailer })) {
+            const confirmed = await confirmAction({
+                title: 'Rensa offertutkast?',
+                message: 'Offertens kund-, produkt- och prisuppgifter rensas. Lagerdata och sparade skisser påverkas inte.',
+                confirmText: 'Rensa offert',
+                cancelText: 'Behåll utkast',
+                tone: 'danger'
+            });
+
+            if (!confirmed) {
+                return;
+            }
+        }
+
+        dispatch({ type: 'RESET_QUOTE_DRAFT' });
         navigation.goToDashboard();
     };
 
@@ -45,171 +112,47 @@ export function Header() {
     };
 
     return (
-        <header className="mb-8">
-            <div className="flex items-center justify-between gap-4 flex-wrap mb-6">
-                <div className="flex items-center gap-3">
-                    {routeId !== APP_ROUTE_IDS.dashboard && (
-                        <div className="flex items-center gap-2">
-                            <button
-                                type="button"
-                                onClick={() => navigation.goToDashboard()}
-                                className="bg-panel-bg border border-panel-border text-text-primary text-sm font-medium px-4 py-2 rounded-lg cursor-pointer hover:bg-panel-border transition-colors shadow-sm flex items-center gap-2"
-                                title="Tillbaka till startskärmen"
-                            >
-                                <span aria-hidden="true">🏠</span>
-                                <span>Start</span>
-                            </button>
-
-                            {showQuoteStepper && (
-                                <button
-                                    type="button"
-                                    onClick={resetToStart}
-                                    className="bg-danger border border-danger text-white text-sm font-medium px-4 py-2 rounded-lg cursor-pointer hover:bg-red-600 hover:border-red-600 transition-all shadow-sm flex items-center gap-2 group"
-                                    title="Varning: Detta kommer att rensa din nuvarande offert!"
-                                >
-                                    <span aria-hidden="true">🗑️</span>
-                                    <span>Rensa offert</span>
-                                </button>
-                            )}
-                        </div>
-                    )}
-                    <h1 className="text-2xl font-semibold m-0">Brixx portal</h1>
-                </div>
-
-                <div className="flex items-center gap-3 flex-wrap">
-                    {canAccessQuoteHistory && (
-                        <button
-                            type="button"
-                            onClick={() => navigation.goToHistory()}
-                            className={`text-text-primary no-underline font-medium text-sm px-3 py-1.5 rounded-md border transition-colors cursor-pointer ${
-                                routeId === APP_ROUTE_IDS.quotes
-                                    ? 'bg-panel-border border-panel-border'
-                                    : 'bg-panel-bg border-panel-border hover:bg-panel-border'
-                            }`}
-                        >
-                            Mina Offerter
-                        </button>
-                    )}
-
-                    {isRetailer && (
-                        <button
-                            type="button"
-                            onClick={() => navigation.goToRetailerOrderHistory()}
-                            className={`text-text-primary no-underline font-medium text-sm px-3 py-1.5 rounded-md border transition-colors cursor-pointer ${
-                                routeId === APP_ROUTE_IDS.retailerOrderHistory
-                                    ? 'bg-panel-border border-panel-border'
-                                    : 'bg-panel-bg border-panel-border hover:bg-panel-border'
-                            }`}
-                        >
-                            Mina Ordrar
-                        </button>
-                    )}
-
-                    {canViewEverything && (
-                        <button
-                            type="button"
-                            onClick={() => navigation.goToCrm()}
-                            className={`text-text-primary no-underline font-medium text-sm px-3 py-1.5 rounded-md border transition-colors cursor-pointer ${
-                                isCrmRoute
-                                    ? 'bg-panel-border border-panel-border'
-                                    : 'bg-panel-bg border-panel-border hover:bg-panel-border'
-                            }`}
-                        >
-                            CRM
-                        </button>
-                    )}
-
-                    {canViewEverything && (
-                        <button
-                            type="button"
-                            onClick={() => navigation.goToRetailerOrders()}
-                            className={`text-text-primary no-underline font-medium text-sm px-3 py-1.5 rounded-md border transition-colors cursor-pointer ${
-                                routeId === APP_ROUTE_IDS.retailerOrders
-                                    ? 'bg-panel-border border-panel-border'
-                                    : 'bg-panel-bg border-panel-border hover:bg-panel-border'
-                            }`}
-                        >
-                            Orderförfrågningar
-                        </button>
-                    )}
-
-                    {canViewEverything && (
-                        <button
-                            type="button"
-                            onClick={() => navigation.goToActivity()}
-                            className={`text-text-primary no-underline font-medium text-sm px-3 py-1.5 rounded-md border transition-colors cursor-pointer ${
-                                routeId === APP_ROUTE_IDS.activity
-                                    ? 'bg-panel-border border-panel-border'
-                                    : 'bg-panel-bg border-panel-border hover:bg-panel-border'
-                            }`}
-                        >
-                            Aktivitetslog
-                        </button>
-                    )}
-
-                    {canViewEverything && (
-                        <button
-                            type="button"
-                            onClick={() => navigation.goToInventoryLogs()}
-                            className={`text-text-primary no-underline font-medium text-sm px-3 py-1.5 rounded-md border transition-colors cursor-pointer ${
-                                routeId === APP_ROUTE_IDS.inventoryLogs
-                                    ? 'bg-panel-border border-panel-border'
-                                    : 'bg-panel-bg border-panel-border hover:bg-panel-border'
-                            }`}
-                        >
-                            Lagerloggar
-                        </button>
-                    )}
-
-                    <div className="flex items-center gap-2 bg-panel-bg px-3 py-1.5 rounded-md border border-panel-border text-sm">
-                        <span className="text-text-secondary">Användare:</span>
-                        <span className="text-text-primary font-medium">{user?.email || '-'}</span>
-                        <button
-                            type="button"
-                            onClick={() => {
-                                void handleLogout();
-                            }}
-                            className="bg-transparent border-none text-text-secondary cursor-pointer text-xs px-2 py-1 border-l border-panel-border ml-1 hover:text-text-primary"
-                        >
-                            Logga ut
-                        </button>
-                    </div>
-                    {canViewEverything && (
-                        <button
-                            type="button"
-                            onClick={() => setSettingsOpen(true)}
-                            className="flex h-[38px] w-[38px] items-center justify-center rounded-md border border-panel-border bg-panel-bg text-text-secondary transition-colors hover:bg-panel-border hover:text-text-primary"
-                            aria-label="Öppna admininställningar"
-                            title="Admininställningar"
-                        >
-                            <span aria-hidden="true">⚙</span>
-                        </button>
-                    )}
-                    <ThemeToggle />
-                </div>
-            </div>
-
-            {showQuoteStepper && (
-                <div className="flex justify-between items-center bg-panel-bg border border-panel-border rounded-lg p-2 overflow-x-auto gap-2">
-                    {steps.map((step) => {
-                        const stepNumber = getQuoteStepNumber(step.id);
-                        const isActive = currentStepNumber === stepNumber;
-                        return (
-                            <button
-                                key={step.id}
-                                type="button"
-                                onClick={() => navigation.goToQuoteStep(step.id)}
-                                className={`flex-1 text-center py-2 px-4 rounded-md text-sm font-medium whitespace-nowrap transition-colors cursor-pointer border-none outline-none ${
-                                    isActive
-                                        ? 'bg-primary text-white'
-                                        : 'bg-transparent text-text-secondary hover:bg-panel-border hover:text-text-primary'
-                                }`}
-                            >
-                                {step.label}
-                            </button>
-                        );
-                    })}
-                </div>
+        <header className="relative mb-6 rounded-panel border border-panel-border bg-panel-bg shadow-sm">
+            <a
+                href="#main-content"
+                className="sr-only left-4 top-3 z-[60] rounded-control bg-action px-3 py-2 text-sm font-semibold text-on-action no-underline focus:absolute focus:not-sr-only"
+            >
+                Hoppa till innehållet
+            </a>
+            <AppTopBar
+                accessLabel={getAccessLabel(accessLevel)}
+                canOpenSettings={canViewEverything}
+                email={user?.email}
+                menuButtonRef={menuButtonRef}
+                menuOpen={mobileMenuOpen}
+                onLogout={() => {
+                    void handleLogout();
+                }}
+                onOpenSettings={() => setSettingsOpen(true)}
+                onToggleMenu={() => setMobileMenuOpen((open) => !open)}
+            />
+            <RoleNavigation
+                canAccessQuoteHistory={canAccessQuoteHistory}
+                canAccessSketch={canAccessSketch}
+                canStartQuote={canStartQuote}
+                canViewEverything={canViewEverything}
+                isRetailer={isRetailer}
+                mobileOpen={mobileMenuOpen}
+                onCloseMobile={closeMobileMenu}
+                onStartQuote={() => {
+                    void startQuote();
+                }}
+                sketchHref={getSketchHref(quoteStep, location.search)}
+            />
+            {quoteStep && (
+                <QuoteContextBar
+                    currentStep={quoteStep}
+                    isRetailer={isRetailer}
+                    onResetQuote={() => {
+                        void resetQuote();
+                    }}
+                    state={state}
+                />
             )}
             {settingsOpen && (
                 <Suspense fallback={null}>

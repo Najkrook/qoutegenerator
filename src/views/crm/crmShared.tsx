@@ -1,5 +1,6 @@
-import React, { useEffect, useId, useRef, useState, type FormEvent, type ReactNode } from 'react';
+import React, { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { Link, NavLink } from 'react-router-dom';
+import { Modal } from '../../components/ui/Modal';
 import { notifyError, notifySuccess } from '../../services/notificationService';
 import { crmRepository } from '../../services/crmRepository';
 import { useAuth } from '../../store/AuthContext';
@@ -368,56 +369,15 @@ export function CrmModal({
     onClose: () => void;
     children: ReactNode;
 }) {
-    const titleId = useId();
-    const descriptionId = useId();
-    const modalRef = useRef<HTMLDivElement>(null);
-
-    useEffect(() => {
-        if (!open) return undefined;
-
-        const handleKeyDown = (event: KeyboardEvent): void => {
-            if (event.key !== 'Escape') return;
-            const openDialogs = document.querySelectorAll('[role="dialog"][aria-modal="true"]');
-            if (openDialogs.item(openDialogs.length - 1) === modalRef.current) {
-                onClose();
-            }
-        };
-        window.addEventListener('keydown', handleKeyDown);
-        return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [onClose, open]);
-
-    if (!open) return null;
-
     return (
-        <div
-            ref={modalRef}
-            className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby={titleId}
-            aria-describedby={description ? descriptionId : undefined}
-            onMouseDown={(event) => {
-                if (event.currentTarget === event.target) onClose();
-            }}
+        <Modal
+            open={open}
+            onClose={onClose}
+            title={title}
+            description={description}
         >
-            <div className="max-h-[calc(100vh-2rem)] w-full max-w-2xl overflow-y-auto rounded-xl border border-panel-border bg-panel-bg shadow-2xl">
-                <div className="sticky top-0 z-10 flex items-start justify-between gap-4 border-b border-panel-border bg-panel-bg px-5 py-4 sm:px-6">
-                    <div>
-                        <h2 id={titleId} className="m-0 text-xl font-semibold text-text-primary">{title}</h2>
-                        {description ? <p id={descriptionId} className="mt-1 text-sm text-text-secondary">{description}</p> : null}
-                    </div>
-                    <button
-                        type="button"
-                        onClick={onClose}
-                        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-panel-border bg-black/10 text-lg text-text-secondary transition-colors hover:bg-white/5 hover:text-text-primary"
-                        aria-label="Stäng"
-                    >
-                        ×
-                    </button>
-                </div>
-                {children}
-            </div>
-        </div>
+            {children}
+        </Modal>
     );
 }
 
@@ -699,21 +659,12 @@ export function ActivityTimeline({
     }
 
     return (
-        <ol className="relative space-y-0 before:absolute before:bottom-4 before:left-[17px] before:top-4 before:w-px before:bg-panel-border">
+        <ol className="space-y-3">
             {activities.map((activity) => {
                 const openTask = isOpenTask(activity);
                 const overdue = isOverdueTask(activity);
                 return (
-                    <li key={activity.id} className="relative grid grid-cols-[36px_minmax(0,1fr)] gap-3 pb-5 last:pb-0">
-                        <div className={`relative z-[1] mt-1 flex h-9 w-9 items-center justify-center rounded-full border text-xs font-black ${
-                            activity.status === 'completed'
-                                ? 'border-success/40 bg-success/15 text-success'
-                                : overdue
-                                    ? 'border-danger/40 bg-danger/15 text-danger'
-                                    : 'border-primary/40 bg-panel-bg text-primary'
-                        }`}>
-                            {activity.type === 'task' ? '✓' : '•'}
-                        </div>
+                    <li key={activity.id}>
                         <article className="rounded-lg border border-panel-border bg-black/5 p-4">
                             <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                                 <div>

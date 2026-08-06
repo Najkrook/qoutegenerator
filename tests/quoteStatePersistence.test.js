@@ -1,10 +1,16 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { createInitialQuoteState } from '../src/store/quoteStateSchema';
+import {
+    CURRENT_STATE_VERSION,
+    createInitialQuoteState
+} from '../src/store/quoteStateSchema';
 import {
     clearPersistedQuoteState,
+    getQuoteStateStorageKey,
     loadPersistedQuoteState,
     persistQuoteState
 } from '../src/store/quoteStatePersistence';
+
+const OWNER_UID = 'user-a';
 
 function createStorage() {
     const store = new Map();
@@ -33,9 +39,9 @@ describe('quoteStatePersistence', () => {
                 addedBahamaLine: 1,
                 addedFiestaLine: 'yes'
             }
-        }, storage);
+        }, OWNER_UID, storage);
 
-        const loaded = loadPersistedQuoteState(storage);
+        const loaded = loadPersistedQuoteState(OWNER_UID, storage);
 
         expect(loaded.sketchMeta).toEqual({
             addedBahamaLine: true,
@@ -47,7 +53,7 @@ describe('quoteStatePersistence', () => {
         storage.getItem.mockReturnValueOnce('{broken');
         const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
-        const loaded = loadPersistedQuoteState(storage);
+        const loaded = loadPersistedQuoteState(OWNER_UID, storage);
 
         expect(loaded).toEqual(createInitialQuoteState());
         expect(errorSpy).toHaveBeenCalled();
@@ -55,10 +61,10 @@ describe('quoteStatePersistence', () => {
         errorSpy.mockRestore();
     });
 
-    it('clears persisted state through the same storage boundary', () => {
-        clearPersistedQuoteState(storage);
+    it('clears only the current owner persisted state', () => {
+        clearPersistedQuoteState(OWNER_UID, storage);
 
-        expect(storage.removeItem).toHaveBeenCalledTimes(1);
+        expect(storage.removeItem).toHaveBeenCalledWith(getQuoteStateStorageKey(OWNER_UID));
     });
 
     it('round-trips builder displayName overrides through persistence', () => {
@@ -93,9 +99,9 @@ describe('quoteStatePersistence', () => {
                     ]
                 }
             ]
-        }, storage);
+        }, OWNER_UID, storage);
 
-        const loaded = loadPersistedQuoteState(storage);
+        const loaded = loadPersistedQuoteState(OWNER_UID, storage);
 
         expect(loaded.builderItems[0].displayName).toBe('BaHaMa Jumbrella Merlot');
         expect(loaded.builderItems[0].addons[0].displayName).toBe('Varmare Merlot');
@@ -125,11 +131,11 @@ describe('quoteStatePersistence', () => {
                     percent: 15
                 }
             }
-        }, storage);
+        }, OWNER_UID, storage);
 
-        const loaded = loadPersistedQuoteState(storage);
+        const loaded = loadPersistedQuoteState(OWNER_UID, storage);
 
-        expect(loaded.stateVersion).toBe(5);
+        expect(loaded.stateVersion).toBe(CURRENT_STATE_VERSION);
         expect(loaded.contractingWork).toEqual({
             enabled: true,
             projectName: '  Designer Village  ',
@@ -149,5 +155,30 @@ describe('quoteStatePersistence', () => {
                 percent: 15
             }
         });
+    });
+
+    it('isolates persisted drafts by authenticated owner', () => {
+        const initial = createInitialQuoteState();
+        persistQuoteState({
+            ...initial,
+            customerInfo: { ...initial.customerInfo, company: 'User A AB' }
+        }, 'user-a', storage);
+        persistQuoteState({
+            ...initial,
+            customerInfo: { ...initial.customerInfo, company: 'User B AB' }
+        }, 'user-b', storage);
+
+        expect(loadPersistedQuoteState('user-a', storage).customerInfo.company).toBe('User A AB');
+        expect(loadPersistedQuoteState('user-b', storage).customerInfo.company).toBe('User B AB');
+        expect(getQuoteStateStorageKey('user-a')).not.toBe(getQuoteStateStorageKey('user-b'));
+    });
+
+    it('does not read or write persisted state without an authenticated owner', () => {
+        const initial = createInitialQuoteState();
+
+        persistQuoteState(initial, null, storage);
+
+        expect(storage.setItem).not.toHaveBeenCalled();
+        expect(loadPersistedQuoteState(null, storage)).toEqual(initial);
     });
 });

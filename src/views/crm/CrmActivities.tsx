@@ -65,7 +65,7 @@ export function CrmActivitiesPage() {
         };
     }, []);
 
-    const { data, loading, error, reload } = useCrmLoader<ActivitiesData>(
+    const { data, loading, error, reload, updateData } = useCrmLoader<ActivitiesData>(
         load,
         { activities: [], companies: [], contacts: [], deals: [] },
         'Kunde inte ladda CRM-aktiviteterna.'
@@ -287,7 +287,17 @@ export function CrmActivitiesPage() {
                                                          >
                                                              {completingId === activity.id ? 'Markerar...' : 'Markera som klar'}
                                                          </button>
-                                                         <TaskRescheduleControl activity={activity} onRescheduled={() => reload()} />
+                                                         <TaskRescheduleControl
+                                                             activity={activity}
+                                                             onRescheduled={(updatedActivity) => {
+                                                                 updateData((current) => ({
+                                                                     ...current,
+                                                                     activities: current.activities.map((item) => (
+                                                                         item.id === updatedActivity.id ? updatedActivity : item
+                                                                     ))
+                                                                 }));
+                                                             }}
+                                                         />
                                                      </div>
                                                  ) : null}
                                             </div>

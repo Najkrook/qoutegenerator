@@ -5,7 +5,9 @@ import { getBuilderCatalogLine, getGridCatalogLine } from '../data/catalogLookup
 import { BuilderConfig } from '../components/features/BuilderConfig';
 import { GridConfig } from '../components/features/GridConfig';
 import { ContractingWorkEditor } from '../components/features/ContractingWorkEditor';
-import { ExportLanguageSelector } from '../components/features/ExportLanguageSelector';
+import { Button } from '../components/ui/Button';
+import { PageHeader } from '../components/ui/PageHeader';
+import { Panel } from '../components/ui/Panel';
 import { hasConfiguredContractingWork } from '../services/contractingWork';
 import type { ConfigurationProps } from '../types/contracts';
 
@@ -25,32 +27,38 @@ export function Configuration({ onNext, onPrev, onBackToSketch }: ConfigurationP
     const hasSelections = hasProductSelections || hasContractingSelections;
 
     return (
-        <div className="max-w-[1200px] mx-auto animate-fade-in pb-20">
-            <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-                <div>
-                    <h2 className="text-2xl font-bold m-0 text-text-primary">Konfigurera offertinnehåll</h2>
-                    <p className="text-text-secondary text-sm mt-1">Anpassa produkter och beskriv eventuella entreprenadarbeten.</p>
-                </div>
-                <ExportLanguageSelector className="w-full sm:w-[180px] sm:shrink-0" />
-            </div>
+        <div className="mx-auto max-w-[1200px] animate-fade-in pb-[calc(12rem+env(safe-area-inset-bottom))] md:pb-24">
+            <PageHeader
+                eyebrow="Steg 2 av 4"
+                title="Konfigurera offertinnehåll"
+                description="Anpassa produkter och beskriv eventuella entreprenadarbeten."
+            />
 
-            <div className="space-y-12">
+            <div className="mt-6 space-y-10">
                 {builderLines.length > 0 && (
-                    <section>
-                        <div className="flex items-center gap-3 mb-4">
-                            <div className="bg-primary/20 text-primary p-2 rounded-lg font-bold text-xs uppercase tracking-wider">Builder Flow</div>
-                            <h3 className="text-xl font-bold m-0 border-l-4 border-primary pl-3">Standardkonfiguration</h3>
-                        </div>
+                    <section aria-labelledby="builder-configuration-heading">
+                        <header className="mb-4">
+                            <p className="m-0 text-[11px] font-semibold uppercase tracking-[0.14em] text-text-muted">
+                                Produktkonfiguration
+                            </p>
+                            <h2 id="builder-configuration-heading" className="mb-0 mt-1 text-xl font-semibold text-text">
+                                Standardprodukter
+                            </h2>
+                        </header>
                         <BuilderConfig />
                     </section>
                 )}
 
                 {gridLines.length > 0 && (
-                    <section>
-                        <div className="flex items-center gap-3 mb-4">
-                            <div className="bg-secondary/20 text-secondary p-2 rounded-lg font-bold text-xs uppercase tracking-wider">Grid Flow</div>
-                            <h3 className="text-xl font-bold m-0 border-l-4 border-secondary pl-3">Sektionsval (Grid)</h3>
-                        </div>
+                    <section aria-labelledby="grid-configuration-heading">
+                        <header className="mb-4">
+                            <p className="m-0 text-[11px] font-semibold uppercase tracking-[0.14em] text-text-muted">
+                                Sektionskonfiguration
+                            </p>
+                            <h2 id="grid-configuration-heading" className="mb-0 mt-1 text-xl font-semibold text-text">
+                                Glaspartier och sektioner
+                            </h2>
+                        </header>
                         {gridLines.map((lineId) => (
                             <GridConfig key={lineId} lineId={lineId} />
                         ))}
@@ -60,44 +68,40 @@ export function Configuration({ onNext, onPrev, onBackToSketch }: ConfigurationP
                 {showContractingWork && <ContractingWorkEditor />}
 
                 {selectedLines.length > 0 && !hasProductSelections && (
-                    <div className="bg-panel-bg border border-panel-border border-dashed rounded-xl p-12 text-center">
-                        <div className="text-4xl mb-4 text-text-secondary opacity-20" aria-hidden="true">📦</div>
-                        <p className="text-text-secondary font-medium">Inga produkter valda ännu. Lägg till en rad ovan för att börja.</p>
-                    </div>
+                    <Panel>
+                        <p className="m-0 p-8 text-center text-sm text-text-muted">
+                            Inga produkter är konfigurerade ännu. Lägg till en produkt eller sektion ovan för att fortsätta.
+                        </p>
+                    </Panel>
                 )}
             </div>
 
-            <div className="fixed bottom-0 left-0 right-0 bg-panel-bg/80 backdrop-blur-md border-t border-panel-border p-4 z-50">
+            <div className="fixed bottom-0 left-0 right-0 z-50 border-t border-border bg-surface-raised/95 p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] backdrop-blur-md">
                 <div className="max-w-[1200px] mx-auto grid grid-cols-1 gap-2 md:grid-cols-3 md:items-center">
-                    <button
-                        type="button"
+                    <Button
                         onClick={onPrev}
-                        className="w-full md:w-auto md:justify-self-start px-6 py-2.5 rounded-md font-medium text-text-primary bg-panel-bg border border-panel-border hover:bg-panel-border transition-colors flex items-center justify-center gap-2"
+                        className="w-full md:w-auto md:justify-self-start"
                     >
-                        &laquo; Tillbaka till Offertinnehåll
-                    </button>
+                        Tillbaka till offertinnehåll
+                    </Button>
                     {onBackToSketch ? (
-                        <button
-                            type="button"
+                        <Button
                             onClick={onBackToSketch}
-                            className="w-full md:w-auto md:justify-self-center px-6 py-2.5 rounded-md font-medium text-text-primary bg-panel-bg border border-panel-border hover:bg-panel-border transition-colors flex items-center justify-center gap-2"
+                            className="w-full md:w-auto md:justify-self-center"
                         >
-                            &laquo; Tillbaka till Rita
-                        </button>
+                            Tillbaka till skiss
+                        </Button>
                     ) : (
                         <div className="hidden md:block" aria-hidden="true" />
                     )}
-                    <button
-                        type="button"
+                    <Button
                         onClick={onNext}
                         disabled={!hasSelections}
-                        className={`w-full md:w-auto md:justify-self-end px-8 py-2.5 rounded-md font-bold text-base transition-all shadow shadow-primary/20 ${!hasSelections
-                            ? 'bg-gray-600 cursor-not-allowed text-gray-400'
-                            : 'bg-primary hover:bg-primary-hover text-white scale-105 shadow-lg shadow-primary/30'
-                        }`}
+                        className="w-full md:w-auto md:justify-self-end"
+                        variant="primary"
                     >
-                        Fortsätt till Prissättning &raquo;
-                    </button>
+                        Fortsätt till prissättning
+                    </Button>
                 </div>
             </div>
         </div>

@@ -25,7 +25,7 @@ import { DEFAULT_PDF_THEME_ID, normalizePdfThemeId } from '../config/pdfThemes';
 import { DEFAULT_EXPORT_LANGUAGE, normalizeExportLanguage } from '../services/exportLocalization';
 
 export const QUOTE_STATE_STORAGE_KEY = 'offertverktyg_state';
-export const CURRENT_STATE_VERSION = 5;
+export const CURRENT_STATE_VERSION = 6;
 
 const VALID_QUOTE_STATUSES: QuoteStatus[] = ['draft', 'sent', 'won', 'lost', 'archived'];
 const VALID_BAHAMA_STATUSES: BahamaInventoryStatus[] = ['available', 'reserved', 'needs-review', 'used', 'sold'];
@@ -134,6 +134,11 @@ function normalizeNonNegativeInt(value: unknown, fallback = 0): number {
 function normalizeNonNegativeNumber(value: unknown, fallback = 0): number {
     const parsed = Number(value);
     return Number.isFinite(parsed) ? Math.max(0, parsed) : fallback;
+}
+
+function normalizeDraftUpdatedAtMs(value: unknown): number | null {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) && parsed > 0 ? Math.floor(parsed) : null;
 }
 
 function normalizePercentage(value: unknown, fallback: number): number {
@@ -361,6 +366,7 @@ function createBaseInitialState(): QuoteState {
 
     return {
         stateVersion: CURRENT_STATE_VERSION,
+        draftUpdatedAtMs: null,
         step: 0,
         selectedLines: [],
         builderItems: [],
@@ -524,6 +530,16 @@ function migrateV4ToV5(rawState: UnknownRecord = {}): UnknownRecord {
     };
 }
 
+function migrateV5ToV6(rawState: UnknownRecord = {}): UnknownRecord {
+    const next = toRecord(rawState);
+
+    return {
+        ...next,
+        stateVersion: 6,
+        draftUpdatedAtMs: normalizeDraftUpdatedAtMs(next.draftUpdatedAtMs)
+    };
+}
+
 export function migrateQuoteState(fromVersion: unknown, rawState: unknown): UnknownRecord {
     let version = Number.isFinite(Number(fromVersion)) ? Number(fromVersion) : 0;
     let nextState: UnknownRecord = isObject(rawState) ? clone(rawState) : {};
@@ -556,6 +572,12 @@ export function migrateQuoteState(fromVersion: unknown, rawState: unknown): Unkn
         if (version === 4) {
             nextState = migrateV4ToV5(nextState);
             version = 5;
+            continue;
+        }
+
+        if (version === 5) {
+            nextState = migrateV5ToV6(nextState);
+            version = 6;
             continue;
         }
 
@@ -608,6 +630,7 @@ export function hydrateQuoteState(input: HydratedQuoteStatePayload): QuoteState 
     return {
         ...mergedState,
         stateVersion: CURRENT_STATE_VERSION,
+        draftUpdatedAtMs: normalizeDraftUpdatedAtMs(mergedState.draftUpdatedAtMs),
         step: normalizeStep(mergedState.step, initialState.step),
         selectedLines: Array.isArray(mergedState.selectedLines)
             ? clone(mergedState.selectedLines).map((line) => line === 'ClickitUP' ? 'ClickitUp' : String(line))

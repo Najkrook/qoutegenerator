@@ -83,8 +83,8 @@ describe('notificationService', () => {
 
         expect(toastState.toastFn.success).toHaveBeenCalledWith('Sparad', expect.objectContaining({ duration: 3500 }));
         expect(toastState.toastFn.error).toHaveBeenCalledWith('Misslyckades', expect.objectContaining({ duration: 5000 }));
-        expect(toastState.toastFn).toHaveBeenCalledWith('Info', expect.objectContaining({ icon: '!' }));
-        expect(toastState.toastFn).toHaveBeenCalledWith('Varning', expect.objectContaining({ icon: '⚠️' }));
+        expect(toastState.toastFn).toHaveBeenCalledWith('Info', expect.not.objectContaining({ icon: expect.anything() }));
+        expect(toastState.toastFn).toHaveBeenCalledWith('Varning', expect.not.objectContaining({ icon: expect.anything() }));
     });
 
     it('supports loading, update, and dismiss by toast id', () => {

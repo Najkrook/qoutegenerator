@@ -5,13 +5,22 @@ import {
     hydrateQuoteState
 } from './quoteStateSchema';
 
-export function loadPersistedQuoteState(storage: Storage | undefined = globalThis.localStorage): QuoteState {
-    if (!storage) {
+export function getQuoteStateStorageKey(ownerUid: string | null | undefined): string | null {
+    const normalizedOwnerUid = String(ownerUid ?? '').trim();
+    return normalizedOwnerUid ? `${QUOTE_STATE_STORAGE_KEY}:${normalizedOwnerUid}` : null;
+}
+
+export function loadPersistedQuoteState(
+    ownerUid: string | null | undefined,
+    storage: Storage | undefined = globalThis.localStorage
+): QuoteState {
+    const storageKey = getQuoteStateStorageKey(ownerUid);
+    if (!storage || !storageKey) {
         return createInitialQuoteState();
     }
 
     try {
-        const saved = storage.getItem(QUOTE_STATE_STORAGE_KEY);
+        const saved = storage.getItem(storageKey);
         if (!saved) {
             return createInitialQuoteState();
         }
@@ -25,17 +34,25 @@ export function loadPersistedQuoteState(storage: Storage | undefined = globalThi
 
 export function persistQuoteState(
     state: QuoteState | HydratedQuoteStatePayload,
+    ownerUid: string | null | undefined,
     storage: Storage | undefined = globalThis.localStorage
 ) {
-    if (!storage) return;
+    const storageKey = getQuoteStateStorageKey(ownerUid);
+    if (!storage || !storageKey) return;
 
     try {
-        storage.setItem(QUOTE_STATE_STORAGE_KEY, JSON.stringify(hydrateQuoteState(state)));
+        storage.setItem(storageKey, JSON.stringify(hydrateQuoteState(state)));
     } catch (error) {
         console.error('Failed to save state to localStorage', error);
     }
 }
 
-export function clearPersistedQuoteState(storage: Storage | undefined = globalThis.localStorage) {
-    storage?.removeItem?.(QUOTE_STATE_STORAGE_KEY);
+export function clearPersistedQuoteState(
+    ownerUid: string | null | undefined,
+    storage: Storage | undefined = globalThis.localStorage
+) {
+    const storageKey = getQuoteStateStorageKey(ownerUid);
+    if (storageKey) {
+        storage?.removeItem?.(storageKey);
+    }
 }

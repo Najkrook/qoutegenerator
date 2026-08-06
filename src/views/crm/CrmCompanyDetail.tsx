@@ -78,7 +78,7 @@ export function CrmCompanyDetailPage() {
         };
     }, [companyId]);
 
-    const { data, loading, error, reload } = useCrmLoader<CompanyDetailData>(
+    const { data, loading, error, reload, updateData } = useCrmLoader<CompanyDetailData>(
         load,
         { company: null, companies: [], contacts: [], deals: [], activities: [], members: [] },
         'Kunde inte ladda kundkortet.'
@@ -368,7 +368,14 @@ export function CrmCompanyDetailPage() {
                             activities={orderedActivities}
                             onComplete={(activity) => void handleComplete(activity)}
                             completingId={completingId}
-                            onRescheduled={() => reload()}
+                            onRescheduled={(updatedActivity) => {
+                                updateData((current) => ({
+                                    ...current,
+                                    activities: current.activities.map((activity) => (
+                                        activity.id === updatedActivity.id ? updatedActivity : activity
+                                    ))
+                                }));
+                            }}
                         />
                     </CrmPanel>
                 </>

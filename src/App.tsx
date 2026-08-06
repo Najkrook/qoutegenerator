@@ -5,11 +5,11 @@ import {
     Navigate,
     Outlet,
     useLocation,
+    useNavigate,
     useSearchParams,
     type RouteObject
 } from 'react-router-dom';
-import { Header } from './components/layout/Header';
-import { ErrorBoundary } from './components/layout/ErrorBoundary';
+import { AppShell } from './components/layout/AppShell';
 import { Dashboard } from './views/Dashboard';
 import { ProductLineSelection } from './views/ProductLineSelection';
 import { Configuration } from './views/Configuration';
@@ -20,7 +20,7 @@ import { Login } from './views/Login';
 import { useQuote } from './store/QuoteContext';
 import { useAuth } from './store/AuthContext';
 import { db, doc, getDoc } from './services/firebase';
-import { confirmChoiceAction, notifyWarn } from './services/notificationService';
+import { confirmAction, confirmChoiceAction, notifyWarn } from './services/notificationService';
 import { cloneInventoryData, createDefaultInventoryData, normalizeStoredInventoryData } from './views/inventoryData';
 import {
     APP_PATHS,
@@ -30,16 +30,18 @@ import {
     getAuthorizedRouteForAccess,
     getNextLoginRedirectTarget,
     getQuoteDraftGuardRedirect,
+    getQuoteResumeStep,
+    getQuoteStepPath,
     getQuoteStepNumber,
-    getRetailerResumeQuoteStep,
     hasConfiguredQuoteContent,
-    hasRetailerStartDraftData,
+    hasQuoteStartDraftData,
     parseSketchReturnTarget,
     resolveLoginRedirectTarget,
     type AppRouteId,
     type QuoteRouteStepId
 } from './navigation/routes';
 import { useAppNavigation } from './navigation/useAppNavigation';
+import { useQuoteDraftActions } from './navigation/useQuoteDraftActions';
 import type {
     ContractingWorkState,
     GridSelections,
@@ -80,38 +82,24 @@ function FullScreenLoader() {
 }
 
 function RouteShell() {
+    const { user } = useAuth();
     const location = useLocation();
     const routeId = getAppRouteIdFromPath(location.pathname);
-    const isSummaryRoute = routeId === APP_ROUTE_IDS.quoteSummary;
-    const isInventoryRoute = routeId === APP_ROUTE_IDS.inventory;
-
-    if (isInventoryRoute) {
-        return (
-            <div className="min-h-screen bg-bg text-text-primary font-sans antialiased">
-                <ErrorBoundary resetHref={APP_PATHS[APP_ROUTE_IDS.dashboard]}>
-                    <main>
-                        <Suspense fallback={<ViewLoader />}>
-                            <Outlet />
-                        </Suspense>
-                    </main>
-                </ErrorBoundary>
-            </div>
-        );
-    }
+    const isFocusRoute = routeId === APP_ROUTE_IDS.sketch;
+    const isWideRoute = routeId === APP_ROUTE_IDS.quoteSummary
+        || routeId === APP_ROUTE_IDS.inventory
+        || routeId === APP_ROUTE_IDS.planner;
 
     return (
-        <div className="min-h-screen bg-bg text-text-primary p-4 md:p-8 font-sans antialiased">
-            <div className={`${isSummaryRoute ? 'max-w-[1920px]' : 'max-w-[1400px]'} mx-auto relative`}>
-                <ErrorBoundary resetHref={APP_PATHS[APP_ROUTE_IDS.dashboard]}>
-                    <Header />
-                    <main>
-                        <Suspense fallback={<ViewLoader />}>
-                            <Outlet />
-                        </Suspense>
-                    </main>
-                </ErrorBoundary>
-            </div>
-        </div>
+        <AppShell
+            ownerUid={user?.uid || null}
+            wide={isWideRoute}
+            variant={isFocusRoute ? 'focus' : 'default'}
+        >
+            <Suspense fallback={<ViewLoader />}>
+                <Outlet />
+            </Suspense>
+        </AppShell>
     );
 }
 
@@ -131,13 +119,13 @@ function LoginRouteElement() {
 }
 
 function ProtectedAppLayout() {
-    const { user, loading } = useAuth();
+    const { user, loading, canViewEverything } = useAuth();
     const { state, dispatch } = useQuote();
     const location = useLocation();
     const inventoryBootstrappedRef = useRef(false);
 
     useEffect(() => {
-        if (!user || inventoryBootstrappedRef.current) {
+        if (!user || !canViewEverything || inventoryBootstrappedRef.current) {
             return;
         }
 
@@ -192,7 +180,7 @@ function ProtectedAppLayout() {
         return () => {
             cancelled = true;
         };
-    }, [dispatch, state.cloudInventoryData, state.inventoryData, user]);
+    }, [canViewEverything, dispatch, state.cloudInventoryData, state.inventoryData, user]);
 
     if (loading) {
         return <FullScreenLoader />;
@@ -257,54 +245,26 @@ function QuoteDraftBoundary({ children, routeId }: RouteAccessBoundaryProps) {
 
 function DashboardPage() {
     const navigation = useAppNavigation();
-    const { state, dispatch } = useQuote();
-    const { isRetailer } = useAuth();
-
-    const handleStartQuote = async (): Promise<void> => {
-        if (!isRetailer) {
-            navigation.goToQuoteStep('product-lines');
-            return;
-        }
-
-        if (hasRetailerStartDraftData(state)) {
-            const choice = await confirmChoiceAction({
-                title: 'Starta ny offert?',
-                message: 'Det finns redan uppgifter i den nuvarande offerten. Om du fortsätter rensas utkastet och du börjar om från början.',
-                confirmText: 'Starta ny offert',
-                cancelText: 'Avbryt',
-                secondaryText: 'Fortsätt till nuvarande offert',
-                tone: 'danger'
-            });
-
-            if (choice === 'secondary') {
-                navigation.goToQuoteStep(getRetailerResumeQuoteStep(state));
-                return;
-            }
-
-            if (choice !== 'confirm') {
-                return;
-            }
-        }
-
-        dispatch({ type: 'RESET_STATE' });
-        navigation.goToQuoteStep('product-lines');
-    };
+    const {
+        continueQuote,
+        hasQuoteDraft,
+        quoteDraftSummary,
+        startQuote
+    } = useQuoteDraftActions();
 
     return (
         <Dashboard
             onStartQuote={() => {
-                void handleStartQuote();
+                void startQuote();
             }}
-            onOpenHistory={() => navigation.goToHistory()}
-            onOpenInventory={() => navigation.goToInventory()}
-            onOpenSketch={() => navigation.goToSketch('dashboard')}
-            onOpenPlanner={() => navigation.goToPlanner()}
+            onContinueQuote={hasQuoteDraft ? continueQuote : undefined}
             onOpenCrm={() => navigation.goToCrm()}
+            onOpenInventory={() => navigation.goToInventory()}
+            onOpenPlanner={() => navigation.goToPlanner()}
+            onOpenSketch={() => navigation.goToSketch('dashboard')}
             onOpenActivity={() => navigation.goToActivity()}
-            onOpenRetailers={() => navigation.goToRetailers()}
             onOpenRetailerOrders={() => navigation.goToRetailerOrders()}
-            onOpenRetailerOrderHistory={() => navigation.goToRetailerOrderHistory()}
-            onOpenRetailerDocuments={() => navigation.goToRetailerDocuments()}
+            quoteDraftSummary={quoteDraftSummary}
         />
     );
 }
@@ -324,7 +284,9 @@ function useSyncQuoteRouteStep(step: QuoteRouteStepId) {
 
 function ProductLineSelectionPage() {
     const navigation = useAppNavigation();
-    const { dispatch } = useQuote();
+    const navigate = useNavigate();
+    const { state, dispatch } = useQuote();
+    const { isRetailer } = useAuth();
     const [searchParams, setSearchParams] = useSearchParams();
     const initializedCrmDealRef = useRef<string | null>(null);
     useSyncQuoteRouteStep('product-lines');
@@ -340,12 +302,34 @@ function ProductLineSelectionPage() {
         }
 
         initializedCrmDealRef.current = crmDealId;
-        dispatch({ type: 'RESET_STATE' });
-        const nextSearchParams = new URLSearchParams(searchParams);
-        nextSearchParams.delete('start');
-        setSearchParams(nextSearchParams, { replace: true });
-
         void (async () => {
+            const quoteDraftOptions = { isRetailer };
+            if (hasQuoteStartDraftData(state, quoteDraftOptions)) {
+                const choice = await confirmChoiceAction({
+                    title: 'Starta offert från CRM-affären?',
+                    message: 'Du har redan ett pågående offertutkast. Välj om det ska ersättas eller om du vill fortsätta med det befintliga utkastet.',
+                    confirmText: 'Ersätt utkast',
+                    cancelText: 'Tillbaka till CRM',
+                    secondaryText: 'Fortsätt utkast',
+                    tone: 'danger'
+                });
+
+                if (choice === 'secondary') {
+                    navigate(getQuoteStepPath(getQuoteResumeStep(state, quoteDraftOptions)), { replace: true });
+                    return;
+                }
+
+                if (choice !== 'confirm') {
+                    navigate(`/crm/deals/${encodeURIComponent(crmDealId)}`, { replace: true });
+                    return;
+                }
+            }
+
+            dispatch({ type: 'RESET_QUOTE_DRAFT' });
+            const nextSearchParams = new URLSearchParams(searchParams);
+            nextSearchParams.delete('start');
+            setSearchParams(nextSearchParams, { replace: true });
+
             const clearInvalidCrmLink = () => {
                 const cleanSearchParams = new URLSearchParams(searchParams);
                 cleanSearchParams.delete('crmDealId');
@@ -384,7 +368,7 @@ function ProductLineSelectionPage() {
                 notifyWarn('CRM-uppgifterna kunde inte förifyllas. Offerten kan fortfarande skapas.');
             }
         })();
-    }, [dispatch, searchParams, setSearchParams]);
+    }, [dispatch, isRetailer, navigate, searchParams, setSearchParams, state]);
 
     return <ProductLineSelection onNext={() => navigation.goToQuoteStep('configuration')} />;
 }
@@ -445,11 +429,12 @@ function SketchPage() {
     const navigation = useAppNavigation();
     const [searchParams] = useSearchParams();
     const returnTarget = parseSketchReturnTarget(searchParams.get('return'));
+    const exportTarget = returnTarget === 'quote-summary' ? 'summary' : 'configuration';
 
     return (
         <SketchTool
             onBack={() => navigation.goToSketchReturnTarget(returnTarget)}
-            onExportToQuoteComplete={() => navigation.goToQuoteStep('configuration')}
+            onExportToQuoteComplete={() => navigation.goToQuoteStep(exportTarget)}
         />
     );
 }
@@ -461,13 +446,27 @@ function PlannerPage() {
 
 function HistoryPage() {
     const navigation = useAppNavigation();
-    const { dispatch } = useQuote();
+    const { state, dispatch } = useQuote();
     const { isRetailer } = useAuth();
 
-    const handleOpenQuote = (
+    const handleOpenQuote = async (
         payload: HistoryOpenQuotePayload,
         context?: { crmDealId?: string | null; quoteOwnerUid?: string | null }
-    ) => {
+    ): Promise<void> => {
+        if (hasQuoteStartDraftData(state, { isRetailer })) {
+            const confirmed = await confirmAction({
+                title: 'Öppna sparad offert?',
+                message: 'Den sparade offerten ersätter det pågående utkastet i arbetsytan.',
+                confirmText: 'Öppna offert',
+                cancelText: 'Behåll utkast',
+                tone: 'danger'
+            });
+
+            if (!confirmed) {
+                return;
+            }
+        }
+
         const targetStep = hasConfiguredQuoteContent({
             builderItems: Array.isArray(payload.builderItems) ? payload.builderItems : [],
             gridSelections: payload.gridSelections && typeof payload.gridSelections === 'object'
@@ -505,8 +504,7 @@ function InventoryLogsPage() {
 }
 
 function RetailerManagerPage() {
-    const navigation = useAppNavigation();
-    return <RetailerManager onBack={() => navigation.goToDashboard()} />;
+    return <RetailerManager />;
 }
 
 function RetailerOrderRequestsPage() {

@@ -15,6 +15,7 @@ describe('quoteStateSchema', () => {
         expect(hydrated.hideZeroDiscountReferencesInPdf).toBe(false);
         expect(hydrated.pdfThemeId).toBe('brixx');
         expect(hydrated.exportLanguage).toBe('sv');
+        expect(hydrated.draftUpdatedAtMs).toBeNull();
         expect(hydrated.customerInfo.customerReference).toBe('');
         expect(hydrated.gridSelections).toEqual({});
         expect(hydrated.contractingWork).toEqual({
@@ -88,7 +89,7 @@ describe('quoteStateSchema', () => {
             selectedLines: ['ClickitUp']
         });
 
-        expect(hydrated.stateVersion).toBe(5);
+        expect(hydrated.stateVersion).toBe(CURRENT_STATE_VERSION);
         expect(hydrated.selectedLines).toEqual(['ClickitUp']);
         expect(hydrated.contractingWork).toEqual({
             enabled: false,
@@ -125,7 +126,7 @@ describe('quoteStateSchema', () => {
             }
         });
 
-        expect(hydrated.stateVersion).toBe(5);
+        expect(hydrated.stateVersion).toBe(CURRENT_STATE_VERSION);
         expect(hydrated.contractingWork.margin).toEqual({
             enabled: false,
             percent: 15
@@ -508,6 +509,17 @@ describe('quoteStateSchema', () => {
         warnSpy.mockRestore();
     });
 
+    it('migrates v5 drafts with a normalized last-updated timestamp', () => {
+        const hydrated = hydrateQuoteState({
+            stateVersion: 5,
+            draftUpdatedAtMs: '1720000000123',
+            selectedLines: ['ClickitUp']
+        });
+
+        expect(hydrated.stateVersion).toBe(CURRENT_STATE_VERSION);
+        expect(hydrated.draftUpdatedAtMs).toBe(1720000000123);
+    });
+
     it('reset path returns the initial schema shape', () => {
         const initial = createInitialQuoteState();
         const dirtyState = hydrateQuoteState({
@@ -520,6 +532,82 @@ describe('quoteStateSchema', () => {
 
         expect(reset).toEqual(initial);
         expect(reset).not.toBe(initial);
+    });
+
+    it('resets only the quote while preserving inventory and both sketch workspaces', () => {
+        const dirtyState = hydrateQuoteState({
+            selectedLines: ['ClickitUp'],
+            customerInfo: { name: 'Dirty' },
+            activeQuoteId: 'quote-1',
+            draftUpdatedAtMs: 1720000000123,
+            inventoryData: {
+                bahama: [],
+                bahamaV2: [],
+                clickitup: {},
+                notes: 'Behåll lokalt lager'
+            },
+            cloudInventoryData: {
+                bahama: [],
+                bahamaV2: [],
+                clickitup: {},
+                notes: 'Behåll molnlager'
+            },
+            inventoryBasket: [{ id: 'basket-row' }],
+            sketchDraft: {
+                config: { width: 9000 },
+                workspace: {}
+            },
+            advancedSketchDraft: {
+                config: { nodes: [], edges: [] },
+                workspace: { camera: { x: 0, y: 0, zoom: 1 } }
+            },
+            sketchMeta: {
+                addedBahamaLine: true,
+                addedFiestaLine: true
+            }
+        });
+
+        const reset = quoteReducer(dirtyState, { type: 'RESET_QUOTE_DRAFT' });
+
+        expect(reset.selectedLines).toEqual([]);
+        expect(reset.customerInfo.name).toBe('');
+        expect(reset.activeQuoteId).toBeNull();
+        expect(reset.draftUpdatedAtMs).toBeNull();
+        expect(reset.inventoryData.notes).toBe('Behåll lokalt lager');
+        expect(reset.cloudInventoryData.notes).toBe('Behåll molnlager');
+        expect(reset.inventoryBasket).toEqual([{ id: 'basket-row' }]);
+        expect(reset.sketchDraft).toEqual(dirtyState.sketchDraft);
+        expect(reset.advancedSketchDraft).toEqual(dirtyState.advancedSketchDraft);
+        expect(reset.sketchMeta).toEqual({
+            addedBahamaLine: false,
+            addedFiestaLine: false
+        });
+    });
+
+    it('updates the draft timestamp only for quote-changing actions', () => {
+        const initial = createInitialQuoteState();
+        const quoteChanged = quoteReducer(initial, {
+            type: 'SET_SELECTED_LINES',
+            payload: ['ClickitUp']
+        });
+        const inventoryChanged = quoteReducer(initial, {
+            type: 'SET_INVENTORY_DATA',
+            payload: initial.inventoryData
+        });
+        const sketchSaved = quoteReducer(initial, {
+            type: 'UPDATE_STATE',
+            payload: {
+                sketchDraft: {
+                    config: { width: 9000 },
+                    workspace: {}
+                }
+            }
+        });
+
+        expect(quoteChanged.draftUpdatedAtMs).toEqual(expect.any(Number));
+        expect(quoteChanged.draftUpdatedAtMs).toBeGreaterThan(0);
+        expect(inventoryChanged.draftUpdatedAtMs).toBeNull();
+        expect(sketchSaved.draftUpdatedAtMs).toBeNull();
     });
 
     it('hydrate action routes external payloads through the same schema path', () => {

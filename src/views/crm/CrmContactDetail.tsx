@@ -63,7 +63,7 @@ export function CrmContactDetailPage() {
         };
     }, [contactId]);
 
-    const { data, loading, error, reload } = useCrmLoader<ContactDetailData>(
+    const { data, loading, error, reload, updateData } = useCrmLoader<ContactDetailData>(
         load,
         { contact: null, companies: [], contacts: [], deals: [], activities: [], members: [] },
         'Kunde inte ladda kontakten.'
@@ -262,7 +262,14 @@ export function CrmContactDetailPage() {
                             activities={activities}
                             onComplete={(activity) => void handleComplete(activity)}
                             completingId={completingId}
-                            onRescheduled={() => reload()}
+                            onRescheduled={(updatedActivity) => {
+                                updateData((current) => ({
+                                    ...current,
+                                    activities: current.activities.map((activity) => (
+                                        activity.id === updatedActivity.id ? updatedActivity : activity
+                                    ))
+                                }));
+                            }}
                         />
                     </CrmPanel>
                 </>

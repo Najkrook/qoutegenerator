@@ -3,6 +3,11 @@ import { useQuote } from '../store/QuoteContext';
 import { useAuth } from '../store/AuthContext';
 import { getCatalogLineIds, getCatalogLineName } from '../data/catalogLookup';
 import { createContractingWorkRow } from '../components/features/ContractingWorkEditor';
+import { CustomerInfoForm } from '../components/features/CustomerInfoForm';
+import { Button } from '../components/ui/Button';
+import { PageHeader } from '../components/ui/PageHeader';
+import { Panel } from '../components/ui/Panel';
+import { StatusChip } from '../components/ui/StatusChip';
 import type { ProductLineSelectionProps, RetailerRecord } from '../types/contracts';
 
 export interface ProductLineOption {
@@ -77,6 +82,8 @@ export function ProductLineSelection({ onNext }: ProductLineSelectionProps) {
     const canSelectContractingWork = !isRetailer && (accessLevel === 'full' || accessLevel === 'quote-only');
     const contractingWorkEnabled = canSelectContractingWork && contractingWork.enabled;
     const hasSelectedQuoteContent = selectedLines.length > 0 || contractingWorkEnabled;
+    const hasCustomer = Boolean(state.customerInfo.company?.trim());
+    const canContinue = hasSelectedQuoteContent && hasCustomer;
 
     const toggleLine = (lineId: string): void => {
         if (isRetailer) {
@@ -118,6 +125,10 @@ export function ProductLineSelection({ onNext }: ProductLineSelectionProps) {
     };
 
     const handleNext = (): void => {
+        if (!canContinue) {
+            return;
+        }
+
         if (isRetailer && selectedLines.length === 1 && retailer) {
             const selectedRetailerId = selectedLines[0];
             const lineConfig = retailer.productLines?.[selectedRetailerId];
@@ -153,130 +164,135 @@ export function ProductLineSelection({ onNext }: ProductLineSelectionProps) {
     }, [dispatch, isRetailer, productLines, selectedLines]);
 
     return (
-        <div className="max-w-[1200px] mx-auto animate-fade-in">
-            <div className="mb-8">
-                <h2 className="text-2xl font-bold m-0 text-text-primary">Välj offertinnehåll</h2>
-                <p className="mb-0 mt-2 text-sm text-text-secondary">
-                    Välj en eller flera produktlinjer, entreprenadarbete eller kombinera båda i samma offert.
-                </p>
+        <div className="mx-auto max-w-[1200px] animate-fade-in">
+            <PageHeader
+                eyebrow="Steg 1 av 4"
+                title="Kund och offertinnehåll"
+                description="Lägg in kundens uppgifter och välj vad offerten ska innehålla."
+            />
+
+            <div className="mt-6">
+                <CustomerInfoForm />
             </div>
 
             {isRetailer && (
-                <div className="mb-8 rounded-xl border border-panel-border bg-panel-bg p-6 shadow-sm">
+                <Panel className="mb-6">
                     <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-                        <div>
-                            <p className="m-0 text-[11px] font-bold uppercase tracking-[0.18em] text-primary">
-                                Retailer Scope
+                        <div className="p-5 sm:p-6">
+                            <p className="m-0 text-[11px] font-bold uppercase tracking-[0.18em] text-text-muted">
+                                Avtalat sortiment
                             </p>
-                            <h3 className="mt-2 text-xl font-semibold text-text-primary">
-                                {retailer?.name || 'Er retailerprofil'}
-                            </h3>
-                            <p className="mt-2 max-w-2xl text-sm leading-relaxed text-text-secondary">
+                            <h2 className="mb-0 mt-2 text-xl font-semibold text-text">
+                                {retailer?.name || 'Er återförsäljarprofil'}
+                            </h2>
+                            <p className="mb-0 mt-2 max-w-2xl text-sm leading-relaxed text-text-muted">
                                 Här visas de produktlinjer som ingår i ert avtal. När du fortsätter appliceras
                                 linjens avtalade standardrabatt automatiskt i prissteget.
                             </p>
                         </div>
 
                         {selectedLine && (
-                            <div className="rounded-lg border border-primary/30 bg-primary/10 px-4 py-3 text-sm text-text-primary">
-                                <div className="font-semibold">{selectedLine.name}</div>
-                                <div className="mt-1 text-text-secondary">
-                                    Förhandsvisning: {nextRetailerDiscount}% retailer-rabatt
+                            <div className="m-5 rounded-panel border border-action/30 bg-action-soft px-4 py-3 text-sm text-action-soft-text sm:m-6 sm:ml-0">
+                                <div className="font-semibold text-text">{selectedLine.name}</div>
+                                <div className="mt-1">
+                                    Förhandsvisning: {nextRetailerDiscount}% återförsäljarrabatt
                                 </div>
                             </div>
                         )}
                     </div>
-                </div>
+                </Panel>
             )}
 
             {isRetailer && !hasRetailerLines ? (
-                <div className="mb-8 rounded-xl border border-warning/30 bg-warning/10 p-5 text-sm text-text-secondary">
-                    Inga produktlinjer är tillgängliga för ert retailer-konto ännu. Kontakta Brixx om ni behöver
+                <div className="mb-6 rounded-panel border border-warning-border bg-warning-bg p-5 text-sm text-warning-text">
+                    Inga produktlinjer är tillgängliga för ert återförsäljarkonto ännu. Kontakta BRIXX om ni behöver
                     tillgång till fler produktlinjer.
                 </div>
             ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
-                    {productLines.map((line) => {
-                        const isSelected = selectedLines.includes(line.id);
+                <Panel
+                    className="mb-6"
+                    title="Välj innehåll"
+                    description="Du kan kombinera flera produktlinjer och entreprenadarbete i samma offert."
+                >
+                    <div className="grid grid-cols-1 gap-4 p-5 sm:p-6 md:grid-cols-2 lg:grid-cols-3">
+                        {productLines.map((line) => {
+                            const isSelected = selectedLines.includes(line.id);
 
-                        return (
+                            return (
+                                <label
+                                    key={line.id}
+                                    className={`flex cursor-pointer items-start gap-4 rounded-panel border p-5 transition-colors ${
+                                        isSelected
+                                            ? 'border-action bg-action-soft'
+                                            : 'border-border bg-surface hover:border-action/60 hover:bg-surface-hover'
+                                    }`}
+                                >
+                                    <input
+                                        type={isRetailer ? 'radio' : 'checkbox'}
+                                        name={isRetailer ? 'productLine' : line.id}
+                                        checked={isSelected}
+                                        onChange={() => toggleLine(line.id)}
+                                        className="mt-1 h-5 w-5 cursor-pointer accent-action"
+                                    />
+                                    <div className="min-w-0 flex-1">
+                                        <div className="flex flex-wrap items-center gap-2">
+                                            <h3 className="m-0 text-base font-semibold text-text">{line.name}</h3>
+                                            {line.retailerDiscountPct !== null && (
+                                                <StatusChip tone="success">
+                                                    {line.retailerDiscountPct}% rabatt
+                                                </StatusChip>
+                                            )}
+                                        </div>
+                                        <p className="mb-0 mt-2 text-sm leading-relaxed text-text-muted">{line.description}</p>
+                                    </div>
+                                </label>
+                            );
+                        })}
+
+                        {canSelectContractingWork && (
                             <label
-                                key={line.id}
-                                className={`flex items-start gap-4 p-6 border rounded-lg bg-panel-bg transition-all ${
-                                    isSelected
-                                        ? 'cursor-pointer border-primary ring-1 ring-primary hover:-translate-y-0.5'
-                                        : 'cursor-pointer border-panel-border hover:-translate-y-0.5 hover:border-primary'
+                                data-testid="contracting-work-option"
+                                className={`flex cursor-pointer items-start gap-4 rounded-panel border p-5 transition-colors ${
+                                    contractingWorkEnabled
+                                        ? 'border-action bg-action-soft'
+                                        : 'border-border bg-surface hover:border-action/60 hover:bg-surface-hover'
                                 }`}
                             >
                                 <input
-                                    type={isRetailer ? 'radio' : 'checkbox'}
-                                    name={isRetailer ? 'productLine' : line.id}
-                                    checked={isSelected}
-                                    onChange={() => toggleLine(line.id)}
-                                    className="mt-1 w-5 h-5 accent-primary cursor-pointer"
+                                    type="checkbox"
+                                    checked={contractingWorkEnabled}
+                                    onChange={toggleContractingWork}
+                                    aria-describedby="contracting-work-option-description"
+                                    className="mt-1 h-5 w-5 cursor-pointer accent-action"
                                 />
                                 <div className="min-w-0 flex-1">
-                                    <div className="flex flex-wrap items-center gap-2">
-                                        <h3 className="text-lg font-semibold text-text-primary mb-0 mt-0">{line.name}</h3>
-                                        {line.retailerDiscountPct !== null && (
-                                            <span className="rounded-full border border-primary/30 bg-primary/10 px-2.5 py-0.5 text-[11px] font-bold text-primary">
-                                                {line.retailerDiscountPct}% rabatt
-                                            </span>
-                                        )}
-                                    </div>
-                                    <p className="text-sm text-text-secondary leading-relaxed mt-2 mb-0">{line.description}</p>
+                                    <h3 className="m-0 text-base font-semibold text-text">Entreprenadarbete</h3>
+                                    <p id="contracting-work-option-description" className="mb-0 mt-2 text-sm leading-relaxed text-text-muted">
+                                        Fria arbetspaket med egen omfattning, enhet och pris exkl. moms.
+                                    </p>
                                 </div>
                             </label>
-                        );
-                    })}
-
-                    {canSelectContractingWork && (
-                        <label
-                            data-testid="contracting-work-option"
-                            className={`flex items-start gap-4 rounded-lg border bg-panel-bg p-6 transition-all ${
-                                contractingWorkEnabled
-                                    ? 'cursor-pointer border-primary ring-1 ring-primary hover:-translate-y-0.5'
-                                    : 'cursor-pointer border-panel-border hover:-translate-y-0.5 hover:border-primary'
-                            }`}
-                        >
-                            <input
-                                type="checkbox"
-                                checked={contractingWorkEnabled}
-                                onChange={toggleContractingWork}
-                                aria-describedby="contracting-work-option-description"
-                                className="mt-1 h-5 w-5 cursor-pointer accent-primary"
-                            />
-                            <div className="min-w-0 flex-1">
-                                <h3 className="m-0 text-lg font-semibold text-text-primary">Entreprenadarbete</h3>
-                                <p id="contracting-work-option-description" className="mb-0 mt-2 text-sm leading-relaxed text-text-secondary">
-                                    Fria arbetspaket med egen omfattning, enhet och pris exkl. moms.
-                                </p>
-                            </div>
-                        </label>
-                    )}
-                </div>
+                        )}
+                    </div>
+                </Panel>
             )}
 
-            {isRetailer && selectedLine && (
-                <div className="mb-8 rounded-xl border border-panel-border bg-panel-bg p-5 text-sm text-text-secondary">
-                    Vald linje: <span className="font-semibold text-text-primary">{selectedLine.name}</span>. När du går
-                    vidare används <span className="font-semibold text-text-primary">{nextRetailerDiscount}%</span> som
-                    standardrabatt i prissteget.
-                </div>
-            )}
-
-            <div className="flex justify-end mt-8 border-t border-panel-border pt-6">
-                <button
-                    type="button"
+            <div className="mt-6 flex flex-col gap-3 border-t border-border pt-6 sm:flex-row sm:items-center sm:justify-between">
+                {!hasCustomer ? (
+                    <p role="status" className="m-0 text-sm text-warning-text">
+                        Ange företag eller organisation för att fortsätta.
+                    </p>
+                ) : (
+                    <span aria-hidden="true" />
+                )}
+                <Button
                     onClick={handleNext}
-                    disabled={!hasSelectedQuoteContent}
-                    className={`px-8 py-3 rounded-md font-medium text-base transition-colors shadow shadow-primary/20 ${!hasSelectedQuoteContent
-                        ? 'bg-gray-600 cursor-not-allowed text-gray-400'
-                        : 'bg-primary hover:bg-primary-hover text-white cursor-pointer'
-                    }`}
+                    disabled={!canContinue}
+                    size="lg"
+                    variant="primary"
                 >
-                    Fortsätt till Konfiguration &raquo;
-                </button>
+                    Fortsätt till konfiguration
+                </Button>
             </div>
         </div>
     );

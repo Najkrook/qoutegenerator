@@ -139,7 +139,7 @@ export function SketchReviewPanel({
         : undefined;
 
     return (
-        <div className="glass-panel rounded-2xl p-4 space-y-4 md:p-5">
+        <div className="space-y-4">
             <div className="flex items-start justify-between gap-3">
                 <div className="space-y-1">
                     <h3 className="text-lg font-semibold text-text-primary m-0">Granska & exportera</h3>
@@ -182,7 +182,7 @@ export function SketchReviewPanel({
                         <p className="text-sm text-amber-100 m-0">
                             Autojustering:{' '}
                             {reviewState.autoAdjustedEdges
-                                .map(([edge, diag]) => `${EDGE_LABELS[edge] || edge} ${diag.requestedDoorSize} → ${diag.resolvedDoorSize} mm`)
+                                .map(([edge, diag]) => `${EDGE_LABELS[edge] || edge} ${diag.requestedDoorSize} till ${diag.resolvedDoorSize} mm`)
                                 .join(', ')}
                         </p>
                     )}
@@ -199,7 +199,7 @@ export function SketchReviewPanel({
                         {reviewState.suggestions.slice(0, 6).map((suggestion) => (
                             <div
                                 key={suggestion.id}
-                                className="glass-card p-3 space-y-2 hover:scale-[1.02] hover:border-amber-500/40 hover:shadow-[0_8px_20px_-6px_rgba(245,158,11,0.2)]"
+                                className="space-y-2 rounded-control border border-panel-border bg-surface p-3 transition-colors hover:bg-surface-hover"
                                 onMouseEnter={() => onHoverSuggestion?.(suggestion)}
                                 onMouseLeave={() => onHoverSuggestion?.(null)}
                             >

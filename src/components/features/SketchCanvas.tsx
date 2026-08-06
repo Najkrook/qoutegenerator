@@ -1,4 +1,16 @@
-import { useMemo, useRef, useState, useEffect, useCallback } from 'react';
+import { useMemo, useRef, useState, useEffect, useCallback, type ReactNode } from 'react';
+import {
+    IconArrowBackUp,
+    IconArrowForwardUp,
+    IconArrowsMaximize,
+    IconLayoutGrid,
+    IconMinus,
+    IconPlus,
+    IconToolsKitchen2,
+    IconUmbrella,
+    IconZoomIn,
+    IconZoomOut
+} from '@tabler/icons-react';
 import { DOOR_LABEL, MIN_DIMENSION_MM, STEP_MM } from '../../utils/sectionCalculator';
 import {
     getFiestaRadiusMm,
@@ -60,6 +72,33 @@ interface TouchSinglePanState {
     startX: number;
     startY: number;
     camera: SketchCamera;
+}
+
+function CanvasIconButton({
+    className = '',
+    disabled,
+    icon,
+    label,
+    onClick
+}: {
+    className?: string;
+    disabled?: boolean;
+    icon: ReactNode;
+    label: string;
+    onClick: () => void;
+}) {
+    return (
+        <button
+            type="button"
+            aria-label={label}
+            title={label}
+            onClick={onClick}
+            disabled={disabled}
+            className={`inline-flex min-h-9 min-w-9 items-center justify-center rounded-control text-text-muted transition-colors hover:bg-surface-hover hover:text-text disabled:cursor-not-allowed disabled:opacity-35 ${className}`}
+        >
+            {icon}
+        </button>
+    );
 }
 
 interface SegmentGeometry {
@@ -165,6 +204,7 @@ export function SketchCanvas({
     selectedParasolId = null,
     fiestaItems = [],
     selectedFiestaId = null,
+    panelOpen = false,
     hoverPreviewLayout,
     onHoverSuggestion,
     undo,
@@ -1748,9 +1788,9 @@ export function SketchCanvas({
                                                 onMouseDown={(e) => e.stopPropagation()}
                                                 onClick={() => onRotateParasol && onRotateParasol(p.id, getParasolRotationDeg(p) === 90 ? 0 : 90)}
                                                 className="px-5 py-3 text-[24px] font-semibold rounded-[12px] bg-panel-bg text-text-secondary border-2 border-panel-border hover:text-text-primary hover:bg-white/5 transition-colors whitespace-nowrap"
-                                                title="Rotera"
-                                            >
-                                                ↻ Rotera
+                                            title="Rotera"
+                                        >
+                                                Rotera
                                             </button>
                                         )}
 
@@ -1761,7 +1801,7 @@ export function SketchCanvas({
                                             className="px-5 py-3 text-[24px] font-semibold rounded-[12px] bg-red-500/10 text-red-400 border-2 border-red-500/20 hover:bg-red-500/20 transition-colors whitespace-nowrap"
                                             title="Ta bort"
                                         >
-                                            🗑 Ta bort
+                                            Ta bort
                                         </button>
                                     </div>
                                 </div>
@@ -1916,56 +1956,56 @@ export function SketchCanvas({
                 onPointerDown={(e) => e.stopPropagation()}
                 onClick={(e) => e.stopPropagation()}
             >
-                <div className="bg-panel-bg/95 border-2 border-panel-border rounded-[20px] shadow-[0_16px_48px_rgba(0,0,0,0.5)] p-3 flex gap-3 items-center backdrop-blur-md">
+                <div className="flex max-w-[calc(100vw-1rem)] items-center gap-2 overflow-x-auto rounded-control border border-panel-border bg-panel-bg p-2">
                     <button
                             type="button"
                             onClick={handleTogglePin}
                             onMouseDown={(e) => e.stopPropagation()}
-                            className={`px-5 py-3 text-[24px] font-semibold rounded-[12px] border-2 transition-colors whitespace-nowrap ${
+                            className={`min-h-9 whitespace-nowrap rounded-control border px-3 text-xs font-semibold transition-colors ${
                                 isPinned
-                                    ? 'bg-amber-500/20 text-amber-300 border-amber-500/50 hover:bg-amber-500/30'
-                                    : 'bg-panel-bg text-text-secondary border-panel-border hover:text-text-primary hover:bg-white/5'
+                                    ? 'border-warning-border bg-warning-bg text-warning-text'
+                                    : 'border-control-border bg-surface-raised text-text-muted hover:bg-surface-hover hover:text-text'
                             }`}
                             title={isPinned ? 'Lås upp sektionsbredd' : 'Lås denna sektionsbredd'}
                         >
-                            {isPinned ? '🔒 Låst' : '🔓 Lås'}
+                            {isPinned ? 'Låst' : 'Lås bredd'}
                         </button>
 
                         <button
                             type="button"
                             onClick={handleToggleDoor}
                             onMouseDown={(e) => e.stopPropagation()}
-                            className={`px-5 py-3 text-[24px] font-semibold rounded-[12px] border-2 transition-colors whitespace-nowrap ${
+                            className={`min-h-9 whitespace-nowrap rounded-control border px-3 text-xs font-semibold transition-colors ${
                                 segment.isDoor
-                                    ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/50 hover:bg-emerald-500/30'
-                                    : 'bg-panel-bg text-text-secondary border-panel-border hover:text-text-primary hover:bg-white/5'
+                                    ? 'border-success-border bg-success-bg text-success-text'
+                                    : 'border-control-border bg-surface-raised text-text-muted hover:bg-surface-hover hover:text-text'
                             }`}
                             title={segment.isDoor ? 'Gör till vanlig glassektion' : 'Gör till dörrsektion'}
                         >
-                            {segment.isDoor ? '🚪 Dörr' : '🚪 Sektion'}
+                            {segment.isDoor ? 'Dörr' : 'Sektion'}
                         </button>
 
-                        <div className="flex items-center border-2 border-panel-border rounded-[12px] overflow-hidden">
+                        <div className="flex items-center overflow-hidden rounded-control border border-control-border">
                             <button
                                 type="button"
                                 onClick={() => handleStepResize(-100)}
                                 onMouseDown={(e) => e.stopPropagation()}
-                                className="px-4 py-3 text-[24px] font-bold bg-panel-bg text-text-secondary border-r-2 border-panel-border hover:text-text-primary hover:bg-white/5 transition-colors"
+                                className="min-h-9 min-w-9 border-r border-control-border bg-surface-raised text-sm font-bold text-text-muted transition-colors hover:bg-surface-hover hover:text-text"
                                 title="Minska med 100 mm"
                             >
-                                −
+                                <IconMinus aria-hidden="true" className="mx-auto" size={17} stroke={2} />
                             </button>
-                            <span className="px-4 py-3 text-[22px] font-semibold text-text-secondary bg-panel-bg/40">
+                            <span className="px-2 text-xs font-semibold text-text-muted">
                                 100
                             </span>
                             <button
                                 type="button"
                                 onClick={() => handleStepResize(100)}
                                 onMouseDown={(e) => e.stopPropagation()}
-                                className="px-4 py-3 text-[24px] font-bold bg-panel-bg text-text-secondary border-l-2 border-panel-border hover:text-text-primary hover:bg-white/5 transition-colors"
+                                className="min-h-9 min-w-9 border-l border-control-border bg-surface-raised text-sm font-bold text-text-muted transition-colors hover:bg-surface-hover hover:text-text"
                                 title="Öka med 100 mm"
                             >
-                                +
+                                <IconPlus aria-hidden="true" className="mx-auto" size={17} stroke={2} />
                             </button>
                         </div>
 
@@ -1973,7 +2013,7 @@ export function SketchCanvas({
                             value={segment.length}
                             onChange={handleSizeSelect}
                             onMouseDown={(e) => e.stopPropagation()}
-                            className="bg-input-bg border-2 border-panel-border rounded-[12px] text-text-primary px-4 py-3 text-[24px] font-semibold outline-none focus:border-primary cursor-pointer transition-colors"
+                            className="min-h-9 cursor-pointer rounded-control border border-control-border bg-input-bg px-3 text-sm font-semibold text-text-primary outline-none transition-colors focus:border-focus-ring"
                         >
                             {currentSizeList.map((sz) => (
                                 <option key={sz} value={sz}>
@@ -1992,77 +2032,105 @@ export function SketchCanvas({
     };
 
     return (
-        <div id="sketchCanvasContainer" className="relative w-full h-full bg-[#0b1220] overflow-hidden rounded-xl border border-panel-border shadow-2xl">
-            {/* Absolute floating toolbar container for modes, zoom, and contextual sub-toolbars */}
-            <div className="absolute top-4 left-1/2 -translate-x-1/2 z-20 pointer-events-none flex flex-col items-center gap-4 w-full max-w-[95%]" data-html2canvas-ignore="true">
-                <div className="pointer-events-auto flex flex-wrap items-center justify-center gap-4 bg-panel-bg/80 backdrop-blur-md border border-panel-border rounded-[24px] px-5 py-3 shadow-[0_16px_48px_rgba(0,0,0,0.5)]">
-                    <div className="flex flex-wrap items-center gap-2">
+        <div
+            id="sketchCanvasContainer"
+            data-surface="simple-sketch-canvas"
+            className="absolute inset-0 overflow-hidden bg-[#0b1220]"
+        >
+            <div
+                className="pointer-events-none absolute inset-x-2 top-2 z-20 flex items-start justify-between gap-2 sm:inset-x-3 sm:top-3"
+                data-html2canvas-ignore="true"
+            >
+                <div
+                    className={`pointer-events-auto flex min-w-0 max-w-[calc(100%-10.5rem)] items-center gap-1 overflow-x-auto rounded-control border border-panel-border bg-panel-bg p-1 sm:max-w-none ${
+                        panelOpen ? 'md:max-w-[calc(100%-35rem)] xl:max-w-none' : ''
+                    }`}
+                >
+                    <div className="flex shrink-0 items-center gap-1">
                         <button
                             type="button"
                             aria-pressed={activeMode === 'clickitup'}
                             onClick={() => onChangeMode && onChangeMode('clickitup')}
-                            className={`h-8 px-3 rounded-md border text-xs font-semibold tracking-wide transition-all ${activeMode === 'clickitup'
-                                ? 'bg-primary/95 text-white border-blue-200/60 shadow-[0_0_0_1px_rgba(191,219,254,0.55),0_8px_18px_rgba(37,99,235,0.35)]'
-                                : 'bg-blue-900/20 text-blue-300 border-blue-800/50 hover:text-white hover:border-blue-500/60 hover:bg-blue-800/40'
+                            className={`inline-flex min-h-9 shrink-0 items-center gap-2 rounded-control px-2.5 text-xs font-semibold transition-colors ${activeMode === 'clickitup'
+                                ? 'bg-action-soft text-action-soft-text'
+                                : 'text-text-muted hover:bg-surface-hover hover:text-text'
                                 }`}
                         >
+                            <IconLayoutGrid aria-hidden="true" size={17} stroke={1.8} />
                             ClickitUp
                         </button>
                         <button
                             type="button"
                             aria-pressed={activeMode === 'parasol'}
                             onClick={() => onChangeMode && onChangeMode('parasol')}
-                            className={`h-8 px-3 rounded-md border text-xs font-semibold tracking-wide transition-all ${activeMode === 'parasol'
-                                ? 'bg-emerald-600/95 text-white border-emerald-300/60 shadow-[0_0_0_1px_rgba(110,231,183,0.55),0_8px_18px_rgba(5,150,105,0.35)]'
-                                : 'bg-emerald-900/20 text-emerald-300 border-emerald-800/50 hover:text-white hover:border-emerald-500/60 hover:bg-emerald-800/40'
+                            className={`inline-flex min-h-9 shrink-0 items-center gap-2 rounded-control px-2.5 text-xs font-semibold transition-colors ${activeMode === 'parasol'
+                                ? 'bg-action-soft text-action-soft-text'
+                                : 'text-text-muted hover:bg-surface-hover hover:text-text'
                                 }`}
                         >
+                            <IconUmbrella aria-hidden="true" size={17} stroke={1.8} />
                             Parasoll
                         </button>
                         <button
                             type="button"
                             aria-pressed={activeMode === 'fiesta'}
                             onClick={() => onChangeMode && onChangeMode('fiesta')}
-                            className={`h-8 px-3 rounded-md border text-xs font-semibold tracking-wide transition-all ${activeMode === 'fiesta'
-                                ? 'bg-amber-500/95 text-white border-amber-200/60 shadow-[0_0_0_1px_rgba(253,230,138,0.55),0_8px_18px_rgba(217,119,6,0.35)]'
-                                : 'bg-amber-900/20 text-amber-300 border-amber-800/50 hover:text-white hover:border-amber-500/60 hover:bg-amber-800/40'
+                            className={`inline-flex min-h-9 shrink-0 items-center gap-2 rounded-control px-2.5 text-xs font-semibold transition-colors ${activeMode === 'fiesta'
+                                ? 'bg-action-soft text-action-soft-text'
+                                : 'text-text-muted hover:bg-surface-hover hover:text-text'
                                 }`}
                         >
+                            <IconToolsKitchen2 aria-hidden="true" size={17} stroke={1.8} />
                             Fiesta
                         </button>
-                        <span className="rounded-full border border-panel-border bg-input-bg px-2.5 py-1 text-xs font-medium text-text-primary">
+                        <span className="hidden shrink-0 border-l border-border px-2.5 text-xs font-medium text-text-muted lg:inline">
                             {activeSelectionLabel}
-                        </span>
-                    </div>
-
-                    <div className="flex flex-wrap items-center gap-1.5">
-                        <button
-                            type="button"
-                            onClick={handleZoomOut}
-                            className="h-8 px-3 rounded-md border border-panel-border bg-input-bg text-xs font-semibold text-text-primary hover:bg-white/5 transition-colors"
-                        >
-                            Zoom -
-                        </button>
-                        <button
-                            type="button"
-                            onClick={handleZoomIn}
-                            className="h-8 px-3 rounded-md border border-panel-border bg-input-bg text-xs font-semibold text-text-primary hover:bg-white/5 transition-colors"
-                        >
-                            Zoom +
-                        </button>
-                        <button
-                            type="button"
-                            onClick={handleFitView}
-                            className="h-8 px-3 rounded-md border border-panel-border bg-input-bg text-xs font-semibold text-text-primary hover:bg-white/5 transition-colors"
-                        >
-                            Anpassa vy
-                        </button>
-                        <span className="text-xs text-text-secondary">
-                            Zoom: <b className="text-text-primary">{activeCamera.zoom.toFixed(2)}x</b>
                         </span>
                     </div>
                 </div>
 
+                <div
+                    className={`pointer-events-auto flex shrink-0 items-center rounded-control border border-panel-border bg-panel-bg p-1 ${
+                        panelOpen ? 'md:mr-[360px] xl:mr-0' : ''
+                    }`}
+                >
+                    <CanvasIconButton
+                        label="Ångra"
+                        onClick={undo}
+                        disabled={!canUndo}
+                        icon={<IconArrowBackUp aria-hidden="true" size={18} stroke={1.8} />}
+                    />
+                    <CanvasIconButton
+                        label="Gör om"
+                        onClick={redo}
+                        disabled={!canRedo}
+                        icon={<IconArrowForwardUp aria-hidden="true" size={18} stroke={1.8} />}
+                    />
+                    <span className="mx-1 h-5 w-px bg-border" aria-hidden="true" />
+                    <CanvasIconButton
+                        label="Zooma ut"
+                        onClick={handleZoomOut}
+                        className="hidden sm:inline-flex"
+                        icon={<IconZoomOut aria-hidden="true" size={18} stroke={1.8} />}
+                    />
+                    <CanvasIconButton
+                        label="Zooma in"
+                        onClick={handleZoomIn}
+                        className="hidden sm:inline-flex"
+                        icon={<IconZoomIn aria-hidden="true" size={18} stroke={1.8} />}
+                    />
+                    <CanvasIconButton
+                        label={`Anpassa vy, zoom ${activeCamera.zoom.toFixed(2)} gånger`}
+                        onClick={handleFitView}
+                        icon={<IconArrowsMaximize aria-hidden="true" size={18} stroke={1.8} />}
+                    />
+                </div>
+            </div>
+
+            <div
+                className="pointer-events-none absolute left-1/2 top-16 z-20 -translate-x-1/2"
+                data-html2canvas-ignore="true"
+            >
                 {renderSegmentToolbar()}
             </div>
 
@@ -2259,32 +2327,6 @@ export function SketchCanvas({
                     </g>
                 </svg>
 
-                {/* Floating Undo/Redo capsule */}
-                <div className="absolute bottom-4 left-4 flex items-center gap-1.5 bg-[#12121a]/85 backdrop-blur-md border border-panel-border/80 rounded-full p-1.5 shadow-[0_8px_32px_0_rgba(0,0,0,0.55)]">
-                    <button
-                        type="button"
-                        onClick={undo}
-                        disabled={!canUndo}
-                        className={`p-2 rounded-full transition-all duration-200 ${canUndo ? 'text-primary hover:bg-white/10 hover:text-white active:scale-95' : 'text-slate-600 cursor-not-allowed opacity-50'}`}
-                        title="Ångra (Ctrl+Z)"
-                    >
-                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M9 15L3 9m0 0l6-6M3 9h12a6 6 0 010 12h-3" />
-                        </svg>
-                    </button>
-                    <div className="w-[1px] h-5 bg-panel-border/60" />
-                    <button
-                        type="button"
-                        onClick={redo}
-                        disabled={!canRedo}
-                        className={`p-2 rounded-full transition-all duration-200 ${canRedo ? 'text-primary hover:bg-white/10 hover:text-white active:scale-95' : 'text-slate-600 cursor-not-allowed opacity-50'}`}
-                        title="Gör om (Ctrl+Y)"
-                    >
-                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l6-6m0 0l-6-6m6 6H9a6 6 0 000 12h3" />
-                        </svg>
-                    </button>
-                </div>
             </div>
         </div>
     );

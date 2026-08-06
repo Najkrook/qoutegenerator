@@ -257,9 +257,9 @@ export function ActivityLogs({ onBack }: ActivityLogsProps) {
                         <button
                             type="button"
                             onClick={onBack}
-                            className="px-4 py-2 bg-panel-bg border border-panel-border hover:bg-white/5 rounded text-text-primary transition-colors"
+                            className="min-h-10 px-4 py-2 bg-surface-raised border border-control-border hover:bg-surface-hover rounded-md text-foreground transition-colors"
                         >
-                            ← Tillbaka
+                            Tillbaka
                         </button>
                     )}
                 </div>

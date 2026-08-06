@@ -1,4 +1,10 @@
 import { useState, useMemo, useCallback, useRef, useEffect } from 'react';
+import {
+    IconDownload,
+    IconRefresh,
+    IconRulerMeasure,
+    IconStack2
+} from '@tabler/icons-react';
 import { useQuote } from '../../../store/QuoteContext';
 import { useAuth } from '../../../store/AuthContext';
 import {
@@ -30,6 +36,12 @@ import { SketchCanvas } from '../SketchCanvas';
 import { SketchInspectorPanel, SketchSetupPanel } from '../SketchConfig';
 import { SketchReviewPanel } from '../SketchBom';
 import { StockComparisonModal } from '../StockComparisonModal';
+import {
+    SketchResponsivePanel,
+    SketchWorkspaceHeader,
+    type SketchPanelTab
+} from '../SketchWorkspace/SketchWorkspaceChrome';
+import { useSketchDraftAutosave } from '../SketchWorkspace/useSketchDraftAutosave';
 import { safeLogActivity } from '../../../services/activityLogService';
 import {
     confirmAction,
@@ -438,7 +450,31 @@ export function SimpleSketchEditor({ onBack, onExportToQuoteComplete, modeToggle
 
     const [showStockModal, setShowStockModal] = useState(false);
     const [dragPreview, setDragPreview] = useState<DragPreview | null>(null);
-    const [activeSidebarTab, setActiveSidebarTab] = useState<'setup' | 'inspector' | 'review' | 'none'>('none');
+    const [activePanelTab, setActivePanelTab] = useState<SketchPanelTab>('drawing');
+    const [panelOpen, setPanelOpen] = useState(true);
+
+    const autosaveSnapshot = useMemo(() => ({
+        config: serializeSketchConfig(config),
+        workspace
+    }), [config, workspace]);
+
+    const commitAutosaveSnapshot = useCallback((snapshot: typeof autosaveSnapshot) => {
+        const sketchDraftStatePatch: SketchDraftStatePatch = {
+            sketchDraft: snapshot
+        };
+        dispatch({
+            type: 'UPDATE_STATE',
+            payload: sketchDraftStatePatch
+        });
+    }, [dispatch]);
+
+    const {
+        status: autosaveStatus,
+        flush: flushAutosave
+    } = useSketchDraftAutosave({
+        snapshot: autosaveSnapshot,
+        onSave: commitAutosaveSnapshot
+    });
 
     // History stacks for undo/redo
     const [past, setPast] = useState<SketchConfigState[]>([]);
@@ -732,6 +768,8 @@ export function SimpleSketchEditor({ onBack, onExportToQuoteComplete, modeToggle
     );
 
     const handleSelectEdge = useCallback((edgeKey) => {
+        setActivePanelTab('properties');
+        setPanelOpen(true);
         setWorkspace((prev) => ({
             ...prev,
             selection: { edgeKey, segmentIndex: null }
@@ -750,6 +788,18 @@ export function SimpleSketchEditor({ onBack, onExportToQuoteComplete, modeToggle
         setConfig(cloneSketchConfig(initialConfigRef.current));
         setWorkspace(cloneWorkspace(initialWorkspaceRef.current));
     }, []);
+
+    const handleResetRequest = useCallback(async () => {
+        const confirmed = await confirmAction({
+            title: 'Börja om med ritningen?',
+            message: 'Alla ändringar som gjorts sedan du öppnade ritningen återställs. Det här påverkar inte offertens övriga innehåll.',
+            confirmText: 'Börja om',
+            cancelText: 'Behåll ritningen',
+            tone: 'danger'
+        });
+        if (!confirmed) return;
+        resetSketch();
+    }, [resetSketch]);
 
     const setSectionCount = useCallback((edgeKey, count) => {
         updateConfig({
@@ -869,7 +919,8 @@ export function SimpleSketchEditor({ onBack, onExportToQuoteComplete, modeToggle
             selectedParasolId: mode === 'parasol' ? config.selectedParasolId : null,
             selectedFiestaId: mode === 'fiesta' ? config.selectedFiestaId : null
         });
-        setActiveSidebarTab('inspector');
+        setActivePanelTab('properties');
+        setPanelOpen(true);
     }, [config.selectedFiestaId, config.selectedParasolId, updateConfig]);
 
     const handlePlaceParasol = useCallback((xMm, yMm) => {
@@ -904,9 +955,13 @@ export function SimpleSketchEditor({ onBack, onExportToQuoteComplete, modeToggle
             parasols: [...(config.parasols || []), newParasol],
             selectedParasolId: newId
         });
+        setActivePanelTab('properties');
+        setPanelOpen(true);
     }, [config.activeMode, config.selectedParasolPresetId, config.parasols, parasolAreaPolygon, updateConfig]);
 
     const handleSelectParasol = useCallback((id) => {
+        setActivePanelTab('properties');
+        setPanelOpen(true);
         updateConfig({ selectedParasolId: id });
     }, [updateConfig]);
 
@@ -995,9 +1050,13 @@ export function SimpleSketchEditor({ onBack, onExportToQuoteComplete, modeToggle
             fiestaItems: [...(config.fiestaItems || []), newFiesta],
             selectedFiestaId: newId
         });
+        setActivePanelTab('properties');
+        setPanelOpen(true);
     }, [config.activeMode, config.fiestaItems, parasolAreaPolygon, updateConfig]);
 
     const handleSelectFiesta = useCallback((id) => {
+        setActivePanelTab('properties');
+        setPanelOpen(true);
         updateConfig({ selectedFiestaId: id });
     }, [updateConfig]);
 
@@ -1022,18 +1081,6 @@ export function SimpleSketchEditor({ onBack, onExportToQuoteComplete, modeToggle
             selectedFiestaId: config.selectedFiestaId === id ? null : config.selectedFiestaId
         });
     }, [config.fiestaItems, config.selectedFiestaId, updateConfig]);
-
-    useEffect(() => {
-        const hasFocusedSelection = Boolean(
-            config.selectedParasolId ||
-            config.selectedFiestaId ||
-            workspace.selection.segmentIndex !== null ||
-            workspace.selection.edgeKey
-        );
-        if (hasFocusedSelection) {
-            setActiveSidebarTab('inspector');
-        }
-    }, [config.selectedFiestaId, config.selectedParasolId, workspace.selection.edgeKey, workspace.selection.segmentIndex]);
 
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
@@ -1074,6 +1121,7 @@ export function SimpleSketchEditor({ onBack, onExportToQuoteComplete, modeToggle
     }, [undo, redo, config.selectedParasolId, config.selectedFiestaId, handleDeleteParasol, handleDeleteFiesta]);
 
     const handleExportClick = () => {
+        flushAutosave();
         if (!canExportSketchToQuote) {
             notifyError('Du har inte behörighet att exportera till offert.');
             return;
@@ -1104,6 +1152,7 @@ export function SimpleSketchEditor({ onBack, onExportToQuoteComplete, modeToggle
     };
 
     const commitExport = () => {
+        flushAutosave();
         if (!canExportSketchToQuote) {
             setShowStockModal(false);
             return;
@@ -1211,6 +1260,7 @@ export function SimpleSketchEditor({ onBack, onExportToQuoteComplete, modeToggle
     };
 
     const handleExportImage = async () => {
+        flushAutosave();
         const element = document.getElementById('sketchCanvasContainer');
         if (!element) {
             notifyError('Kan inte hitta skissen att exportera.');
@@ -1310,99 +1360,112 @@ export function SimpleSketchEditor({ onBack, onExportToQuoteComplete, modeToggle
     };
 
     const handleBackClick = useCallback(() => {
-        const sketchDraftStatePatch: SketchDraftStatePatch = {
-            sketchDraft: {
-                config: serializeSketchConfig(config),
-                workspace
-            }
-        };
-        dispatch({
-            type: 'UPDATE_STATE',
-            payload: sketchDraftStatePatch
-        });
+        flushAutosave();
         onBack?.();
-    }, [config, dispatch, onBack, workspace]);
+    }, [flushAutosave, onBack]);
+
+    const materialIssueCount = criticalWarnings.length
+        + invalidEdges.length
+        + warningWarnings.length
+        + autoAdjustedEdges.length
+        + parasolWarnings.length
+        + (layout.suggestions?.length || 0);
+    const readinessTone = sketchReviewState.health === 'blocked'
+        ? 'danger' as const
+        : sketchReviewState.health === 'attention'
+            ? 'warning' as const
+            : 'success' as const;
+    const readinessLabel = sketchReviewState.health === 'blocked'
+        ? (canExportSketchToQuote ? 'Kan inte överföras' : 'Kan inte laddas ner')
+        : sketchReviewState.health === 'attention'
+            ? `Kontrollera ${materialIssueCount} problem`
+            : (canExportSketchToQuote ? 'Redo att överföra' : 'Redo att ladda ner');
+    const openMaterialPanel = () => {
+        setActivePanelTab('material');
+        setPanelOpen(true);
+    };
 
     return (
-        <div className="animate-slide-in flex flex-col w-full h-[calc(100vh-100px)] min-h-[700px] bg-panel-bg rounded-xl overflow-hidden border border-panel-border shadow-2xl">
-            
-            {/* Top Header Bar */}
-            <header className="flex-none flex flex-wrap items-center justify-between px-6 py-3 border-b border-panel-border bg-panel-bg/95 backdrop-blur-sm z-20">
-                <div className="flex flex-col gap-0.5">
-                    <div className="flex items-center gap-3">
-                        <h2 className="text-xl md:text-2xl font-semibold text-text-primary m-0 tracking-tight">Rita Uteservering</h2>
-                        {modeToggleNode}
-                    </div>
-                    <p className="text-text-secondary text-xs m-0">
-                        Skissa en rektangel och beräkna optimala ClickitUp-sektioner.
-                    </p>
-                </div>
-
-                <div className="flex items-center gap-3">
-                    <span
-                        className={`rounded-full border px-3 py-1 text-xs font-semibold ${sketchReviewState.health === 'blocked'
-                            ? 'border-danger/50 text-danger bg-danger/10'
-                            : sketchReviewState.health === 'attention'
-                                ? 'border-amber-400/40 text-amber-200 bg-amber-500/10'
-                                : 'border-success/40 text-success bg-success/10'
-                            }`}
-                    >
-                        {sketchReviewState.healthLabel}
-                    </span>
-                    <button
-                        onClick={handleBackClick}
-                        className="h-9 px-4 border border-panel-border bg-panel-bg text-text-primary text-sm font-medium rounded-lg cursor-pointer hover:bg-white/5 transition-colors"
-                    >
-                        Till offert
-                    </button>
-                    <button
-                        onClick={handleExportImage}
-                        disabled={!canExport}
-                        className="h-9 px-4 border border-panel-border bg-panel-bg text-text-primary text-sm font-medium rounded-lg cursor-pointer hover:bg-white/5 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-                    >
-                        Ladda ner bild
-                    </button>
-                    <button
-                        onClick={resetSketch}
-                        className="h-9 px-4 border border-red-900/50 bg-red-950/20 text-red-300 text-sm font-medium rounded-lg cursor-pointer hover:text-white hover:border-red-500/60 hover:bg-red-800/40 transition-colors"
-                    >
-                        Återställ
-                    </button>
-                    <button
-                        onClick={handleExportClick}
-                        disabled={!canExport || !canExportSketchToQuote}
-                        className="h-9 px-4 bg-primary text-white border-none rounded-lg cursor-pointer text-sm font-semibold hover:brightness-110 disabled:opacity-40 disabled:cursor-not-allowed transition-all shadow-md"
-                    >
-                        Exportera till offert
-                    </button>
-                </div>
-            </header>
+        <div
+            data-surface="simple-sketch-editor"
+            className="flex h-full min-h-0 w-full flex-1 flex-col overflow-hidden rounded-xl border border-panel-border bg-panel-bg"
+        >
+            <SketchWorkspaceHeader
+                modeToggleNode={modeToggleNode}
+                onBack={handleBackClick}
+                saveStatus={autosaveStatus}
+                readiness={{
+                    label: readinessLabel,
+                    tone: readinessTone,
+                    onClick: openMaterialPanel
+                }}
+                primaryAction={canExportSketchToQuote
+                    ? {
+                        label: 'Överför till offert',
+                        onClick: handleExportClick,
+                        disabled: !canExport
+                    }
+                    : {
+                        label: 'Ladda ner bild',
+                        onClick: () => {
+                            void handleExportImage();
+                        },
+                        disabled: !canExport
+                    }}
+                secondaryAction={canExportSketchToQuote
+                    ? {
+                        label: 'Ladda ner bild',
+                        onClick: () => {
+                            void handleExportImage();
+                        },
+                        disabled: !canExport
+                    }
+                    : undefined}
+                overflowActions={[
+                    {
+                        label: 'Ladda ner bild',
+                        icon: <IconDownload aria-hidden="true" size={17} stroke={1.8} />,
+                        onClick: () => {
+                            void handleExportImage();
+                        },
+                        disabled: !canExport
+                    },
+                    {
+                        label: 'Börja om',
+                        icon: <IconRefresh aria-hidden="true" size={17} stroke={1.8} />,
+                        onClick: () => {
+                            void handleResetRequest();
+                        },
+                        tone: 'danger'
+                    }
+                ]}
+            />
 
             {/* Main Workspace (Canvas + Sidebar) */}
-            <div className="flex-1 flex overflow-hidden relative bg-panel-bg">
+            <div
+                data-surface="simple-sketch-workspace"
+                className="relative flex min-h-0 flex-1 basis-0 flex-col overflow-hidden bg-panel-bg md:flex-row"
+            >
                 
                 {/* Center Canvas Area */}
-                <main className="flex-1 relative bg-[#0b1220] h-full overflow-hidden flex flex-col" id="sketch-canvas-container">
-                    {/* Blocking Warnings Overlay */}
-                    {criticalWarnings.length > 0 && (
-                        <div className="absolute top-4 inset-x-4 z-30 rounded-xl border border-danger/40 bg-danger/10 px-4 py-3 text-danger text-sm shadow-lg backdrop-blur-md">
-                            <p className="font-semibold m-0 mb-1">Blockerande problem ({criticalWarnings.length})</p>
-                            <ul className="m-0 pl-5 space-y-1">
-                                {criticalWarnings.map((warning) => (
-                                    <li key={warning.id}>{warning.text}</li>
-                                ))}
-                            </ul>
-                        </div>
-                    )}
-
+                <div
+                    id="sketch-canvas-container"
+                    data-surface="simple-sketch-main"
+                    className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-[#0b1220]"
+                >
                     {/* The SVG Canvas */}
-                    <div className="flex-1 w-full h-full">
+                    <div
+                        id="sketch-workspace-canvas"
+                        data-surface="simple-sketch-viewport"
+                        className="relative min-h-0 w-full flex-1 basis-0"
+                    >
                         <SketchCanvas
                             activeMode={config.activeMode}
                             parasols={config.parasols}
                             selectedParasolId={config.selectedParasolId}
                             fiestaItems={config.fiestaItems}
                             selectedFiestaId={config.selectedFiestaId}
+                            panelOpen={panelOpen}
                             onPlaceParasol={handlePlaceParasol}
                             onSelectParasol={handleSelectParasol}
                             onMoveParasol={handleMoveParasol}
@@ -1438,7 +1501,8 @@ export function SimpleSketchEditor({ onBack, onExportToQuoteComplete, modeToggle
                             onResetDoorSegment={resetDoorSegment}
                             onSelectEdge={handleSelectEdge}
                             onSelectSection={(edgeKey, segmentIndex) => {
-                                setActiveSidebarTab('inspector');
+                                setActivePanelTab('properties');
+                                setPanelOpen(true);
                                 setWorkspace((prev) => ({
                                     ...prev,
                                     selection: { edgeKey, segmentIndex }
@@ -1456,34 +1520,51 @@ export function SimpleSketchEditor({ onBack, onExportToQuoteComplete, modeToggle
                         />
                     </div>
 
-                    {/* Bottom Summary Bar */}
-                    <div className="absolute bottom-6 inset-x-0 z-20 flex justify-center pointer-events-none hidden xl:flex">
-                        <div className="pointer-events-auto flex items-center gap-x-6 gap-y-1 rounded-full border border-panel-border bg-panel-bg/95 px-8 py-3 text-sm text-text-secondary shadow-xl backdrop-blur-md">
-                            <span>
-                                Bredd: <b className="text-text-primary text-base">{layout.edgeSummaries?.front?.effectiveLength ?? config.width} mm</b>
-                            </span>
-                            {config.equalDepth ? (
-                                <span>Djup: <b className="text-text-primary text-base">{layout.edgeSummaries?.left?.effectiveLength ?? config.depth} mm</b></span>
-                            ) : (
-                                <>
-                                    <span>Vänster: <b className="text-text-primary text-base">{layout.edgeSummaries?.left?.effectiveLength ?? config.depthLeft} mm</b></span>
-                                    <span>Höger: <b className="text-text-primary text-base">{layout.edgeSummaries?.right?.effectiveLength ?? config.depthRight} mm</b></span>
-                                </>
-                            )}
-                            <span>
-                                Sektioner: <b className="text-text-primary text-base">{layout.allSections.length} st</b>
-                            </span>
-                        </div>
+                    <div className="flex min-h-11 flex-none items-center gap-4 overflow-x-auto border-t border-panel-border bg-panel-bg px-3 text-xs text-text-muted sm:gap-6 sm:px-5">
+                        <span className="inline-flex shrink-0 items-center gap-2">
+                            <IconRulerMeasure aria-hidden="true" size={17} stroke={1.8} />
+                            <span className="hidden sm:inline">Bredd</span>
+                            <b className="tabular-nums text-text">{layout.edgeSummaries?.front?.effectiveLength ?? config.width} mm</b>
+                        </span>
+                        <span className="inline-flex shrink-0 items-center gap-2">
+                            <IconRulerMeasure aria-hidden="true" className="rotate-90" size={17} stroke={1.8} />
+                            <span className="hidden sm:inline">{config.equalDepth ? 'Djup' : 'Djup vänster/höger'}</span>
+                            <b className="tabular-nums text-text">
+                                {config.equalDepth
+                                    ? `${layout.edgeSummaries?.left?.effectiveLength ?? config.depth} mm`
+                                    : `${layout.edgeSummaries?.left?.effectiveLength ?? config.depthLeft} / ${layout.edgeSummaries?.right?.effectiveLength ?? config.depthRight} mm`}
+                            </b>
+                        </span>
+                        <span className="inline-flex shrink-0 items-center gap-2">
+                            <IconStack2 aria-hidden="true" size={17} stroke={1.8} />
+                            <span className="hidden sm:inline">Sektioner</span>
+                            <b className="tabular-nums text-text">{layout.allSections.length} st</b>
+                        </span>
+                        <button
+                            type="button"
+                            onClick={openMaterialPanel}
+                            className={`ml-auto inline-flex min-h-8 shrink-0 items-center rounded-full border px-2.5 font-semibold transition-colors hover:brightness-110 ${readinessTone === 'success'
+                                ? 'border-success-border bg-success-bg text-success-text'
+                                : readinessTone === 'warning'
+                                    ? 'border-warning-border bg-warning-bg text-warning-text'
+                                    : 'border-danger-border bg-danger-bg text-danger-text'
+                            }`}
+                        >
+                            {readinessLabel}
+                        </button>
                     </div>
-                </main>
+                </div>
 
-                {/* Right Sidebar (Properties & Export) */}
-                <aside className="hidden xl:flex w-[350px] flex-none border-l border-panel-border bg-panel-bg/60 flex-col h-full z-10 overflow-hidden backdrop-blur-md">
-                    <div className="p-5 flex-1 overflow-y-auto custom-scrollbar flex flex-col gap-6">
+                <SketchResponsivePanel
+                    activeTab={activePanelTab}
+                    materialCount={materialIssueCount}
+                    onTabChange={setActivePanelTab}
+                    open={panelOpen}
+                    onOpenChange={setPanelOpen}
+                >
+                    {activePanelTab === 'drawing' ? (
                         <SketchSetupPanel config={config} onChange={updateConfig} />
-                        
-                        <hr className="border-panel-border/60 border-t m-0" />
-
+                    ) : activePanelTab === 'properties' ? (
                         <SketchInspectorPanel
                             config={config}
                             onChange={updateConfig}
@@ -1502,7 +1583,7 @@ export function SimpleSketchEditor({ onBack, onExportToQuoteComplete, modeToggle
                             onRotateParasol={handleRotateParasol}
                             onDeleteFiesta={handleDeleteFiesta}
                         />
-                        <hr className="border-panel-border/60 border-t m-0" />
+                    ) : (
                         <SketchReviewPanel
                             reviewState={sketchReviewState}
                             canExportToQuote={canExportSketchToQuote}
@@ -1511,90 +1592,8 @@ export function SimpleSketchEditor({ onBack, onExportToQuoteComplete, modeToggle
                             onExport={handleExportClick}
                             onExportImage={handleExportImage}
                         />
-                    </div>
-                </aside>
-
-                {/* Mobile / Tablet floating sidebars */}
-                <div className="absolute bottom-4 inset-x-4 z-30 pointer-events-none flex flex-col gap-3 xl:hidden">
-                    <div className="pointer-events-auto flex items-center justify-center gap-2 flex-wrap">
-                        <button
-                            type="button"
-                            onClick={() => setActiveSidebarTab(activeSidebarTab === 'setup' ? 'none' : 'setup')}
-                            className={`px-4 py-2 rounded-full border text-sm font-semibold transition-colors shadow-lg ${activeSidebarTab === 'setup'
-                                ? 'border-blue-200/60 bg-primary text-white'
-                                : 'border-panel-border bg-panel-bg text-text-primary hover:bg-white/5'
-                                }`}
-                        >
-                            Inställningar
-                        </button>
-                        <button
-                            type="button"
-                            onClick={() => setActiveSidebarTab(activeSidebarTab === 'inspector' ? 'none' : 'inspector')}
-                            className={`px-4 py-2 rounded-full border text-sm font-semibold transition-colors shadow-lg ${activeSidebarTab === 'inspector'
-                                ? 'border-blue-200/60 bg-primary text-white'
-                                : 'border-panel-border bg-panel-bg text-text-primary hover:bg-white/5'
-                                }`}
-                        >
-                            Inspektör
-                        </button>
-                        <button
-                            type="button"
-                            onClick={() => setActiveSidebarTab(activeSidebarTab === 'review' ? 'none' : 'review')}
-                            className={`px-4 py-2 rounded-full border text-sm font-semibold transition-colors shadow-lg ${activeSidebarTab === 'review'
-                                ? 'border-blue-200/60 bg-primary text-white'
-                                : 'border-panel-border bg-panel-bg text-text-primary hover:bg-white/5'
-                                }`}
-                        >
-                            Granska
-                        </button>
-                    </div>
-                    {activeSidebarTab !== 'none' && (
-                        <div className="relative pointer-events-auto mt-2">
-                            <button
-                                type="button"
-                                onClick={() => setActiveSidebarTab('none')}
-                                className="absolute -top-3.5 left-1/2 -translate-x-1/2 bg-panel-bg border border-panel-border text-text-secondary hover:text-white hover:bg-white/10 rounded-full p-1 shadow-[0_4px_12px_rgba(0,0,0,0.5)] transition-all z-10"
-                                title="Minimera panelen"
-                            >
-                                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
-                                    <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-                                </svg>
-                            </button>
-                            <div className="bg-panel-bg/95 backdrop-blur-md rounded-2xl p-4 shadow-2xl border border-panel-border max-h-[400px] overflow-y-auto custom-scrollbar">
-                            {activeSidebarTab === 'setup' ? (
-                                <SketchSetupPanel config={config} onChange={updateConfig} />
-                            ) : activeSidebarTab === 'inspector' ? (
-                                <SketchInspectorPanel
-                                    config={config}
-                                    onChange={updateConfig}
-                                    selectedEdge={workspace.selection.edgeKey}
-                                    selectedSegmentIndex={workspace.selection.segmentIndex}
-                                    edgeSummaries={layout.edgeSummaries}
-                                    suggestions={layout.suggestions}
-                                    onSetManualPin={setManualPin}
-                                    onClearManualPins={clearManualPins}
-                                    onConvertSegmentToDoor={setDoorSegmentSize}
-                                    onSetDoorSegmentSize={setDoorSegmentSize}
-                                    onResetDoorSegment={resetDoorSegment}
-                                    onApplySuggestion={applySuggestion}
-                                    onHoverSuggestion={setHoveredSuggestion}
-                                    onDeleteParasol={handleDeleteParasol}
-                                    onRotateParasol={handleRotateParasol}
-                                    onDeleteFiesta={handleDeleteFiesta}
-                                />
-                            ) : (
-                                <SketchReviewPanel
-                                    reviewState={sketchReviewState}
-                                    canExportToQuote={canExportSketchToQuote}
-                                    onApplySuggestion={applySuggestion}
-                                    onHoverSuggestion={setHoveredSuggestion}
-                                    onExport={handleExportClick}
-                                />
-                            )}
-                        </div>
-                        </div>
                     )}
-                </div>
+                </SketchResponsivePanel>
             </div>
 
             {showStockModal && (

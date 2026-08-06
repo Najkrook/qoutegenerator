@@ -10,6 +10,8 @@ import { ContractingWorkSummaryTable } from '../components/features/ContractingW
 import { TermsAndPaymentPanel } from '../components/features/TermsAndPaymentPanel';
 import { MarginSummaryPanel } from '../components/features/MarginSummaryPanel';
 import { ExportLanguageSelector } from '../components/features/ExportLanguageSelector';
+import { Button } from '../components/ui/Button';
+import { PageHeader } from '../components/ui/PageHeader';
 import { downloadBlob, saveBlobWithPicker } from '../utils/fileUtils';
 import { createQuotePdfBlob } from '../services/quotePdfService';
 import { quoteRepository } from '../services/quoteRepositoryClient';
@@ -85,27 +87,15 @@ function getActivityCustomerLabel(customerInfo: QuoteState['customerInfo']): str
     return customerInfo.company || customerInfo.name || '';
 }
 
-function getOrderRequestStatusClasses(status: string): string {
-    switch (status) {
-        case 'completed':
-            return 'border-success/35 bg-success/10 text-success';
-        case 'reviewing':
-            return 'border-primary/35 bg-primary/10 text-primary';
-        case 'new':
-        default:
-            return 'border-warning/35 bg-warning/10 text-warning';
-    }
-}
-
 function getRetailerOrderRequestStatusClasses(status: string): string {
     switch (status) {
         case 'completed':
-            return 'border-success/35 bg-success/10 text-success';
+            return 'border-success-border bg-success-bg text-success-text';
         case 'reviewing':
-            return 'border-warning/35 bg-warning/10 text-warning';
+            return 'border-warning-border bg-warning-bg text-warning-text';
         case 'new':
         default:
-            return 'border-primary/35 bg-primary/10 text-primary';
+            return 'border-info-border bg-info-bg text-info-text';
     }
 }
 
@@ -115,9 +105,6 @@ export function getPdfExportBlockReason(quoteNumber: QuoteState['quoteNumber'] |
     }
 
     return 'Offerten saknar offertnummer. Spara offerten f\u00F6r att tilldela ett nummer, eller exportera \u00E4nd\u00E5 utan nummer.';
-    return quoteNumber
-        ? null
-        : 'Spara offerten först för att tilldela ett offertnummer innan PDF-export.';
 }
 
 async function exportExcelWorkbook(state: QuoteState, summaryData: QuoteTotalsResult): Promise<void> {
@@ -181,13 +168,26 @@ export function SummaryExport({
     );
     const [previewUrl, setPreviewUrl] = useState('');
     const [previewError, setPreviewError] = useState('');
+    const [isPreviewUpdating, setIsPreviewUpdating] = useState(true);
     const [isSavingQuote, setIsSavingQuote] = useState(false);
     const [orderRequest, setOrderRequest] = useState<OrderRequestRecord | null>(null);
     const [isLoadingOrderRequest, setIsLoadingOrderRequest] = useState(false);
     const [isSubmittingOrderRequest, setIsSubmittingOrderRequest] = useState(false);
     const [hasJustSubmittedOrderRequest, setHasJustSubmittedOrderRequest] = useState(false);
     const previewUrlRef = useRef<string>('');
+    const previewPdfRef = useRef<{
+        blob: Blob;
+        state: QuoteState;
+        summary: QuoteTotalsResult;
+    } | null>(null);
     const exportBlockReason = getPdfExportBlockReason(state.quoteNumber);
+    const hasQuoteNumber = Boolean(String(state.quoteNumber || '').trim());
+    const hasSavedRevision = Boolean(
+        state.activeQuoteId
+        && hasQuoteNumber
+        && Number(state.activeQuoteVersion) > 0
+    );
+    const saveLabel = state.activeQuoteId ? 'Spara ny version' : 'Spara offert';
 
     const allowedThemeOptions = useMemo(() => {
         if (!isRetailer) {
@@ -222,9 +222,7 @@ export function SummaryExport({
 
     const canSubmitOrderRequest = Boolean(
         isRetailer
-        && state.activeQuoteId
-        && state.quoteNumber
-        && Number(state.activeQuoteVersion) > 0
+        && hasSavedRevision
     );
 
     useEffect(() => {
@@ -240,33 +238,47 @@ export function SummaryExport({
 
     useEffect(() => {
         let cancelled = false;
+        setIsPreviewUpdating(true);
+        setPreviewError('');
 
-        void (async () => {
-            const pdfBlob = await createQuotePdfBlob(effectiveState, summaryData);
-            if (cancelled) return;
+        const timerId = globalThis.setTimeout(() => {
+            void (async () => {
+                try {
+                    const pdfBlob = await createQuotePdfBlob(effectiveState, summaryData);
+                    if (cancelled) return;
 
-            if (!pdfBlob) {
-                if (previewUrlRef.current) {
-                    URL.revokeObjectURL(previewUrlRef.current);
-                    previewUrlRef.current = '';
+                    if (!pdfBlob) {
+                        setPreviewError('Kunde inte skapa PDF-förhandsvisning. Kontrollera offertinnehållet och försök igen.');
+                        setIsPreviewUpdating(false);
+                        return;
+                    }
+
+                    previewPdfRef.current = {
+                        blob: pdfBlob,
+                        state: effectiveState,
+                        summary: summaryData
+                    };
+                    const nextUrl = URL.createObjectURL(pdfBlob);
+                    if (previewUrlRef.current) {
+                        URL.revokeObjectURL(previewUrlRef.current);
+                    }
+
+                    previewUrlRef.current = nextUrl;
+                    setPreviewUrl(nextUrl);
+                    setPreviewError('');
+                    setIsPreviewUpdating(false);
+                } catch (error) {
+                    if (cancelled) return;
+                    console.error('Failed to create quote preview:', error);
+                    setPreviewError('Kunde inte skapa PDF-förhandsvisning. Kontrollera offertinnehållet och försök igen.');
+                    setIsPreviewUpdating(false);
                 }
-                setPreviewUrl('');
-                setPreviewError('Kunde inte skapa PDF-förhandsvisning. Kontrollera offertinnehållet och försök igen.');
-                return;
-            }
-
-            const nextUrl = URL.createObjectURL(pdfBlob);
-            if (previewUrlRef.current) {
-                URL.revokeObjectURL(previewUrlRef.current);
-            }
-
-            previewUrlRef.current = nextUrl;
-            setPreviewUrl(nextUrl);
-            setPreviewError('');
-        })();
+            })();
+        }, 400);
 
         return () => {
             cancelled = true;
+            globalThis.clearTimeout(timerId);
         };
     }, [effectiveState, summaryData]);
 
@@ -311,6 +323,7 @@ export function SummaryExport({
                 URL.revokeObjectURL(previewUrlRef.current);
                 previewUrlRef.current = '';
             }
+            previewPdfRef.current = null;
         };
     }, []);
 
@@ -328,16 +341,32 @@ export function SummaryExport({
     };
 
     const handleExportPDF = async ({ allowMissingQuoteNumber = false }: PdfExportOptions = {}): Promise<void> => {
+        if (isSavingQuote) {
+            return;
+        }
+
         if (exportBlockReason && !allowMissingQuoteNumber) {
             notifyError(exportBlockReason);
             return;
         }
 
         const fileName = buildPdfFileName(state.customerInfo, selectedExportLanguage);
-        const pdfBlob = await createQuotePdfBlob(effectiveState, summaryData);
+        const cachedPreview = previewPdfRef.current;
+        const pdfBlob = cachedPreview?.state === effectiveState
+            && cachedPreview.summary === summaryData
+            ? cachedPreview.blob
+            : await createQuotePdfBlob(effectiveState, summaryData);
         if (!pdfBlob) {
             notifyError('Kunde inte skapa PDF.');
             return;
+        }
+
+        if (cachedPreview?.state !== effectiveState || cachedPreview.summary !== summaryData) {
+            previewPdfRef.current = {
+                blob: pdfBlob,
+                state: effectiveState,
+                summary: summaryData
+            };
         }
 
         const pickerResult = await saveBlobWithPicker(pdfBlob, fileName);
@@ -374,6 +403,10 @@ export function SummaryExport({
     };
 
     const handleExportExcel = async (): Promise<void> => {
+        if (isSavingQuote) {
+            return;
+        }
+
         const excelFileName = effectiveState.exportLanguage === 'en' ? 'Quote.xlsx' : 'Offert.xlsx';
 
         try {
@@ -400,7 +433,7 @@ export function SummaryExport({
     };
 
     const handleCopyQuoteLink = async (): Promise<void> => {
-        if (!state.activeQuoteId) return;
+        if (!state.activeQuoteId || isSavingQuote) return;
 
         try {
             if (!navigator.clipboard?.writeText) {
@@ -497,7 +530,7 @@ export function SummaryExport({
     };
 
     const handleSubmitOrderRequest = async (): Promise<void> => {
-        if (!canSubmitOrderRequest || isSubmittingOrderRequest || !retailer) {
+        if (!canSubmitOrderRequest || isSavingQuote || isSubmittingOrderRequest || !retailer) {
             return;
         }
 
@@ -524,32 +557,17 @@ export function SummaryExport({
         <div className="max-w-[1760px] mx-auto pb-20">
             <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_620px] gap-8 items-start">
                 <div>
-                    <div className="flex justify-between items-center mb-8">
-                        <div>
-                            <h2 className="text-3xl font-black text-white tracking-tight uppercase">Offertsammanställning</h2>
-                            <p className="text-text-secondary mt-1">Granska kunduppgifter och slutgiltiga belopp före export.</p>
-                        </div>
-                        <div className="flex items-center gap-3">
-                            {onBackToSketch && (
-                                <button
-                                    type="button"
-                                    onClick={onBackToSketch}
-                                    className="px-6 py-2.5 bg-panel-bg border border-panel-border text-text-secondary rounded-lg font-medium hover:bg-panel-border hover:text-white transition-all text-sm tracking-wide"
-                                >
+                    <div className="mb-8">
+                        <PageHeader
+                            eyebrow="Steg 4 av 4"
+                            title="Offertsammanställning"
+                            description="Granska kunduppgifter och slutgiltiga belopp före export."
+                            actions={onBackToSketch ? (
+                                <Button onClick={onBackToSketch}>
                                     Tillbaka till ritning
-                                </button>
-                            )}
-                            <button
-                                type="button"
-                                onClick={() => {
-                                    void handleSaveQuote();
-                                }}
-                                disabled={isSavingQuote}
-                                className="px-6 py-2.5 bg-success/10 border border-success/40 text-success rounded-lg font-bold hover:bg-success/20 hover:border-success/60 active:bg-success/30 transition-all text-sm uppercase tracking-wide disabled:opacity-50 disabled:cursor-not-allowed shadow-[0_0_15px_rgba(16,185,129,0.05)]"
-                            >
-                                {isSavingQuote ? 'Sparar...' : 'Spara offert'}
-                            </button>
-                        </div>
+                                </Button>
+                            ) : undefined}
+                        />
                     </div>
 
                     <div className="grid grid-cols-1 gap-8">
@@ -562,10 +580,8 @@ export function SummaryExport({
                         </section>
 
 
-                        <section className="bg-panel-bg border border-panel-border rounded-lg p-6 shadow-sm">
-                            <h3 className="text-lg font-bold mb-6 flex items-center gap-2">
-                                <span className="text-primary text-xl" aria-hidden="true">📋</span> Summering
-                            </h3>
+                        <section className="rounded-panel border border-border bg-surface-raised p-6 shadow-panel">
+                            <h2 className="mb-6 text-lg font-bold text-text">Summering</h2>
                             {hasProducts ? <FinalSummaryTable isMixedOffer={hasContractingWork} /> : null}
                             {hasContractingWork ? (
                                 <ContractingWorkSummaryTable className={hasProducts ? 'mt-8' : ''} />
@@ -573,90 +589,113 @@ export function SummaryExport({
                             {hasProducts ? <MarginSummaryPanel summaryData={summaryData} className="mt-6" /> : null}
                             <section className="mt-8 flex flex-col gap-6">
                                 {exportBlockReason && (
-                                    <div className="flex items-start gap-4 rounded-xl border border-amber-500/30 bg-amber-500/10 px-6 py-5 shadow-sm">
-                                        <div className="flex-shrink-0 text-2xl" aria-hidden="true">⚠️</div>
-                                        <div>
-                                            <h4 className="m-0 text-base font-bold text-amber-200">Offerten saknar offertnummer</h4>
-                                            <p className="m-0 mt-1 text-sm text-amber-100/90">{exportBlockReason}</p>
-                                            <p className="m-0 mt-2 text-sm text-amber-100/80">
+                                    <div className="rounded-panel border border-warning-border bg-warning-bg px-6 py-5 shadow-sm">
+                                        <div className="max-w-3xl">
+                                            <p className="m-0 text-[11px] font-bold uppercase tracking-[0.14em] text-warning-text">
+                                                Åtgärd krävs
+                                            </p>
+                                            <h3 className="m-0 text-base font-bold text-warning-text">Offerten saknar offertnummer</h3>
+                                            <p className="m-0 mt-1 text-sm text-text">{exportBlockReason}</p>
+                                            <p className="m-0 mt-2 text-sm text-text-muted">
                                                 Spara offert är rekommenderat, men du kan fortfarande exportera PDF:n utan nummer.
                                             </p>
+                                            <Button
+                                                onClick={() => {
+                                                    void handleExportPDF({ allowMissingQuoteNumber: true });
+                                                }}
+                                                disabled={isSavingQuote}
+                                                className="mt-4"
+                                            >
+                                                Exportera PDF utan offertnummer
+                                            </Button>
                                         </div>
                                     </div>
                                 )}
 
-                                <div className="flex flex-col xl:flex-row justify-between items-center gap-4 rounded-xl border border-panel-border bg-black/40 p-3 shadow-sm">
-                                    <button
-                                        type="button"
+                                <div className="flex flex-col items-stretch justify-between gap-4 rounded-panel border border-border bg-surface p-4 xl:flex-row xl:items-center">
+                                    <Button
                                         onClick={handleBack}
-                                        className="w-full xl:w-auto px-6 py-3 bg-panel-bg border border-panel-border text-text-secondary rounded-lg font-medium hover:bg-panel-border hover:text-white transition-all text-sm tracking-wide flex items-center justify-center gap-2 group whitespace-nowrap"
+                                        className="w-full whitespace-nowrap xl:w-auto"
+                                        size="lg"
                                     >
-                                        <span className="group-hover:-translate-x-1 transition-transform">&larr;</span>
                                         Tillbaka för att ändra priser
-                                    </button>
+                                    </Button>
 
-                                    <div className="flex flex-col sm:flex-row sm:flex-wrap items-center justify-center xl:justify-end gap-3 w-full xl:w-auto">
-
-                                        <button
-                                            type="button"
-                                            onClick={() => {
-                                                void handleSaveQuote();
-                                            }}
-                                            disabled={isSavingQuote}
-                                            className="w-full sm:w-auto px-6 py-3 bg-success/10 border border-success/40 text-success rounded-lg font-bold hover:bg-success/20 hover:border-success/60 active:bg-success/30 transition-all text-sm tracking-wide flex items-center justify-center gap-2 disabled:cursor-not-allowed disabled:opacity-50 shadow-[0_0_15px_rgba(16,185,129,0.05)]"
-                                        >
-                                            <span aria-hidden="true" className="opacity-70">💾</span> {isSavingQuote ? 'Sparar...' : 'Spara offert'}
-                                        </button>
-                                        
-
-
-                                        {exportBlockReason && (
-                                            <button
-                                                type="button"
+                                    <div className="flex w-full flex-col items-stretch gap-3 xl:w-auto xl:items-end">
+                                        {!hasQuoteNumber && (
+                                            <Button
                                                 onClick={() => {
-                                                    void handleExportPDF({ allowMissingQuoteNumber: true });
+                                                    void handleSaveQuote();
                                                 }}
-                                                className="w-full sm:w-auto px-6 py-3 bg-amber-500/10 text-amber-400 border border-amber-500/30 rounded-lg font-bold hover:bg-amber-500/20 transition-all text-sm tracking-wide flex items-center justify-center gap-2"
+                                                disabled={isSavingQuote}
+                                                className="w-full sm:w-auto"
+                                                size="lg"
+                                                variant="primary"
                                             >
-                                                <span aria-hidden="true">!</span> Exportera ändå
-                                            </button>
+                                                {isSavingQuote ? 'Sparar...' : saveLabel}
+                                            </Button>
                                         )}
 
-                                        <button
-                                            type="button"
-                                            onClick={() => {
-                                                void handleExportPDF();
-                                            }}
-                                            disabled={Boolean(exportBlockReason)}
-                                            className="w-full sm:w-auto px-8 py-3 bg-primary text-white rounded-lg font-bold hover:bg-primary-hover shadow-lg shadow-primary/20 transition-all text-sm tracking-wide flex items-center justify-center gap-2 disabled:cursor-not-allowed disabled:opacity-50 disabled:shadow-none"
-                                        >
-                                            <span aria-hidden="true">📄</span> Exportera som PDF
-                                        </button>
+                                        {hasQuoteNumber && (
+                                            <>
+                                                <Button
+                                                    onClick={() => {
+                                                        void handleExportPDF();
+                                                    }}
+                                                    disabled={isSavingQuote}
+                                                    className="w-full sm:w-auto"
+                                                    size="lg"
+                                                    variant="primary"
+                                                >
+                                                    Skapa PDF
+                                                </Button>
 
-                                        <button
-                                            type="button"
-                                            onClick={() => {
-                                                void handleExportExcel();
-                                            }}
-                                            disabled={Boolean(exportBlockReason)}
-                                            className="w-full sm:w-auto px-6 py-3 bg-panel-bg border border-panel-border text-white rounded-lg font-bold hover:bg-white/5 transition-all text-sm tracking-wide flex items-center justify-center gap-2 disabled:cursor-not-allowed disabled:opacity-50"
-                                        >
-                                            <span aria-hidden="true" className={exportBlockReason ? "opacity-50" : "opacity-70"}>📊</span> Exportera som Excel
-                                        </button>
+                                                <div className="flex flex-col flex-wrap gap-2 sm:flex-row sm:justify-end">
+                                                    <Button
+                                                        onClick={() => {
+                                                            void handleSaveQuote();
+                                                        }}
+                                                        disabled={isSavingQuote}
+                                                    >
+                                                        {isSavingQuote ? 'Sparar...' : saveLabel}
+                                                    </Button>
+
+                                                    <Button
+                                                        onClick={() => {
+                                                            void handleExportExcel();
+                                                        }}
+                                                        disabled={isSavingQuote}
+                                                    >
+                                                        Exportera Excel
+                                                    </Button>
+
+                                                    {state.activeQuoteId && (
+                                                        <Button
+                                                            onClick={() => {
+                                                                void handleCopyQuoteLink();
+                                                            }}
+                                                            disabled={isSavingQuote}
+                                                        >
+                                                            Kopiera länk
+                                                        </Button>
+                                                    )}
+                                                </div>
+                                            </>
+                                        )}
                                     </div>
                                 </div>
                             </section>
 
                             {isRetailer && (
-                                <section className="rounded-xl border border-panel-border bg-panel-bg p-6 shadow-sm mt-8">
+                                <section className="mt-8 rounded-panel border border-border bg-surface-raised p-6 shadow-panel">
                                     <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                                         <div className="max-w-3xl">
-                                            <h3 className="m-0 text-lg font-bold text-text-primary">Skicka orderförfrågan till BRIXX</h3>
+                                            <h2 className="m-0 text-lg font-bold text-text">Skicka orderförfrågan till BRIXX</h2>
                                             <p className="mt-2 text-sm text-text-secondary">
                                                 När offerten är sparad kan den skickas in som en orderförfrågan för intern hantering hos BRIXX.
                                             </p>
                                             {!canSubmitOrderRequest && (
-                                                <p className="mt-3 text-sm text-amber-200">
+                                                <p className="mt-3 text-sm text-warning-text">
                                                     Spara offerten först för att kunna skicka en orderförfrågan.
                                                 </p>
                                             )}
@@ -674,43 +713,42 @@ export function SummaryExport({
                                                 <p className="mt-3 text-sm text-text-secondary">Kontrollerar aktuell orderförfrågan...</p>
                                             )}
                                             {orderRequest && (
-                                                <div className="mt-4 rounded-xl border border-success/25 bg-success/10 p-4">
-                                                    <h4 className="m-0 text-base font-semibold text-text-primary">
+                                                <div className="mt-4 rounded-panel border border-success-border bg-success-bg p-4">
+                                                    <h3 className="m-0 text-base font-semibold text-text">
                                                         {hasJustSubmittedOrderRequest ? 'Tack för din order!' : 'Orderförfrågan registrerad'}
-                                                    </h4>
+                                                    </h3>
                                                     <p className="mt-2 text-sm text-text-secondary">
                                                         {hasJustSubmittedOrderRequest
                                                             ? 'Du kan följa statusen live under Skickade ordrar. Där ser du när BRIXX börjar hantera ärendet.'
                                                             : 'Följ statusen för era skickade ordrar under Skickade ordrar.'}
                                                     </p>
                                                     {onOpenRetailerOrderHistory && (
-                                                        <button
-                                                            type="button"
+                                                        <Button
                                                             onClick={onOpenRetailerOrderHistory}
-                                                            className="mt-4 rounded-md border border-panel-border bg-black/10 px-4 py-2 text-sm font-medium text-text-primary transition-colors hover:bg-white/5"
+                                                            className="mt-4"
                                                         >
                                                             Se skickade ordrar
-                                                        </button>
+                                                        </Button>
                                                     )}
                                                 </div>
                                             )}
                                         </div>
 
                                         <div className="flex w-full flex-col gap-3 lg:w-auto lg:min-w-[280px]">
-                                            <button
-                                                type="button"
+                                            <Button
                                                 onClick={() => {
                                                     void handleSubmitOrderRequest();
                                                 }}
-                                                disabled={!canSubmitOrderRequest || Boolean(orderRequest) || isSubmittingOrderRequest || isLoadingOrderRequest}
-                                                className="rounded-lg bg-primary px-6 py-3 text-sm font-bold text-white shadow-lg shadow-primary/20 transition-all hover:bg-primary-hover disabled:cursor-not-allowed disabled:opacity-50"
+                                                disabled={!canSubmitOrderRequest || isSavingQuote || Boolean(orderRequest) || isSubmittingOrderRequest || isLoadingOrderRequest}
+                                                size="lg"
+                                                variant="primary"
                                             >
                                                 {isSubmittingOrderRequest
                                                     ? 'Skickar orderförfrågan...'
                                                     : orderRequest
                                                         ? `Orderförfrågan registrerad för v${orderRequest.quoteVersion}`
                                                         : 'Skicka orderförfrågan'}
-                                            </button>
+                                            </Button>
                                             <p className="m-0 text-xs text-text-secondary">
                                                 Det här påverkar inte offertens vanliga status utan skapar ett separat adminärende.
                                             </p>
@@ -725,8 +763,12 @@ export function SummaryExport({
                 <aside className="bg-panel-bg border border-panel-border rounded-lg p-4 xl:sticky xl:top-4 shadow-sm flex flex-col gap-4">
                     <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                         <div>
-                            <h3 className="text-base font-bold text-text-primary">PDF förhandsvisning</h3>
-                            <p className="text-xs text-text-secondary mt-1">Uppdateras automatiskt när offertdata ändras.</p>
+                            <h2 className="text-base font-bold text-text">PDF-förhandsvisning</h2>
+                            <p className="text-xs text-text-secondary mt-1">
+                                {isPreviewUpdating
+                                    ? 'Uppdaterar förhandsvisning…'
+                                    : 'Uppdateras automatiskt när offertdata ändras.'}
+                            </p>
                         </div>
                         <div className="flex w-full flex-col gap-3 sm:w-auto sm:min-w-[180px]">
                             <label className="flex flex-col gap-1 text-xs font-semibold uppercase tracking-wide text-text-secondary">
@@ -735,7 +777,7 @@ export function SummaryExport({
                                     name="pdfThemeId"
                                     value={effectivePdfThemeId}
                                     onChange={handlePdfThemeChange}
-                                    className="h-[38px] w-full rounded-md border border-panel-border bg-panel-bg px-3 text-sm font-bold normal-case tracking-normal text-white outline-none transition-colors hover:bg-white/5 focus:border-primary focus:ring-2 focus:ring-primary/25"
+                                    className="h-10 w-full rounded-control border border-control-border bg-input px-3 text-sm font-semibold normal-case tracking-normal text-text transition-colors hover:bg-surface-hover"
                                 >
                                     {allowedThemeOptions.map((option) => (
                                         <option key={option.id} value={option.id}>
@@ -748,7 +790,10 @@ export function SummaryExport({
                             <ExportLanguageSelector />
                         </div>
                     </div>
-                    <div className="h-[860px] bg-white border border-panel-border rounded-md overflow-hidden">
+                    <div
+                        className="relative h-[860px] overflow-hidden rounded-control border border-border bg-paper"
+                        aria-busy={isPreviewUpdating}
+                    >
                         {previewUrl ? (
                             <iframe
                                 title="PDF förhandsvisning"
@@ -756,23 +801,24 @@ export function SummaryExport({
                                 className="w-full h-full"
                             />
                         ) : (
-                            <div className="w-full h-full flex items-center justify-center p-6 text-center text-sm text-text-secondary bg-black/5">
-                                {previewError || 'Genererar PDF-förhandsvisning...'}
+                            <div className="flex h-full w-full items-center justify-center bg-paper p-6 text-center text-sm text-on-paper">
+                                {previewError || 'Genererar PDF-förhandsvisning…'}
+                            </div>
+                        )}
+                        {previewUrl && isPreviewUpdating && (
+                            <div
+                                role="status"
+                                className="absolute right-3 top-3 rounded-full border border-info-border bg-info-bg px-3 py-1.5 text-xs font-semibold text-info-text shadow-panel"
+                            >
+                                Uppdaterar förhandsvisning…
                             </div>
                         )}
                     </div>
-                    <div className="flex justify-end">
-                        <button
-                            type="button"
-                            onClick={() => {
-                                void handleCopyQuoteLink();
-                            }}
-                            disabled={!state.activeQuoteId}
-                            className="w-full sm:w-auto px-5 py-2.5 bg-panel-bg border border-panel-border text-white rounded-lg font-bold hover:bg-white/5 transition-all text-sm tracking-wide flex items-center justify-center gap-2 disabled:cursor-not-allowed disabled:opacity-50 shadow-sm"
-                        >
-                            <span aria-hidden="true" className="opacity-70">🔗</span> Kopiera länk
-                        </button>
-                    </div>
+                    {previewUrl && previewError && (
+                        <p role="alert" className="m-0 text-sm text-danger-text">
+                            {previewError} Den senaste giltiga förhandsvisningen visas fortfarande.
+                        </p>
+                    )}
                 </aside>
             </div>
         </div>

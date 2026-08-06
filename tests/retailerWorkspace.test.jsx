@@ -47,7 +47,7 @@ function renderWithProviders(node, overrides = {}) {
             exchangeRate: 12.2,
             customerInfo: {
                 name: '',
-                company: '',
+                company: 'Testkund AB',
                 email: '',
                 reference: '',
                 customerReference: '',
@@ -101,40 +101,38 @@ function renderWithProviders(node, overrides = {}) {
 }
 
 describe('Retailer workspace', () => {
-    it('renders a retailer-specific dashboard overview with quote and history CTAs', () => {
+    it('renders a retailer quote overview and active product lines without duplicate navigation', () => {
         const html = renderWithProviders(
             <Dashboard
                 onStartQuote={() => {}}
-                onOpenHistory={() => {}}
-                onOpenInventory={() => {}}
-                onOpenSketch={() => {}}
-                onOpenRetailerOrderHistory={() => {}}
-                onOpenRetailerDocuments={() => {}}
             />
         );
 
-        expect(html).toContain('Retailer Workspace');
+        expect(html).toContain('Återförsäljarportal');
         expect(html).toContain('Välkommen, Markishuset');
         expect(html).toContain('Aktiva produktlinjer och rabatter');
         expect(html).toContain('12% rabatt');
-        expect(html).toContain('Starta Ny Offert');
-        expect(html).toContain('Mina Offerter');
-        expect(html).toContain('Skickade Ordrar');
-        expect(html).toContain('Produktdokument');
-        expect(html).not.toContain('Hantera Lagersaldo');
-        expect(html).not.toContain('Senaste Händelser');
+        expect(html).toContain('Skapa ny offert');
+        expect(html).not.toContain('Mina Offerter');
+        expect(html).not.toContain('Skickade Ordrar');
+        expect(html).not.toContain('Produktdokument');
+        expect(html).not.toContain('Lagersaldo');
+        expect(html).not.toContain('Sälj-CRM');
+        expect(html).not.toContain('Aktivitetslogg');
+        expect(html).not.toContain('Senaste aktivitet');
     });
 
     it('renders retailer product line selection with only active lines and discount preview', () => {
         const html = renderWithProviders(<ProductLineSelection onNext={() => {}} />);
 
-        expect(html).toContain('Retailer Scope');
+        expect(html).toContain('Kundinformation');
+        expect(html).toContain('Avtalat sortiment');
         expect(html).toContain('BaHaMa');
         expect(html).not.toContain('ClickitUp');
         expect(html).toContain('12% rabatt');
         expect(html).not.toContain('Ingår inte i ert retailer-avtal.');
         expect(html).not.toContain('Ej tillgänglig');
-        expect(html).toContain('Förhandsvisning: 12% retailer-rabatt');
+        expect(html).toContain('Förhandsvisning: 12% återförsäljarrabatt');
         expect((html.match(/type="radio"/g) || []).length).toBe(1);
         expect(html).not.toContain('disabled=""');
         expect(html).not.toContain('Entreprenadarbete');
@@ -162,10 +160,33 @@ describe('Retailer workspace', () => {
             }
         );
 
-        expect(html).toContain('Inga produktlinjer är tillgängliga för ert retailer-konto ännu.');
+        expect(html).toContain('Inga produktlinjer är tillgängliga för ert återförsäljarkonto ännu.');
         expect(html).not.toContain('BaHaMa');
         expect(html).not.toContain('ClickitUp');
         expect(html).toContain('cursor-not-allowed');
+    });
+
+    it('keeps the first step blocked until the customer is identified', () => {
+        const html = renderWithProviders(
+            <ProductLineSelection onNext={() => {}} />,
+            {
+                state: {
+                    customerInfo: {
+                        name: '',
+                        company: '',
+                        email: '',
+                        reference: '',
+                        customerReference: '',
+                        date: '',
+                        validity: '30 dagar',
+                        extraNotes: ''
+                    }
+                }
+            }
+        );
+
+        expect(html).toContain('Ange företag eller organisation för att fortsätta.');
+        expect(html).toContain('disabled=""');
     });
 
     it('renders retailer pricing guidance with global and row discounts capped by the retailer agreement', () => {
@@ -189,9 +210,9 @@ describe('Retailer workspace', () => {
             }
         );
 
-        expect(html).toContain('Retailer-prissättning');
+        expect(html).toContain('Återförsäljarprissättning');
         expect(html).toContain('Vald produktlinje: BaHaMa');
-        expect(html).toContain('Avtalad retailer-rabatt');
+        expect(html).toContain('Avtalad återförsäljarrabatt');
         expect(html).toContain('MAX 12%');
         expect(html).toContain('CustomCostsMock');
         expect(html).toContain('PricingTableMock');

@@ -210,7 +210,7 @@ export function TermsAndPaymentPanel({ summaryData }: TermsAndPaymentPanelProps)
                             }}
                             className="px-4 py-2 bg-primary/20 border border-primary/40 text-primary rounded-md text-sm font-semibold hover:bg-primary/30 transition-colors"
                         >
-                            💾 Spara mall
+                            Spara mall
                         </button>
                         {canDeleteSelected && (
                             <button
@@ -219,9 +219,9 @@ export function TermsAndPaymentPanel({ summaryData }: TermsAndPaymentPanelProps)
                                     void handleDeleteTemplate();
                                 }}
                                 className="px-3 py-2 bg-danger/20 border border-danger/40 text-danger rounded-md text-sm font-semibold hover:bg-danger/30 transition-colors"
-                                title="Ta bort vald mall"
+                                aria-label="Ta bort vald mall"
                             >
-                                🗑
+                                Ta bort
                             </button>
                         )}
                     </div>

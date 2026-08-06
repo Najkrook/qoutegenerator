@@ -65,6 +65,34 @@ export const APP_PATHS: Record<AppRouteId, string> = Object.freeze({
 export type QuoteRouteStepId = 'product-lines' | 'configuration' | 'pricing' | 'summary';
 export type SketchReturnTarget = 'dashboard' | 'quote-configuration' | 'quote-summary';
 export type AppRouteAccess = 'public' | 'authenticated' | 'quote' | 'history' | 'sketch' | 'admin' | 'retailer';
+export type QuoteStepNavigationStatus = 'current' | 'past' | 'available' | 'locked';
+export type QuoteStepBlockerCode = 'quote-content-required' | 'configuration-required';
+
+export interface QuoteStepBlocker {
+    code: QuoteStepBlockerCode;
+    path: string;
+    step: QuoteRouteStepId;
+}
+
+export interface QuoteStepNavigationItem {
+    blocker: QuoteStepBlocker | null;
+    canNavigate: boolean;
+    current: boolean;
+    label: string;
+    locked: boolean;
+    number: 1 | 2 | 3 | 4;
+    path: string;
+    past: boolean;
+    status: QuoteStepNavigationStatus;
+    step: QuoteRouteStepId;
+}
+
+export const QUOTE_ROUTE_STEPS: readonly QuoteRouteStepId[] = [
+    'product-lines',
+    'configuration',
+    'pricing',
+    'summary'
+];
 
 const QUOTE_STEP_TO_ROUTE_ID: Record<QuoteRouteStepId, AppRouteId> = {
     'product-lines': APP_ROUTE_IDS.quoteProductLines,
@@ -78,6 +106,13 @@ const QUOTE_STEP_NUMBERS: Record<QuoteRouteStepId, 1 | 2 | 3 | 4> = {
     configuration: 2,
     pricing: 3,
     summary: 4
+};
+
+const QUOTE_STEP_LABELS: Record<QuoteRouteStepId, string> = {
+    'product-lines': 'Offertinnehåll',
+    configuration: 'Konfiguration',
+    pricing: 'Prissättning',
+    summary: 'Sammanställning'
 };
 
 const QUOTE_STEP_NUMBER_TO_STEP: Record<1 | 2 | 3 | 4, QuoteRouteStepId> = {
@@ -183,6 +218,10 @@ export function getQuoteStepNumber(step: QuoteRouteStepId): 1 | 2 | 3 | 4 {
     return QUOTE_STEP_NUMBERS[step];
 }
 
+export function getQuoteStepLabel(step: QuoteRouteStepId): string {
+    return QUOTE_STEP_LABELS[step];
+}
+
 export function getQuoteRouteStepFromPath(pathname: string | null | undefined): QuoteRouteStepId | null {
     const routeId = getAppRouteIdFromPath(pathname);
     switch (routeId) {
@@ -282,7 +321,7 @@ export function hasConfiguredQuoteSelections(
         ));
 }
 
-interface QuoteDraftOptions {
+export interface QuoteDraftOptions {
     isRetailer?: boolean;
 }
 
@@ -297,16 +336,18 @@ export function hasConfiguredQuoteContent(
         || (!options.isRetailer && hasConfiguredContractingWork(state.contractingWork));
 }
 
-export function hasRetailerStartDraftData(
+export function hasQuoteStartDraftData(
     state: Pick<
         QuoteState,
         'selectedLines' | 'builderItems' | 'gridSelections' | 'customCosts' | 'activeQuoteId' | 'quoteNumber' | 'customerInfo'
-    >
+    > & Partial<Pick<QuoteState, 'contractingWork'>>,
+    options: QuoteDraftOptions = {}
 ): boolean {
     const hasSelectedLines = Array.isArray(state.selectedLines) && state.selectedLines.length > 0;
     const hasSelections = hasConfiguredQuoteSelections(state);
     const hasCustomCosts = Array.isArray(state.customCosts) && state.customCosts.length > 0;
     const hasQuoteIdentity = Boolean(state.activeQuoteId || state.quoteNumber);
+    const hasContractingWork = !options.isRetailer && state.contractingWork?.enabled === true;
     const customerInfo = state.customerInfo;
     const hasCustomerInfo = [
         customerInfo.name,
@@ -318,7 +359,18 @@ export function hasRetailerStartDraftData(
         customerInfo.date
     ].some((value) => String(value || '').trim().length > 0);
 
-    return hasSelectedLines || hasSelections || hasCustomCosts || hasQuoteIdentity || hasCustomerInfo;
+    return hasSelectedLines
+        || hasSelections
+        || hasCustomCosts
+        || hasQuoteIdentity
+        || hasContractingWork
+        || hasCustomerInfo;
+}
+
+export function hasRetailerStartDraftData(
+    state: Parameters<typeof hasQuoteStartDraftData>[0]
+): boolean {
+    return hasQuoteStartDraftData(state, { isRetailer: true });
 }
 
 function getQuoteStepFromStateStep(step: QuoteState['step']): QuoteRouteStepId | null {
@@ -329,16 +381,18 @@ function getQuoteStepFromStateStep(step: QuoteState['step']): QuoteRouteStepId |
     return null;
 }
 
-function getFallbackRetailerResumeQuoteStep(
+function getFallbackResumeQuoteStep(
     state: Pick<QuoteState, 'selectedLines' | 'builderItems' | 'gridSelections' | 'activeQuoteId' | 'quoteNumber' | 'activeQuoteVersion'>
+        & Partial<Pick<QuoteState, 'contractingWork'>>,
+    options: QuoteDraftOptions
 ): QuoteRouteStepId {
     const hasSelectedLines = Array.isArray(state.selectedLines) && state.selectedLines.length > 0;
-    if (!hasSelectedLines) {
+    const hasSelectedContractingWork = !options.isRetailer && state.contractingWork?.enabled === true;
+    if (!hasSelectedLines && !hasSelectedContractingWork) {
         return 'product-lines';
     }
 
-    const hasSelections = hasConfiguredQuoteSelections(state);
-    if (!hasSelections) {
+    if (!hasConfiguredQuoteContent(state, options)) {
         return 'configuration';
     }
 
@@ -346,21 +400,28 @@ function getFallbackRetailerResumeQuoteStep(
     return hasSavedQuoteIdentity ? 'summary' : 'pricing';
 }
 
-export function getRetailerResumeQuoteStep(
+export function getQuoteResumeStep(
     state: Pick<
         QuoteState,
         'step' | 'selectedLines' | 'builderItems' | 'gridSelections' | 'activeQuoteId' | 'quoteNumber' | 'activeQuoteVersion'
-    >
+    > & Partial<Pick<QuoteState, 'contractingWork'>>,
+    options: QuoteDraftOptions = {}
 ): QuoteRouteStepId {
     const currentStep = getQuoteStepFromStateStep(state.step);
     if (currentStep) {
         const currentRouteId = getQuoteStepRouteId(currentStep);
-        if (!getQuoteDraftGuardRedirect(currentRouteId, state, { isRetailer: true })) {
+        if (!getQuoteDraftGuardRedirect(currentRouteId, state, options)) {
             return currentStep;
         }
     }
 
-    return getFallbackRetailerResumeQuoteStep(state);
+    return getFallbackResumeQuoteStep(state, options);
+}
+
+export function getRetailerResumeQuoteStep(
+    state: Parameters<typeof getQuoteResumeStep>[0]
+): QuoteRouteStepId {
+    return getQuoteResumeStep(state, { isRetailer: true });
 }
 
 export function getQuoteDraftGuardRedirect(
@@ -388,4 +449,50 @@ export function getQuoteDraftGuardRedirect(
     }
 
     return null;
+}
+
+export function getQuoteStepNavigationItems(
+    state: QuoteDraftState,
+    currentStep: QuoteRouteStepId,
+    options: QuoteDraftOptions = {}
+): QuoteStepNavigationItem[] {
+    const currentStepNumber = getQuoteStepNumber(currentStep);
+
+    return QUOTE_ROUTE_STEPS.map((step) => {
+        const number = getQuoteStepNumber(step);
+        const path = getQuoteStepPath(step);
+        const guardRedirect = getQuoteDraftGuardRedirect(getQuoteStepRouteId(step), state, options);
+        const blockerStep = guardRedirect ? getQuoteRouteStepFromPath(guardRedirect) : null;
+        const blocker = guardRedirect && blockerStep
+            ? {
+                code: blockerStep === 'configuration'
+                    ? 'configuration-required' as const
+                    : 'quote-content-required' as const,
+                path: guardRedirect,
+                step: blockerStep
+            }
+            : null;
+        const current = step === currentStep;
+        const locked = blocker !== null;
+        const past = !current && !locked && number < currentStepNumber;
+
+        return {
+            step,
+            number,
+            label: getQuoteStepLabel(step),
+            path,
+            current,
+            past,
+            locked,
+            canNavigate: !current && !locked,
+            blocker,
+            status: locked
+                ? 'locked'
+                : current
+                    ? 'current'
+                    : past
+                        ? 'past'
+                        : 'available'
+        };
+    });
 }

@@ -1,4 +1,6 @@
 import type { StockComparisonModalProps, StockComparisonRow } from '../../types/contracts';
+import { Button } from '../ui/Button';
+import { Modal } from '../ui/Modal';
 
 function extractDoorSize(item: string | number): number | null {
     const match = /Dörr\s+(\d+)/i.exec(String(item));
@@ -55,10 +57,19 @@ export function StockComparisonModal({
         });
 
     return (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50" onClick={onCancel}>
-            <div className="bg-panel-bg border border-panel-border rounded-xl p-8 w-full max-w-3xl animate-slide-in" onClick={(event) => event.stopPropagation()}>
-                <h3 className="text-xl font-semibold text-text-primary mb-6 m-0">Lagerjämförelse</h3>
-
+        <Modal
+            onClose={onCancel}
+            title="Lagerjämförelse"
+            description="Jämför skissens behov med aktuellt lagersaldo innan export."
+            maxWidthClassName="max-w-3xl"
+            footer={(
+                <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+                    <Button onClick={onCancel}>Avbryt</Button>
+                    <Button onClick={onConfirm} variant="primary">Exportera till offert</Button>
+                </div>
+            )}
+        >
+            <div className="p-5 sm:p-6">
                 <div className="overflow-x-auto">
                     <table className="w-full border-collapse text-sm">
                         <thead>
@@ -75,57 +86,52 @@ export function StockComparisonModal({
                             {rows.map((row) => (
                                 <tr
                                     key={`${row.type}-${row.size}`}
-                                    className="border-b border-panel-border"
-                                    style={{
-                                        background: row.isShort
-                                            ? 'rgba(255, 80, 80, 0.12)'
-                                            : 'rgba(80, 255, 80, 0.05)'
-                                    }}
+                                    className={`border-b border-border ${row.isShort ? 'bg-danger-bg' : 'bg-success-bg'}`}
                                 >
                                     <td className="p-2.5 font-semibold text-text-primary">{row.type}</td>
                                     <td className="p-2.5 text-center text-text-primary">{row.size} mm</td>
                                     <td className="p-2.5 text-center font-bold text-text-primary">{row.needed}</td>
-                                    <td className="p-2.5 text-center font-bold" style={{ color: row.inStock > 0 ? '#4ade80' : '#9ca3af' }}>
+                                    <td className={`p-2.5 text-center font-bold ${row.inStock > 0 ? 'text-success-text' : 'text-text-muted'}`}>
                                         {row.inStock}
                                     </td>
-                                    <td className="p-2.5 text-center font-semibold" style={{ color: row.isShort ? '#ff6b6b' : '#4ade80' }}>
+                                    <td className={`p-2.5 text-center font-semibold ${row.isShort ? 'text-danger-text' : 'text-success-text'}`}>
                                         {row.isShort ? `${row.shortfall} st` : '0 st'}
                                     </td>
-                                    <td className="p-2.5 text-center font-semibold" style={{ color: row.isShort ? '#ff6b6b' : '#4ade80' }}>
+                                    <td className={`p-2.5 text-center font-semibold ${row.isShort ? 'text-danger-text' : 'text-success-text'}`}>
                                         {row.isShort ? 'Kritisk' : 'OK'}
                                     </td>
                                 </tr>
                             ))}
 
                             {stodbenCount > 0 && (
-                                <tr className="border-b border-panel-border" style={{ background: 'rgba(255, 165, 0, 0.05)' }}>
+                                <tr className="border-b border-border bg-warning-bg">
                                     <td className="p-2.5 font-semibold text-text-primary">Stödben 45°</td>
                                     <td className="p-2.5 text-center text-text-primary">-</td>
                                     <td className="p-2.5 text-center font-bold text-text-primary">{stodbenCount}</td>
-                                    <td className="p-2.5 text-center" style={{ color: '#888' }}>
+                                    <td className="p-2.5 text-center text-text-muted">
                                         -
                                     </td>
-                                    <td className="p-2.5 text-center" style={{ color: '#f39c12' }}>
+                                    <td className="p-2.5 text-center text-warning-text">
                                         -
                                     </td>
-                                    <td className="p-2.5 text-center" style={{ color: '#f39c12' }}>
+                                    <td className="p-2.5 text-center text-warning-text">
                                         Tillval
                                     </td>
                                 </tr>
                             )}
 
                             {slimlineCount > 0 && (
-                                <tr className="border-b border-panel-border" style={{ background: 'rgba(255, 165, 0, 0.05)' }}>
+                                <tr className="border-b border-border bg-warning-bg">
                                     <td className="p-2.5 font-semibold text-text-primary">Slimline</td>
                                     <td className="p-2.5 text-center text-text-primary">-</td>
                                     <td className="p-2.5 text-center font-bold text-text-primary">{slimlineCount}</td>
-                                    <td className="p-2.5 text-center" style={{ color: '#888' }}>
+                                    <td className="p-2.5 text-center text-text-muted">
                                         -
                                     </td>
-                                    <td className="p-2.5 text-center" style={{ color: '#f39c12' }}>
+                                    <td className="p-2.5 text-center text-warning-text">
                                         -
                                     </td>
-                                    <td className="p-2.5 text-center" style={{ color: '#f39c12' }}>
+                                    <td className="p-2.5 text-center text-warning-text">
                                         Tillval
                                     </td>
                                 </tr>
@@ -135,26 +141,11 @@ export function StockComparisonModal({
                 </div>
 
                 {hasShortfall && (
-                    <p className="mt-4 p-3 bg-danger/15 rounded-lg text-sm text-danger m-0">
+                    <p role="alert" className="m-0 mt-4 rounded-panel border border-danger-border bg-danger-bg p-3 text-sm text-danger-text">
                         Det finns lagerbrist för en eller flera storlekar. Du kan fortfarande exportera till offerten.
                     </p>
                 )}
-
-                <div className="flex justify-end gap-3 mt-6 pt-4 border-t border-panel-border">
-                    <button
-                        onClick={onCancel}
-                        className="px-5 py-2.5 border border-panel-border bg-transparent text-text-primary rounded-lg cursor-pointer hover:bg-white/5"
-                    >
-                        Avbryt
-                    </button>
-                    <button
-                        onClick={onConfirm}
-                        className="px-5 py-2.5 bg-primary text-white border-none rounded-lg cursor-pointer font-semibold hover:brightness-110"
-                    >
-                        Exportera till Offert
-                    </button>
-                </div>
             </div>
-        </div>
+        </Modal>
     );
 }

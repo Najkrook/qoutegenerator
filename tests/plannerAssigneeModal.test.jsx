@@ -98,6 +98,36 @@ afterEach(() => {
 });
 
 describe('planner assignee modal', () => {
+    it('supports assigning users by click and exposes dialog semantics', async () => {
+        const { container, onSave } = await renderModal();
+        const dialog = container.querySelector('[role="dialog"]');
+        const johanOption = getByTestId(container, 'planner-assignee-option-johan@brixx.se');
+        const saveButton = getByTestId(container, 'planner-assignee-save');
+
+        expect(dialog).toBeTruthy();
+        expect(dialog.getAttribute('aria-modal')).toBe('true');
+        expect(johanOption.getAttribute('aria-pressed')).toBe('false');
+
+        await click(johanOption);
+        expect(johanOption.getAttribute('aria-pressed')).toBe('true');
+
+        await click(saveButton);
+        expect(onSave).toHaveBeenCalledWith(expect.objectContaining({
+            assignees: ['johan@brixx.se']
+        }));
+    });
+
+    it('closes on Escape', async () => {
+        const { onClose } = await renderModal();
+
+        await act(async () => {
+            document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+            await Promise.resolve();
+        });
+
+        expect(onClose).toHaveBeenCalledTimes(1);
+    });
+
     it('renders the fixed assignee pool and saves drag-and-drop assignees without duplicates', async () => {
         const { container, onSave, onClose } = await renderModal();
         const johanOption = getByTestId(container, 'planner-assignee-option-johan@brixx.se');

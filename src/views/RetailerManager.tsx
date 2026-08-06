@@ -3,8 +3,7 @@ import React, {
     useEffect,
     useCallback,
     type ChangeEvent,
-    type FormEvent,
-    type MouseEvent
+    type FormEvent
 } from 'react';
 import { useAuth } from '../store/AuthContext';
 import { catalogData } from '../data/catalog';
@@ -24,6 +23,11 @@ import {
 } from '../services/retailerDocumentService';
 import { notifySuccess } from '../services/notificationService';
 import { getErrorMessage } from '../utils/runtime';
+import { Button } from '../components/ui/Button';
+import { Modal } from '../components/ui/Modal';
+import { PageHeader } from '../components/ui/PageHeader';
+import { Panel } from '../components/ui/Panel';
+import { StatusChip } from '../components/ui/StatusChip';
 import type {
     PdfThemeId,
     RetailerFormState,
@@ -109,6 +113,7 @@ function buildRetailerLineDocumentsDraftMap(records: RetailerLineDocumentsRecord
 }
 
 function RetailerForm({ initial, onSave, onCancel, saving }: RetailerFormProps) {
+    const formId = React.useId();
     const [form, setForm] = useState<RetailerFormState>(() => buildFormState(initial));
     const [error, setError] = useState('');
 
@@ -173,185 +178,193 @@ function RetailerForm({ initial, onSave, onCancel, saving }: RetailerFormProps) 
     };
 
     return (
-        <form onSubmit={handleSubmit} className="bg-panel-bg border border-panel-border rounded-xl p-6 space-y-5 animate-fade-in">
+        <form onSubmit={handleSubmit} className="animate-fade-in space-y-5 rounded-panel border border-border bg-surface-raised p-6 shadow-panel">
             {error && (
-                <div className="bg-red-500/10 border border-red-500/30 text-red-400 rounded-lg p-3 text-sm">
+                <div role="alert" className="rounded-control border border-danger-border bg-danger-soft p-3 text-sm text-danger-text">
                     {error}
                 </div>
             )}
 
             <div>
-                <label className="block text-xs font-bold text-text-secondary uppercase mb-1.5">Namn *</label>
+                <label htmlFor={`${formId}-name`} className="mb-1.5 block text-xs font-bold uppercase text-text-muted">Namn *</label>
                 <input
+                    id={`${formId}-name`}
+                    name="retailerName"
                     type="text"
                     value={form.name}
                     onChange={updateField('name')}
                     placeholder="T.ex. Markishuset"
                     required
-                    className="w-full bg-input-bg border border-panel-border text-text-primary p-2.5 rounded-md outline-none focus:border-primary transition-colors"
+                    autoComplete="organization"
+                    className="w-full rounded-control border border-control-border bg-input p-2.5 text-text outline-none transition-colors focus:border-action"
                 />
             </div>
 
             <div>
-                <label className="block text-xs font-bold text-text-secondary uppercase mb-1.5">E-post *</label>
+                <label htmlFor={`${formId}-email`} className="mb-1.5 block text-xs font-bold uppercase text-text-muted">E-post *</label>
                 <input
+                    id={`${formId}-email`}
+                    name="retailerEmail"
                     type="email"
                     value={form.email}
                     onChange={updateField('email')}
                     placeholder="E-postadress för inloggning"
                     required
                     readOnly={Boolean(initial)}
-                    className={`w-full bg-input-bg border border-panel-border text-text-primary p-2.5 rounded-md outline-none focus:border-primary transition-colors ${initial ? 'opacity-60 cursor-not-allowed' : ''}`}
+                    autoComplete="email"
+                    className={`w-full rounded-control border border-control-border bg-input p-2.5 text-text outline-none transition-colors focus:border-action ${initial ? 'cursor-not-allowed opacity-60' : ''}`}
                 />
             </div>
 
             {!initial && (
                 <div>
-                    <label className="block text-xs font-bold text-text-secondary uppercase mb-1.5">Lösenord *</label>
+                    <label htmlFor={`${formId}-password`} className="mb-1.5 block text-xs font-bold uppercase text-text-muted">Lösenord *</label>
                     <input
-                        type="text"
+                        id={`${formId}-password`}
+                        name="retailerPassword"
+                        type="password"
                         value={form.password || ''}
                         onChange={updateField('password')}
                         placeholder="Minst 6 tecken"
                         required
                         minLength={6}
-                        className="w-full bg-input-bg border border-panel-border text-text-primary p-2.5 rounded-md outline-none focus:border-primary transition-colors"
+                        autoComplete="new-password"
+                        className="w-full rounded-control border border-control-border bg-input p-2.5 text-text outline-none transition-colors focus:border-action"
                     />
                 </div>
             )}
 
-            <div>
-                <label className="block text-xs font-bold text-text-secondary uppercase mb-3">Produktlinjer & rabatter</label>
+            <fieldset className="m-0 border-0 p-0">
+                <legend className="mb-3 block text-xs font-bold uppercase text-text-muted">Produktlinjer och rabatter</legend>
                 <div className="space-y-3">
                     {PRODUCT_LINE_IDS.map((lineId) => {
                         const lineEntry = form.productLines[lineId];
+                        const lineName = getCatalogLineName(lineId) || lineId;
                         return (
                             <div
                                 key={lineId}
                                 className={`flex items-center gap-4 p-3 rounded-lg border transition-colors ${
                                     lineEntry.enabled
-                                        ? 'border-primary/40 bg-primary/5'
-                                        : 'border-panel-border bg-transparent'
+                                        ? 'border-action bg-action-soft'
+                                        : 'border-border bg-transparent'
                                 }`}
                             >
                                 <label className="flex items-center gap-2.5 cursor-pointer flex-1 min-w-0">
                                     <input
+                                        name={`productLine-${lineId}`}
                                         type="checkbox"
                                         checked={lineEntry.enabled}
                                         onChange={() => handleToggleLine(lineId)}
-                                        className="w-4 h-4 accent-primary cursor-pointer"
+                                        className="h-4 w-4 cursor-pointer accent-action"
                                     />
-                                    <span className="font-semibold text-text-primary text-sm">
-                                        {getCatalogLineName(lineId) || lineId}
+                                    <span className="text-sm font-semibold text-text">
+                                        {lineName}
                                     </span>
                                 </label>
                                 {lineEntry.enabled && (
                                     <div className="flex items-center gap-2 shrink-0">
-                                        <span className="text-xs text-text-secondary">Rabatt:</span>
+                                        <label htmlFor={`${formId}-${lineId}-discount`} className="text-xs text-text-muted">Maxrabatt</label>
                                         <input
+                                            id={`${formId}-${lineId}-discount`}
+                                            name={`discount-${lineId}`}
                                             type="number"
                                             min="0"
                                             max="100"
                                             step="1"
                                             value={lineEntry.discountPct}
                                             onChange={(event) => handleDiscountChange(lineId, event.target.value)}
-                                            className="w-16 bg-input-bg border border-panel-border text-text-primary p-1.5 rounded-md text-center text-sm outline-none focus:border-primary"
+                                            aria-label={`Maximal rabatt för ${lineName}`}
+                                            className="w-16 rounded-control border border-control-border bg-input p-1.5 text-center text-sm text-text outline-none focus:border-action"
                                         />
-                                        <span className="text-xs text-text-secondary">%</span>
+                                        <span className="text-xs text-text-muted">%</span>
                                     </div>
                                 )}
                             </div>
                         );
                     })}
                 </div>
-            </div>
+            </fieldset>
 
-            <div>
-                <label className="block text-xs font-bold text-text-secondary uppercase mb-3">PDF-teman</label>
+            <fieldset className="m-0 border-0 p-0">
+                <legend className="mb-3 block text-xs font-bold uppercase text-text-muted">PDF-teman</legend>
                 <div className="space-y-2">
                     {PDF_THEME_OPTIONS.filter((t) => t.id !== DEFAULT_PDF_THEME_ID).map((theme) => (
                         <label key={theme.id} className="flex items-center gap-2.5 cursor-pointer">
                             <input
+                                name={`pdfTheme-${theme.id}`}
                                 type="checkbox"
                                 checked={(form.pdfThemes || []).includes(theme.id)}
                                 onChange={() => handleTogglePdfTheme(theme.id)}
-                                className="w-4 h-4 accent-primary cursor-pointer"
+                                className="h-4 w-4 cursor-pointer accent-action"
                             />
-                            <span className="text-sm text-text-primary">{theme.label}</span>
+                            <span className="text-sm text-text">{theme.label}</span>
                         </label>
                     ))}
                 </div>
-                <p className="mt-2 text-xs text-text-secondary italic">
-                    (Standardtemat "BRIXX" är alltid tillgängligt.)
+                <p className="mt-2 text-xs italic text-text-muted">
+                    Standardtemat BRIXX är alltid tillgängligt.
                 </p>
-            </div>
+            </fieldset>
 
             <div>
-                <label className="block text-xs font-bold text-text-secondary uppercase mb-1.5">Anteckningar</label>
+                <label htmlFor={`${formId}-notes`} className="mb-1.5 block text-xs font-bold uppercase text-text-muted">Anteckningar</label>
                 <textarea
+                    id={`${formId}-notes`}
+                    name="retailerNotes"
                     value={form.notes}
                     onChange={updateField('notes')}
                     rows={2}
-                    placeholder="Valfria anteckningar..."
-                    className="w-full bg-input-bg border border-panel-border text-text-primary p-2.5 rounded-md outline-none focus:border-primary transition-colors resize-y text-sm"
+                    placeholder="Valfria anteckningar…"
+                    className="w-full resize-y rounded-control border border-control-border bg-input p-2.5 text-sm text-text outline-none transition-colors focus:border-action"
                 />
             </div>
 
             <div className="flex justify-end gap-3 pt-2">
-                <button
-                    type="button"
+                <Button
                     onClick={onCancel}
                     disabled={saving}
-                    className="px-4 py-2 rounded-md font-medium text-text-primary bg-panel-bg border border-panel-border hover:bg-panel-border transition-colors text-sm"
                 >
                     Avbryt
-                </button>
-                <button
+                </Button>
+                <Button
                     type="submit"
                     disabled={saving}
-                    className="px-5 py-2 rounded-md font-bold text-white bg-primary hover:bg-primary-hover transition-colors text-sm disabled:opacity-50"
+                    variant="primary"
                 >
-                    {saving ? 'Sparar...' : (initial ? 'Uppdatera' : 'Skapa')}
-                </button>
+                    {saving ? 'Sparar…' : (initial ? 'Uppdatera' : 'Skapa')}
+                </Button>
             </div>
         </form>
     );
 }
 
 function DeleteConfirmation({ retailerName, onConfirm, onCancel, deleting }: DeleteConfirmationProps) {
-    const handleDialogClick = (event: MouseEvent<HTMLDivElement>) => {
-        event.stopPropagation();
-    };
-
     return (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[100] animate-fade-in" onClick={onCancel}>
-            <div className="bg-panel-bg border border-panel-border rounded-xl p-6 max-w-md mx-4 shadow-2xl" onClick={handleDialogClick}>
-                <h3 className="text-lg font-bold text-text-primary mb-2">Ta bort återförsäljare?</h3>
-                <p className="text-text-secondary text-sm mb-5">
-                    Är du säker på att du vill ta bort <strong className="text-text-primary">{retailerName}</strong>? Det går inte att ångra.
-                </p>
-                <div className="flex justify-end gap-3">
-                    <button
-                        onClick={onCancel}
-                        disabled={deleting}
-                        className="px-4 py-2 rounded-md font-medium text-text-primary bg-panel-bg border border-panel-border hover:bg-panel-border transition-colors text-sm"
-                    >
+        <Modal
+            dismissible={!deleting}
+            onClose={onCancel}
+            title="Ta bort återförsäljare?"
+            description="Åtgärden går inte att ångra."
+            maxWidthClassName="max-w-md"
+            footer={(
+                <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+                    <Button onClick={onCancel} disabled={deleting}>
                         Avbryt
-                    </button>
-                    <button
-                        onClick={onConfirm}
-                        disabled={deleting}
-                        className="px-5 py-2 rounded-md font-bold text-white bg-red-600 hover:bg-red-700 transition-colors text-sm disabled:opacity-50"
-                    >
+                    </Button>
+                    <Button onClick={onConfirm} disabled={deleting} variant="danger">
                         {deleting ? 'Tar bort...' : 'Ta bort'}
-                    </button>
+                    </Button>
                 </div>
-            </div>
-        </div>
+            )}
+        >
+            <p className="m-0 p-6 text-sm text-text-muted">
+                Du håller på att ta bort <strong className="text-text">{retailerName}</strong>.
+            </p>
+        </Modal>
     );
 }
 
-export function RetailerManager({ onBack }: RetailerManagerProps) {
+export function RetailerManager(_: RetailerManagerProps) {
     const { user } = useAuth();
     const [retailers, setRetailers] = useState<RetailerRecord[]>([]);
     const [loading, setLoading] = useState(true);
@@ -533,38 +546,26 @@ export function RetailerManager({ onBack }: RetailerManagerProps) {
     };
 
     return (
-        <div className="max-w-[1000px] mx-auto animate-slide-in">
-            <div className="flex justify-between items-center mb-8">
-                <div>
-                    <button
-                        onClick={onBack}
-                        className="text-text-secondary hover:text-text-primary text-sm mb-2 transition-colors inline-flex items-center gap-1"
-                    >
-                        &laquo; Tillbaka till Dashboard
-                    </button>
-                    <h2 className="text-2xl font-bold text-text-primary m-0">Återförsäljare</h2>
-                    <p className="text-text-secondary text-sm mt-1">
-                        Hantera återförsäljare och deras produktlinjer med rabatter.
-                    </p>
-                </div>
-                {!showForm && (
-                    <button
-                        onClick={openAdd}
-                        className="px-5 py-2.5 rounded-md font-bold text-white bg-primary hover:bg-primary-hover transition-colors text-sm shadow shadow-primary/20"
-                    >
-                        + Ny återförsäljare
-                    </button>
-                )}
-            </div>
+        <div className="mx-auto max-w-[1000px] animate-slide-in">
+            <PageHeader
+                eyebrow="Partners"
+                title="Återförsäljare"
+                description="Hantera återförsäljare, produktlinjer, rabatter och dokument."
+                actions={!showForm ? (
+                    <Button onClick={openAdd} variant="primary">
+                        Ny återförsäljare
+                    </Button>
+                ) : undefined}
+            />
 
             {error && (
-                <div className="bg-red-500/10 border border-red-500/30 text-red-400 rounded-lg p-3 text-sm mb-6">
+                <div role="alert" className="mb-6 mt-6 rounded-panel border border-danger-border bg-danger-bg p-3 text-sm text-danger-text">
                     {error}
                 </div>
             )}
 
             {showForm && (
-                <div className="mb-8">
+                <div className="mb-8 mt-6">
                     <h3 className="text-lg font-semibold text-text-primary mb-3">
                         {editingRetailer ? `Redigera: ${editingRetailer.name}` : 'Ny återförsäljare'}
                     </h3>
@@ -578,46 +579,44 @@ export function RetailerManager({ onBack }: RetailerManagerProps) {
             )}
 
             {loading ? (
-                <p className="text-text-secondary text-center italic py-12">Laddar återförsäljare...</p>
+                <p role="status" className="py-12 text-center text-sm text-text-muted">Laddar återförsäljare…</p>
             ) : retailers.length === 0 ? (
-                <div className="bg-panel-bg border border-panel-border rounded-xl p-12 text-center">
-                    <div className="text-5xl mb-3">🏪</div>
-                    <p className="text-text-secondary">Inga återförsäljare konfigurerade ännu.</p>
+                <Panel className="mt-6">
+                    <div className="p-10 text-center">
+                    <h2 className="m-0 text-lg font-semibold text-text">Inga återförsäljare ännu</h2>
+                    <p className="mb-0 mt-2 text-sm text-text-muted">Skapa den första profilen för att tilldela sortiment och rabatter.</p>
                     {!showForm && (
-                        <button
+                        <Button
                             onClick={openAdd}
-                            className="mt-4 px-5 py-2 rounded-md font-medium text-primary border border-primary hover:bg-primary/10 transition-colors text-sm"
+                            className="mt-4"
+                            variant="primary"
                         >
                             Lägg till den första
-                        </button>
+                        </Button>
                     )}
-                </div>
+                    </div>
+                </Panel>
             ) : (
-                <div className="space-y-3">
+                <div className="mt-6 space-y-3">
                     {retailers.map((retailer) => {
                         const lines = enabledLines(retailer);
                         return (
                             <div
                                 key={retailer.id}
-                                className="bg-panel-bg border border-panel-border rounded-xl p-5 flex items-center gap-5 hover:border-primary/30 transition-colors group"
+                                className="group flex items-center gap-5 rounded-panel border border-border bg-surface-raised p-5 transition-colors hover:border-action/40"
                             >
-                                <div className="text-2xl">🏪</div>
                                 <div className="flex-1 min-w-0">
-                                    <h4 className="font-semibold text-text-primary text-base m-0">{retailer.name}</h4>
+                                    <h2 className="m-0 text-base font-semibold text-text">{retailer.name}</h2>
                                     <div className="flex flex-wrap gap-2 mt-2">
                                         {lines.length === 0 ? (
                                             <span className="text-xs text-text-secondary italic">Inga produktlinjer aktiverade</span>
                                         ) : (
                                             lines.map((lineId) => (
-                                                <span
-                                                    key={lineId}
-                                                    className="inline-flex items-center gap-1.5 bg-primary/10 text-primary border border-primary/20 rounded-full px-2.5 py-0.5 text-xs font-medium"
-                                                >
+                                                <StatusChip key={lineId} tone="success">
                                                     {getCatalogLineName(lineId) || lineId}
-                                                    <span className="text-primary/70 font-normal">
-                                                        {retailer.productLines?.[lineId]?.discountPct || 0}%
-                                                    </span>
-                                                </span>
+                                                    {' · '}
+                                                    {retailer.productLines?.[lineId]?.discountPct || 0}%
+                                                </StatusChip>
                                             ))
                                         )}
                                     </div>
@@ -632,19 +631,20 @@ export function RetailerManager({ onBack }: RetailerManagerProps) {
                                         <p className="text-xs text-text-secondary mt-1.5 m-0 truncate">{retailer.notes}</p>
                                     )}
                                 </div>
-                                <div className="flex gap-2 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
-                                    <button
+                                <div className="flex shrink-0 flex-wrap gap-2">
+                                    <Button
                                         onClick={() => openEdit(retailer)}
-                                        className="px-3 py-1.5 rounded-md text-xs font-medium text-text-primary bg-panel-bg border border-panel-border hover:bg-panel-border transition-colors"
+                                        size="sm"
                                     >
                                         Redigera
-                                    </button>
-                                    <button
+                                    </Button>
+                                    <Button
                                         onClick={() => setDeleteTarget(retailer)}
-                                        className="px-3 py-1.5 rounded-md text-xs font-medium text-red-400 bg-panel-bg border border-red-500/30 hover:bg-red-500/10 transition-colors"
+                                        size="sm"
+                                        variant="danger"
                                     >
                                         Ta bort
-                                    </button>
+                                    </Button>
                                 </div>
                             </div>
                         );
@@ -652,33 +652,31 @@ export function RetailerManager({ onBack }: RetailerManagerProps) {
                 </div>
             )}
 
-            <section className="mt-10 rounded-2xl border border-panel-border bg-panel-bg p-6 shadow-sm" data-testid="retailer-documents-admin">
-                <div className="flex flex-col gap-3 border-b border-panel-border pb-4 sm:flex-row sm:items-center sm:justify-between">
+            <section className="mt-10 rounded-panel border border-border bg-surface-raised p-6 shadow-panel" data-testid="retailer-documents-admin">
+                <div className="flex flex-col gap-3 border-b border-border pb-4 sm:flex-row sm:items-center sm:justify-between">
                     <div>
                         <h3 className="m-0 text-lg font-semibold text-text-primary">Dokument per produktlinje</h3>
                         <p className="mt-1 text-sm text-text-secondary">
-                            Hantera globala PDF-länkar för färgkartor och installationsinstruktioner som visas i retailer-vyn.
+                            Hantera globala PDF-länkar för färgkartor och installationsinstruktioner som visas i återförsäljarvyn.
                         </p>
                     </div>
-                    <button
-                        type="button"
+                    <Button
                         onClick={() => {
                             void loadRetailerDocuments();
                         }}
-                        className="rounded-md border border-panel-border bg-black/10 px-4 py-2 text-sm font-medium text-text-primary transition-colors hover:bg-white/5"
                     >
                         Uppdatera dokument
-                    </button>
+                    </Button>
                 </div>
 
                 {documentsError && (
-                    <div className="mt-4 rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-400">
+                    <div role="alert" className="mt-4 rounded-control border border-danger-border bg-danger-soft p-3 text-sm text-danger-text">
                         {documentsError}
                     </div>
                 )}
 
                 {documentsLoading ? (
-                    <p className="py-8 text-center text-sm italic text-text-secondary">Laddar produktdokument...</p>
+                    <p className="py-8 text-center text-sm italic text-text-muted">Laddar produktdokument…</p>
                 ) : (
                     <div className="mt-6 grid grid-cols-1 gap-6">
                         {PRODUCT_LINE_IDS.map((lineId) => {
@@ -688,9 +686,9 @@ export function RetailerManager({ onBack }: RetailerManagerProps) {
                             return (
                                 <section
                                     key={lineId}
-                                    className="rounded-xl border border-panel-border bg-black/10 p-5"
+                                    className="rounded-panel border border-border bg-surface p-5"
                                 >
-                                    <div className="flex flex-col gap-3 border-b border-panel-border pb-4 sm:flex-row sm:items-center sm:justify-between">
+                                    <div className="flex flex-col gap-3 border-b border-border pb-4 sm:flex-row sm:items-center sm:justify-between">
                                         <div>
                                             <h4 className="m-0 text-base font-semibold text-text-primary">{getCatalogLineName(lineId) || lineId}</h4>
                                             <p className="mt-1 text-xs text-text-secondary">
@@ -700,113 +698,124 @@ export function RetailerManager({ onBack }: RetailerManagerProps) {
                                             </p>
                                         </div>
                                         <div className="flex flex-wrap gap-3">
-                                            <button
-                                                type="button"
+                                            <Button
                                                 onClick={() => addLineDocument(lineId)}
-                                                className="rounded-md border border-panel-border bg-panel-bg px-3 py-2 text-xs font-medium text-text-primary transition-colors hover:bg-white/5"
+                                                size="sm"
                                             >
-                                                + Lägg till dokument
-                                            </button>
-                                            <button
-                                                type="button"
+                                                Lägg till dokument
+                                            </Button>
+                                            <Button
                                                 onClick={() => {
                                                     void saveLineDocuments(lineId);
                                                 }}
                                                 disabled={isSavingDocuments}
-                                                className="rounded-md bg-primary px-3 py-2 text-xs font-bold text-white transition-colors hover:bg-primary-hover disabled:cursor-not-allowed disabled:opacity-60"
+                                                size="sm"
+                                                variant="primary"
                                             >
-                                                {isSavingDocuments ? 'Sparar...' : 'Spara dokument'}
-                                            </button>
+                                                {isSavingDocuments ? 'Sparar…' : 'Spara dokument'}
+                                            </Button>
                                         </div>
                                     </div>
 
                                     {documents.length === 0 ? (
                                         <div className="mt-4 rounded-lg border border-dashed border-panel-border p-4 text-sm text-text-secondary">
-                                            Lägg till de PDF-länkar som ska visas för retailers med denna produktlinje.
+                                            Lägg till de PDF-länkar som ska visas för återförsäljare med denna produktlinje.
                                         </div>
                                     ) : (
                                         <div className="mt-4 space-y-4">
                                             {documents.map((document, index) => (
                                                 <div
                                                     key={document.id}
-                                                    className="rounded-lg border border-panel-border bg-panel-bg/60 p-4"
+                                                    className="rounded-control border border-border bg-surface-raised p-4"
                                                 >
                                                     <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
                                                         <div>
-                                                            <label className="mb-1.5 block text-xs font-bold uppercase text-text-secondary">Titel</label>
+                                                            <label htmlFor={`${lineId}-${document.id}-title`} className="mb-1.5 block text-xs font-bold uppercase text-text-muted">Titel</label>
                                                             <input
+                                                                id={`${lineId}-${document.id}-title`}
+                                                                name={`${lineId}-${document.id}-title`}
                                                                 type="text"
                                                                 value={document.title}
                                                                 onChange={(event) => updateLineDocument(lineId, document.id, { title: event.target.value })}
                                                                 placeholder="T.ex. Färgkarta Markisväv"
-                                                                className="w-full rounded-md border border-panel-border bg-input-bg p-2.5 text-sm text-text-primary outline-none transition-colors focus:border-primary"
+                                                                className="w-full rounded-control border border-control-border bg-input p-2.5 text-sm text-text outline-none transition-colors focus:border-action"
                                                             />
                                                         </div>
                                                         <div>
-                                                            <label className="mb-1.5 block text-xs font-bold uppercase text-text-secondary">Typ</label>
+                                                            <label htmlFor={`${lineId}-${document.id}-kind`} className="mb-1.5 block text-xs font-bold uppercase text-text-muted">Typ</label>
                                                             <select
+                                                                id={`${lineId}-${document.id}-kind`}
+                                                                name={`${lineId}-${document.id}-kind`}
                                                                 value={document.kind}
                                                                 onChange={(event) => updateLineDocument(lineId, document.id, { kind: event.target.value as RetailerDocumentKind })}
-                                                                className="w-full rounded-md border border-panel-border bg-input-bg p-2.5 text-sm text-text-primary outline-none transition-colors focus:border-primary"
+                                                                className="w-full rounded-control border border-control-border bg-input p-2.5 text-sm text-text outline-none transition-colors focus:border-action"
                                                             >
                                                                 <option value="color-chart">{getRetailerDocumentKindLabel('color-chart')}</option>
                                                                 <option value="installation-instructions">{getRetailerDocumentKindLabel('installation-instructions')}</option>
                                                             </select>
                                                         </div>
                                                         <div className="lg:col-span-2">
-                                                            <label className="mb-1.5 block text-xs font-bold uppercase text-text-secondary">PDF-URL</label>
+                                                            <label htmlFor={`${lineId}-${document.id}-url`} className="mb-1.5 block text-xs font-bold uppercase text-text-muted">PDF-URL</label>
                                                             <input
+                                                                id={`${lineId}-${document.id}-url`}
+                                                                name={`${lineId}-${document.id}-url`}
                                                                 type="url"
                                                                 value={document.url}
                                                                 onChange={(event) => updateLineDocument(lineId, document.id, { url: event.target.value })}
                                                                 placeholder="https://..."
-                                                                className="w-full rounded-md border border-panel-border bg-input-bg p-2.5 text-sm text-text-primary outline-none transition-colors focus:border-primary"
+                                                                className="w-full rounded-control border border-control-border bg-input p-2.5 text-sm text-text outline-none transition-colors focus:border-action"
                                                             />
                                                         </div>
                                                         <div>
-                                                            <label className="mb-1.5 block text-xs font-bold uppercase text-text-secondary">Filnamn</label>
+                                                            <label htmlFor={`${lineId}-${document.id}-filename`} className="mb-1.5 block text-xs font-bold uppercase text-text-muted">Filnamn</label>
                                                             <input
+                                                                id={`${lineId}-${document.id}-filename`}
+                                                                name={`${lineId}-${document.id}-filename`}
                                                                 type="text"
                                                                 value={document.fileName}
                                                                 onChange={(event) => updateLineDocument(lineId, document.id, { fileName: event.target.value })}
                                                                 placeholder="fargkarta.pdf"
-                                                                className="w-full rounded-md border border-panel-border bg-input-bg p-2.5 text-sm text-text-primary outline-none transition-colors focus:border-primary"
+                                                                className="w-full rounded-control border border-control-border bg-input p-2.5 text-sm text-text outline-none transition-colors focus:border-action"
                                                             />
                                                         </div>
                                                         <div>
-                                                            <label className="mb-1.5 block text-xs font-bold uppercase text-text-secondary">Sortering</label>
+                                                            <label htmlFor={`${lineId}-${document.id}-sort`} className="mb-1.5 block text-xs font-bold uppercase text-text-muted">Sortering</label>
                                                             <input
+                                                                id={`${lineId}-${document.id}-sort`}
+                                                                name={`${lineId}-${document.id}-sort`}
                                                                 type="number"
                                                                 min="0"
                                                                 step="1"
                                                                 value={document.sortOrder}
                                                                 onChange={(event) => updateLineDocument(lineId, document.id, { sortOrder: Number(event.target.value) || 0 })}
-                                                                className="w-full rounded-md border border-panel-border bg-input-bg p-2.5 text-sm text-text-primary outline-none transition-colors focus:border-primary"
+                                                                className="w-full rounded-control border border-control-border bg-input p-2.5 text-sm text-text outline-none transition-colors focus:border-action"
                                                             />
                                                         </div>
                                                         <div className="lg:col-span-2">
-                                                            <label className="mb-1.5 block text-xs font-bold uppercase text-text-secondary">Beskrivning</label>
+                                                            <label htmlFor={`${lineId}-${document.id}-description`} className="mb-1.5 block text-xs font-bold uppercase text-text-muted">Beskrivning</label>
                                                             <textarea
+                                                                id={`${lineId}-${document.id}-description`}
+                                                                name={`${lineId}-${document.id}-description`}
                                                                 value={document.description || ''}
                                                                 onChange={(event) => updateLineDocument(lineId, document.id, { description: event.target.value })}
                                                                 rows={2}
-                                                                placeholder="Kort hjälptext som visas i retailer-vyn."
-                                                                className="w-full resize-y rounded-md border border-panel-border bg-input-bg p-2.5 text-sm text-text-primary outline-none transition-colors focus:border-primary"
+                                                                placeholder="Kort hjälptext som visas i återförsäljarvyn."
+                                                                className="w-full resize-y rounded-control border border-control-border bg-input p-2.5 text-sm text-text outline-none transition-colors focus:border-action"
                                                             />
                                                         </div>
                                                     </div>
 
-                                                    <div className="mt-4 flex items-center justify-between gap-3 border-t border-panel-border pt-3">
-                                                        <div className="text-xs text-text-secondary">
+                                                    <div className="mt-4 flex items-center justify-between gap-3 border-t border-border pt-3">
+                                                        <div className="text-xs text-text-muted">
                                                             Rad {index + 1} · {getRetailerDocumentKindLabel(document.kind)}
                                                         </div>
-                                                        <button
-                                                            type="button"
+                                                        <Button
                                                             onClick={() => removeLineDocument(lineId, document.id)}
-                                                            className="rounded-md border border-red-500/30 bg-panel-bg px-3 py-1.5 text-xs font-medium text-red-400 transition-colors hover:bg-red-500/10"
+                                                            size="sm"
+                                                            variant="danger"
                                                         >
                                                             Ta bort dokument
-                                                        </button>
+                                                        </Button>
                                                     </div>
                                                 </div>
                                             ))}

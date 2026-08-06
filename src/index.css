@@ -5,16 +5,68 @@
   while giving us full Tailwind utility class power.
 */
 @theme {
+  --color-action: var(--theme-action);
+  --color-action-hover: var(--theme-action-hover);
+  --color-action-active: var(--theme-action-active);
+  --color-action-soft: var(--theme-action-soft);
+  --color-action-soft-text: var(--theme-action-soft-text);
+  --color-brand: var(--theme-brand-emphasis);
+  --color-brand-solid: var(--theme-brand-solid);
+  --color-brand-emphasis: var(--theme-brand-emphasis);
+  --color-brand-soft: var(--theme-brand-soft);
+  --color-on-brand: var(--theme-on-brand);
+  --color-canvas: var(--theme-canvas);
+  --color-border: var(--theme-border);
+  --color-control-border: var(--theme-control-border);
+  --color-focus-ring: var(--theme-focus-ring);
+  --color-hover: var(--theme-hover);
+  --color-input: var(--theme-input);
+  --color-input-bg: var(--theme-input);
   --color-primary: var(--theme-primary);
   --color-primary-hover: var(--theme-primary-hover);
   --color-bg: var(--theme-bg);
+  --color-surface: var(--theme-surface);
+  --color-surface-raised: var(--theme-surface-raised);
+  --color-surface-hover: var(--theme-hover);
+  --color-surface-active: var(--theme-surface-active);
   --color-panel-bg: var(--theme-panel-bg);
   --color-panel-border: var(--theme-panel-border);
+  --color-panel-hover: var(--theme-hover);
+  --color-foreground: var(--theme-text);
+  --color-muted-foreground: var(--theme-text-muted);
+  --color-subtle-foreground: var(--theme-text-subtle);
+  --color-on-action: var(--theme-text-inverse);
+  --color-text: var(--theme-text);
+  --color-text-muted: var(--theme-text-muted);
+  --color-text-inverse: var(--theme-text-inverse);
   --color-text-primary: var(--theme-text-primary);
   --color-text-secondary: var(--theme-text-secondary);
+  --color-secondary: var(--theme-secondary);
   --color-success: #10b981;
+  --color-success-bg: var(--theme-success-bg);
+  --color-success-border: var(--theme-success-border);
+  --color-success-solid: var(--theme-success-solid);
+  --color-success-text: var(--theme-success-text);
   --color-danger: #ef4444;
+  --color-danger-bg: var(--theme-danger-bg);
+  --color-danger-border: var(--theme-danger-border);
+  --color-danger-solid: var(--theme-danger-solid);
+  --color-danger-text: var(--theme-danger-text);
   --color-warning: #f59e0b;
+  --color-warning-bg: var(--theme-warning-bg);
+  --color-warning-border: var(--theme-warning-border);
+  --color-warning-solid: var(--theme-warning-solid);
+  --color-warning-text: var(--theme-warning-text);
+  --color-info-bg: var(--theme-info-bg);
+  --color-info-border: var(--theme-info-border);
+  --color-info-solid: var(--theme-info-solid);
+  --color-info-text: var(--theme-info-text);
+  --color-paper: #ffffff;
+  --color-on-paper: #334155;
+
+  --radius-control: 0.5rem;
+  --radius-panel: 0.75rem;
+  --shadow-panel: 0 10px 30px rgba(0, 0, 0, 0.16);
   
   --animate-pulse-warning: pulse-warning 2s infinite ease-in-out;
   --animate-snap-glow: snap-glow 0.8s ease-out forwards;
@@ -32,13 +84,55 @@
 
 :root,
 [data-theme="portal-dark"] {
-  --theme-primary: #3b82f6;
-  --theme-primary-hover: #2563eb;
-  --theme-bg: #0f0f1a;
+  color-scheme: dark;
+  --theme-action: #2563eb;
+  --theme-action-hover: #1d4ed8;
+  --theme-action-active: #1e40af;
+  --theme-action-soft: #172b55;
+  --theme-action-soft-text: #bfdbfe;
+  --theme-brand-solid: #edb059;
+  --theme-brand-emphasis: #f1b85f;
+  --theme-brand-soft: #3a2c1a;
+  --theme-on-brand: #2a1a04;
+  --theme-primary: var(--theme-action);
+  --theme-primary-hover: var(--theme-action-hover);
+  --theme-canvas: #0f0f1a;
+  --theme-bg: var(--theme-canvas);
+  --theme-surface: #171725;
+  --theme-surface-raised: #1e1e2e;
+  --theme-surface-active: #343b50;
+  --theme-input: #141722;
+  --theme-hover: #29293b;
+  --theme-border: #3d3d50;
+  --theme-control-border: #64748b;
+  --theme-focus-ring: #93c5fd;
+  --theme-text: #f8fafc;
+  --theme-text-muted: #a8b2c1;
+  --theme-text-subtle: #94a3b8;
+  --theme-text-inverse: #ffffff;
+  --theme-secondary: #7dd3fc;
+  --theme-success-bg: #16372f;
+  --theme-success-border: #2f7d62;
+  --theme-success-solid: #047857;
+  --theme-success-text: #6ee7b7;
+  --theme-warning-bg: #422d13;
+  --theme-warning-border: #8a5a18;
+  --theme-warning-solid: #b45309;
+  --theme-warning-text: #fcd34d;
+  --theme-danger-bg: #421b22;
+  --theme-danger-border: #8b3541;
+  --theme-danger-solid: #b91c1c;
+  --theme-danger-text: #fca5a5;
+  --theme-info-bg: #172b55;
+  --theme-info-border: #315b9c;
+  --theme-info-solid: #1d4ed8;
+  --theme-info-text: #bfdbfe;
   --theme-panel-bg: #1e1e2e;
-  --theme-panel-border: #333344;
-  --theme-text-primary: #ffffff;
-  --theme-text-secondary: #a0aec0;
+  --theme-panel-border: var(--theme-border);
+  --theme-text-primary: var(--theme-text);
+  --theme-text-secondary: var(--theme-text-muted);
+  --theme-scrollbar-thumb: rgba(255, 255, 255, 0.18);
+  --theme-scrollbar-thumb-hover: rgba(96, 165, 250, 0.65);
   
   --theme-glass-panel-bg: rgba(30, 30, 46, 0.65);
   --theme-glass-panel-border: rgba(255, 255, 255, 0.07);
@@ -51,13 +145,55 @@
 }
 
 [data-theme="brixx-light"] {
-  --theme-primary: #EDB059;
-  --theme-primary-hover: #D99A3F;
-  --theme-bg: #F0F5FA;
+  color-scheme: light;
+  --theme-action: #1d4ed8;
+  --theme-action-hover: #1e40af;
+  --theme-action-active: #1e3a8a;
+  --theme-action-soft: #dbeafe;
+  --theme-action-soft-text: #1e3a8a;
+  --theme-brand-solid: #edb059;
+  --theme-brand-emphasis: #8a5b14;
+  --theme-brand-soft: #fff3df;
+  --theme-on-brand: #2a1a04;
+  --theme-primary: var(--theme-action);
+  --theme-primary-hover: var(--theme-action-hover);
+  --theme-canvas: #f1f5f9;
+  --theme-bg: var(--theme-canvas);
+  --theme-surface: #f8fafc;
+  --theme-surface-raised: #ffffff;
+  --theme-surface-active: #dce6f0;
+  --theme-input: #ffffff;
+  --theme-hover: #e8eef6;
+  --theme-border: #cbd5e1;
+  --theme-control-border: #8796a9;
+  --theme-focus-ring: #2563eb;
+  --theme-text: #111827;
+  --theme-text-muted: #526071;
+  --theme-text-subtle: #64748b;
+  --theme-text-inverse: #ffffff;
+  --theme-secondary: #0369a1;
+  --theme-success-bg: #d1fae5;
+  --theme-success-border: #6ee7b7;
+  --theme-success-solid: #047857;
+  --theme-success-text: #047857;
+  --theme-warning-bg: #fef3c7;
+  --theme-warning-border: #fbbf24;
+  --theme-warning-solid: #b45309;
+  --theme-warning-text: #92400e;
+  --theme-danger-bg: #fee2e2;
+  --theme-danger-border: #fca5a5;
+  --theme-danger-solid: #b91c1c;
+  --theme-danger-text: #b91c1c;
+  --theme-info-bg: #dbeafe;
+  --theme-info-border: #93c5fd;
+  --theme-info-solid: #1d4ed8;
+  --theme-info-text: #1e3a8a;
   --theme-panel-bg: #FFFFFF;
-  --theme-panel-border: #D1D5DB;
-  --theme-text-primary: #111111;
-  --theme-text-secondary: #6B7280;
+  --theme-panel-border: var(--theme-border);
+  --theme-text-primary: var(--theme-text);
+  --theme-text-secondary: var(--theme-text-muted);
+  --theme-scrollbar-thumb: rgba(71, 85, 105, 0.28);
+  --theme-scrollbar-thumb-hover: rgba(29, 78, 216, 0.55);
   
   --theme-glass-panel-bg: rgba(255, 255, 255, 0.85);
   --theme-glass-panel-border: rgba(0, 0, 0, 0.07);
@@ -67,11 +203,6 @@
   --theme-glass-card-bg: rgba(255, 255, 255, 0.75);
   --theme-glass-card-bg-hover: rgba(255, 255, 255, 0.95);
   --theme-glass-card-border: rgba(0, 0, 0, 0.04);
-}
-
-/* Ensure button text has good contrast in Brixx mode */
-[data-theme="brixx-light"] .bg-primary {
-  color: #111111 !important;
 }
 
 body {
@@ -86,6 +217,16 @@ select option,
 select optgroup {
   background-color: var(--color-panel-bg);
   color: var(--color-text-primary);
+}
+
+:where(a, button, input, select, textarea, summary, [contenteditable], [tabindex]):focus-visible {
+  outline: 2px solid var(--theme-focus-ring) !important;
+  outline-offset: 2px !important;
+}
+
+::selection {
+  background: color-mix(in srgb, var(--theme-action) 32%, transparent);
+  color: var(--theme-text);
 }
 
 select optgroup {
@@ -144,13 +285,13 @@ select optgroup {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.12);
+  background: var(--theme-scrollbar-thumb);
   border-radius: 3px;
   transition: background 0.3s;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(59, 130, 246, 0.5);
+  background: var(--theme-scrollbar-thumb-hover);
 }
 
 /* Custom animations and utilities */
@@ -241,23 +382,24 @@ select optgroup {
 
 .app-confirm-secondary {
   margin-right: auto;
-  border-color: rgba(59, 130, 246, 0.35);
-  background: rgba(59, 130, 246, 0.12);
-  color: var(--color-primary);
+  border-color: var(--theme-action);
+  background: var(--theme-action-soft);
+  color: var(--theme-action-soft-text);
 }
 
 .app-confirm-secondary:hover {
-  background: rgba(59, 130, 246, 0.2);
+  border-color: var(--theme-action-hover);
+  background: var(--theme-surface-active);
 }
 
 .app-confirm-cancel {
-  border-color: var(--color-panel-border);
-  background: rgba(0, 0, 0, 0.16);
-  color: var(--color-text-primary);
+  border-color: var(--theme-control-border);
+  background: var(--theme-surface-raised);
+  color: var(--theme-text);
 }
 
 .app-confirm-cancel:hover {
-  background: rgba(255, 255, 255, 0.06);
+  background: var(--theme-hover);
 }
 
 .app-confirm-ok {
@@ -265,7 +407,7 @@ select optgroup {
 }
 
 .app-confirm-ok-danger {
-  background: var(--color-danger);
+  background: var(--theme-danger-solid);
 }
 
 .app-confirm-ok-danger:hover {
@@ -273,17 +415,17 @@ select optgroup {
 }
 
 .app-confirm-ok-neutral {
-  background: var(--color-primary);
+  background: var(--theme-action);
 }
 
 .app-confirm-ok-neutral:hover {
-  background: var(--color-primary-hover);
+  background: var(--theme-action-hover);
 }
 
 .app-confirm-secondary:focus-visible,
 .app-confirm-cancel:focus-visible,
 .app-confirm-ok:focus-visible {
-  outline: 2px solid var(--color-primary);
+  outline: 2px solid var(--theme-focus-ring);
   outline-offset: 2px;
 }
 
@@ -305,5 +447,22 @@ select optgroup {
 
   .app-confirm-secondary {
     margin-right: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+@media (forced-colors: active) {
+  :where(a, button, input, select, textarea, summary, [contenteditable], [tabindex]):focus-visible {
+    outline-color: CanvasText !important;
   }
 }

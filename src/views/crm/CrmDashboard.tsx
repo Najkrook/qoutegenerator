@@ -81,7 +81,7 @@ export function CrmDashboardPage() {
         };
     }, []);
 
-    const { data, loading, error, reload } = useCrmLoader<DashboardData>(
+    const { data, loading, error, reload, updateData } = useCrmLoader<DashboardData>(
         load,
         { companies: [], deals: [], activities: [] },
         'Kunde inte ladda CRM-översikten.'
@@ -177,7 +177,14 @@ export function CrmDashboardPage() {
                                         .slice(0, 8)}
                                      onComplete={(activity) => void handleComplete(activity)}
                                      completingId={completingId}
-                                     onRescheduled={() => reload()}
+                                     onRescheduled={(updatedActivity) => {
+                                         updateData((current) => ({
+                                             ...current,
+                                             activities: current.activities.map((activity) => (
+                                                 activity.id === updatedActivity.id ? updatedActivity : activity
+                                             ))
+                                         }));
+                                     }}
                                  />
                             )}
                         </CrmPanel>

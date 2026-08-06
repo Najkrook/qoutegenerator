@@ -18,16 +18,23 @@ export function useAppNavigation() {
     const navigate = useNavigate();
     const location = useLocation();
 
-    const getActiveCrmDealSearch = (): string => {
-        const crmDealId = new URLSearchParams(location.search).get('crmDealId')?.trim();
-        if (!crmDealId) return '';
+    const getActiveCrmDealParams = (): URLSearchParams => {
+        const currentParams = new URLSearchParams(location.search);
+        const crmDealId = currentParams.get('crmDealId')?.trim();
+        const params = new URLSearchParams();
+        if (!crmDealId) return params;
 
-        const params = new URLSearchParams({ crmDealId });
-        const quoteOwnerUid = new URLSearchParams(location.search).get('quoteOwnerUid')?.trim();
+        params.set('crmDealId', crmDealId);
+        const quoteOwnerUid = currentParams.get('quoteOwnerUid')?.trim();
         if (quoteOwnerUid) {
             params.set('quoteOwnerUid', quoteOwnerUid);
         }
-        return `?${params.toString()}`;
+        return params;
+    };
+
+    const getActiveCrmDealSearch = (): string => {
+        const params = getActiveCrmDealParams();
+        return params.size > 0 ? `?${params.toString()}` : '';
     };
 
     return {
@@ -36,6 +43,9 @@ export function useAppNavigation() {
         },
         goToQuoteStep(step: QuoteRouteStepId, options?: NavigateOptions) {
             navigate(`${getQuoteStepPath(step)}${getActiveCrmDealSearch()}`, options);
+        },
+        goToNewQuote(options?: NavigateOptions) {
+            navigate(getQuoteStepPath('product-lines'), options);
         },
         goToLinkedQuoteStep(
             step: QuoteRouteStepId,
@@ -100,15 +110,19 @@ export function useAppNavigation() {
             navigate(APP_PATHS[APP_ROUTE_IDS.retailerDocuments], options);
         },
         goToSketch(returnTo?: SketchReturnTarget | null, options?: NavigateOptions) {
+            const params = getActiveCrmDealParams();
             if (returnTo) {
-                navigate(`${APP_PATHS[APP_ROUTE_IDS.sketch]}?return=${returnTo}`, options);
-                return;
+                params.set('return', returnTo);
             }
 
-            navigate(APP_PATHS[APP_ROUTE_IDS.sketch], options);
+            const search = params.size > 0 ? `?${params.toString()}` : '';
+            navigate(`${APP_PATHS[APP_ROUTE_IDS.sketch]}${search}`, options);
         },
         goToSketchReturnTarget(returnTo?: SketchReturnTarget | null, options?: NavigateOptions) {
-            navigate(getSketchReturnPath(returnTo), options);
+            const crmSearch = returnTo === 'quote-configuration' || returnTo === 'quote-summary'
+                ? getActiveCrmDealSearch()
+                : '';
+            navigate(`${getSketchReturnPath(returnTo)}${crmSearch}`, options);
         },
         goToLogin(next?: string | { pathname: string; search?: string; hash?: string }, options?: NavigateOptions) {
             if (!next) {

@@ -217,6 +217,13 @@ async function clickButton(container, label) {
     return button;
 }
 
+async function waitForPreviewDebounce() {
+    await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 450));
+        await Promise.resolve();
+    });
+}
+
 beforeEach(() => {
     fileUtilsState.downloadBlob.mockReset();
     fileUtilsState.saveBlobWithPicker.mockReset();
@@ -335,6 +342,7 @@ describe('SummaryExport PDF override', () => {
         const { container, dispatch } = await renderSummaryExport({
             stateOverrides: { exportLanguage: 'en' }
         });
+        await waitForPreviewDebounce();
 
         expect(container.textContent).toContain('Exportspråk');
         expect(findButton(container, 'EN').getAttribute('aria-pressed')).toBe('true');
@@ -395,16 +403,20 @@ describe('SummaryExport PDF override', () => {
         });
     });
 
-    it('allows legacy export through Exportera ändå when quoteNumber is missing', async () => {
+    it('shows one save action and keeps legacy PDF export inside the warning when quoteNumber is missing', async () => {
         const { container } = await renderSummaryExport({
             stateOverrides: { quoteNumber: null }
         });
 
         expect(container.textContent).toContain('Offerten saknar offertnummer');
-        expect(findButton(container, 'Exportera som PDF').disabled).toBe(true);
-        expect(findButton(container, 'Exportera ändå').disabled).toBe(false);
+        expect(Array.from(container.querySelectorAll('button')).filter((button) => (
+            button.textContent?.trim() === 'Spara offert'
+        ))).toHaveLength(1);
+        expect(container.textContent).not.toContain('Skapa PDF');
+        expect(container.textContent).not.toContain('Exportera Excel');
+        expect(findButton(container, 'Exportera PDF utan offertnummer').disabled).toBe(false);
 
-        await clickButton(container, 'Exportera ändå');
+        await clickButton(container, 'Exportera PDF utan offertnummer');
 
         expect(fileUtilsState.saveBlobWithPicker).toHaveBeenCalledTimes(1);
         expect(toastState.error).not.toHaveBeenCalled();
@@ -420,10 +432,11 @@ describe('SummaryExport PDF override', () => {
             stateOverrides: { quoteNumber: 'BRIXX - 260423-101' }
         });
 
-        expect(container.textContent).not.toContain('Exportera ändå');
-        expect(findButton(container, 'Exportera som PDF').disabled).toBe(false);
+        expect(container.textContent).not.toContain('Exportera PDF utan offertnummer');
+        expect(findButton(container, 'Skapa PDF').disabled).toBe(false);
+        expect(findButton(container, 'Spara offert').disabled).toBe(false);
 
-        await clickButton(container, 'Exportera som PDF');
+        await clickButton(container, 'Skapa PDF');
 
         expect(fileUtilsState.saveBlobWithPicker).toHaveBeenCalledTimes(1);
         expect(activityState.safeLogActivity).toHaveBeenCalledWith(expect.objectContaining({
@@ -431,6 +444,69 @@ describe('SummaryExport PDF override', () => {
                 missingQuoteNumber: false
             })
         }));
+    });
+
+    it('reuses the completed preview blob for export when the quote has not changed', async () => {
+        const { container } = await renderSummaryExport({
+            stateOverrides: { quoteNumber: 'BRIXX - 260423-102' }
+        });
+        await waitForPreviewDebounce();
+
+        expect(createQuotePdfBlob).toHaveBeenCalledTimes(1);
+        await clickButton(container, 'Skapa PDF');
+
+        expect(createQuotePdfBlob).toHaveBeenCalledTimes(1);
+        expect(fileUtilsState.saveBlobWithPicker).toHaveBeenCalledTimes(1);
+    });
+
+    it('shows one version-save action and blocks delivery actions while saving', async () => {
+        let resolveSave;
+        quoteSaveState.saveQuoteToRepository.mockReturnValueOnce(new Promise((resolve) => {
+            resolveSave = resolve;
+        }));
+        const { container } = await renderSummaryExport({
+            authOverrides: {
+                accessLevel: 'retailer',
+                isRetailer: true,
+                retailer: {
+                    id: 'retailer-1',
+                    name: 'Nordvind',
+                    email: 'retailer@example.com'
+                }
+            },
+            stateOverrides: {
+                activeQuoteId: 'quote-1',
+                quoteNumber: 'BRIXX - 260423-101',
+                activeQuoteVersion: 2
+            }
+        });
+
+        expect(Array.from(container.querySelectorAll('button')).filter((button) => (
+            button.textContent?.trim() === 'Spara ny version'
+        ))).toHaveLength(1);
+
+        await clickButton(container, 'Spara ny version');
+
+        expect(findButton(container, 'Skapa PDF').disabled).toBe(true);
+        expect(findButton(container, 'Exportera Excel').disabled).toBe(true);
+        expect(findButton(container, 'Kopiera länk').disabled).toBe(true);
+        expect(findButton(container, 'Skicka orderförfrågan').disabled).toBe(true);
+
+        await act(async () => {
+            resolveSave({
+                saved: { quoteId: 'quote-1' },
+                isNewQuote: false,
+                statePatch: {
+                    activeQuoteId: 'quote-1',
+                    activeQuoteVersion: 3,
+                    quoteNumber: 'BRIXX - 260423-101',
+                    quoteStatus: 'draft'
+                }
+            });
+            await Promise.resolve();
+        });
+
+        expect(findButton(container, 'Skapa PDF').disabled).toBe(false);
     });
 
     it('logs the English Excel filename when exporting in English', async () => {
@@ -441,7 +517,7 @@ describe('SummaryExport PDF override', () => {
             }
         });
 
-        await clickButton(container, 'Exportera som Excel');
+        await clickButton(container, 'Exportera Excel');
 
         expect(excelExportState.generateExcel).toHaveBeenCalledWith(
             expect.objectContaining({ exportLanguage: 'en' }),
@@ -486,6 +562,7 @@ describe('SummaryExport PDF override', () => {
                 }
             }
         });
+        await waitForPreviewDebounce();
 
         expect(container.textContent).not.toContain('Hidden retailer work');
         expect(createQuotePdfBlob).toHaveBeenCalledWith(
@@ -501,7 +578,7 @@ describe('SummaryExport PDF override', () => {
             expect.any(Object)
         );
 
-        await clickButton(container, 'Exportera som Excel');
+        await clickButton(container, 'Exportera Excel');
 
         expect(excelExportState.generateExcel).toHaveBeenCalledWith(
             expect.objectContaining({
@@ -514,7 +591,7 @@ describe('SummaryExport PDF override', () => {
             expect.any(Object)
         );
 
-        await clickButton(container, 'Spara offert');
+        await clickButton(container, 'Spara ny version');
 
         expect(quoteSaveState.saveQuoteToRepository).toHaveBeenCalledWith(
             expect.objectContaining({
@@ -623,7 +700,7 @@ describe('SummaryExport PDF override', () => {
         expect(onOpenRetailerOrderHistory).toHaveBeenCalledTimes(1);
     });
 
-    it('disables quote link copying until the quote has been saved', async () => {
+    it('hides quote link copying until the quote has been saved', async () => {
         const { container } = await renderSummaryExport({
             stateOverrides: {
                 activeQuoteId: null,
@@ -631,13 +708,14 @@ describe('SummaryExport PDF override', () => {
             }
         });
 
-        expect(findButton(container, 'Kopiera länk').disabled).toBe(true);
+        expect(container.textContent).not.toContain('Kopiera länk');
     });
 
     it('copies the saved quote link', async () => {
         const { container } = await renderSummaryExport({
             stateOverrides: {
                 activeQuoteId: 'quote-1',
+                quoteNumber: 'BRIXX - 260423-101',
                 activeQuoteVersion: 2
             }
         });
@@ -654,6 +732,7 @@ describe('SummaryExport PDF override', () => {
         const { container } = await renderSummaryExport({
             stateOverrides: {
                 activeQuoteId: 'quote-1',
+                quoteNumber: 'BRIXX - 260423-101',
                 activeQuoteVersion: 2
             }
         });

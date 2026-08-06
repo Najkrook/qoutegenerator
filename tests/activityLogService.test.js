@@ -63,7 +63,7 @@ describe('activityLogService', () => {
         expect(row.resolvedMs).toBe(1700000000000);
         expect(getActivitySystemLabel(row.system)).toBe('Ritning');
         expect(getActivityEventDefinition(row.eventType).label).toBe('Ritningsbild nedladdad');
-        expect(getActivityLogVisual(row).icon).toBe('🖼️');
+        expect(getActivityLogVisual(row).color).toBe('var(--color-success)');
         expect(formatActivityMetadata(row.metadata)).toBe('PNG · 5 sektioner');
     });
 

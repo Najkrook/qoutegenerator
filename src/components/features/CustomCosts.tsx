@@ -85,10 +85,10 @@ export function CustomCosts() {
                             <button
                                 type="button"
                                 onClick={() => removeCost(index)}
-                                className="bg-danger/10 text-danger border border-danger/20 p-2 rounded-md hover:bg-danger/20 transition-colors h-[38px] w-[38px] flex items-center justify-center font-bold"
+                                className="min-h-10 self-end rounded-md border border-danger-border bg-danger-soft px-3 py-2 text-sm font-semibold text-danger-text transition-colors hover:bg-danger-soft/80"
                                 aria-label={`Ta bort kostnad ${index + 1}`}
                             >
-                                ✕
+                                Ta bort
                             </button>
                         </div>
                     ))

@@ -402,6 +402,7 @@ export interface RawPersistedSketchMeta extends UnknownRecord {
 export interface QuoteState {
     stateVersion: number;
     step: StepInput;
+    draftUpdatedAtMs: number | null;
     selectedLines: string[];
     builderItems: BuilderItem[];
     gridSelections: GridSelections;
@@ -1058,6 +1059,7 @@ export type QuoteReducerAction =
     | { type: 'SET_EXPORT_LANGUAGE'; payload: QuoteExportLanguage }
     | { type: 'SET_PAYMENT_TERMS_DAYS'; payload: number }
     | { type: 'SET_QUOTE_VALIDITY_DAYS'; payload: number }
+    | { type: 'RESET_QUOTE_DRAFT' }
     | { type: 'RESET_STATE' };
 
 export interface QuoteContextValue {
@@ -1069,18 +1071,24 @@ export interface HeaderProps {
     currentStep?: StepInput;
 }
 
+export interface DashboardQuoteDraftSummary {
+    customerLabel: string;
+    reference?: string;
+    quoteNumber?: string;
+    stepLabel: string;
+    updatedAtMs?: number | null;
+}
+
 export interface DashboardProps {
     onStartQuote?: () => void;
-    onOpenHistory?: () => void;
-    onOpenInventory?: () => void;
-    onOpenSketch?: () => void;
-    onOpenPlanner?: () => void;
+    onContinueQuote?: () => void;
     onOpenCrm?: () => void;
+    onOpenInventory?: () => void;
+    onOpenPlanner?: () => void;
+    onOpenSketch?: () => void;
     onOpenActivity?: () => void;
-    onOpenRetailers?: () => void;
     onOpenRetailerOrders?: () => void;
-    onOpenRetailerOrderHistory?: () => void;
-    onOpenRetailerDocuments?: () => void;
+    quoteDraftSummary?: DashboardQuoteDraftSummary | null;
 }
 
 export interface ProductLineSelectionProps {
@@ -1142,6 +1150,7 @@ export interface TermsAndPaymentPanelProps {
 export interface ErrorBoundaryProps {
     children?: ReactNode;
     resetHref?: string;
+    ownerUid?: string | null;
 }
 
 export interface ErrorBoundaryState {
@@ -1224,9 +1233,7 @@ export interface ClickitupStockGridProps {
     onUpdateStock: (size: string, field: ClickitupFieldKey, delta: number) => void;
 }
 
-export interface RetailerManagerProps {
-    onBack?: () => void;
-}
+export interface RetailerManagerProps {}
 
 export interface RetailerOrderRequestsProps {
     onBack?: () => void;
@@ -1313,7 +1320,6 @@ export interface ActivityLogFilters {
 
 export interface ActivityEventDefinition {
     label: string;
-    icon: string;
     color: string;
 }
 
@@ -1704,6 +1710,7 @@ export interface SketchCanvasProps {
     selectedParasolId?: string | null;
     fiestaItems?: PlacedFiesta[];
     selectedFiestaId?: string | null;
+    panelOpen?: boolean;
     hoverPreviewLayout?: ComputedLayoutResult | null;
     undo?: () => void;
     redo?: () => void;

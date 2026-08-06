@@ -68,22 +68,22 @@ export const ACTIVITY_SYSTEM_DEFINITIONS: Record<string, { label: string }> = {
 };
 
 export const ACTIVITY_EVENT_DEFINITIONS: Record<string, ActivityEventDefinition> = {
-    quote_created: { label: 'Offert skapad', icon: '📄', color: 'var(--color-success)' },
-    quote_revision_saved: { label: 'Ny offertversion sparad', icon: '↻', color: 'var(--color-primary)' },
-    quote_export_pdf: { label: 'PDF exporterad', icon: '📄', color: 'var(--color-primary)' },
-    quote_export_excel: { label: 'Excel exporterad', icon: '📊', color: 'var(--color-success)' },
-    sketch_export_to_quote: { label: 'Ritning exporterad till offert', icon: '✏️', color: 'var(--color-primary)' },
-    sketch_export_image: { label: 'Ritningsbild nedladdad', icon: '🖼️', color: 'var(--color-success)' },
-    crm_company_created: { label: 'CRM-kund skapad', icon: '◎', color: 'var(--color-success)' },
-    crm_contact_created: { label: 'CRM-kontakt skapad', icon: '◎', color: 'var(--color-primary)' },
-    crm_deal_created: { label: 'CRM-affär skapad', icon: '◎', color: 'var(--color-success)' },
-    crm_deal_stage_changed: { label: 'CRM-affär uppdaterad', icon: '↻', color: 'var(--color-primary)' },
-    crm_activity_created: { label: 'CRM-aktivitet skapad', icon: '◎', color: 'var(--color-primary)' },
-    crm_activity_completed: { label: 'CRM-uppföljning klar', icon: '✓', color: 'var(--color-success)' },
-    retailer_created: { label: 'Återförsäljare skapad', icon: '🏪', color: 'var(--color-success)' },
-    retailer_updated: { label: 'Återförsäljare uppdaterad', icon: '🏪', color: 'var(--color-primary)' },
-    retailer_deleted: { label: 'Återförsäljare borttagen', icon: '🗑️', color: 'var(--color-error, #e74c3c)' },
-    retailer_documents_updated: { label: 'Retailer-dokument uppdaterade', icon: '📄', color: 'var(--color-primary)' }
+    quote_created: { label: 'Offert skapad', color: 'var(--color-success)' },
+    quote_revision_saved: { label: 'Ny offertversion sparad', color: 'var(--color-primary)' },
+    quote_export_pdf: { label: 'PDF exporterad', color: 'var(--color-primary)' },
+    quote_export_excel: { label: 'Excel exporterad', color: 'var(--color-success)' },
+    sketch_export_to_quote: { label: 'Ritning exporterad till offert', color: 'var(--color-primary)' },
+    sketch_export_image: { label: 'Ritningsbild nedladdad', color: 'var(--color-success)' },
+    crm_company_created: { label: 'CRM-kund skapad', color: 'var(--color-success)' },
+    crm_contact_created: { label: 'CRM-kontakt skapad', color: 'var(--color-primary)' },
+    crm_deal_created: { label: 'CRM-affär skapad', color: 'var(--color-success)' },
+    crm_deal_stage_changed: { label: 'CRM-affär uppdaterad', color: 'var(--color-primary)' },
+    crm_activity_created: { label: 'CRM-aktivitet skapad', color: 'var(--color-primary)' },
+    crm_activity_completed: { label: 'CRM-uppföljning klar', color: 'var(--color-success)' },
+    retailer_created: { label: 'Återförsäljare skapad', color: 'var(--color-success)' },
+    retailer_updated: { label: 'Återförsäljare uppdaterad', color: 'var(--color-primary)' },
+    retailer_deleted: { label: 'Återförsäljare borttagen', color: 'var(--color-error, #e74c3c)' },
+    retailer_documents_updated: { label: 'Retailer-dokument uppdaterade', color: 'var(--color-primary)' }
 };
 
 function toActivityLogRaw(source: ActivityLogSource | null | undefined): UnknownRecord {
@@ -148,7 +148,6 @@ export function getActivitySystemLabel(system: unknown): string {
 export function getActivityEventDefinition(eventType: unknown): ActivityEventDefinition {
     return ACTIVITY_EVENT_DEFINITIONS[String(eventType || '').trim()] || {
         label: String(eventType || 'Aktivitet'),
-        icon: 'i',
         color: 'var(--color-primary)'
     };
 }
@@ -227,7 +226,6 @@ export function normalizeActivityLog(source: ActivityLogSource | null | undefine
 export function getActivityLogVisual(entry: Pick<ActivityLogRow, 'eventType'> | null | undefined): ActivityEventDefinition {
     const definition = getActivityEventDefinition(entry?.eventType);
     return {
-        icon: definition.icon,
         color: definition.color,
         label: definition.label
     };
