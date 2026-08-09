@@ -89,11 +89,12 @@ describe('AppShell navigation', () => {
             })
         });
 
-        expect(screen.getByRole('link', { name: 'CRM' })).toBeTruthy();
-        expect(screen.queryByRole('link', { name: 'Lager' })).toBeNull();
-        fireEvent.click(screen.getByRole('button', { name: 'Mer' }));
-        expect(screen.getByRole('link', { name: 'Lager' })).toBeTruthy();
-        expect(screen.getByRole('link', { name: 'Orderförfrågningar' })).toBeTruthy();
+        const adminPrimaryRow = screen.getByRole('group', { name: 'Primära funktioner' });
+        const adminSecondaryRow = screen.getByRole('group', { name: 'Övriga funktioner' });
+        expect(within(adminPrimaryRow).getByRole('link', { name: 'CRM' })).toBeTruthy();
+        expect(within(adminSecondaryRow).getByRole('link', { name: 'Lager' })).toBeTruthy();
+        expect(within(adminSecondaryRow).getByRole('link', { name: 'Orderförfrågningar' })).toBeTruthy();
+        expect(screen.queryByRole('button', { name: 'Mer' })).toBeNull();
         expect(screen.queryByRole('link', { name: 'Mina ordrar' })).toBeNull();
 
         admin.unmount();
@@ -105,8 +106,11 @@ describe('AppShell navigation', () => {
             })
         });
 
-        expect(screen.getByRole('link', { name: 'Mina ordrar' })).toBeTruthy();
-        expect(screen.getByRole('link', { name: 'Dokument' })).toBeTruthy();
+        const retailerPrimaryRow = screen.getByRole('group', { name: 'Primära funktioner' });
+        const retailerSecondaryRow = screen.getByRole('group', { name: 'Övriga funktioner' });
+        expect(within(retailerSecondaryRow).getByRole('link', { name: 'Mina ordrar' })).toBeTruthy();
+        expect(within(retailerSecondaryRow).getByRole('link', { name: 'Dokument' })).toBeTruthy();
+        expect(within(retailerPrimaryRow).queryByRole('link', { name: 'Mina ordrar' })).toBeNull();
         expect(screen.queryByRole('button', { name: 'Mer' })).toBeNull();
         expect(screen.queryByRole('link', { name: 'CRM' })).toBeNull();
     });
@@ -130,7 +134,7 @@ describe('AppShell navigation', () => {
         expect(screen.getByTestId('location').textContent).toBe('/inventory/qr');
     });
 
-    it('opens the compact desktop disclosure and restores focus with Escape', () => {
+    it('shows every authorized admin destination directly in two desktop rows', () => {
         renderHeader({
             auth: createAuth({
                 accessLevel: 'full',
@@ -138,78 +142,29 @@ describe('AppShell navigation', () => {
                 canAccessSketch: true
             })
         });
-        const moreButton = screen.getByRole('button', { name: 'Mer' });
+        const primaryRow = screen.getByRole('group', { name: 'Primära funktioner' });
+        const secondaryRow = screen.getByRole('group', { name: 'Övriga funktioner' });
 
-        expect(moreButton.getAttribute('aria-expanded')).toBe('false');
-        expect(moreButton.getAttribute('aria-haspopup')).toBe('true');
-        expect(screen.queryByRole('region', { name: 'Fler destinationer' })).toBeNull();
-
-        fireEvent.click(moreButton);
-
-        expect(moreButton.getAttribute('aria-expanded')).toBe('true');
-        const morePanel = screen.getByRole('region', { name: 'Fler destinationer' });
-        expect(morePanel).toBeTruthy();
-        expect(morePanel.className).toContain('w-[min(22rem,calc(100vw-2rem))]');
-        expect(morePanel.querySelector('.grid-cols-2')).toBeNull();
-        expect(screen.getByText('Drift').tagName).toBe('P');
-        expect(
-            Array.from(morePanel.querySelectorAll('section')).every(
-                (section) => !section.className.includes('rounded-control')
-            )
-        ).toBe(true);
-        expect(screen.getByRole('link', { name: 'Planering' })).toBeTruthy();
-        expect(screen.getByRole('link', { name: 'Återförsäljare' })).toBeTruthy();
-        expect(screen.getByRole('link', { name: 'Aktiviteter' })).toBeTruthy();
-
-        fireEvent.keyDown(document, { key: 'Escape' });
-
-        expect(screen.queryByRole('region', { name: 'Fler destinationer' })).toBeNull();
-        expect(moreButton.getAttribute('aria-expanded')).toBe('false');
-        expect(moreButton).toBe(document.activeElement);
-    });
-
-    it('closes the compact desktop disclosure when focus moves outside it', () => {
-        renderHeader({
-            auth: createAuth({
-                accessLevel: 'full',
-                canViewEverything: true,
-                canAccessSketch: true
-            })
-        });
-        const moreButton = screen.getByRole('button', { name: 'Mer' });
-        const homeLink = screen.getByRole('link', { name: 'Hem' });
-
-        fireEvent.click(moreButton);
-        expect(screen.getByRole('region', { name: 'Fler destinationer' })).toBeTruthy();
-
-        homeLink.focus();
-        fireEvent.focusIn(homeLink);
-
-        expect(screen.queryByRole('region', { name: 'Fler destinationer' })).toBeTruthy();
-
-        screen.getByText('Brixx portal').focus();
-        fireEvent.focusIn(document.body);
-
-        expect(screen.queryByRole('region', { name: 'Fler destinationer' })).toBeNull();
-    });
-
-    it('closes the compact desktop disclosure on an outside pointer press', () => {
-        renderHeader({
-            auth: createAuth({
-                accessLevel: 'full',
-                canViewEverything: true,
-                canAccessSketch: true
-            })
-        });
-        const moreButton = screen.getByRole('button', { name: 'Mer' });
-
-        fireEvent.click(moreButton);
-        expect(screen.getByRole('region', { name: 'Fler destinationer' })).toBeTruthy();
-
-        fireEvent.pointerDown(document.body);
-
-        expect(screen.queryByRole('region', { name: 'Fler destinationer' })).toBeNull();
-        expect(moreButton.getAttribute('aria-expanded')).toBe('false');
+        expect(Array.from(primaryRow.querySelectorAll('a, button')).map((item) => item.textContent)).toEqual([
+            'Hem',
+            'Ny offert',
+            'Offerter',
+            'CRM'
+        ]);
+        expect(within(secondaryRow).getAllByRole('link').map((item) => item.textContent)).toEqual([
+            'Orderförfrågningar',
+            'Skiss',
+            'Skanna parasoll',
+            'Lager',
+            'Planering',
+            'Återförsäljare',
+            'Dokument',
+            'Aktiviteter',
+            'Lagerloggar',
+            'QR-etiketter'
+        ]);
+        expect(secondaryRow.className).toContain('overflow-x-auto');
+        expect(screen.queryByRole('button', { name: 'Mer' })).toBeNull();
     });
 
     it('opens an accessible mobile drawer, closes with Escape, and restores focus', () => {
@@ -293,9 +248,6 @@ describe('AppShell navigation', () => {
 
         first.unmount();
         renderHeader({ auth, route: '/inventory/logs' });
-        const moreButton = screen.getByRole('button', { name: 'Mer, aktuell sida: Lagerloggar' });
-        expect(moreButton.textContent).toBe('Mer');
-        fireEvent.click(moreButton);
         expect(screen.getByRole('link', { name: 'Lagerloggar' }).getAttribute('aria-current')).toBe('page');
         expect(screen.getByRole('link', { name: 'Lager' }).getAttribute('aria-current')).toBeNull();
     });
