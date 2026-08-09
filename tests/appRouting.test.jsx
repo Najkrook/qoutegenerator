@@ -95,6 +95,18 @@ vi.mock('../src/views/InventoryManager', () => ({
     InventoryManager: () => <div>InventoryView</div>
 }));
 
+vi.mock('../src/views/InventoryQrGenerator', () => ({
+    InventoryQrGenerator: () => <div>InventoryQrView</div>
+}));
+
+vi.mock('../src/views/QrScanner', () => ({
+    QrScanner: () => <div>QrScannerView</div>
+}));
+
+vi.mock('../src/views/QrParasolDetail', () => ({
+    QrParasolDetail: () => <div>QrParasolDetailView</div>
+}));
+
 vi.mock('../src/views/Planner', () => ({
     Planner: () => <div>PlannerView</div>
 }));
@@ -376,6 +388,28 @@ describe('app routing', () => {
         const quoteOnly = await renderApp({
             initialEntries: [APP_PATHS[APP_ROUTE_IDS.crmDashboard]]
         });
+
+        expect(quoteOnly.router.state.location.pathname).toBe(APP_PATHS[APP_ROUTE_IDS.dashboard]);
+        expect(quoteOnly.container.textContent).toContain('DashboardView');
+    });
+
+    it.each([
+        [APP_PATHS[APP_ROUTE_IDS.inventoryQr], 'InventoryQrView'],
+        [APP_PATHS[APP_ROUTE_IDS.qrScanner], 'QrScannerView'],
+        ['/p/d1d3ba1f-bdee-4f45-8f63-04b379e3d45b', 'QrParasolDetailView']
+    ])('allows admins to open the QR route %s and redirects quote-only users', async (path, expectedView) => {
+        const admin = await renderApp({
+            initialEntries: [path],
+            auth: {
+                accessLevel: 'full',
+                canViewEverything: true
+            }
+        });
+
+        expect(admin.router.state.location.pathname).toBe(path);
+        expect(admin.container.textContent).toContain(expectedView);
+
+        const quoteOnly = await renderApp({ initialEntries: [path] });
 
         expect(quoteOnly.router.state.location.pathname).toBe(APP_PATHS[APP_ROUTE_IDS.dashboard]);
         expect(quoteOnly.container.textContent).toContain('DashboardView');

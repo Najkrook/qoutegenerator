@@ -136,3 +136,11 @@ Mobiljämförelsen gjordes två gånger. Första passet visade att ett överlagr
 | Webbkonsol | 0 fel, 0 varningar |
 
 final result: passed
+
+---
+
+# Design QA — BaHaMa QR-stöd
+
+Den fullständiga QR-granskningen finns i [docs/design-qa-qr.md](docs/design-qa-qr.md). Desktop- och mobilkoncepten jämfördes sida vid sida med browser-renderad implementation, interaktionerna verifierades och inga blockerande avvikelser återstår.
+
+final result: passed

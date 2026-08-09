@@ -9,6 +9,7 @@ import React, {
     type KeyboardEvent
 } from 'react';
 import { notifyError } from '../../services/notificationService';
+import { createBahamaQrId } from '../../services/bahamaQrService';
 import type { BahamaInventoryStatus, BahamaInventoryV2Item, InventoryItemModalProps } from '../../types/contracts';
 import {
     BAHAMA_FOOT_OPTIONS,
@@ -41,6 +42,7 @@ function nowIso(): string {
 function createBlankItem(): BahamaInventoryV2Item {
     const timestamp = nowIso();
     return {
+        qrId: createBahamaQrId(),
         id: '',
         type: '',
         size: '',
@@ -123,6 +125,7 @@ function PresetTextInput({
     autoFocus = false
 }: PresetTextInputProps) {
     const wrapperRef = useRef<HTMLDivElement>(null);
+    const blurTimeoutRef = useRef<number | null>(null);
     const [isOpen, setIsOpen] = useState(false);
     const [activeIndex, setActiveIndex] = useState(0);
     const [dropdownMaxHeight, setDropdownMaxHeight] = useState(224);
@@ -184,6 +187,12 @@ function PresetTextInput({
         return () => window.removeEventListener('resize', updateDropdownHeight);
     }, [canShowOptions, isOpen, updateDropdownHeight]);
 
+    useEffect(() => () => {
+        if (blurTimeoutRef.current !== null) {
+            window.clearTimeout(blurTimeoutRef.current);
+        }
+    }, []);
+
     const selectOption = (option: string) => {
         onValueChange(option);
         setIsOpen(false);
@@ -230,11 +239,18 @@ function PresetTextInput({
                     window.requestAnimationFrame(updateDropdownHeight);
                 }}
                 onFocus={() => {
+                    if (blurTimeoutRef.current !== null) {
+                        window.clearTimeout(blurTimeoutRef.current);
+                        blurTimeoutRef.current = null;
+                    }
                     setIsOpen(true);
                     window.requestAnimationFrame(updateDropdownHeight);
                 }}
                 onBlur={() => {
-                    window.setTimeout(() => setIsOpen(false), 120);
+                    blurTimeoutRef.current = window.setTimeout(() => {
+                        setIsOpen(false);
+                        blurTimeoutRef.current = null;
+                    }, 120);
                 }}
                 onKeyDown={handleKeyDown}
                 disabled={disabled}

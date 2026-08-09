@@ -23,6 +23,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
 
             if (u) {
                 let roleDocFetched = false;
+                let hasExplicitInternalRole = false;
 
                 try {
                     const roleRef = doc(db, 'user_roles', u.uid);
@@ -33,13 +34,15 @@ export function AuthProvider({ children }: PropsWithChildren) {
                         if (data.role === 'admin') {
                             resolvedLevel = ACCESS_LEVELS.FULL;
                             roleDocFetched = true;
+                            hasExplicitInternalRole = true;
                         } else if (data.role === 'sketch_only') {
                             resolvedLevel = ACCESS_LEVELS.SKETCH_ONLY;
                             roleDocFetched = true;
+                            hasExplicitInternalRole = true;
                         } else if (data.role === 'quote_only') {
-                            // Explicit quote_only means they don't fall back to hardcoded,
-                            // but we leave resolvedLevel as GUEST here so they can still hit retailer check later.
+                            resolvedLevel = ACCESS_LEVELS.QUOTE_ONLY;
                             roleDocFetched = true;
+                            hasExplicitInternalRole = true;
                         }
                     }
                 } catch (err) {
@@ -52,7 +55,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
                 }
 
                 // If not an admin or sketch_only, check if they are a retailer
-                if (resolvedLevel !== ACCESS_LEVELS.FULL && resolvedLevel !== ACCESS_LEVELS.SKETCH_ONLY && u.email) {
+                if (!hasExplicitInternalRole && resolvedLevel !== ACCESS_LEVELS.FULL && resolvedLevel !== ACCESS_LEVELS.SKETCH_ONLY && u.email) {
                     try {
                         const emailLower = u.email.toLowerCase();
                         const retailersRef = collection(db, 'retailers');
@@ -73,6 +76,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
                 if (resolvedLevel === ACCESS_LEVELS.GUEST) {
                     resolvedLevel = ACCESS_LEVELS.QUOTE_ONLY;
                 }
+
             }
 
             setAccessLevel(resolvedLevel);

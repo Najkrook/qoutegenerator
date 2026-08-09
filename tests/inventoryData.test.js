@@ -44,6 +44,7 @@ describe('inventoryData helpers', () => {
         const original = normalizeStoredInventoryData({
             bahama: [{ BESKRIVNING: 'Parasollfot' }],
             bahamaV2: [{
+                qrId: '',
                 id: 'BA-001',
                 type: 'Parasoll',
                 size: '4x4',
@@ -77,6 +78,7 @@ describe('inventoryData helpers', () => {
         expect(original).toEqual({
             bahama: [{ BESKRIVNING: 'Parasollfot' }],
             bahamaV2: [{
+                qrId: '',
                 id: 'BA-001',
                 type: 'Parasoll',
                 size: '4x4',
@@ -199,6 +201,7 @@ describe('inventoryData helpers', () => {
         });
 
         expect(normalized.bahamaV2).toEqual([{
+            qrId: '',
             id: 'BA-001',
             type: 'Parasoll',
             size: '4x4',

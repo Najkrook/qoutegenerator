@@ -155,6 +155,7 @@ export interface BahamaInventoryProperties {
 }
 
 export interface BahamaInventoryV2Item {
+    qrId: string;
     id: string;
     type: string;
     size: string;
@@ -166,6 +167,38 @@ export interface BahamaInventoryV2Item {
     updatedAt: string;
     updatedByUid: string;
     updatedByEmail: string;
+}
+
+export interface BahamaQrActiveRecord {
+    schemaVersion: 1;
+    qrId: string;
+    inventoryId: string;
+    active: true;
+    type: string;
+    size: string;
+    status: BahamaInventoryStatus;
+    location: string;
+    properties: BahamaInventoryProperties;
+    comment: string;
+    updatedAt: string;
+}
+
+export interface BahamaQrArchivedRecord {
+    schemaVersion: 1;
+    qrId: string;
+    inventoryId: string;
+    active: false;
+    archivedAt: string;
+    updatedAt: string;
+}
+
+export type BahamaQrRecord = BahamaQrActiveRecord | BahamaQrArchivedRecord;
+
+export interface QrLabelLayout {
+    widthMm: number;
+    heightMm: number;
+    marginMm: number;
+    gapMm: number;
 }
 
 export type ClickitupFieldKey = 'sektion' | 'dorr_h' | 'dorr_v' | 'hane_h' | 'hane_v';

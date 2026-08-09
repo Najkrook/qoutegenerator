@@ -29,6 +29,52 @@ service cloud.firestore {
       );
     }
 
+    function hasValidBahamaQrProperties(properties) {
+      return properties is map
+        && properties.keys().hasOnly(['stativ', 'textil', 'fot', 'belysning', 'varme'])
+        && properties.stativ is string
+        && properties.textil is string
+        && properties.fot is string
+        && properties.belysning is string
+        && properties.varme is string;
+    }
+
+    function isValidBahamaQrActive(data, qrId) {
+      return data.keys().hasOnly([
+          'schemaVersion', 'qrId', 'inventoryId', 'active', 'type', 'size',
+          'status', 'location', 'properties', 'comment', 'updatedAt'
+        ])
+        && data.schemaVersion == 1
+        && data.qrId == qrId
+        && data.inventoryId is string
+        && data.inventoryId.size() > 0
+        && data.active == true
+        && data.type is string
+        && data.size is string
+        && data.status in ['available', 'reserved', 'needs-review', 'used', 'sold']
+        && data.location is string
+        && hasValidBahamaQrProperties(data.properties)
+        && data.comment is string
+        && data.updatedAt is string;
+    }
+
+    function isValidBahamaQrArchived(data, qrId) {
+      return data.keys().hasOnly([
+          'schemaVersion', 'qrId', 'inventoryId', 'active', 'archivedAt', 'updatedAt'
+        ])
+        && data.schemaVersion == 1
+        && data.qrId == qrId
+        && data.inventoryId is string
+        && data.inventoryId.size() > 0
+        && data.active == false
+        && data.archivedAt is string
+        && data.updatedAt is string;
+    }
+
+    function isValidBahamaQrRecord(data, qrId) {
+      return isValidBahamaQrActive(data, qrId) || isValidBahamaQrArchived(data, qrId);
+    }
+
     function isNullableCrmString(value) {
       return value == null || value is string;
     }
@@ -486,6 +532,13 @@ service cloud.firestore {
 
     match /stock/{docId} {
       allow read, write: if isAdmin();
+    }
+
+    match /bahama_qr_items/{qrId} {
+      allow get: if isAdmin();
+      allow list: if false;
+      allow create, update: if isAdmin() && isValidBahamaQrRecord(request.resource.data, qrId);
+      allow delete: if false;
     }
 
     match /inventory_logs/{logId} {

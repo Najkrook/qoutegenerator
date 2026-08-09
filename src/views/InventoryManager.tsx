@@ -20,6 +20,7 @@ import {
     notifyWarn
 } from '../services/notificationService';
 import { getErrorMessage } from '../utils/runtime';
+import { ensureBahamaQrIds, stageBahamaQrProjectionWrites } from '../services/bahamaQrService';
 import type {
     BahamaInventoryStatus,
     BahamaInventoryV2Item,
@@ -276,6 +277,7 @@ export function InventoryManager(_props: InventoryManagerProps) {
         try {
             const batch = writeBatch(db);
             const inventoryToSave = cloneInventoryData(inventoryData);
+            inventoryToSave.bahamaV2 = ensureBahamaQrIds(inventoryToSave.bahamaV2 || []);
             const invRef = doc(db, 'stock', 'main_inventory');
             batch.set(invRef, inventoryToSave);
 
@@ -287,6 +289,7 @@ export function InventoryManager(_props: InventoryManagerProps) {
 
             const bahamaLocal = inventoryToSave.bahamaV2 || [];
             const bahamaCloud = cloudInventoryData.bahamaV2 || [];
+            stageBahamaQrProjectionWrites(batch, bahamaLocal, bahamaCloud, now);
             const cloudMap = bahamaCloud.reduce<Record<string, BahamaInventoryV2Item>>((acc, item) => {
                 acc[item.id] = item;
                 return acc;
@@ -389,10 +392,11 @@ export function InventoryManager(_props: InventoryManagerProps) {
 
             await batch.commit();
             dispatch({ type: 'SET_CLOUD_INVENTORY_DATA', payload: cloneInventoryData(inventoryToSave) });
+            dispatch({ type: 'SET_INVENTORY_DATA', payload: cloneInventoryData(inventoryToSave) });
             notifySuccess('Ändringar sparade till molnet!');
         } catch (err) {
             console.error('Failed to commit:', err);
-            notifyError('Nätverksfel. Kontrollera din internetuppkoppling.');
+            notifyError(getErrorMessage(err, 'Nätverksfel. Kontrollera din internetuppkoppling.'));
         } finally {
             setIsSaving(false);
         }

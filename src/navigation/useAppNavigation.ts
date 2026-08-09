@@ -4,6 +4,7 @@ import {
     APP_ROUTE_IDS,
     getNextLoginRedirectTarget,
     getQuoteStepPath,
+    getQrParasolPath,
     getSketchReturnPath,
     resolveLoginRedirectTarget,
     type QuoteRouteStepId,
@@ -75,6 +76,15 @@ export function useAppNavigation() {
         },
         goToInventory(options?: NavigateOptions) {
             navigate(APP_PATHS[APP_ROUTE_IDS.inventory], options);
+        },
+        goToInventoryQr(options?: NavigateOptions) {
+            navigate(APP_PATHS[APP_ROUTE_IDS.inventoryQr], options);
+        },
+        goToQrScanner(options?: NavigateOptions) {
+            navigate(APP_PATHS[APP_ROUTE_IDS.qrScanner], options);
+        },
+        goToQrParasol(qrId: string, options?: NavigateOptions) {
+            navigate(getQrParasolPath(qrId), options);
         },
         goToInventoryLogs(options?: NavigateOptions) {
             navigate(APP_PATHS[APP_ROUTE_IDS.inventoryLogs], options);

@@ -50,6 +50,9 @@ import type {
 
 const SummaryExport = lazy(() => import('./views/SummaryExport').then((module) => ({ default: module.SummaryExport })));
 const InventoryManager = lazy(() => import('./views/InventoryManager').then((module) => ({ default: module.InventoryManager })));
+const InventoryQrGenerator = lazy(() => import('./views/InventoryQrGenerator').then((module) => ({ default: module.InventoryQrGenerator })));
+const QrScanner = lazy(() => import('./views/QrScanner').then((module) => ({ default: module.QrScanner })));
+const QrParasolDetail = lazy(() => import('./views/QrParasolDetail').then((module) => ({ default: module.QrParasolDetail })));
 const SketchTool = lazy(() => import('./views/SketchTool').then((module) => ({ default: module.SketchTool })));
 const Planner = lazy(() => import('./views/Planner').then((module) => ({ default: module.Planner })));
 const History = lazy(() => import('./views/History').then((module) => ({ default: module.History })));
@@ -85,9 +88,12 @@ function RouteShell() {
     const { user } = useAuth();
     const location = useLocation();
     const routeId = getAppRouteIdFromPath(location.pathname);
-    const isFocusRoute = routeId === APP_ROUTE_IDS.sketch;
+    const isFocusRoute = routeId === APP_ROUTE_IDS.sketch
+        || routeId === APP_ROUTE_IDS.qrScanner
+        || routeId === APP_ROUTE_IDS.qrParasolDetail;
     const isWideRoute = routeId === APP_ROUTE_IDS.quoteSummary
         || routeId === APP_ROUTE_IDS.inventory
+        || routeId === APP_ROUTE_IDS.inventoryQr
         || routeId === APP_ROUTE_IDS.planner;
 
     return (
@@ -594,6 +600,30 @@ export const appRoutes: RouteObject[] = [
                 element: (
                     <RouteAccessBoundary routeId={APP_ROUTE_IDS.inventory}>
                         <InventoryManagerPage />
+                    </RouteAccessBoundary>
+                )
+            },
+            {
+                path: APP_PATHS[APP_ROUTE_IDS.inventoryQr].slice(1),
+                element: (
+                    <RouteAccessBoundary routeId={APP_ROUTE_IDS.inventoryQr}>
+                        <InventoryQrGenerator />
+                    </RouteAccessBoundary>
+                )
+            },
+            {
+                path: APP_PATHS[APP_ROUTE_IDS.qrScanner].slice(1),
+                element: (
+                    <RouteAccessBoundary routeId={APP_ROUTE_IDS.qrScanner}>
+                        <QrScanner />
+                    </RouteAccessBoundary>
+                )
+            },
+            {
+                path: APP_PATHS[APP_ROUTE_IDS.qrParasolDetail].slice(1),
+                element: (
+                    <RouteAccessBoundary routeId={APP_ROUTE_IDS.qrParasolDetail}>
+                        <QrParasolDetail />
                     </RouteAccessBoundary>
                 )
             },

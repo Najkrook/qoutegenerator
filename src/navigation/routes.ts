@@ -18,6 +18,9 @@ export const APP_ROUTE_IDS = Object.freeze({
     quotes: 'quotes',
     sketch: 'sketch',
     inventory: 'inventory',
+    inventoryQr: 'inventory-qr',
+    qrScanner: 'qr-scanner',
+    qrParasolDetail: 'qr-parasol-detail',
     inventoryLogs: 'inventory-logs',
     activity: 'activity',
     planner: 'planner',
@@ -46,6 +49,9 @@ export const APP_PATHS: Record<AppRouteId, string> = Object.freeze({
     [APP_ROUTE_IDS.quotes]: '/quotes',
     [APP_ROUTE_IDS.sketch]: '/sketch',
     [APP_ROUTE_IDS.inventory]: '/inventory',
+    [APP_ROUTE_IDS.inventoryQr]: '/inventory/qr',
+    [APP_ROUTE_IDS.qrScanner]: '/scan',
+    [APP_ROUTE_IDS.qrParasolDetail]: '/p/:qrId',
     [APP_ROUTE_IDS.inventoryLogs]: '/inventory/logs',
     [APP_ROUTE_IDS.activity]: '/activity',
     [APP_ROUTE_IDS.planner]: '/planner',
@@ -132,6 +138,9 @@ const ROUTE_ACCESS: Record<AppRouteId, AppRouteAccess> = {
     [APP_ROUTE_IDS.quotes]: 'history',
     [APP_ROUTE_IDS.sketch]: 'sketch',
     [APP_ROUTE_IDS.inventory]: 'admin',
+    [APP_ROUTE_IDS.inventoryQr]: 'admin',
+    [APP_ROUTE_IDS.qrScanner]: 'admin',
+    [APP_ROUTE_IDS.qrParasolDetail]: 'admin',
     [APP_ROUTE_IDS.inventoryLogs]: 'admin',
     [APP_ROUTE_IDS.activity]: 'admin',
     [APP_ROUTE_IDS.planner]: 'admin',
@@ -190,6 +199,9 @@ export function getAppRouteIdFromPath(pathname: string | null | undefined): AppR
     if (/^\/crm\/deals\/[^/]+$/.test(normalizedPathname)) {
         return APP_ROUTE_IDS.crmDealDetail;
     }
+    if (/^\/p\/[^/]+$/.test(normalizedPathname)) {
+        return APP_ROUTE_IDS.qrParasolDetail;
+    }
 
     return null;
 }
@@ -204,6 +216,10 @@ export function getCrmContactPath(contactId: string): string {
 
 export function getCrmDealPath(dealId: string): string {
     return APP_PATHS[APP_ROUTE_IDS.crmDealDetail].replace(':dealId', encodeURIComponent(dealId));
+}
+
+export function getQrParasolPath(qrId: string): string {
+    return APP_PATHS[APP_ROUTE_IDS.qrParasolDetail].replace(':qrId', encodeURIComponent(qrId));
 }
 
 export function getQuoteStepPath(step: QuoteRouteStepId): string {
@@ -258,7 +274,10 @@ export function getSketchReturnPath(target: SketchReturnTarget | null | undefine
     }
 }
 
-export function getAuthorizedRouteForAccess(routeId: AppRouteId, accessLevel: AccessLevel): string {
+export function getAuthorizedRouteForAccess(
+    routeId: AppRouteId,
+    accessLevel: AccessLevel
+): string {
     const requiredAccess = getRequiredAccessForRoute(routeId);
 
     switch (requiredAccess) {

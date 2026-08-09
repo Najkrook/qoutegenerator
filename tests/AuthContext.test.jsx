@@ -133,22 +133,17 @@ describe('AuthContext Role Precedence', () => {
         expect(screen.getByTestId('can-view-everything').textContent).toBe('true');
     });
 
-    it('falls back to retailer if explicit quote_only is found (or doc missing) and user is in retailers collection', async () => {
+    it('keeps explicit quote_only even if the email belongs to a retailer', async () => {
         firebase.getDoc.mockResolvedValueOnce({
             exists: () => true,
             data: () => ({ role: 'quote_only' })
         });
 
-        firebase.getDocs.mockResolvedValueOnce({
-            empty: false,
-            docs: [{ id: 'ret-1', data: () => ({ name: 'Test Retailer' }) }]
-        });
-
         await triggerAuth({ uid: 'some-uid', email: 'retailer@test.com' });
         
-        expect(screen.getByTestId('level').textContent).toBe(ACCESS_LEVELS.RETAILER);
-        expect(screen.getByTestId('is-retailer').textContent).toBe('true');
-        expect(firebase.getDocs).toHaveBeenCalled();
+        expect(screen.getByTestId('level').textContent).toBe(ACCESS_LEVELS.QUOTE_ONLY);
+        expect(screen.getByTestId('is-retailer').textContent).toBe('false');
+        expect(firebase.getDocs).not.toHaveBeenCalled();
     });
 
     it('resolves quote_only if user is logged in, no special role, and not a retailer', async () => {

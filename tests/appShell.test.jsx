@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { MemoryRouter, useLocation } from 'react-router-dom';
 import { Header } from '../src/components/layout/Header';
 import { AuthContext } from '../src/store/AuthContext';
@@ -109,6 +109,25 @@ describe('AppShell navigation', () => {
         expect(screen.getByRole('link', { name: 'Dokument' })).toBeTruthy();
         expect(screen.queryByRole('button', { name: 'Mer' })).toBeNull();
         expect(screen.queryByRole('link', { name: 'CRM' })).toBeNull();
+    });
+
+    it('shows QR destinations to admins and routes the generator click', () => {
+        renderHeader({
+            auth: createAuth({
+                accessLevel: 'full',
+                canViewEverything: true,
+                canAccessSketch: true
+            })
+        });
+
+        fireEvent.click(screen.getByRole('button', { name: 'Meny' }));
+        const mobileNavigation = screen.getByRole('navigation', { name: 'Mobil huvudnavigation' });
+        expect(within(mobileNavigation).getByRole('link', { name: 'Skanna parasoll' }).getAttribute('href')).toBe('/scan');
+        const qrLink = within(mobileNavigation).getByRole('link', { name: 'QR-etiketter' });
+        expect(qrLink.getAttribute('href')).toBe('/inventory/qr');
+
+        fireEvent.click(qrLink);
+        expect(screen.getByTestId('location').textContent).toBe('/inventory/qr');
     });
 
     it('opens the compact desktop disclosure and restores focus with Escape', () => {

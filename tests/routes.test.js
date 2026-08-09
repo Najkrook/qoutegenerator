@@ -10,6 +10,7 @@ import {
     getQuoteResumeStep,
     getQuoteStepNavigationItems,
     getQuoteStepPath,
+    getQrParasolPath,
     getRetailerResumeQuoteStep,
     getSketchReturnPath,
     hasConfiguredQuoteContent,
@@ -43,6 +44,20 @@ describe('navigation routes', () => {
         expect(getAuthorizedRouteForAccess(APP_ROUTE_IDS.crmDashboard, ACCESS_LEVELS.FULL)).toBe(APP_PATHS[APP_ROUTE_IDS.crmDashboard]);
         expect(getAuthorizedRouteForAccess(APP_ROUTE_IDS.crmDashboard, ACCESS_LEVELS.QUOTE_ONLY)).toBe(APP_PATHS[APP_ROUTE_IDS.dashboard]);
         expect(getAuthorizedRouteForAccess(APP_ROUTE_IDS.crmDealDetail, ACCESS_LEVELS.RETAILER)).toBe(APP_PATHS[APP_ROUTE_IDS.dashboard]);
+        for (const routeId of [APP_ROUTE_IDS.inventoryQr, APP_ROUTE_IDS.qrScanner, APP_ROUTE_IDS.qrParasolDetail]) {
+            expect(getAuthorizedRouteForAccess(routeId, ACCESS_LEVELS.FULL)).toBe(APP_PATHS[routeId]);
+            expect(getAuthorizedRouteForAccess(routeId, ACCESS_LEVELS.QUOTE_ONLY)).toBe(APP_PATHS[APP_ROUTE_IDS.dashboard]);
+            expect(getAuthorizedRouteForAccess(routeId, ACCESS_LEVELS.SKETCH_ONLY)).toBe(APP_PATHS[APP_ROUTE_IDS.dashboard]);
+            expect(getAuthorizedRouteForAccess(routeId, ACCESS_LEVELS.RETAILER)).toBe(APP_PATHS[APP_ROUTE_IDS.dashboard]);
+            expect(getAuthorizedRouteForAccess(routeId, ACCESS_LEVELS.GUEST)).toBe(APP_PATHS[APP_ROUTE_IDS.dashboard]);
+        }
+    });
+
+    it('builds and recognizes QR detail paths', () => {
+        expect(getQrParasolPath('a/b')).toBe('/p/a%2Fb');
+        expect(getAppRouteIdFromPath('/scan')).toBe(APP_ROUTE_IDS.qrScanner);
+        expect(getAppRouteIdFromPath('/p/1234')).toBe(APP_ROUTE_IDS.qrParasolDetail);
+        expect(resolveLoginRedirectTarget('/p/1234')).toBe('/p/1234');
     });
 
     it('encodes login next targets and resolves them safely', () => {

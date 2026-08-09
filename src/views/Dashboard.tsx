@@ -55,8 +55,11 @@ interface QuoteDraftPanelProps {
 }
 
 interface DashboardLauncherCardProps {
+    badgeBgClass?: string;
     description: string;
-    icon: TablerIcon;
+    emoji: string;
+    hoverBorderClass?: string;
+    icon?: TablerIcon;
     label: string;
     onClick?: () => void;
 }
@@ -116,6 +119,25 @@ function getOrderRequestStatusTone(status: string): StatusTone {
     }
 }
 
+function getOrderRequestStatusEmoji(status: string): string {
+    switch (status) {
+        case 'completed':
+            return '✅';
+        case 'new':
+            return '🆕';
+        case 'reviewing':
+        default:
+            return '🔍';
+    }
+}
+
+function getProductLineEmoji(lineId: string): string {
+    if (lineId === 'BaHaMa') return '☂️';
+    if (lineId === 'ClickitUp') return '🪟';
+    if (lineId === 'ClickitUpFixed') return '📐';
+    return '🌿';
+}
+
 function getRetailerLineSummaries(retailer: RetailerRecord | null): RetailerLineSummary[] {
     if (!retailer?.productLines) {
         return [];
@@ -151,17 +173,17 @@ function QuoteDraftPanel({
         >
             <div className="p-5 sm:p-6">
                 {quoteDraftSummary && (
-                    <div className="mb-5 rounded-panel border border-action/30 bg-action/10 p-4">
+                    <div className="mb-5 rounded-panel border border-indigo-500/30 bg-indigo-500/10 p-4 shadow-sm">
                         <div className="flex flex-wrap items-start justify-between gap-3">
                             <div>
                                 <p className="m-0 text-base font-semibold text-text">
-                                    {quoteDraftSummary.customerLabel}
+                                    <span aria-hidden="true">👤 </span>{quoteDraftSummary.customerLabel}
                                 </p>
                                 <p className="mb-0 mt-1 text-sm text-text-muted">
-                                    {quoteDraftSummary.stepLabel}
+                                    <span aria-hidden="true">📍 </span>{quoteDraftSummary.stepLabel}
                                 </p>
                             </div>
-                            <StatusChip>Utkast</StatusChip>
+                            <StatusChip tone="warning"><span aria-hidden="true">⚡ </span>Utkast</StatusChip>
                         </div>
                         {(quoteDraftSummary.reference || quoteDraftSummary.quoteNumber) && (
                             <p className="mb-0 mt-3 text-sm text-text-muted">
@@ -175,7 +197,7 @@ function QuoteDraftPanel({
                                 className="mt-2 block text-xs text-text-muted"
                                 dateTime={draftUpdatedAt.dateTime}
                             >
-                                Senast ändrad {draftUpdatedAt.label}
+                                <span aria-hidden="true">⏱️ </span>Senast ändrad {draftUpdatedAt.label}
                             </time>
                         )}
                     </div>
@@ -184,7 +206,7 @@ function QuoteDraftPanel({
                 <div className="flex flex-wrap gap-3">
                     {quoteDraftSummary && onContinueQuote && (
                         <Button onClick={onContinueQuote} size="lg" variant="primary">
-                            Fortsätt offert
+                            <span aria-hidden="true">▶️ </span>Fortsätt offert
                         </Button>
                     )}
                     {onStartQuote && (
@@ -193,7 +215,7 @@ function QuoteDraftPanel({
                             size="lg"
                             variant={quoteDraftSummary ? 'secondary' : 'primary'}
                         >
-                            {quoteDraftSummary ? 'Ny offert' : 'Skapa ny offert'}
+                            <span aria-hidden="true">➕ </span>{quoteDraftSummary ? 'Ny offert' : 'Skapa ny offert'}
                         </Button>
                     )}
                 </div>
@@ -203,7 +225,10 @@ function QuoteDraftPanel({
 }
 
 function DashboardLauncherCard({
+    badgeBgClass = 'bg-action/10 text-action border border-action/20',
     description,
+    emoji,
+    hoverBorderClass = 'hover:border-action/60 hover:bg-action/5',
     icon: Icon,
     label,
     onClick
@@ -215,29 +240,27 @@ function DashboardLauncherCard({
             disabled={!onClick}
             className={[
                 'group grid min-h-36 w-full grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-4',
-                'rounded-panel border border-border bg-surface-raised p-5 text-left text-text',
-                'transition-colors hover:border-control-border hover:bg-surface-hover',
+                'rounded-panel border border-border bg-surface-raised p-5 text-left text-text shadow-sm',
+                'transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md',
+                hoverBorderClass,
                 'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring',
                 'disabled:cursor-not-allowed disabled:opacity-60 sm:gap-5'
             ].join(' ')}
         >
-            <Icon
-                aria-hidden="true"
-                className="shrink-0 text-text"
-                size={40}
-                stroke={1.7}
-            />
+            <div className={`flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl text-2xl shadow-inner transition-transform duration-200 group-hover:scale-110 ${badgeBgClass}`}>
+                <span aria-hidden="true">{emoji}</span>
+            </div>
             <span className="min-w-0">
-                <span className="block text-lg font-semibold tracking-tight text-text">
+                <span className="block text-lg font-semibold tracking-tight text-text group-hover:text-action">
                     {label}
                 </span>
-                <span className="mt-2 line-clamp-2 block break-words text-sm leading-6 text-text-muted">
+                <span className="mt-1 line-clamp-2 block break-words text-sm leading-6 text-text-muted">
                     {description}
                 </span>
             </span>
             <IconChevronRight
                 aria-hidden="true"
-                className="shrink-0 text-text-muted transition-colors group-hover:text-text"
+                className="shrink-0 text-text-muted transition-all duration-200 group-hover:translate-x-1 group-hover:text-action"
                 size={24}
                 stroke={1.8}
             />
@@ -364,7 +387,10 @@ export function Dashboard({
                                     className="rounded-panel border border-border bg-surface p-5"
                                 >
                                     <div className="flex items-start justify-between gap-3">
-                                        <h2 className="m-0 text-base font-semibold text-text">{line.name}</h2>
+                                        <h2 className="m-0 flex items-center gap-2 text-base font-semibold text-text">
+                                            <span>{getProductLineEmoji(line.id)}</span>
+                                            <span>{line.name}</span>
+                                        </h2>
                                         <StatusChip tone="success">{line.discountPct}% rabatt</StatusChip>
                                     </div>
                                     <p className="mb-0 mt-3 text-sm text-text-muted">
@@ -418,40 +444,52 @@ export function Dashboard({
         const hasResumableDraft = Boolean(quoteDraftSummary && onContinueQuote);
         const launcherItems: DashboardLauncherCardProps[] = [
             {
+                badgeBgClass: 'bg-indigo-500/10 text-indigo-600 dark:bg-indigo-500/20 dark:text-indigo-400 border border-indigo-500/30',
                 description: hasResumableDraft && quoteDraftSummary
                     ? `${quoteDraftSummary.customerLabel} · ${quoteDraftSummary.stepLabel}`
                     : 'Starta ett nytt offertflöde.',
-                icon: IconFileText,
+                emoji: hasResumableDraft ? '📄' : '➕',
+                hoverBorderClass: 'hover:border-indigo-500/60 hover:bg-indigo-500/5',
                 label: hasResumableDraft ? 'Fortsätt offert' : 'Skapa ny offert',
                 onClick: hasResumableDraft ? onContinueQuote : onStartQuote
             },
             {
+                badgeBgClass: 'bg-purple-500/10 text-purple-600 dark:bg-purple-500/20 dark:text-purple-400 border border-purple-500/30',
                 description: 'Samla kunder, affärer och erbjudanden.',
-                icon: IconTargetArrow,
+                emoji: '🎯',
+                hoverBorderClass: 'hover:border-purple-500/60 hover:bg-purple-500/5',
                 label: 'Sälj-CRM',
                 onClick: onOpenCrm
             },
             {
+                badgeBgClass: 'bg-emerald-500/10 text-emerald-600 dark:bg-emerald-500/20 dark:text-emerald-400 border border-emerald-500/30',
                 description: 'Uppdatera lagersaldon och historik.',
-                icon: IconPackage,
+                emoji: '📦',
+                hoverBorderClass: 'hover:border-emerald-500/60 hover:bg-emerald-500/5',
                 label: 'Lagersaldo',
                 onClick: onOpenInventory
             },
             {
+                badgeBgClass: 'bg-amber-500/10 text-amber-600 dark:bg-amber-500/20 dark:text-amber-400 border border-amber-500/30',
                 description: 'Skissa snabbt och beräkna optimalt.',
-                icon: IconPencil,
+                emoji: '✏️',
+                hoverBorderClass: 'hover:border-amber-500/60 hover:bg-amber-500/5',
                 label: 'Rita uteservering',
                 onClick: onOpenSketch
             },
             {
+                badgeBgClass: 'bg-sky-500/10 text-sky-600 dark:bg-sky-500/20 dark:text-sky-400 border border-sky-500/30',
                 description: 'Se skapade offerter och exporter.',
-                icon: IconHistory,
+                emoji: '📜',
+                hoverBorderClass: 'hover:border-sky-500/60 hover:bg-sky-500/5',
                 label: 'Aktivitetslogg',
                 onClick: onOpenActivity
             },
             {
+                badgeBgClass: 'bg-rose-500/10 text-rose-600 dark:bg-rose-500/20 dark:text-rose-400 border border-rose-500/30',
                 description: 'Planera och följ upp projekt.',
-                icon: IconClipboardList,
+                emoji: '📋',
+                hoverBorderClass: 'hover:border-rose-500/60 hover:bg-rose-500/5',
                 label: 'Planering',
                 onClick: onOpenPlanner
             }
@@ -463,6 +501,9 @@ export function Dashboard({
                     <h1 className="m-0 text-3xl font-semibold tracking-tight text-text sm:text-4xl">
                         Välkommen till Brixx portal
                     </h1>
+                    <p className="mx-auto mb-0 mt-2 max-w-lg text-sm leading-relaxed text-text-muted">
+                        Snabb och visuell översikt över dina verktyg, offerter och aktiviteter.
+                    </p>
                 </header>
 
                 <nav
@@ -483,9 +524,9 @@ export function Dashboard({
                         <header className="mb-2 flex min-h-10 items-center justify-between gap-4 px-1">
                             <h2
                                 id="recent-order-requests-title"
-                                className="m-0 text-lg font-semibold text-text"
+                                className="m-0 flex items-center gap-2 text-lg font-semibold text-text"
                             >
-                                Senaste orderförfrågningar
+                                <span aria-hidden="true" className="text-xl">📥</span> Senaste orderförfrågningar
                             </h2>
                             {onOpenRetailerOrders && (
                                 <Button onClick={onOpenRetailerOrders} size="sm" variant="ghost">
@@ -534,14 +575,14 @@ export function Dashboard({
                                             <div className="min-w-0">
                                                 <div className="flex flex-wrap items-center gap-2">
                                                     <span className="text-sm font-semibold text-text">
-                                                        {request.quoteNumber}
+                                                        📄 {request.quoteNumber}
                                                     </span>
                                                     <StatusChip tone={getOrderRequestStatusTone(request.status)}>
-                                                        {getOrderRequestStatusLabel(request.status)}
+                                                        {getOrderRequestStatusEmoji(request.status)} {getOrderRequestStatusLabel(request.status)}
                                                     </StatusChip>
                                                 </div>
                                                 <p className="mb-0 mt-1 break-words text-xs text-text-muted">
-                                                    {request.retailerName} · {customerLabel}
+                                                    🏢 {request.retailerName} · 👤 {customerLabel}
                                                 </p>
                                             </div>
                                             <span
@@ -550,14 +591,14 @@ export function Dashboard({
                                                     request.totalSek < 0 ? 'text-danger-text' : 'text-text'
                                                 ].join(' ')}
                                             >
-                                                {formatCurrencySek(request.totalSek)}
+                                                💳 {formatCurrencySek(request.totalSek)}
                                             </span>
                                             {createdAt ? (
                                                 <time
                                                     className="whitespace-nowrap text-xs text-text-muted"
                                                     dateTime={createdAt.dateTime}
                                                 >
-                                                    {createdAt.label}
+                                                    ⏱️ {createdAt.label}
                                                 </time>
                                             ) : (
                                                 <span className="whitespace-nowrap text-xs text-text-muted">
@@ -579,9 +620,9 @@ export function Dashboard({
                         <header className="mb-2 flex min-h-10 items-center justify-between gap-4 px-1">
                             <h2
                                 id="recent-activity-title"
-                                className="m-0 text-lg font-semibold text-text"
+                                className="m-0 flex items-center gap-2 text-lg font-semibold text-text"
                             >
-                                Senaste aktivitet
+                                <span aria-hidden="true" className="text-xl">⚡</span> Senaste aktivitet
                             </h2>
                             {onOpenActivity && (
                                 <Button onClick={onOpenActivity} size="sm" variant="ghost">
@@ -637,8 +678,10 @@ export function Dashboard({
                                         >
                                             <span
                                                 aria-hidden="true"
-                                                className="mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full bg-action"
-                                            />
+                                                className="mt-1 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-action/10 text-xs text-action"
+                                            >
+                                                📌
+                                            </span>
                                             <div className="min-w-0">
                                                 <h3 className="m-0 text-sm font-semibold text-text">{label}</h3>
                                                 <p className="mb-0 mt-1 line-clamp-2 break-words text-xs leading-5 text-text-muted">
@@ -650,7 +693,7 @@ export function Dashboard({
                                                     className="col-start-2 whitespace-nowrap text-xs text-text-muted sm:col-start-auto"
                                                     dateTime={occurredAt.dateTime}
                                                 >
-                                                    {occurredAt.label}
+                                                    ⏱️ {occurredAt.label}
                                                 </time>
                                             ) : (
                                                 <span className="col-start-2 whitespace-nowrap text-xs text-text-muted sm:col-start-auto">

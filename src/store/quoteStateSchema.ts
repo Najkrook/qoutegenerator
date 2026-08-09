@@ -216,6 +216,7 @@ function normalizeBahamaV2Items(value: unknown): BahamaInventoryV2Item[] {
 
         const properties = toRecord(record.properties);
         return [{
+            qrId: normalizeInventoryString(record.qrId),
             id,
             type: normalizeInventoryString(record.type),
             size: normalizeInventoryString(record.size),

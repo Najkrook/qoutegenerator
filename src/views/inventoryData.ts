@@ -11,6 +11,7 @@ import type {
     RawClickitupStockEntry,
     UnknownRecord
 } from '../types/contracts';
+import { createBahamaQrId } from '../services/bahamaQrService';
 
 export type InventorySheetCell = string | number | boolean | null | undefined;
 export type InventorySheetRow = InventorySheetCell[];
@@ -69,6 +70,7 @@ function normalizeBahamaProperties(value: unknown): BahamaInventoryProperties {
 
 export function createEmptyBahamaV2Item(now = new Date().toISOString()): BahamaInventoryV2Item {
     return {
+        qrId: createBahamaQrId(),
         id: '',
         type: '',
         size: '',
@@ -95,6 +97,7 @@ export function normalizeBahamaV2Item(value: unknown): BahamaInventoryV2Item | n
 
     const now = new Date().toISOString();
     return {
+        qrId: normalizeString(value.qrId),
         id,
         type: normalizeString(value.type),
         size: normalizeString(value.size),

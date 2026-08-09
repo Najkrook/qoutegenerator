@@ -350,6 +350,7 @@ describe('quoteStateSchema', () => {
         expect(hydrated.inventoryData).toEqual({
             bahama: [{ ID: 'B-1', BESKRIVNING: 'Parasollfot' }],
             bahamaV2: [{
+                qrId: '',
                 id: 'BA-001',
                 type: 'Parasoll',
                 size: '4x4',

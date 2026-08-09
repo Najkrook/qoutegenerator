@@ -100,6 +100,11 @@ function getNavigationGroups({
     if (canViewEverything) {
         operationsItems.push(
             {
+                kind: 'link',
+                label: 'Skanna parasoll',
+                to: APP_PATHS[APP_ROUTE_IDS.qrScanner]
+            },
+            {
                 end: true,
                 kind: 'link',
                 label: 'Lager',
@@ -155,6 +160,11 @@ function getNavigationGroups({
                     kind: 'link',
                     label: 'Lagerloggar',
                     to: APP_PATHS[APP_ROUTE_IDS.inventoryLogs]
+                },
+                {
+                    kind: 'link',
+                    label: 'QR-etiketter',
+                    to: APP_PATHS[APP_ROUTE_IDS.inventoryQr]
                 }
             ]
         });

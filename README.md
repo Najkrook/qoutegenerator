@@ -27,10 +27,9 @@ This repository is a fully isolated `src/`-only React SPA environment.
 - npm 10+
 
 ### Run locally
-From `QuoteGenerator/`, run:
+From the repository root, run:
 
 ```powershell
-cd .\QuoteGenerator
 npm install
 npm run dev
 ```
@@ -38,7 +37,6 @@ npm run dev
 If PowerShell execution policy blocks `npm.ps1`, use `cmd /c npm ...` instead:
 
 ```powershell
-cd .\QuoteGenerator
 cmd /c npm install
 cmd /c npm run dev
 ```
@@ -47,14 +45,14 @@ Default Vite dev URL:
 - `http://localhost:5173` unless Vite selects a different port
 
 ## Firebase Setup
-The Firebase web app client config is currently checked into `src/services/firebase.ts`.
+The Firebase web app client config is currently defined in `src/services/firebase.ts`.
 
 - This client-side config is not the same thing as Firebase Admin credentials.
 - Admin or service-account credentials are only required for admin scripts such as `scripts/backfill-quote-metadata.mjs`.
 - Do not commit secrets or private credential files.
 
 ## Available Scripts
-From `QuoteGenerator/`:
+From the repository root:
 
 - `npm run dev`: Start the local Vite dev server.
 - `npm run build`: Create a production build in `dist/`.
