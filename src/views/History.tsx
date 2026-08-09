@@ -134,14 +134,10 @@ export function History({ onBack, onOpenQuote }: HistoryProps) {
                     latestPayload.metadata.status
                 );
 
-                if (latestPayload.metadata.crmDealId) {
-                    onOpenQuote?.(nextState, {
-                        crmDealId: latestPayload.metadata.crmDealId,
-                        quoteOwnerUid: ownerUid
-                    });
-                } else {
-                    onOpenQuote?.(nextState);
-                }
+                onOpenQuote?.(nextState, {
+                    crmDealId: latestPayload.metadata.crmDealId,
+                    quoteOwnerUid: ownerUid
+                });
             } catch (openError) {
                 console.error('Failed to open quote link:', openError);
                 notifyError(`Kunde inte \u00f6ppna offerten: ${getErrorMessage(openError, 'ok\u00e4nt fel')}`);
@@ -317,6 +313,57 @@ export function History({ onBack, onOpenQuote }: HistoryProps) {
         isAdminBrowsing ? (getQuoteOwnerUid(quote) || null) : null
     );
 
+    const handleCrmRepair = async (quote: HistoryQuoteRow): Promise<void> => {
+        if (!canViewEverything || !user?.uid || !quote.crmSynchronizationIssue) return;
+        const quoteRef = {
+            ownerUid: getQuoteOwnerUid(quote),
+            quoteId: quote.quoteId
+        };
+
+        try {
+            const { quoteSave } = await import('../services/quoteSaveService');
+            let outcome = await quoteSave.repairCrm({
+                actor: user,
+                quote: quoteRef,
+                canManageAllQuotes: true
+            });
+
+            if (outcome.status === 'needs-relink') {
+                const confirmed = await confirmAction({
+                    title: 'Koppla om CRM-länken?',
+                    message: 'Affären eller offerten är redan kopplad. En omkoppling lossar den tidigare länken och kopplar den här offerten i stället.',
+                    confirmText: 'Koppla om',
+                    cancelText: 'Avbryt',
+                    tone: 'danger'
+                });
+                if (!confirmed) return;
+                outcome = await quoteSave.repairCrm({
+                    actor: user,
+                    quote: quoteRef,
+                    canManageAllQuotes: true,
+                    relink: true
+                });
+            }
+
+            if (outcome.status === 'repaired' || outcome.status === 'no-repair-needed') {
+                setQuotes((previous) => previous.map((row) => (
+                    row.quoteId === quote.quoteId && getQuoteOwnerUid(row) === quoteRef.ownerUid
+                        ? { ...row, crmSynchronizationIssue: null }
+                        : row
+                )));
+                notifySuccess('CRM-länken är reparerad.');
+                return;
+            }
+
+            if (outcome.status === 'repair-pending') {
+                notifyInfo('CRM-reparationen kunde inte slutföras ännu och försöks igen automatiskt.');
+            }
+        } catch (repairError) {
+            console.error('Failed to repair CRM link:', repairError);
+            notifyError('Kunde inte reparera CRM-länken.');
+        }
+    };
+
     const handleStatusChange = async (quote: HistoryQuoteRow, nextStatus: string): Promise<void> => {
         if (!quoteLifecycleEnabled || !user?.uid) return;
 
@@ -409,11 +456,10 @@ export function History({ onBack, onOpenQuote }: HistoryProps) {
             metadata?.status || 'draft'
         );
 
-        if (metadata?.crmDealId) {
-            onOpenQuote?.(nextState, { crmDealId: metadata.crmDealId, quoteOwnerUid });
-        } else {
-            onOpenQuote?.(nextState);
-        }
+        onOpenQuote?.(nextState, {
+            crmDealId: metadata?.crmDealId,
+            quoteOwnerUid
+        });
     };
 
     const openLatestQuote = async (quote: HistoryQuoteRow): Promise<void> => {
@@ -689,6 +735,17 @@ export function History({ onBack, onOpenQuote }: HistoryProps) {
                                     >
                                         Duplicera
                                     </button>
+                                    {canViewEverything && quote.crmSynchronizationIssue && (
+                                        <button
+                                            type="button"
+                                            className="px-4 py-2 text-sm border border-warning-border bg-warning-bg text-warning-text hover:bg-white/5 rounded w-full transition-colors"
+                                            onClick={() => {
+                                                void handleCrmRepair(quote);
+                                            }}
+                                        >
+                                            Reparera CRM-länk
+                                        </button>
+                                    )}
                                     <button
                                         type="button"
                                         className="px-4 py-2 text-sm border border-panel-border bg-transparent text-text-primary hover:bg-white/5 rounded w-full transition-colors"

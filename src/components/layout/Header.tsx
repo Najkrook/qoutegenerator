@@ -5,7 +5,9 @@ import { useAuth } from '../../store/AuthContext';
 import {
     APP_PATHS,
     APP_ROUTE_IDS,
+    appendQuoteRouteContext,
     getQuoteRouteStepFromPath,
+    readQuoteRouteContext,
     hasQuoteStartDraftData
 } from '../../navigation/routes';
 import { useAppNavigation } from '../../navigation/useAppNavigation';
@@ -42,15 +44,7 @@ function getSketchHref(
     params.set('return', quoteStep === 'summary' ? 'quote-summary' : quoteStep ? 'quote-configuration' : 'dashboard');
 
     if (quoteStep) {
-        const currentParams = new URLSearchParams(currentSearch);
-        const crmDealId = currentParams.get('crmDealId')?.trim();
-        if (crmDealId) {
-            params.set('crmDealId', crmDealId);
-            const quoteOwnerUid = currentParams.get('quoteOwnerUid')?.trim();
-            if (quoteOwnerUid) {
-                params.set('quoteOwnerUid', quoteOwnerUid);
-            }
-        }
+        appendQuoteRouteContext(params, readQuoteRouteContext(currentSearch));
     }
 
     return `${APP_PATHS[APP_ROUTE_IDS.sketch]}?${params.toString()}`;

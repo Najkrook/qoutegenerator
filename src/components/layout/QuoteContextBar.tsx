@@ -4,6 +4,8 @@ import {
     getQuoteStepLabel,
     getQuoteStepNavigationItems,
     getQuoteStepNumber,
+    readQuoteRouteContext,
+    withQuoteRouteContext,
     type QuoteStepBlocker,
     type QuoteRouteStepId
 } from '../../navigation/routes';
@@ -16,21 +18,6 @@ interface QuoteContextBarProps {
     isRetailer: boolean;
     onResetQuote: () => void;
     state: QuoteState;
-}
-
-function withActiveCrmContext(path: string, search: string): string {
-    const currentParams = new URLSearchParams(search);
-    const crmDealId = currentParams.get('crmDealId')?.trim();
-    if (!crmDealId) {
-        return path;
-    }
-
-    const params = new URLSearchParams({ crmDealId });
-    const quoteOwnerUid = currentParams.get('quoteOwnerUid')?.trim();
-    if (quoteOwnerUid) {
-        params.set('quoteOwnerUid', quoteOwnerUid);
-    }
-    return `${path}?${params.toString()}`;
 }
 
 function getBlockerText(blocker: QuoteStepBlocker): string {
@@ -51,7 +38,7 @@ export function QuoteContextBar({
         || 'Nytt offertutkast';
     const reference = String(state.customerInfo?.reference || '').trim()
         || String(state.customerInfo?.customerReference || '').trim();
-    const crmDealId = new URLSearchParams(location.search).get('crmDealId')?.trim();
+    const crmDealId = readQuoteRouteContext(location.search).crmDealId;
 
     return (
         <section aria-label="Pågående offert" className="border-b border-border bg-surface px-4 py-4 md:px-5">
@@ -145,7 +132,7 @@ export function QuoteContextBar({
                     return (
                         <li key={step.step}>
                             <NavLink
-                                to={withActiveCrmContext(step.path, location.search)}
+                                to={withQuoteRouteContext(step.path, readQuoteRouteContext(location.search))}
                                 aria-current={step.current ? 'step' : undefined}
                                 className={[
                                     'flex min-h-12 items-center justify-center gap-2 rounded-lg border px-2 py-2 no-underline transition-colors sm:justify-start',

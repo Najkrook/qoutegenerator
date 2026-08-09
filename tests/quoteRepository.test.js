@@ -136,6 +136,87 @@ describe('quoteRepository', () => {
         expect(updated.revision.version).toBe(2);
     });
 
+    it('creates at most one revision for each Save Intent', async () => {
+        const { repo, mock } = buildRepo();
+        const createInput = {
+            user,
+            state: baseState,
+            summary: baseSummary,
+            customerInfo: baseState.customerInfo,
+            status: 'draft',
+            saveIntentId: 'save-create-1'
+        };
+
+        const first = await repo.createQuote(createInput);
+        const retried = await repo.createQuote(createInput);
+        expect(retried.quoteId).toBe(first.quoteId);
+        expect(retried.revision.revisionId).toBe(first.revision.revisionId);
+        expect(retried.metadata.latestVersion).toBe(1);
+
+        const revisionInput = {
+            user,
+            ownerUid: user.uid,
+            quoteId: first.quoteId,
+            state: baseState,
+            summary: baseSummary,
+            customerInfo: baseState.customerInfo,
+            status: 'draft',
+            saveIntentId: 'save-revision-2'
+        };
+        const second = await repo.saveQuoteRevision(revisionInput);
+        const secondRetry = await repo.saveQuoteRevision(revisionInput);
+        expect(secondRetry.revision.revisionId).toBe(second.revision.revisionId);
+        expect(secondRetry.metadata.latestVersion).toBe(2);
+
+        const revisionPrefix = `users/${user.uid}/quotes/${first.quoteId}/revisions/`;
+        expect([...mock.__docs.keys()].filter((path) => path.startsWith(revisionPrefix))).toHaveLength(2);
+    });
+
+    it('stores and clears CRM Synchronization Issues only in Quote metadata', async () => {
+        const { repo, mock } = buildRepo();
+        const created = await repo.createQuote({
+            user,
+            state: baseState,
+            summary: baseSummary,
+            customerInfo: baseState.customerInfo,
+            status: 'draft',
+            saveIntentId: 'save-issue-1'
+        });
+        const issue = {
+            code: 'unavailable',
+            dealId: 'deal-1',
+            saveIntentId: 'save-issue-1',
+            revisionId: created.revision.revisionId,
+            quoteVersion: 1,
+            firstFailedAtMs: 1,
+            lastAttemptAtMs: 1,
+            attemptCount: 1,
+            nextRetryAtMs: 1501,
+            requiresRelink: false,
+            conflictingDealId: null,
+            conflictingQuoteOwnerUid: null,
+            conflictingQuoteId: null,
+            diagnosticCode: 'unavailable'
+        };
+
+        const updated = await repo.updateQuoteCrmSynchronizationIssue({
+            ownerUid: user.uid,
+            quoteId: created.quoteId,
+            issue,
+            expectedSaveIntentId: 'save-issue-1'
+        });
+        expect(updated.crmSynchronizationIssue).toEqual(issue);
+        expect(created.revision.state).not.toHaveProperty('crmSynchronizationIssue');
+
+        await repo.updateQuoteCrmSynchronizationIssue({
+            ownerUid: user.uid,
+            quoteId: created.quoteId,
+            issue: null,
+            expectedSaveIntentId: 'save-issue-1'
+        });
+        expect(mock.__docs.get(`users/${user.uid}/quotes/${created.quoteId}`).crmSynchronizationIssue).toBeNull();
+    });
+
     it('assigns a global daily quote sequence across multiple new quotes on the same day', async () => {
         vi.useFakeTimers();
         vi.setSystemTime(new Date('2026-04-22T10:00:00.000Z'));

@@ -675,7 +675,75 @@ describe('crmRepository quote linking', () => {
         expect(mock.__docs.get('users/quote-owner/quotes/quote-2').crmDealId).toBeNull();
     });
 
-    it('keeps a finished deal and its newly linked quote on the same status', async () => {
+    it('updates later Quote Revision references without changing the established Deal stage', async () => {
+        const { repo } = buildRepo({
+            'users/quote-owner/quotes/quote-1': {
+                quoteNumber: 'BRIXX - 260723-101',
+                status: 'draft'
+            }
+        });
+        const deal = await repo.createDeal({ actor, title: 'Offertaffär' });
+        await repo.linkDealToQuote({
+            dealId: deal.id,
+            quoteOwnerUid: 'quote-owner',
+            quoteId: 'quote-1',
+            quoteVersion: 1,
+            user: actor
+        });
+        await repo.changeDealStage({ dealId: deal.id, stage: 'won', actor });
+
+        const updated = await repo.linkDealToQuote({
+            dealId: deal.id,
+            quoteOwnerUid: 'quote-owner',
+            quoteId: 'quote-1',
+            quoteRevisionId: 'revision-2',
+            quoteVersion: 2,
+            valueSek: 99000,
+            user: actor
+        });
+
+        expect(updated).toMatchObject({
+            stage: 'won',
+            quoteRevisionId: 'revision-2',
+            quoteVersion: 2,
+            valueSek: 99000
+        });
+    });
+
+    it('requires the dedicated relink command before detaching another Quote', async () => {
+        const { repo, mock } = buildRepo({
+            'users/quote-owner/quotes/quote-old': { status: 'draft' },
+            'users/quote-owner/quotes/quote-new': { status: 'draft' }
+        });
+        const deal = await repo.createDeal({ actor, title: 'Omkopplingsaffär' });
+        await repo.linkDealToQuote({
+            dealId: deal.id,
+            quoteOwnerUid: 'quote-owner',
+            quoteId: 'quote-old',
+            user: actor
+        });
+
+        await expect(repo.linkDealToQuote({
+            dealId: deal.id,
+            quoteOwnerUid: 'quote-owner',
+            quoteId: 'quote-new',
+            user: actor
+        })).rejects.toMatchObject({ code: 'crm-link-conflict' });
+        expect(mock.__docs.get('users/quote-owner/quotes/quote-old').crmDealId).toBe(deal.id);
+        expect(mock.__docs.get('users/quote-owner/quotes/quote-new').crmDealId).toBeUndefined();
+
+        const relinked = await repo.relinkDealToQuote({
+            dealId: deal.id,
+            quoteOwnerUid: 'quote-owner',
+            quoteId: 'quote-new',
+            user: actor
+        });
+        expect(relinked.quoteId).toBe('quote-new');
+        expect(mock.__docs.get('users/quote-owner/quotes/quote-old').crmDealId).toBeNull();
+        expect(mock.__docs.get('users/quote-owner/quotes/quote-new').crmDealId).toBe(deal.id);
+    });
+
+    it('preserves a finished deal stage without changing Quote status during linking', async () => {
         const { repo, mock } = buildRepo({
             'users/quote-owner/quotes/quote-won': {
                 quoteId: 'quote-won',
@@ -700,7 +768,7 @@ describe('crmRepository quote linking', () => {
         expect(linked.stage).toBe('won');
         expect(mock.__docs.get('users/quote-owner/quotes/quote-won')).toMatchObject({
             crmDealId: deal.id,
-            status: 'won'
+            status: 'draft'
         });
     });
 });

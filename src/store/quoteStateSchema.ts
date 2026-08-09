@@ -23,6 +23,7 @@ import type {
 import { DEFAULT_TEMPLATE_ID, getTemplateById, isBuiltinTemplateId } from '../config/legalTemplates.shared';
 import { DEFAULT_PDF_THEME_ID, normalizePdfThemeId } from '../config/pdfThemes';
 import { DEFAULT_EXPORT_LANGUAGE, normalizeExportLanguage } from '../services/exportLocalization';
+import { stripPrivateQuoteStateData } from '../utils/quoteStateSanitization';
 
 export const QUOTE_STATE_STORAGE_KEY = 'offertverktyg_state';
 export const CURRENT_STATE_VERSION = 6;
@@ -295,6 +296,24 @@ function normalizeGridCustomAddonsByCategory(
     }, {});
 }
 
+function normalizeGridCustomItems(value: unknown): NonNullable<QuoteState['gridSelections'][string]['customItems']> {
+    if (!Array.isArray(value)) {
+        return [];
+    }
+
+    return value.map((row, index) => {
+        const safeRow = toRecord(row);
+        return {
+            id: String(safeRow.id || `custom_item_${index}`),
+            name: String(safeRow.name || ''),
+            size: String(safeRow.size || ''),
+            price: toNumber(safeRow.price, 0),
+            qty: normalizeNonNegativeInt(safeRow.qty, 1),
+            discountPct: toNumber(safeRow.discountPct, 0)
+        };
+    });
+}
+
 function normalizeGridSelections(value: unknown): QuoteState['gridSelections'] {
     if (!isObject(value)) {
         return {};
@@ -305,10 +324,10 @@ function normalizeGridSelections(value: unknown): QuoteState['gridSelections'] {
         const safeLineSelection = toRecord<RawPersistedGridLineSelection>(lineSelection);
 
         acc[key] = {
-            ...clone(safeLineSelection),
             items: normalizeGridItemSelectionMap(safeLineSelection.items),
             addons: normalizeGridAddonStateMap(safeLineSelection.addons),
-            customAddonsByCategory: normalizeGridCustomAddonsByCategory(safeLineSelection.customAddonsByCategory)
+            customAddonsByCategory: normalizeGridCustomAddonsByCategory(safeLineSelection.customAddonsByCategory),
+            customItems: normalizeGridCustomItems(safeLineSelection.customItems)
         };
         return acc;
     }, {});
@@ -346,8 +365,9 @@ function normalizeBuilderItems(value: unknown): QuoteState['builderItems'] {
 
     return value.map((item, index) => {
         const safeItem = toRecord<RawPersistedBuilderItem>(item);
+        const source = normalizeOptionalDisplayName(safeItem.source);
+        const sourceType = normalizeOptionalDisplayName(safeItem.sourceType);
         return {
-            ...clone(safeItem),
             id: String(safeItem.id || `builder_item_${index}`),
             line: String(safeItem.line || ''),
             model: String(safeItem.model || ''),
@@ -357,7 +377,9 @@ function normalizeBuilderItems(value: unknown): QuoteState['builderItems'] {
             displayName: normalizeOptionalDisplayName(safeItem.displayName),
             addons: Array.isArray(safeItem.addons)
                 ? safeItem.addons.map((addon, addonIndex) => normalizeBuilderAddon(addon, addonIndex))
-                : []
+                : [],
+            ...(source ? { source } : {}),
+            ...(sourceType ? { sourceType } : {})
         };
     });
 }
@@ -594,7 +616,7 @@ export function hydrateQuoteState(input: HydratedQuoteStatePayload): QuoteState 
         return initialState;
     }
 
-    const rawState = clone(input);
+    const rawState = stripPrivateQuoteStateData(clone(input)) as UnknownRecord;
     const rawVersion = Object.prototype.hasOwnProperty.call(rawState, 'stateVersion')
         ? Number(rawState.stateVersion)
         : 0;
@@ -605,7 +627,7 @@ export function hydrateQuoteState(input: HydratedQuoteStatePayload): QuoteState 
             `Quote state version ${rawVersion} is newer than supported version ${CURRENT_STATE_VERSION}. Conservatively hydrating known fields.`
         );
     } else {
-        migratedState = migrateQuoteState(rawVersion, rawState);
+        migratedState = stripPrivateQuoteStateData(migrateQuoteState(rawVersion, rawState)) as UnknownRecord;
     }
 
     const mergedState: QuoteState & UnknownRecord = { ...initialState, ...migratedState };
@@ -625,11 +647,7 @@ export function hydrateQuoteState(input: HydratedQuoteStatePayload): QuoteState 
         : clone(inventoryData);
     const normalizedGlobalDiscount = toNumber(mergedState.globalDiscountPct, initialState.globalDiscountPct);
     const sketchMeta = toRecord<RawPersistedSketchMeta>(mergedState.sketchMeta);
-    delete mergedState.crmDealId;
-    delete mergedState.quoteOwnerUid;
-
     return {
-        ...mergedState,
         stateVersion: CURRENT_STATE_VERSION,
         draftUpdatedAtMs: normalizeDraftUpdatedAtMs(mergedState.draftUpdatedAtMs),
         step: normalizeStep(mergedState.step, initialState.step),
@@ -638,15 +656,23 @@ export function hydrateQuoteState(input: HydratedQuoteStatePayload): QuoteState 
             : [],
         builderItems: normalizeBuilderItems(mergedState.builderItems),
         gridSelections: normalizeGridSelections(mergedState.gridSelections),
-        customCosts: cloneArray(mergedState.customCosts),
+        customCosts: Array.isArray(mergedState.customCosts)
+            ? mergedState.customCosts.map((cost) => {
+                const safeCost = toRecord(cost);
+                return {
+                    description: String(safeCost.description || ''),
+                    price: toNumber(safeCost.price, 0),
+                    qty: normalizeNonNegativeInt(safeCost.qty, 1),
+                    discountPct: toNumber(safeCost.discountPct, 0)
+                };
+            })
+            : [],
         contractingWork: normalizeContractingWork(mergedState.contractingWork),
         includesVat: Boolean(mergedState.includesVat),
         globalDiscountPct: normalizedGlobalDiscount,
         prevGlobalDiscountPct: toNumber(mergedState.prevGlobalDiscountPct, normalizedGlobalDiscount),
         exchangeRate: toNumber(mergedState.exchangeRate, initialState.exchangeRate),
         customerInfo: {
-            ...initialState.customerInfo,
-            ...customerInfoSource,
             name: String(customerInfoSource.name || ''),
             company: String(customerInfoSource.company || ''),
             email: String(customerInfoSource.email || ''),

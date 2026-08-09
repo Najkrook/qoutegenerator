@@ -6,6 +6,7 @@ import {
     canViewEverythingLevel
 } from '../config/accessControl.shared';
 import { hasConfiguredContractingWork } from '../services/contractingWork';
+import { hasConfiguredGridSelections } from '../services/quoteContent';
 import type { AccessLevel, QuoteState } from '../types/contracts';
 
 export const APP_ROUTE_IDS = Object.freeze({
@@ -38,6 +39,40 @@ export const APP_ROUTE_IDS = Object.freeze({
 } as const);
 
 export type AppRouteId = typeof APP_ROUTE_IDS[keyof typeof APP_ROUTE_IDS];
+
+export interface QuoteRouteContext {
+    crmDealId: string | null;
+    quoteOwnerUid: string | null;
+}
+
+export function readQuoteRouteContext(search: string | URLSearchParams): QuoteRouteContext {
+    const params = typeof search === 'string'
+        ? new URLSearchParams(search)
+        : search;
+    return {
+        crmDealId: params.get('crmDealId')?.trim() || null,
+        quoteOwnerUid: params.get('quoteOwnerUid')?.trim() || null
+    };
+}
+
+export function appendQuoteRouteContext(
+    params: URLSearchParams,
+    context: Partial<QuoteRouteContext>
+): URLSearchParams {
+    const crmDealId = String(context.crmDealId || '').trim();
+    const quoteOwnerUid = String(context.quoteOwnerUid || '').trim();
+    if (crmDealId) params.set('crmDealId', crmDealId);
+    if (quoteOwnerUid) params.set('quoteOwnerUid', quoteOwnerUid);
+    return params;
+}
+
+export function withQuoteRouteContext(
+    path: string,
+    context: Partial<QuoteRouteContext>
+): string {
+    const search = appendQuoteRouteContext(new URLSearchParams(), context).toString();
+    return search ? `${path}?${search}` : path;
+}
 
 export const APP_PATHS: Record<AppRouteId, string> = Object.freeze({
     [APP_ROUTE_IDS.login]: '/login',
@@ -334,10 +369,7 @@ export function hasConfiguredQuoteSelections(
     state: Pick<QuoteState, 'builderItems' | 'gridSelections'>
 ): boolean {
     return (state.builderItems || []).length > 0
-        || Object.values(state.gridSelections || {}).some((selection) => (
-            Object.keys(selection?.items || {}).length > 0
-            || Object.keys(selection?.addons || {}).length > 0
-        ));
+        || hasConfiguredGridSelections(state.gridSelections);
 }
 
 export interface QuoteDraftOptions {

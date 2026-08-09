@@ -2,6 +2,7 @@ import type { UserCredential } from 'firebase/auth';
 import type { ReactNode } from 'react';
 
 export type QuoteStatus = 'draft' | 'sent' | 'won' | 'lost' | 'archived';
+export type QuoteOrigin = 'retailer' | 'internal';
 
 export type OrderRequestStatus = 'new' | 'reviewing' | 'completed';
 export type RetailerDocumentKind = 'color-chart' | 'installation-instructions';
@@ -473,6 +474,7 @@ export interface RawPersistedGridLineSelection extends UnknownRecord {
     items?: unknown;
     addons?: unknown;
     customAddonsByCategory?: unknown;
+    customItems?: unknown;
 }
 
 export type HydratedQuoteStatePayload = Partial<QuoteState> | UnknownRecord | null | undefined;
@@ -560,8 +562,40 @@ export interface QuoteTotalsResult extends QuoteSummary {
     globalDiscountAmt: number;
 }
 
+export interface QuoteReference {
+    ownerUid: string;
+    quoteId: string;
+}
+
+export type CrmSynchronizationIssueCode =
+    | 'pending'
+    | 'conflict'
+    | 'deal-not-found'
+    | 'unauthorized'
+    | 'timeout'
+    | 'unavailable'
+    | 'unknown';
+
+export interface CrmSynchronizationIssue {
+    code: CrmSynchronizationIssueCode;
+    dealId: string;
+    saveIntentId: string;
+    revisionId: string;
+    quoteVersion: number;
+    firstFailedAtMs: number;
+    lastAttemptAtMs: number;
+    attemptCount: number;
+    nextRetryAtMs: number | null;
+    requiresRelink: boolean;
+    conflictingDealId: string | null;
+    conflictingQuoteOwnerUid: string | null;
+    conflictingQuoteId: string | null;
+    diagnosticCode: string;
+}
+
 export interface QuoteMetadata {
     quoteId: string;
+    ownerUid?: string;
     quoteNumber: string | null;
     quoteDateKey: string | null;
     quoteSequence: number | null;
@@ -582,8 +616,10 @@ export interface QuoteMetadata {
     state?: RepositoryQuoteStatePayload | null;
     summary?: RepositoryQuoteSummaryPayload | null;
     latestChangeNote?: string;
-    originType?: 'retailer' | 'internal';
+    originType?: QuoteOrigin;
     crmDealId?: string | null;
+    crmSynchronizationIssue?: CrmSynchronizationIssue | null;
+    latestSaveIntentId?: string | null;
 }
 
 export interface QuoteRevision {
@@ -596,6 +632,7 @@ export interface QuoteRevision {
     state: RepositoryQuoteStatePayload;
     summary: RepositoryQuoteSummaryPayload;
     changeNote: string;
+    saveIntentId?: string | null;
 }
 
 export interface OrderRequestRecord {
@@ -676,8 +713,10 @@ export interface QuoteRevisionSaveInput {
     status?: QuoteStatus | string;
     changeNote?: string;
     retailerName?: string | null;
-    originType?: 'retailer' | 'internal';
+    originType?: QuoteOrigin;
     crmDealId?: string | null;
+    crmSynchronizationIssue?: CrmSynchronizationIssue | null;
+    saveIntentId?: string | null;
 }
 
 export interface CreateQuoteInput extends Omit<QuoteRevisionSaveInput, 'quoteId'> {}
@@ -716,6 +755,11 @@ export interface DeleteQuoteInput {
     quoteId: string;
 }
 
+export interface UpdateQuoteCrmSynchronizationIssueInput extends QuoteReference {
+    issue: CrmSynchronizationIssue | null;
+    expectedSaveIntentId?: string | null;
+}
+
 export interface QuoteLatestRevisionResult {
     metadata: QuoteMetadata;
     revision: QuoteRevision | null;
@@ -732,6 +776,7 @@ export interface RawQuoteSummary extends UnknownRecord {
 export type RepositoryQuoteSummaryPayload = QuoteSummary | RawQuoteSummary;
 
 export interface RawQuoteMetadataDoc extends UnknownRecord {
+    ownerUid?: unknown;
     quoteNumber?: unknown;
     quoteDateKey?: unknown;
     quoteSequence?: unknown;
@@ -755,6 +800,8 @@ export interface RawQuoteMetadataDoc extends UnknownRecord {
     latestChangeNote?: unknown;
     originType?: unknown;
     crmDealId?: unknown;
+    crmSynchronizationIssue?: unknown;
+    latestSaveIntentId?: unknown;
 }
 
 export interface RawQuoteRevisionDoc extends UnknownRecord {
@@ -767,28 +814,13 @@ export interface RawQuoteRevisionDoc extends UnknownRecord {
     state?: RepositoryQuoteStatePayload;
     summary?: RepositoryQuoteSummaryPayload;
     changeNote?: unknown;
+    saveIntentId?: unknown;
 }
 
 export interface SavedQuoteLike {
     quoteId?: string | null;
     metadata?: Partial<QuoteMetadata> | null;
     revision?: Partial<Pick<QuoteRevision, 'version'>> | null;
-}
-
-export interface SaveQuoteToRepositoryResult {
-    saved: SavedQuoteLike;
-    isNewQuote: boolean;
-    statePatch: SavedQuoteStatePatch;
-}
-
-export interface SaveQuoteToRepositoryParams {
-    quoteRepository: Pick<QuoteRepository, 'createQuote' | 'saveQuoteRevision'>;
-    user: AccessUser | null;
-    retailer?: RetailerRecord | null;
-    state: QuoteState;
-    summary: QuoteSummary | QuoteTotalsResult;
-    crmDealId?: string | null;
-    quoteOwnerUid?: string | null;
 }
 
 export interface CreateOrderRequestInput {
@@ -953,6 +985,7 @@ export interface QuoteRepository {
     getQuoteLatestRevision(input: GetQuoteLatestRevisionInput): Promise<QuoteLatestRevisionResult | null>;
     getQuoteRevisionByVersion(input: GetQuoteRevisionByVersionInput): Promise<QuoteRevision | null>;
     getQuoteRevisions(input: GetQuoteRevisionsInput): Promise<Array<QuoteRevision>>;
+    updateQuoteCrmSynchronizationIssue(input: UpdateQuoteCrmSynchronizationIssueInput): Promise<QuoteMetadata>;
     deleteQuote(input: DeleteQuoteInput): Promise<void>;
     updateQuoteStatus(input: UpdateQuoteStatusInput): Promise<QuoteMetadata>;
     getAllUsersQuotes(input?: GetAllUsersQuotesInput): Promise<Array<QuoteMetadata & { ownerUid: string }>>;

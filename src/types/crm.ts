@@ -439,6 +439,7 @@ export interface CrmRepository {
 
     searchAll(options: CrmSearchOptions): Promise<CrmSearchResults>;
     linkDealToQuote(input: CrmLinkDealToQuoteInput): Promise<CrmDeal>;
+    relinkDealToQuote(input: CrmLinkDealToQuoteInput): Promise<CrmDeal>;
     syncDealFromQuote(input: CrmSyncDealFromQuoteInput): Promise<CrmDeal>;
     unlinkDealFromQuote(input: CrmUnlinkDealFromQuoteInput): Promise<CrmDeal>;
 }

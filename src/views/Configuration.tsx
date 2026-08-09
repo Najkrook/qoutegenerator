@@ -9,6 +9,7 @@ import { Button } from '../components/ui/Button';
 import { PageHeader } from '../components/ui/PageHeader';
 import { Panel } from '../components/ui/Panel';
 import { hasConfiguredContractingWork } from '../services/contractingWork';
+import { hasConfiguredGridSelections } from '../services/quoteContent';
 import type { ConfigurationProps } from '../types/contracts';
 
 export function Configuration({ onNext, onPrev, onBackToSketch }: ConfigurationProps) {
@@ -19,9 +20,7 @@ export function Configuration({ onNext, onPrev, onBackToSketch }: ConfigurationP
     const builderLines = selectedLines.filter((lineId) => getBuilderCatalogLine(lineId) !== null);
     const gridLines = selectedLines.filter((lineId) => getGridCatalogLine(lineId) !== null);
 
-    const hasProductSelections = builderItems.length > 0 || Object.values(gridSelections).some((selection) =>
-        Object.keys(selection.items || {}).length > 0 || Object.keys(selection.addons || {}).length > 0
-    );
+    const hasProductSelections = builderItems.length > 0 || hasConfiguredGridSelections(gridSelections);
     const showContractingWork = !isRetailer && state.contractingWork?.enabled === true;
     const hasContractingSelections = showContractingWork && hasConfiguredContractingWork(state.contractingWork);
     const hasSelections = hasProductSelections || hasContractingSelections;

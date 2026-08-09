@@ -31,6 +31,8 @@ import {
     getNextLoginRedirectTarget,
     getQuoteDraftGuardRedirect,
     getQuoteResumeStep,
+    readQuoteRouteContext,
+    withQuoteRouteContext,
     getQuoteStepPath,
     getQuoteStepNumber,
     hasConfiguredQuoteContent,
@@ -231,19 +233,7 @@ function QuoteDraftBoundary({ children, routeId }: RouteAccessBoundaryProps) {
     const redirectPath = getQuoteDraftGuardRedirect(routeId, state, { isRetailer });
 
     if (redirectPath) {
-        const currentSearch = new URLSearchParams(location.search);
-        const crmDealId = currentSearch.get('crmDealId')?.trim();
-        const linkedQuoteSearch = new URLSearchParams();
-        if (crmDealId) {
-            linkedQuoteSearch.set('crmDealId', crmDealId);
-            const quoteOwnerUid = currentSearch.get('quoteOwnerUid')?.trim();
-            if (quoteOwnerUid) {
-                linkedQuoteSearch.set('quoteOwnerUid', quoteOwnerUid);
-            }
-        }
-        const serializedSearch = linkedQuoteSearch.toString();
-        const search = serializedSearch ? `?${serializedSearch}` : '';
-        return <Navigate to={`${redirectPath}${search}`} replace />;
+        return <Navigate to={withQuoteRouteContext(redirectPath, readQuoteRouteContext(location.search))} replace />;
     }
 
     return <>{children}</>;
@@ -409,10 +399,9 @@ function SummaryExportPage() {
     const navigation = useAppNavigation();
     const { canAccessSketch, canViewEverything } = useAuth();
     const [searchParams] = useSearchParams();
-    const crmDealId = canViewEverything ? searchParams.get('crmDealId')?.trim() || null : null;
-    const quoteOwnerUid = crmDealId
-        ? searchParams.get('quoteOwnerUid')?.trim() || null
-        : null;
+    const quoteRouteContext = readQuoteRouteContext(searchParams);
+    const crmDealId = canViewEverything ? quoteRouteContext.crmDealId : null;
+    const quoteOwnerUid = canViewEverything ? quoteRouteContext.quoteOwnerUid : null;
     useSyncQuoteRouteStep('summary');
 
     return (
@@ -489,8 +478,12 @@ function HistoryPage() {
                 }
             });
         });
+        if (context?.quoteOwnerUid) {
+            navigation.goToExistingQuoteStep(targetStep, context.quoteOwnerUid, context.crmDealId);
+            return;
+        }
         if (context?.crmDealId) {
-            navigation.goToLinkedQuoteStep(targetStep, context.crmDealId, context.quoteOwnerUid);
+            navigation.goToLinkedQuoteStep(targetStep, context.crmDealId);
             return;
         }
         navigation.goToQuoteStep(targetStep);

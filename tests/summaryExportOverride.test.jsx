@@ -6,7 +6,7 @@ import { createRoot } from 'react-dom/client';
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 
-const toastState = vi.hoisted(() => ({
+const toastState = vi.hoisted(() => Object.assign(vi.fn(), {
     error: vi.fn(),
     success: vi.fn(),
     loading: vi.fn(() => 'toast-id'),
@@ -27,7 +27,8 @@ const excelExportState = vi.hoisted(() => ({
 }));
 
 const quoteSaveState = vi.hoisted(() => ({
-    saveQuoteToRepository: vi.fn(async () => ({
+    repairCrm: vi.fn(async () => ({ status: 'no-repair-needed' })),
+    save: vi.fn(async () => ({
         saved: { quoteId: 'quote-1' },
         isNewQuote: false,
         statePatch: {
@@ -109,7 +110,10 @@ vi.mock('../src/services/quoteRepositoryClient', () => ({
 }));
 
 vi.mock('../src/services/quoteSaveService', () => ({
-    saveQuoteToRepository: quoteSaveState.saveQuoteToRepository
+    quoteSave: {
+        save: quoteSaveState.save,
+        repairCrm: quoteSaveState.repairCrm
+    }
 }));
 
 vi.mock('../src/services/activityLogService', () => ({
@@ -232,8 +236,10 @@ beforeEach(() => {
     activityState.safeLogActivity.mockResolvedValue({ ok: true });
     excelExportState.generateExcel.mockReset();
     excelExportState.generateExcel.mockResolvedValue(undefined);
-    quoteSaveState.saveQuoteToRepository.mockReset();
-    quoteSaveState.saveQuoteToRepository.mockResolvedValue({
+    quoteSaveState.save.mockReset();
+    quoteSaveState.repairCrm.mockReset();
+    quoteSaveState.repairCrm.mockResolvedValue({ status: 'no-repair-needed' });
+    quoteSaveState.save.mockResolvedValue({
         saved: { quoteId: 'quote-1' },
         isNewQuote: false,
         statePatch: {
@@ -271,6 +277,7 @@ beforeEach(() => {
     });
     toastState.error.mockReset();
     toastState.success.mockReset();
+    toastState.mockReset();
     toastState.loading.mockReset();
     toastState.dismiss.mockReset();
     createQuotePdfBlob.mockClear();
@@ -461,7 +468,7 @@ describe('SummaryExport PDF override', () => {
 
     it('shows one version-save action and blocks delivery actions while saving', async () => {
         let resolveSave;
-        quoteSaveState.saveQuoteToRepository.mockReturnValueOnce(new Promise((resolve) => {
+        quoteSaveState.save.mockReturnValueOnce(new Promise((resolve) => {
             resolveSave = resolve;
         }));
         const { container } = await renderSummaryExport({
@@ -507,6 +514,90 @@ describe('SummaryExport PDF override', () => {
         });
 
         expect(findButton(container, 'Skapa PDF').disabled).toBe(false);
+    });
+
+    it('dispatches the saved identity and reports a durable CRM repair outcome', async () => {
+        quoteSaveState.save.mockResolvedValueOnce({
+            status: 'saved-needs-crm-repair',
+            quote: { ownerUid: 'user-1', quoteId: 'quote-1' },
+            isNewQuote: false,
+            statePatch: {
+                activeQuoteId: 'quote-1',
+                activeQuoteVersion: 3,
+                quoteNumber: 'BRIXX - 260423-101',
+                quoteStatus: 'draft'
+            },
+            crm: { dealId: 'deal-1', status: 'repair-pending' }
+        });
+        const { container, dispatch } = await renderSummaryExport({
+            stateOverrides: {
+                activeQuoteId: 'quote-1',
+                quoteNumber: 'BRIXX - 260423-101',
+                activeQuoteVersion: 2
+            },
+            props: { crmDealId: 'deal-1' }
+        });
+
+        await clickButton(container, 'Spara ny version');
+
+        expect(quoteSaveState.save).toHaveBeenCalledWith(expect.objectContaining({
+            actor: expect.objectContaining({ uid: 'user-1' }),
+            state: expect.any(Object),
+            target: {
+                kind: 'existing',
+                quote: { ownerUid: 'user-1', quoteId: 'quote-1' },
+                crmDealId: 'deal-1'
+            }
+        }));
+        expect(dispatch).toHaveBeenCalledWith({
+            type: 'UPDATE_STATE',
+            payload: expect.objectContaining({ activeQuoteVersion: 3 })
+        });
+        expect(toastState.success).toHaveBeenCalled();
+        expect(toastState).toHaveBeenCalledWith(
+            expect.stringContaining('repareras automatiskt'),
+            expect.any(Object)
+        );
+        expect(activityState.safeLogActivity).not.toHaveBeenCalled();
+    });
+
+    it('retains an ambiguous Save Intent only for the next persistence retry', async () => {
+        quoteSaveState.save
+            .mockResolvedValueOnce({
+                status: 'not-saved',
+                failure: {
+                    code: 'persistence-ambiguous',
+                    message: 'Transport response lost.',
+                    retryable: true
+                },
+                retry: { saveIntentId: 'save-retry-1' }
+            })
+            .mockResolvedValueOnce({
+                status: 'saved',
+                quote: { ownerUid: 'user-1', quoteId: 'quote-1' },
+                isNewQuote: false,
+                statePatch: {
+                    activeQuoteId: 'quote-1',
+                    activeQuoteVersion: 3,
+                    quoteNumber: 'BRIXX - 260423-101',
+                    quoteStatus: 'draft'
+                }
+            });
+        const { container, dispatch } = await renderSummaryExport({
+            stateOverrides: {
+                activeQuoteId: 'quote-1',
+                quoteNumber: 'BRIXX - 260423-101',
+                activeQuoteVersion: 2
+            }
+        });
+
+        await clickButton(container, 'Spara ny version');
+        expect(dispatch).not.toHaveBeenCalledWith(expect.objectContaining({ type: 'UPDATE_STATE' }));
+        await clickButton(container, 'Spara ny version');
+
+        expect(quoteSaveState.save.mock.calls[0][0].retrySaveIntentId).toBeNull();
+        expect(quoteSaveState.save.mock.calls[1][0].retrySaveIntentId).toBe('save-retry-1');
+        expect(dispatch).toHaveBeenCalledWith(expect.objectContaining({ type: 'UPDATE_STATE' }));
     });
 
     it('logs the English Excel filename when exporting in English', async () => {
@@ -593,7 +684,7 @@ describe('SummaryExport PDF override', () => {
 
         await clickButton(container, 'Spara ny version');
 
-        expect(quoteSaveState.saveQuoteToRepository).toHaveBeenCalledWith(
+        expect(quoteSaveState.save).toHaveBeenCalledWith(
             expect.objectContaining({
                 state: expect.objectContaining({
                     contractingWork: expect.objectContaining({
