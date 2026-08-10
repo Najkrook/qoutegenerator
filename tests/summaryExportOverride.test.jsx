@@ -229,6 +229,7 @@ async function waitForPreviewDebounce() {
 }
 
 beforeEach(() => {
+    globalThis.sessionStorage.clear();
     fileUtilsState.downloadBlob.mockReset();
     fileUtilsState.saveBlobWithPicker.mockReset();
     fileUtilsState.saveBlobWithPicker.mockResolvedValue('saved');
@@ -561,7 +562,7 @@ describe('SummaryExport PDF override', () => {
         expect(activityState.safeLogActivity).not.toHaveBeenCalled();
     });
 
-    it('retains an ambiguous Save Intent only for the next persistence retry', async () => {
+    it('retains an ambiguous Save Intent across a refresh for the same draft', async () => {
         quoteSaveState.save
             .mockResolvedValueOnce({
                 status: 'not-saved',
@@ -583,7 +584,51 @@ describe('SummaryExport PDF override', () => {
                     quoteStatus: 'draft'
                 }
             });
+        const stateOverrides = {
+            activeQuoteId: 'quote-1',
+            quoteNumber: 'BRIXX - 260423-101',
+            activeQuoteVersion: 2
+        };
         const { container, dispatch } = await renderSummaryExport({
+            stateOverrides
+        });
+
+        await clickButton(container, 'Spara ny version');
+        expect(dispatch).not.toHaveBeenCalledWith(expect.objectContaining({ type: 'UPDATE_STATE' }));
+
+        const refreshed = await renderSummaryExport({
+            stateOverrides
+        });
+        await clickButton(refreshed.container, 'Spara ny version');
+
+        expect(quoteSaveState.save.mock.calls[0][0].retrySaveIntentId).toBeNull();
+        expect(quoteSaveState.save.mock.calls[1][0].retrySaveIntentId).toBe('save-retry-1');
+        expect(refreshed.dispatch).toHaveBeenCalledWith(expect.objectContaining({ type: 'UPDATE_STATE' }));
+    });
+
+    it('does not reuse an ambiguous Save Intent after the draft changes', async () => {
+        quoteSaveState.save
+            .mockResolvedValueOnce({
+                status: 'not-saved',
+                failure: {
+                    code: 'persistence-ambiguous',
+                    message: 'Transport response lost.',
+                    retryable: true
+                },
+                retry: { saveIntentId: 'save-retry-1' }
+            })
+            .mockResolvedValueOnce({
+                status: 'saved',
+                quote: { ownerUid: 'user-1', quoteId: 'quote-1' },
+                isNewQuote: false,
+                statePatch: {
+                    activeQuoteId: 'quote-1',
+                    activeQuoteVersion: 4,
+                    quoteNumber: 'BRIXX - 260423-101',
+                    quoteStatus: 'sent'
+                }
+            });
+        const original = await renderSummaryExport({
             stateOverrides: {
                 activeQuoteId: 'quote-1',
                 quoteNumber: 'BRIXX - 260423-101',
@@ -591,13 +636,21 @@ describe('SummaryExport PDF override', () => {
             }
         });
 
-        await clickButton(container, 'Spara ny version');
-        expect(dispatch).not.toHaveBeenCalledWith(expect.objectContaining({ type: 'UPDATE_STATE' }));
-        await clickButton(container, 'Spara ny version');
+        await clickButton(original.container, 'Spara ny version');
+
+        const edited = await renderSummaryExport({
+            stateOverrides: {
+                activeQuoteId: 'quote-1',
+                quoteNumber: 'BRIXX - 260423-101',
+                activeQuoteVersion: 2,
+                quoteStatus: 'sent'
+            }
+        });
+        await clickButton(edited.container, 'Spara ny version');
 
         expect(quoteSaveState.save.mock.calls[0][0].retrySaveIntentId).toBeNull();
-        expect(quoteSaveState.save.mock.calls[1][0].retrySaveIntentId).toBe('save-retry-1');
-        expect(dispatch).toHaveBeenCalledWith(expect.objectContaining({ type: 'UPDATE_STATE' }));
+        expect(quoteSaveState.save.mock.calls[1][0].retrySaveIntentId).toBeNull();
+        expect(edited.dispatch).toHaveBeenCalledWith(expect.objectContaining({ type: 'UPDATE_STATE' }));
     });
 
     it('logs the English Excel filename when exporting in English', async () => {

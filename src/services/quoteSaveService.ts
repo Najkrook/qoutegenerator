@@ -736,9 +736,16 @@ export function createQuoteSaveModule({
         const isNewQuote = target.kind === 'new';
         const requestedDealId = normalizeId(target.crmDealId);
         const existingDealId = normalizeId(existing?.metadata.crmDealId);
-        const previousIssueDealId = normalizeId(existing?.metadata.crmSynchronizationIssue?.dealId);
-        const desiredDealId = requestedDealId || existingDealId || previousIssueDealId;
-        const pendingCrmIssue: CrmSynchronizationIssue | null = desiredDealId ? {
+        const existingCrmIssue = existing?.metadata.crmSynchronizationIssue || null;
+        const preservedRelinkIssue = existingCrmIssue?.requiresRelink
+            ? { ...existingCrmIssue, saveIntentId }
+            : null;
+        const previousIssueDealId = normalizeId(existingCrmIssue?.dealId);
+        const desiredDealId = preservedRelinkIssue?.dealId
+            || requestedDealId
+            || existingDealId
+            || previousIssueDealId;
+        const pendingCrmIssue: CrmSynchronizationIssue | null = preservedRelinkIssue || (desiredDealId ? {
             code: 'pending',
             dealId: desiredDealId,
             saveIntentId,
@@ -753,7 +760,7 @@ export function createQuoteSaveModule({
             conflictingQuoteOwnerUid: null,
             conflictingQuoteId: null,
             diagnosticCode: 'pending'
-        } : null;
+        } : null);
 
         let saved: {
             quoteId?: string;
@@ -812,8 +819,10 @@ export function createQuoteSaveModule({
         const persistedDealId = normalizeId(existing?.metadata.crmDealId || saved.metadata.crmDealId);
         const dealId = desiredDealId;
 
-        let crmIssue: CrmSynchronizationIssue | null = null;
-        if (dealId) {
+        let crmIssue: CrmSynchronizationIssue | null = preservedRelinkIssue
+            ? saved.metadata.crmSynchronizationIssue || pendingCrmIssue
+            : null;
+        if (dealId && !preservedRelinkIssue) {
             try {
                 if (persistedDealId && requestedDealId && persistedDealId !== requestedDealId) {
                     throw new CrmAttemptError('crm-link-conflict', 'Quote is already linked to another CRM deal.', {

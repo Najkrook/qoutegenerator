@@ -620,6 +620,46 @@ describe('Quote Save module', () => {
         expect(harness.dealStore.get('deal-b').quoteId).toBe(created.quote.quoteId);
     });
 
+    it('preserves an unresolved relink request across normal Quote saves', async () => {
+        const harness = createHarness({ deals: { 'deal-a': {}, 'deal-b': {} } });
+        const created = await harness.module.save({
+            actor: ACTOR,
+            state: quoteState(),
+            target: { kind: 'new', crmDealId: 'deal-a' }
+        });
+        const relinkRequested = await harness.module.save({
+            actor: ACTOR,
+            state: quoteState({ activeQuoteId: created.quote.quoteId, activeQuoteVersion: 1 }),
+            target: { kind: 'existing', quote: created.quote, crmDealId: 'deal-b' }
+        });
+
+        expect(relinkRequested).toMatchObject({
+            status: 'saved-needs-crm-repair',
+            crm: { dealId: 'deal-b', status: 'relink-required' }
+        });
+
+        const savedAgain = await harness.module.save({
+            actor: ACTOR,
+            state: quoteState({ activeQuoteId: created.quote.quoteId, activeQuoteVersion: 2 }),
+            target: { kind: 'existing', quote: created.quote, crmDealId: 'deal-a' }
+        });
+
+        expect(savedAgain).toMatchObject({
+            status: 'saved-needs-crm-repair',
+            crm: { dealId: 'deal-b', status: 'relink-required' }
+        });
+        expect(harness.crm.linkDealToQuote).toHaveBeenCalledTimes(1);
+        expect(harness.firestore.__docs.get(
+            `users/actor-1/quotes/${created.quote.quoteId}`
+        ).crmSynchronizationIssue).toMatchObject({
+            dealId: 'deal-b',
+            conflictingDealId: 'deal-a',
+            requiresRelink: true,
+            saveIntentId: 'intent-3',
+            quoteVersion: 3
+        });
+    });
+
     it('retains the transactionally persisted CRM issue when the post-attempt issue update fails', async () => {
         const updateIssue = vi.fn(async () => {
             throw Object.assign(new Error('Issue update unavailable.'), { code: 'unavailable' });

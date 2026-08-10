@@ -49,6 +49,13 @@ interface PdfExportOptions {
     allowMissingQuoteNumber?: boolean;
 }
 
+interface PendingQuoteSaveRetry {
+    saveIntentId: string;
+    draftSignature: string;
+}
+
+const QUOTE_SAVE_RETRY_STORAGE_PREFIX = 'quote-generator:pending-save-retry:';
+
 const RETAILER_SAFE_CONTRACTING_WORK: QuoteState['contractingWork'] = {
     enabled: false,
     projectName: '',
@@ -62,6 +69,77 @@ const RETAILER_SAFE_CONTRACTING_WORK: QuoteState['contractingWork'] = {
         percent: 15
     }
 };
+
+function getQuoteSaveRetryStorageKey(userUid: string | null | undefined): string | null {
+    const normalizedUid = String(userUid || '').trim();
+    return normalizedUid ? `${QUOTE_SAVE_RETRY_STORAGE_PREFIX}${normalizedUid}` : null;
+}
+
+function buildQuoteSaveDraftSignature({
+    state,
+    ownerUid,
+    quoteId,
+    crmDealId,
+    retailerId
+}: {
+    state: QuoteState;
+    ownerUid: string;
+    quoteId: string | null;
+    crmDealId: string | null;
+    retailerId: string | null;
+}): string {
+    return JSON.stringify({ ownerUid, quoteId, crmDealId, retailerId, state });
+}
+
+function readMatchingQuoteSaveRetry(
+    userUid: string | null | undefined,
+    draftSignature: string,
+    storage: Storage | undefined = globalThis.sessionStorage
+): string | null {
+    const storageKey = getQuoteSaveRetryStorageKey(userUid);
+    if (!storageKey || !storage) return null;
+
+    try {
+        const raw = storage.getItem(storageKey);
+        if (!raw) return null;
+        const pending = JSON.parse(raw) as Partial<PendingQuoteSaveRetry>;
+        if (
+            typeof pending.saveIntentId === 'string'
+            && pending.saveIntentId.trim()
+            && pending.draftSignature === draftSignature
+        ) {
+            return pending.saveIntentId;
+        }
+        storage.removeItem(storageKey);
+    } catch (error) {
+        console.error('Failed to restore pending Quote Save retry:', error);
+        storage.removeItem(storageKey);
+    }
+    return null;
+}
+
+function persistQuoteSaveRetry(
+    userUid: string | null | undefined,
+    pending: PendingQuoteSaveRetry,
+    storage: Storage | undefined = globalThis.sessionStorage
+): void {
+    const storageKey = getQuoteSaveRetryStorageKey(userUid);
+    if (!storageKey || !storage) return;
+
+    try {
+        storage.setItem(storageKey, JSON.stringify(pending));
+    } catch (error) {
+        console.error('Failed to persist pending Quote Save retry:', error);
+    }
+}
+
+function clearQuoteSaveRetry(
+    userUid: string | null | undefined,
+    storage: Storage | undefined = globalThis.sessionStorage
+): void {
+    const storageKey = getQuoteSaveRetryStorageKey(userUid);
+    if (storageKey) storage?.removeItem(storageKey);
+}
 
 function sanitizeFileNamePart(value: string): string {
     return String(value || '')
@@ -174,7 +252,6 @@ export function SummaryExport({
     const [isSubmittingOrderRequest, setIsSubmittingOrderRequest] = useState(false);
     const [hasJustSubmittedOrderRequest, setHasJustSubmittedOrderRequest] = useState(false);
     const previewUrlRef = useRef<string>('');
-    const pendingSaveIntentRef = useRef<string | null>(null);
     const reopenedQuoteIdRef = useRef(state.activeQuoteId);
     const attemptedReopenRepairRef = useRef<string | null>(null);
     const previewPdfRef = useRef<{
@@ -493,31 +570,48 @@ export function SummaryExport({
 
         setIsSavingQuote(true);
         try {
+            const ownerUid = quoteOwnerUid || user?.uid || '';
+            const saveTarget = state.activeQuoteId
+                ? {
+                    kind: 'existing' as const,
+                    quote: {
+                        ownerUid,
+                        quoteId: state.activeQuoteId
+                    },
+                    crmDealId
+                }
+                : { kind: 'new' as const, crmDealId };
+            const draftSignature = buildQuoteSaveDraftSignature({
+                state: effectiveState,
+                ownerUid,
+                quoteId: state.activeQuoteId || null,
+                crmDealId,
+                retailerId: retailer?.id || null
+            });
+            const retrySaveIntentId = readMatchingQuoteSaveRetry(user?.uid, draftSignature);
             const outcome = await quoteSave.save({
                 actor: user,
                 retailer,
                 state: effectiveState,
-                target: state.activeQuoteId
-                    ? {
-                        kind: 'existing',
-                        quote: {
-                            ownerUid: quoteOwnerUid || user?.uid || '',
-                            quoteId: state.activeQuoteId
-                        },
-                        crmDealId
-                    }
-                    : { kind: 'new', crmDealId },
+                target: saveTarget,
                 canManageAllQuotes: canViewEverything,
-                retrySaveIntentId: pendingSaveIntentRef.current
+                retrySaveIntentId
             });
 
             if ('status' in outcome && outcome.status === 'not-saved') {
-                pendingSaveIntentRef.current = outcome.retry?.saveIntentId || null;
+                if (outcome.retry?.saveIntentId) {
+                    persistQuoteSaveRetry(user?.uid, {
+                        saveIntentId: outcome.retry.saveIntentId,
+                        draftSignature
+                    });
+                } else {
+                    clearQuoteSaveRetry(user?.uid);
+                }
                 notifyError(`Kunde inte spara offerten: ${outcome.failure.message}`);
                 return;
             }
 
-            pendingSaveIntentRef.current = null;
+            clearQuoteSaveRetry(user?.uid);
             const { isNewQuote, statePatch } = outcome;
             const saveStatePatch: SavedQuoteStatePatch = statePatch;
 
