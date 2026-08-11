@@ -717,6 +717,59 @@ describe('Quote Save module', () => {
         consoleSpy.mockRestore();
     });
 
+    it('does not report a stale CRM repair as successful when a newer issue wins the update race', async () => {
+        const harness = createHarness({ deals: { 'deal-1': {} } });
+        harness.crm.linkDealToQuote.mockRejectedValueOnce(
+            Object.assign(new Error('CRM offline.'), { code: 'unavailable' })
+        );
+        const saved = await harness.module.save({
+            actor: ACTOR,
+            state: quoteState(),
+            target: { kind: 'new', crmDealId: 'deal-1' }
+        });
+        const latest = await harness.repository.getQuoteLatestRevision({
+            userId: saved.quote.ownerUid,
+            quoteId: saved.quote.quoteId
+        });
+        const newerIssue = {
+            ...latest.metadata.crmSynchronizationIssue,
+            saveIntentId: 'intent-newer',
+            revisionId: 'intent_intent-newer',
+            quoteVersion: 2,
+            attemptCount: 2
+        };
+        const staleUpdate = vi.fn(async () => ({
+            applied: false,
+            metadata: {
+                ...latest.metadata,
+                latestSaveIntentId: 'intent-newer',
+                crmSynchronizationIssue: newerIssue
+            }
+        }));
+        const reopenedModule = createQuoteSaveModule({
+            quotePersistence: {
+                ...harness.repository,
+                updateQuoteCrmSynchronizationIssue: staleUpdate
+            },
+            crm: harness.crm,
+            logActivity: harness.logActivity,
+            calculateTotals: () => SUMMARY,
+            schedule: vi.fn()
+        });
+
+        const repaired = await reopenedModule.repairCrm({ actor: ACTOR, quote: saved.quote });
+
+        expect(staleUpdate).toHaveBeenCalledWith(expect.objectContaining({
+            issue: null,
+            expectedSaveIntentId: latest.metadata.crmSynchronizationIssue.saveIntentId
+        }));
+        expect(repaired).toMatchObject({
+            status: 'repair-pending',
+            quote: saved.quote,
+            dealId: 'deal-1'
+        });
+    });
+
     it('repairs a durable issue after Quote reopen without creating a revision', async () => {
         const harness = createHarness({ deals: { 'deal-1': {} } });
         harness.crm.linkDealToQuote.mockRejectedValueOnce(

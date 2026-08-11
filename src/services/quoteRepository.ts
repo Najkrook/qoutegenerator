@@ -25,6 +25,7 @@ import type {
     RepositoryQuoteSummaryPayload,
     UnknownRecord,
     UpdateQuoteCrmSynchronizationIssueInput,
+    UpdateQuoteCrmSynchronizationIssueResult,
     UpdateQuoteStatusInput
 } from '../types/contracts';
 import { stripPrivateQuoteStateData } from '../utils/quoteStateSanitization';
@@ -1057,14 +1058,14 @@ export function createQuoteRepository(deps: QuoteRepositoryDeps = {} as QuoteRep
         quoteId,
         issue,
         expectedSaveIntentId
-    }: UpdateQuoteCrmSynchronizationIssueInput): Promise<QuoteMetadata> {
+    }: UpdateQuoteCrmSynchronizationIssueInput): Promise<UpdateQuoteCrmSynchronizationIssueResult> {
         if (!ownerUid || !quoteId) throw new Error('ownerUid and quoteId are required.');
         const quoteRef = quoteDocRef(ownerUid, quoteId);
 
         const applyUpdate = async (
             reader: (ref: FirestoreDocRef) => Promise<{ exists(): boolean; data(): UnknownRecord | undefined }>,
             writer: (ref: FirestoreDocRef, payload: UnknownRecord, options?: { merge?: boolean }) => void | Promise<unknown>
-        ): Promise<QuoteMetadata> => {
+        ): Promise<UpdateQuoteCrmSynchronizationIssueResult> => {
             const snap = await reader(quoteRef);
             if (!snap.exists()) throw new Error('Quote not found.');
             const existing = normalizeQuoteMetadata(quoteId, snap.data() || {});
@@ -1073,13 +1074,16 @@ export function createQuoteRepository(deps: QuoteRepositoryDeps = {} as QuoteRep
                 && existing.latestSaveIntentId
                 && existing.latestSaveIntentId !== expectedSaveIntentId
             ) {
-                return existing;
+                return { applied: false, metadata: existing };
             }
 
             await writer(quoteRef, { crmSynchronizationIssue: issue || null }, { merge: true });
             return {
-                ...existing,
-                crmSynchronizationIssue: issue || null
+                applied: true,
+                metadata: {
+                    ...existing,
+                    crmSynchronizationIssue: issue || null
+                }
             };
         };
 

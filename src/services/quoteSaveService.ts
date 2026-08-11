@@ -470,12 +470,12 @@ export function createQuoteSaveModule({
         expectedSaveIntentId?: string | null
     ): Promise<boolean> => {
         try {
-            await quotePersistence.updateQuoteCrmSynchronizationIssue({
+            const result = await quotePersistence.updateQuoteCrmSynchronizationIssue({
                 ...quote,
                 issue,
                 expectedSaveIntentId
             });
-            return true;
+            return result.applied;
         } catch (error) {
             console.error('Failed to persist CRM synchronization issue:', error);
             return false;

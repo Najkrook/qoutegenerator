@@ -760,6 +760,11 @@ export interface UpdateQuoteCrmSynchronizationIssueInput extends QuoteReference 
     expectedSaveIntentId?: string | null;
 }
 
+export interface UpdateQuoteCrmSynchronizationIssueResult {
+    applied: boolean;
+    metadata: QuoteMetadata;
+}
+
 export interface QuoteLatestRevisionResult {
     metadata: QuoteMetadata;
     revision: QuoteRevision | null;
@@ -985,7 +990,9 @@ export interface QuoteRepository {
     getQuoteLatestRevision(input: GetQuoteLatestRevisionInput): Promise<QuoteLatestRevisionResult | null>;
     getQuoteRevisionByVersion(input: GetQuoteRevisionByVersionInput): Promise<QuoteRevision | null>;
     getQuoteRevisions(input: GetQuoteRevisionsInput): Promise<Array<QuoteRevision>>;
-    updateQuoteCrmSynchronizationIssue(input: UpdateQuoteCrmSynchronizationIssueInput): Promise<QuoteMetadata>;
+    updateQuoteCrmSynchronizationIssue(
+        input: UpdateQuoteCrmSynchronizationIssueInput
+    ): Promise<UpdateQuoteCrmSynchronizationIssueResult>;
     deleteQuote(input: DeleteQuoteInput): Promise<void>;
     updateQuoteStatus(input: UpdateQuoteStatusInput): Promise<QuoteMetadata>;
     getAllUsersQuotes(input?: GetAllUsersQuotesInput): Promise<Array<QuoteMetadata & { ownerUid: string }>>;
