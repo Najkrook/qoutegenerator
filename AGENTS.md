@@ -142,7 +142,9 @@ Simple sketch state and `advancedSketchDraft` are both persisted as quote state.
 
 ### Quote calculations, save, and history
 
-`src/services/calculationEngine.ts` computes quote totals. `src/services/quoteSaveService.ts` decides between creating a quote and saving a revision. `src/services/quoteRepositoryClient.ts` supplies browser Firebase bindings to `src/services/quoteRepository.ts`.
+`src/services/calculationEngine.ts` computes quote totals. `src/services/quoteSaveService.ts` is the deep Quote Save module; application callers use only `quoteSave.save()` and `quoteSave.repairCrm()`. The module owns canonical calculation and state sanitization, stable owner/origin resolution, Save Intent idempotency, persistence, CRM synchronization/repair, and non-authoritative activity logging. `src/services/quoteRepositoryClient.ts` supplies browser Firebase bindings to `src/services/quoteRepository.ts`.
+
+Quote persistence defines Quote Save success. CRM failures are recorded as `crmSynchronizationIssue` in Quote metadata and repaired without creating a Quote Revision. `saveIntentId` is revision-document metadata, never Quote Revision state. The repository uses deterministic Save Intent document IDs so ambiguous transport retries cannot create duplicate revisions.
 
 History supports latest and specific revision opening, lifecycle status changes, deep links, link copying, quote duplication as a new draft, and deletion with revisions. Reopening and duplication must pass saved state through `src/views/historyPayload.ts` and schema hydration.
 

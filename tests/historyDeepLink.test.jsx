@@ -193,12 +193,15 @@ describe('History quote deep links', () => {
             quoteId: 'q1',
             version: 2
         });
-        expect(onOpenQuote).toHaveBeenCalledWith(expect.objectContaining({
-            activeQuoteId: 'q1',
-            activeQuoteVersion: 2,
-            quoteNumber: 'BRIXX - 260526-001',
-            quoteStatus: 'sent'
-        }));
+        expect(onOpenQuote).toHaveBeenCalledWith(
+            expect.objectContaining({
+                activeQuoteId: 'q1',
+                activeQuoteVersion: 2,
+                quoteNumber: 'BRIXX - 260526-001',
+                quoteStatus: 'sent'
+            }),
+            expect.objectContaining({ quoteOwnerUid: 'user-1' })
+        );
         expect(getLocation().search).toBe('');
     });
 
@@ -224,10 +227,13 @@ describe('History quote deep links', () => {
             userId: 'other-uid',
             quoteId: 'q1'
         });
-        expect(onOpenQuote).toHaveBeenCalledWith(expect.objectContaining({
-            activeQuoteId: 'q1',
-            activeQuoteVersion: 1
-        }));
+        expect(onOpenQuote).toHaveBeenCalledWith(
+            expect.objectContaining({
+                activeQuoteId: 'q1',
+                activeQuoteVersion: 1
+            }),
+            expect.objectContaining({ quoteOwnerUid: 'other-uid' })
+        );
     });
 
     it('blocks non-admin deep links for another owner and clears params', async () => {

@@ -6,6 +6,9 @@ import {
     getQuoteStepPath,
     getQrParasolPath,
     getSketchReturnPath,
+    appendQuoteRouteContext,
+    readQuoteRouteContext,
+    withQuoteRouteContext,
     resolveLoginRedirectTarget,
     type QuoteRouteStepId,
     type SketchReturnTarget
@@ -19,31 +22,14 @@ export function useAppNavigation() {
     const navigate = useNavigate();
     const location = useLocation();
 
-    const getActiveCrmDealParams = (): URLSearchParams => {
-        const currentParams = new URLSearchParams(location.search);
-        const crmDealId = currentParams.get('crmDealId')?.trim();
-        const params = new URLSearchParams();
-        if (!crmDealId) return params;
-
-        params.set('crmDealId', crmDealId);
-        const quoteOwnerUid = currentParams.get('quoteOwnerUid')?.trim();
-        if (quoteOwnerUid) {
-            params.set('quoteOwnerUid', quoteOwnerUid);
-        }
-        return params;
-    };
-
-    const getActiveCrmDealSearch = (): string => {
-        const params = getActiveCrmDealParams();
-        return params.size > 0 ? `?${params.toString()}` : '';
-    };
+    const getActiveQuoteContext = () => readQuoteRouteContext(location.search);
 
     return {
         goToDashboard(options?: NavigateOptions) {
             navigate(APP_PATHS[APP_ROUTE_IDS.dashboard], options);
         },
         goToQuoteStep(step: QuoteRouteStepId, options?: NavigateOptions) {
-            navigate(`${getQuoteStepPath(step)}${getActiveCrmDealSearch()}`, options);
+            navigate(withQuoteRouteContext(getQuoteStepPath(step), getActiveQuoteContext()), options);
         },
         goToNewQuote(options?: NavigateOptions) {
             navigate(getQuoteStepPath('product-lines'), options);
@@ -54,17 +40,15 @@ export function useAppNavigation() {
             quoteOwnerUid?: string | null,
             options?: NavigateOptions
         ) {
-            const normalizedDealId = String(crmDealId || '').trim();
-            const params = new URLSearchParams();
-            if (normalizedDealId) {
-                params.set('crmDealId', normalizedDealId);
-            }
-            const normalizedOwnerUid = String(quoteOwnerUid || '').trim();
-            if (normalizedOwnerUid) {
-                params.set('quoteOwnerUid', normalizedOwnerUid);
-            }
-            const search = params.size > 0 ? `?${params.toString()}` : '';
-            navigate(`${getQuoteStepPath(step)}${search}`, options);
+            navigate(withQuoteRouteContext(getQuoteStepPath(step), { crmDealId, quoteOwnerUid }), options);
+        },
+        goToExistingQuoteStep(
+            step: QuoteRouteStepId,
+            quoteOwnerUid: string,
+            crmDealId?: string | null,
+            options?: NavigateOptions
+        ) {
+            navigate(withQuoteRouteContext(getQuoteStepPath(step), { crmDealId, quoteOwnerUid }), options);
         },
         goToQuoteFromDeal(crmDealId: string, options?: NavigateOptions) {
             const normalizedDealId = String(crmDealId || '').trim();
@@ -120,7 +104,7 @@ export function useAppNavigation() {
             navigate(APP_PATHS[APP_ROUTE_IDS.retailerDocuments], options);
         },
         goToSketch(returnTo?: SketchReturnTarget | null, options?: NavigateOptions) {
-            const params = getActiveCrmDealParams();
+            const params = appendQuoteRouteContext(new URLSearchParams(), getActiveQuoteContext());
             if (returnTo) {
                 params.set('return', returnTo);
             }
@@ -129,10 +113,13 @@ export function useAppNavigation() {
             navigate(`${APP_PATHS[APP_ROUTE_IDS.sketch]}${search}`, options);
         },
         goToSketchReturnTarget(returnTo?: SketchReturnTarget | null, options?: NavigateOptions) {
-            const crmSearch = returnTo === 'quote-configuration' || returnTo === 'quote-summary'
-                ? getActiveCrmDealSearch()
-                : '';
-            navigate(`${getSketchReturnPath(returnTo)}${crmSearch}`, options);
+            const path = getSketchReturnPath(returnTo);
+            navigate(
+                returnTo === 'quote-configuration' || returnTo === 'quote-summary'
+                    ? withQuoteRouteContext(path, getActiveQuoteContext())
+                    : path,
+                options
+            );
         },
         goToLogin(next?: string | { pathname: string; search?: string; hash?: string }, options?: NavigateOptions) {
             if (!next) {

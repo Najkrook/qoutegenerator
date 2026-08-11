@@ -194,6 +194,27 @@ vi.mock('../src/views/History', () => ({
             <button
                 type="button"
                 onClick={() => onOpenQuote?.({
+                    selectedLines: ['BaHaMa'],
+                    builderItems: [{
+                        id: 'item-owned',
+                        line: 'BaHaMa',
+                        model: 'Jumbrella',
+                        size: '4x4 Kvadrat',
+                        qty: 1,
+                        discountPct: 0,
+                        addons: []
+                    }],
+                    customerInfo: { name: 'Ada' },
+                    activeQuoteId: 'quote-owned',
+                    activeQuoteVersion: 1,
+                    quoteStatus: 'draft'
+                }, { quoteOwnerUid: 'other-owner' })}
+            >
+                Open Other Owner Quote
+            </button>
+            <button
+                type="button"
+                onClick={() => onOpenQuote?.({
                     selectedLines: [],
                     builderItems: [],
                     gridSelections: {},
@@ -733,6 +754,36 @@ describe('app routing', () => {
                 step: 4
             })
         }));
+    });
+
+    it('preserves the stable owner reference for an unlinked quote opened by an admin', async () => {
+        const { container, router } = await renderApp({
+            initialEntries: [APP_PATHS[APP_ROUTE_IDS.quotes]],
+            quoteState: {
+                ...createInitialQuoteState(),
+                selectedLines: ['BaHaMa'],
+                builderItems: [{
+                    id: 'existing-item',
+                    line: 'BaHaMa',
+                    model: 'Jumbrella',
+                    size: '4x4 Kvadrat',
+                    qty: 1,
+                    discountPct: 0,
+                    addons: []
+                }]
+            },
+            auth: {
+                accessLevel: 'full',
+                canViewEverything: true,
+                canAccessSketch: true,
+                canExportSketchToQuote: true
+            }
+        });
+
+        await clickButton(container, 'Open Other Owner Quote');
+
+        expect(router.state.location.pathname).toBe(APP_PATHS[APP_ROUTE_IDS.quoteSummary]);
+        expect(router.state.location.search).toBe('?quoteOwnerUid=other-owner');
     });
 
     it('keeps the current draft when opening a history quote is cancelled', async () => {

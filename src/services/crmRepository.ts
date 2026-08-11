@@ -117,6 +117,31 @@ export interface CrmRepositoryDeps {
     logAudit?: (entry: CrmAuditEntry) => void | Promise<unknown>;
 }
 
+export class CrmQuoteLinkConflictError extends Error {
+    readonly code = 'crm-link-conflict';
+    readonly conflictingDealId: string | null;
+    readonly conflictingQuoteOwnerUid: string | null;
+    readonly conflictingQuoteId: string | null;
+
+    constructor({
+        message,
+        conflictingDealId = null,
+        conflictingQuoteOwnerUid = null,
+        conflictingQuoteId = null
+    }: {
+        message: string;
+        conflictingDealId?: string | null;
+        conflictingQuoteOwnerUid?: string | null;
+        conflictingQuoteId?: string | null;
+    }) {
+        super(message);
+        this.name = 'CrmQuoteLinkConflictError';
+        this.conflictingDealId = conflictingDealId;
+        this.conflictingQuoteOwnerUid = conflictingQuoteOwnerUid;
+        this.conflictingQuoteId = conflictingQuoteId;
+    }
+}
+
 const EMPTY_ADDRESS: CrmAddress = {
     street: '',
     postalCode: '',
@@ -1319,6 +1344,7 @@ export function createCrmRepository(deps: CrmRepositoryDeps = {}): CrmRepository
             quoteStage: CrmDealStage | null;
             quoteStatus?: string;
             syncStageFromQuote?: boolean;
+            allowRelink?: boolean;
         }
     ): Promise<CrmDeal> {
         const user = requiredActor(input.user);
@@ -1338,20 +1364,66 @@ export function createCrmRepository(deps: CrmRepositoryDeps = {}): CrmRepository
             const current = normalizeCrmDeal(dealId, dealSnapshot.data() || {});
             const quoteRaw = toRecord(quoteSnapshot.data());
             const existingDealId = toNullableString(quoteRaw.crmDealId);
-            if (existingDealId && existingDealId !== dealId) {
-                throw new Error('Quote is already linked to another CRM deal.');
-            }
-
-            if (
+            const quoteHasConflict = Boolean(existingDealId && existingDealId !== dealId);
+            const dealHasConflict = Boolean(
                 current.quoteOwnerUid
                 && current.quoteId
                 && (current.quoteOwnerUid !== link.quoteOwnerUid || current.quoteId !== link.quoteId)
-            ) {
-                const oldQuoteRef = makeDoc(dbRef, 'users', current.quoteOwnerUid, 'quotes', current.quoteId);
-                const oldQuoteSnapshot = await reader(oldQuoteRef);
-                if (oldQuoteSnapshot.exists() && toStringValue(toRecord(oldQuoteSnapshot.data()).crmDealId) === dealId) {
-                    await writer(oldQuoteRef, { crmDealId: null }, { merge: true });
+            );
+
+            if (quoteHasConflict && !options.allowRelink) {
+                throw new CrmQuoteLinkConflictError({
+                    message: 'Quote is already linked to another CRM deal.',
+                    conflictingDealId: existingDealId,
+                    conflictingQuoteOwnerUid: link.quoteOwnerUid,
+                    conflictingQuoteId: link.quoteId
+                });
+            }
+            if (dealHasConflict && !options.allowRelink) {
+                throw new CrmQuoteLinkConflictError({
+                    message: 'CRM deal is already linked to another quote.',
+                    conflictingQuoteOwnerUid: current.quoteOwnerUid,
+                    conflictingQuoteId: current.quoteId
+                });
+            }
+
+            const previousDealRef = quoteHasConflict && existingDealId
+                ? entityRef(CRM_COLLECTIONS.deals, existingDealId)
+                : null;
+            const oldQuoteRef = dealHasConflict && current.quoteOwnerUid && current.quoteId
+                ? makeDoc(dbRef, 'users', current.quoteOwnerUid, 'quotes', current.quoteId)
+                : null;
+            const [previousDealSnapshot, oldQuoteSnapshot] = await Promise.all([
+                previousDealRef ? reader(previousDealRef) : Promise.resolve(null),
+                oldQuoteRef ? reader(oldQuoteRef) : Promise.resolve(null)
+            ]);
+
+            if (previousDealRef && previousDealSnapshot?.exists() && existingDealId) {
+                const previousDeal = normalizeCrmDeal(existingDealId, previousDealSnapshot.data() || {});
+                if (
+                    previousDeal.quoteOwnerUid === link.quoteOwnerUid
+                    && previousDeal.quoteId === link.quoteId
+                ) {
+                    const unlinkedPreviousDeal = normalizeCrmDeal(existingDealId, {
+                        ...previousDeal,
+                        stage: previousDeal.stage === 'quote' ? 'lead' : previousDeal.stage,
+                        quoteOwnerUid: null,
+                        quoteId: null,
+                        quoteNumber: null,
+                        quoteRevisionId: null,
+                        quoteVersion: null,
+                        ...buildUpdateAudit(user, now())
+                    });
+                    await writer(previousDealRef, unlinkedPreviousDeal as unknown as UnknownRecord, { merge: true });
                 }
+            }
+
+            if (
+                oldQuoteRef
+                && oldQuoteSnapshot?.exists()
+                && toStringValue(toRecord(oldQuoteSnapshot.data()).crmDealId) === dealId
+            ) {
+                await writer(oldQuoteRef, { crmDealId: null }, { merge: true });
             }
 
             const deal = normalizeCrmDeal(dealId, {
@@ -1360,14 +1432,18 @@ export function createCrmRepository(deps: CrmRepositoryDeps = {}): CrmRepository
                 valueSek: input.valueSek == null ? current.valueSek : link.valueSek,
                 stage: options.syncStageFromQuote
                     ? (options.quoteStage || current.stage)
-                    : (current.stage === 'lead' ? 'quote' : current.stage),
+                    : (
+                        current.stage === 'lead' && (!current.quoteOwnerUid || !current.quoteId)
+                            ? 'quote'
+                            : current.stage
+                    ),
                 lostReason: options.quoteStage && options.quoteStage !== 'lost' ? '' : current.lostReason,
                 ...buildUpdateAudit(user, now())
             });
             await writer(dealRef, deal as unknown as UnknownRecord, { merge: true });
             const quoteStatus = options.quoteStatus !== undefined
                 ? normalizeQuoteStatus(options.quoteStatus)
-                : (deal.stage === 'won' || deal.stage === 'lost' ? deal.stage : null);
+                : null;
             if (quoteStatus) {
                 const status = quoteStatus;
                 await writer(quoteRef, {
@@ -1482,6 +1558,7 @@ export function createCrmRepository(deps: CrmRepositoryDeps = {}): CrmRepository
         restoreMember: (input) => setMemberArchived(input, false),
         searchAll,
         linkDealToQuote: (input) => writeQuoteLink(input, { quoteStage: null }),
+        relinkDealToQuote: (input) => writeQuoteLink(input, { quoteStage: null, allowRelink: true }),
         syncDealFromQuote: (input: CrmSyncDealFromQuoteInput) =>
             writeQuoteLink(input, {
                 quoteStage: getCrmStageForQuoteStatus(input.quoteStatus),

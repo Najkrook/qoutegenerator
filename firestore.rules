@@ -448,6 +448,53 @@ service cloud.firestore {
         && request.resource.data.metadata is map;
     }
 
+    function isValidQuoteCrmSynchronizationIssue(data) {
+      return data.get('crmSynchronizationIssue', null) == null || (
+        data.crmSynchronizationIssue is map
+        && data.crmSynchronizationIssue.code in [
+          'pending', 'conflict', 'deal-not-found', 'unauthorized', 'timeout', 'unavailable', 'unknown'
+        ]
+        && data.crmSynchronizationIssue.keys().hasOnly([
+          'code', 'dealId', 'saveIntentId', 'revisionId', 'quoteVersion',
+          'firstFailedAtMs', 'lastAttemptAtMs', 'attemptCount', 'nextRetryAtMs',
+          'requiresRelink', 'conflictingDealId', 'conflictingQuoteOwnerUid',
+          'conflictingQuoteId', 'diagnosticCode'
+        ])
+        && data.crmSynchronizationIssue.dealId is string
+        && data.crmSynchronizationIssue.saveIntentId is string
+        && data.crmSynchronizationIssue.revisionId is string
+        && data.crmSynchronizationIssue.quoteVersion is int
+        && data.crmSynchronizationIssue.firstFailedAtMs is int
+        && data.crmSynchronizationIssue.lastAttemptAtMs is int
+        && data.crmSynchronizationIssue.attemptCount is int
+        && (
+          data.crmSynchronizationIssue.nextRetryAtMs == null
+          || data.crmSynchronizationIssue.nextRetryAtMs is int
+        )
+        && data.crmSynchronizationIssue.requiresRelink is bool
+        && isNullableCrmString(data.crmSynchronizationIssue.conflictingDealId)
+        && isNullableCrmString(data.crmSynchronizationIssue.conflictingQuoteOwnerUid)
+        && isNullableCrmString(data.crmSynchronizationIssue.conflictingQuoteId)
+        && data.crmSynchronizationIssue.diagnosticCode is string
+      );
+    }
+
+    function isValidQuoteMetadataForPath(data, userId) {
+      return data.get('ownerUid', userId) == userId
+        && data.get('originType', 'internal') in ['internal', 'retailer']
+        && isNullableCrmString(data.get('latestSaveIntentId', null))
+        && isValidQuoteCrmSynchronizationIssue(data);
+    }
+
+    function preservesStableQuoteMetadata(previous, next, userId) {
+      return previous.get('ownerUid', userId) == userId
+        && next.get('ownerUid', userId) == userId
+        && (
+          previous.get('originType', null) == null
+          || next.get('originType', 'internal') == previous.originType
+        );
+    }
+
     function isOwnOrderRequestRead() {
       return isSignedIn() && resource.data.createdByUid == request.auth.uid;
     }
@@ -488,27 +535,109 @@ service cloud.firestore {
         && request.auth.uid == userId
         && resource.data.get('crmDealId', null) == null
       );
-      allow create: if isAdmin() || (
-        isSignedIn()
-        && request.auth.uid == userId
-        && request.resource.data.get('crmDealId', null) == null
+      allow create: if isValidQuoteMetadataForPath(request.resource.data, userId) && (
+        isAdmin() || (
+          isSignedIn()
+          && request.auth.uid == userId
+          && request.resource.data.get('crmDealId', null) == null
+        )
       );
-      allow update: if isAdmin() || (
-        isSignedIn()
-        && request.auth.uid == userId
-        && resource.data.get('crmDealId', null) == null
-        && request.resource.data.get('crmDealId', null) == resource.data.get('crmDealId', null)
-      );
+      allow update: if isValidQuoteMetadataForPath(request.resource.data, userId)
+        && preservesStableQuoteMetadata(resource.data, request.resource.data, userId)
+        && (
+          isAdmin() || (
+            isSignedIn()
+            && request.auth.uid == userId
+            && resource.data.get('crmDealId', null) == null
+            && request.resource.data.get('crmDealId', null) == resource.data.get('crmDealId', null)
+          )
+        );
     }
 
-    function isCrmFreeQuoteRevision() {
-      return request.resource.data.get('state', {}).get('crmDealId', null) == null
-        && request.resource.data.get('state', {}).get('quoteOwnerUid', null) == null;
+    function hasCustomerSafeQuoteStateShape(state) {
+      return state is map
+        && state.keys().hasOnly([
+          'stateVersion', 'step', 'draftUpdatedAtMs', 'selectedLines', 'builderItems',
+          'gridSelections', 'customCosts', 'contractingWork', 'includesVat',
+          'globalDiscountPct', 'prevGlobalDiscountPct', 'exchangeRate', 'customerInfo',
+          'inventoryData', 'cloudInventoryData', 'sketchDraft', 'advancedSketchDraft',
+          'sketchMeta', 'inventoryBasket', 'activeQuoteId', 'quoteNumber',
+          'activeQuoteVersion', 'quoteStatus', 'includeTerms', 'termsText',
+          'termsTemplateId', 'termsCustomized', 'includeSignatureBlock',
+          'includePaymentBox', 'hideZeroDiscountReferencesInPdf', 'pdfThemeId',
+          'exportLanguage', 'paymentTermsDays', 'quoteValidityDays'
+        ])
+        && (
+          state.get('customerInfo', null) == null
+          || (
+            state.customerInfo is map
+            && state.customerInfo.keys().hasOnly([
+              'name', 'company', 'email', 'reference', 'customerReference',
+              'date', 'validity', 'extraNotes'
+            ])
+          )
+        )
+        && (
+          state.get('contractingWork', null) == null
+          || (
+            state.contractingWork is map
+            && state.contractingWork.keys().hasOnly(['enabled', 'projectName', 'rows', 'margin', 'ata'])
+            && state.contractingWork.get('margin', {}) is map
+            && state.contractingWork.get('margin', {}).keys().hasOnly(['enabled', 'percent'])
+            && state.contractingWork.get('ata', {}) is map
+            && state.contractingWork.get('ata', {}).keys().hasOnly(['enabled', 'percent'])
+          )
+        )
+        && (
+          state.get('sketchMeta', null) == null
+          || (
+            state.sketchMeta is map
+            && state.sketchMeta.keys().hasOnly(['addedBahamaLine', 'addedFiestaLine'])
+          )
+        );
+    }
+
+    function isCustomerSafeQuoteRevision() {
+      let state = request.resource.data.get('state', {});
+      return request.resource.data.keys().hasOnly([
+          'quoteId', 'version', 'savedAtMs', 'savedBy', 'savedByUid',
+          'state', 'summary', 'changeNote', 'saveIntentId'
+        ])
+        && hasCustomerSafeQuoteStateShape(state)
+        && state.get('crmDealId', null) == null
+        && state.get('crmSynchronizationIssue', null) == null
+        && state.get('crmSyncIssue', null) == null
+        && state.get('crmRouting', null) == null
+        && state.get('crmRoutingMetadata', null) == null
+        && state.get('quoteOwnerUid', null) == null
+        && state.get('ownerUid', null) == null
+        && state.get('ownerRouting', null) == null
+        && state.get('ownerRoutingData', null) == null
+        && state.get('saveIntentId', null) == null
+        && state.get('internalMargin', null) == null
+        && state.get('internalMargins', null) == null
+        && state.get('marginAnalysis', null) == null
+        && state.get('marginSettings', null) == null
+        && state.get('costPrice', null) == null
+        && state.get('grossProfit', null) == null
+        && state.get('actualMargin', null) == null
+        && state.get('reviewCode', null) == null;
+    }
+
+    function hasValidQuoteRevisionSaveIntent(revisionId) {
+      let saveIntentId = request.resource.data.get('saveIntentId', null);
+      return saveIntentId == null || (
+        saveIntentId is string
+        && saveIntentId.size() > 0
+        && revisionId == 'intent_' + saveIntentId
+      );
     }
 
     match /users/{userId}/quotes/{quoteId}/revisions/{revisionId} {
       allow read: if isSignedIn() && (request.auth.uid == userId || isAdmin());
-      allow create: if isCrmFreeQuoteRevision() && (
+      allow create: if isCustomerSafeQuoteRevision()
+        && hasValidQuoteRevisionSaveIntent(revisionId)
+        && (
         isAdmin() || (
           isSignedIn()
           && request.auth.uid == userId
@@ -516,13 +645,7 @@ service cloud.firestore {
           && getAfter(/databases/$(database)/documents/users/$(userId)/quotes/$(quoteId)).data.get('crmDealId', null) == null
         )
       );
-      allow update: if isCrmFreeQuoteRevision() && (
-        isAdmin() || (
-          isSignedIn()
-          && request.auth.uid == userId
-          && get(/databases/$(database)/documents/users/$(userId)/quotes/$(quoteId)).data.get('crmDealId', null) == null
-        )
-      );
+      allow update: if false;
       allow delete: if isAdmin() || (
         isSignedIn()
         && request.auth.uid == userId

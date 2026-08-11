@@ -14,8 +14,7 @@ import { Button } from '../components/ui/Button';
 import { PageHeader } from '../components/ui/PageHeader';
 import { downloadBlob, saveBlobWithPicker } from '../utils/fileUtils';
 import { createQuotePdfBlob } from '../services/quotePdfService';
-import { quoteRepository } from '../services/quoteRepositoryClient';
-import { saveQuoteToRepository } from '../services/quoteSaveService';
+import { quoteSave } from '../services/quoteSaveService';
 import { safeLogActivity } from '../services/activityLogService';
 import { hasZeroDiscountSummary } from '../services/exportDataBuilders';
 import { normalizeExportLanguage } from '../services/exportLocalization';
@@ -50,6 +49,13 @@ interface PdfExportOptions {
     allowMissingQuoteNumber?: boolean;
 }
 
+interface PendingQuoteSaveRetry {
+    saveIntentId: string;
+    draftSignature: string;
+}
+
+const QUOTE_SAVE_RETRY_STORAGE_PREFIX = 'quote-generator:pending-save-retry:';
+
 const RETAILER_SAFE_CONTRACTING_WORK: QuoteState['contractingWork'] = {
     enabled: false,
     projectName: '',
@@ -63,6 +69,77 @@ const RETAILER_SAFE_CONTRACTING_WORK: QuoteState['contractingWork'] = {
         percent: 15
     }
 };
+
+function getQuoteSaveRetryStorageKey(userUid: string | null | undefined): string | null {
+    const normalizedUid = String(userUid || '').trim();
+    return normalizedUid ? `${QUOTE_SAVE_RETRY_STORAGE_PREFIX}${normalizedUid}` : null;
+}
+
+function buildQuoteSaveDraftSignature({
+    state,
+    ownerUid,
+    quoteId,
+    crmDealId,
+    retailerId
+}: {
+    state: QuoteState;
+    ownerUid: string;
+    quoteId: string | null;
+    crmDealId: string | null;
+    retailerId: string | null;
+}): string {
+    return JSON.stringify({ ownerUid, quoteId, crmDealId, retailerId, state });
+}
+
+function readMatchingQuoteSaveRetry(
+    userUid: string | null | undefined,
+    draftSignature: string,
+    storage: Storage | undefined = globalThis.sessionStorage
+): string | null {
+    const storageKey = getQuoteSaveRetryStorageKey(userUid);
+    if (!storageKey || !storage) return null;
+
+    try {
+        const raw = storage.getItem(storageKey);
+        if (!raw) return null;
+        const pending = JSON.parse(raw) as Partial<PendingQuoteSaveRetry>;
+        if (
+            typeof pending.saveIntentId === 'string'
+            && pending.saveIntentId.trim()
+            && pending.draftSignature === draftSignature
+        ) {
+            return pending.saveIntentId;
+        }
+        storage.removeItem(storageKey);
+    } catch (error) {
+        console.error('Failed to restore pending Quote Save retry:', error);
+        storage.removeItem(storageKey);
+    }
+    return null;
+}
+
+function persistQuoteSaveRetry(
+    userUid: string | null | undefined,
+    pending: PendingQuoteSaveRetry,
+    storage: Storage | undefined = globalThis.sessionStorage
+): void {
+    const storageKey = getQuoteSaveRetryStorageKey(userUid);
+    if (!storageKey || !storage) return;
+
+    try {
+        storage.setItem(storageKey, JSON.stringify(pending));
+    } catch (error) {
+        console.error('Failed to persist pending Quote Save retry:', error);
+    }
+}
+
+function clearQuoteSaveRetry(
+    userUid: string | null | undefined,
+    storage: Storage | undefined = globalThis.sessionStorage
+): void {
+    const storageKey = getQuoteSaveRetryStorageKey(userUid);
+    if (storageKey) storage?.removeItem(storageKey);
+}
 
 function sanitizeFileNamePart(value: string): string {
     return String(value || '')
@@ -161,7 +238,7 @@ export function SummaryExport({
     quoteOwnerUid = null
 }: SummaryExportProps) {
     const { state, dispatch } = useQuote();
-    const { user, retailer, isRetailer } = useAuth();
+    const { user, retailer, isRetailer, canViewEverything } = useAuth();
     const summaryData = useMemo(
         () => computeQuoteTotals({ state, catalogData }),
         [state]
@@ -175,6 +252,8 @@ export function SummaryExport({
     const [isSubmittingOrderRequest, setIsSubmittingOrderRequest] = useState(false);
     const [hasJustSubmittedOrderRequest, setHasJustSubmittedOrderRequest] = useState(false);
     const previewUrlRef = useRef<string>('');
+    const reopenedQuoteIdRef = useRef(state.activeQuoteId);
+    const attemptedReopenRepairRef = useRef<string | null>(null);
     const previewPdfRef = useRef<{
         blob: Blob;
         state: QuoteState;
@@ -318,6 +397,40 @@ export function SummaryExport({
     }, [canSubmitOrderRequest, state.activeQuoteId, state.activeQuoteVersion]);
 
     useEffect(() => {
+        const reopenedQuoteId = reopenedQuoteIdRef.current;
+        if (
+            !canViewEverything
+            || !user?.uid
+            || !state.activeQuoteId
+            || state.activeQuoteId !== reopenedQuoteId
+            || attemptedReopenRepairRef.current === reopenedQuoteId
+        ) return;
+
+        attemptedReopenRepairRef.current = reopenedQuoteId;
+
+        let cancelled = false;
+        void import('../services/quoteSaveService').then((module) => {
+            if (cancelled || typeof module.quoteSave?.repairCrm !== 'function') return;
+            return module.quoteSave.repairCrm({
+                actor: user,
+                quote: {
+                    ownerUid: quoteOwnerUid || user.uid || '',
+                    quoteId: state.activeQuoteId || ''
+                },
+                canManageAllQuotes: true
+            });
+        }).catch((error) => {
+            if (!cancelled) {
+                console.error('Failed to retry CRM repair when reopening Quote:', error);
+            }
+        });
+
+        return () => {
+            cancelled = true;
+        };
+    }, [canViewEverything, quoteOwnerUid, state.activeQuoteId, user]);
+
+    useEffect(() => {
         return () => {
             if (previewUrlRef.current) {
                 URL.revokeObjectURL(previewUrlRef.current);
@@ -457,15 +570,49 @@ export function SummaryExport({
 
         setIsSavingQuote(true);
         try {
-            const { saved, isNewQuote, statePatch } = await saveQuoteToRepository({
-                quoteRepository,
-                user,
+            const ownerUid = quoteOwnerUid || user?.uid || '';
+            const saveTarget = state.activeQuoteId
+                ? {
+                    kind: 'existing' as const,
+                    quote: {
+                        ownerUid,
+                        quoteId: state.activeQuoteId
+                    },
+                    crmDealId
+                }
+                : { kind: 'new' as const, crmDealId };
+            const draftSignature = buildQuoteSaveDraftSignature({
+                state: effectiveState,
+                ownerUid,
+                quoteId: state.activeQuoteId || null,
+                crmDealId,
+                retailerId: retailer?.id || null
+            });
+            const retrySaveIntentId = readMatchingQuoteSaveRetry(user?.uid, draftSignature);
+            const outcome = await quoteSave.save({
+                actor: user,
                 retailer,
                 state: effectiveState,
-                summary: summaryData,
-                crmDealId,
-                quoteOwnerUid
+                target: saveTarget,
+                canManageAllQuotes: canViewEverything,
+                retrySaveIntentId
             });
+
+            if ('status' in outcome && outcome.status === 'not-saved') {
+                if (outcome.retry?.saveIntentId) {
+                    persistQuoteSaveRetry(user?.uid, {
+                        saveIntentId: outcome.retry.saveIntentId,
+                        draftSignature
+                    });
+                } else {
+                    clearQuoteSaveRetry(user?.uid);
+                }
+                notifyError(`Kunde inte spara offerten: ${outcome.failure.message}`);
+                return;
+            }
+
+            clearQuoteSaveRetry(user?.uid);
+            const { isNewQuote, statePatch } = outcome;
             const saveStatePatch: SavedQuoteStatePatch = statePatch;
 
             dispatch({
@@ -473,53 +620,15 @@ export function SummaryExport({
                 payload: saveStatePatch
             });
 
-            const linkedCrmDealId = crmDealId || saved.metadata?.crmDealId || null;
-            if (linkedCrmDealId && user?.uid && saveStatePatch.activeQuoteId) {
-                try {
-                    const { syncCrmDealFromQuote } = await import('../services/crmQuoteWorkflow');
-                    await syncCrmDealFromQuote({
-                        metadata: {
-                            quoteId: saveStatePatch.activeQuoteId,
-                            quoteNumber: saved.metadata?.quoteNumber ?? saveStatePatch.quoteNumber ?? null,
-                            latestRevisionId: saved.metadata?.latestRevisionId || '',
-                            latestVersion: saved.metadata?.latestVersion || saveStatePatch.activeQuoteVersion || 1,
-                            totalSek: saved.metadata?.totalSek ?? summaryData.finalTotalSek ?? 0,
-                            status: saved.metadata?.status || saveStatePatch.quoteStatus || 'draft',
-                            crmDealId: linkedCrmDealId
-                        },
-                        quoteOwnerUid: quoteOwnerUid || user.uid,
-                        actor: {
-                            uid: user.uid,
-                            email: user.email || ''
-                        }
-                    });
-                } catch (crmError) {
-                    console.error('Failed to synchronize saved quote with CRM:', crmError);
-                    notifyWarn('Offerten sparades, men CRM-affären kunde inte uppdateras. Försök spara igen.');
-                }
-            }
-
-            void safeLogActivity({
-                user,
-                eventType: isNewQuote ? 'quote_created' : 'quote_revision_saved',
-                system: 'quote',
-                targetType: isNewQuote ? 'quote' : 'revision',
-                targetId: saveStatePatch.activeQuoteId || saved?.quoteId || 'unknown_quote',
-                details: isNewQuote
-                    ? 'Offert skapad och sparad i Mina Offerter.'
-                    : `Offerten sparades som version ${saveStatePatch.activeQuoteVersion}.`,
-                metadata: {
-                    version: saveStatePatch.activeQuoteVersion || null,
-                    customerName: getActivityCustomerLabel(state.customerInfo),
-                    reference: state.customerInfo.reference || '',
-                    totalSek: summaryData.finalTotalSek || 0
-                }
-            }).then((result) => warnIfActivityLogFailed(result, 'Offerten sparades, men aktivitetsloggen kunde inte uppdateras.'));
-
             if (isNewQuote) {
                 notifySuccess('Offerten sparades i Mina Offerter.');
             } else {
                 notifySuccess(`Offerten sparades som version ${saveStatePatch.activeQuoteVersion}.`);
+            }
+            if ('status' in outcome && outcome.status === 'saved-needs-crm-repair') {
+                notifyWarn(outcome.crm.status === 'relink-required'
+                    ? 'Offerten sparades. CRM-länken kräver ett uttryckligt beslut om omkoppling.'
+                    : 'Offerten sparades. CRM-synkroniseringen repareras automatiskt.');
             }
         } catch (error) {
             console.error('Failed to save quote:', error);

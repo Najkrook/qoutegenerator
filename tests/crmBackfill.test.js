@@ -224,7 +224,9 @@ describe('CRM Firebase configuration', () => {
         expect(rules).toContain('function hasRecognizedRole()');
         expect(rules).toContain('!hasRecognizedRole()');
         expect(rules).toContain('existsAfter(/databases/$(database)/documents/users/$(userId)/quotes/$(quoteId))');
-        expect(rules).toContain("request.resource.data.get('state', {}).get('crmDealId', null) == null");
+        expect(rules).toContain('function isCustomerSafeQuoteRevision()');
+        expect(rules).toContain("state.get('crmDealId', null) == null");
+        expect(rules).toContain("state.get('internalMargins', null) == null");
         expect(rules).toContain('match /{document=**}');
         expect(rules).toContain('allow read, write: if false;');
     });

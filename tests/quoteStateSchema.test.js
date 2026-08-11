@@ -75,12 +75,75 @@ describe('quoteStateSchema', () => {
         const hydrated = hydrateQuoteState({
             customerInfo: { name: 'Ada' },
             crmDealId: 'deal-should-not-persist',
-            quoteOwnerUid: 'owner-should-not-persist'
+            quoteOwnerUid: 'owner-should-not-persist',
+            crmSynchronizationIssue: { dealId: 'deal-1' },
+            ownerRoutingData: { ownerUid: 'owner-1' },
+            saveIntentId: 'save-1',
+            internalMargins: { BaHaMa: 50 }
         });
 
         expect(hydrated.customerInfo.name).toBe('Ada');
         expect(hydrated).not.toHaveProperty('crmDealId');
         expect(hydrated).not.toHaveProperty('quoteOwnerUid');
+        expect(hydrated).not.toHaveProperty('crmSynchronizationIssue');
+        expect(hydrated).not.toHaveProperty('ownerRoutingData');
+        expect(hydrated).not.toHaveProperty('saveIntentId');
+        expect(hydrated).not.toHaveProperty('internalMargins');
+    });
+
+    it('drops unknown and recursively nested private fields during hydration', () => {
+        const hydrated = hydrateQuoteState({
+            unknownTopLevel: { harmless: true },
+            costPrice: 123,
+            grossProfit: 456,
+            actualMargin: 78,
+            reviewCode: 'internal-review',
+            customerInfo: {
+                name: 'Ada',
+                unknownCustomerField: 'drop-me',
+                internalMargins: { BaHaMa: 55 }
+            },
+            builderItems: [{
+                id: 'item-1',
+                line: 'BaHaMa',
+                model: 'Jumbrella',
+                size: '4x4 Kvadrat',
+                qty: 1,
+                discountPct: 0,
+                addons: [],
+                crmRoutingMetadata: { dealId: 'deal-1' },
+                unknownBuilderField: 'drop-me'
+            }],
+            gridSelections: {
+                ClickitUp: {
+                    items: {},
+                    addons: {},
+                    customAddonsByCategory: {},
+                    ownerRoutingData: { ownerUid: 'owner-1' },
+                    unknownGridField: 'drop-me'
+                }
+            },
+            sketchDraft: {
+                config: { width: 9000, estimatedCostSek: 12345 },
+                workspace: { actualMarginPct: 42 }
+            },
+            inventoryBasket: [{ id: 'basket-row', marginsByLine: { BaHaMa: 55 } }]
+        });
+
+        expect(hydrated).not.toHaveProperty('unknownTopLevel');
+        expect(hydrated).not.toHaveProperty('costPrice');
+        expect(hydrated).not.toHaveProperty('grossProfit');
+        expect(hydrated).not.toHaveProperty('actualMargin');
+        expect(hydrated).not.toHaveProperty('reviewCode');
+        expect(hydrated.customerInfo).not.toHaveProperty('unknownCustomerField');
+        expect(hydrated.customerInfo).not.toHaveProperty('internalMargins');
+        expect(hydrated.builderItems[0]).not.toHaveProperty('crmRoutingMetadata');
+        expect(hydrated.builderItems[0]).not.toHaveProperty('unknownBuilderField');
+        expect(hydrated.gridSelections.ClickitUp).not.toHaveProperty('ownerRoutingData');
+        expect(hydrated.gridSelections.ClickitUp).not.toHaveProperty('unknownGridField');
+        expect(hydrated.sketchDraft.config).not.toHaveProperty('estimatedCostSek');
+        expect(hydrated.sketchDraft.workspace).not.toHaveProperty('actualMarginPct');
+        expect(hydrated.inventoryBasket[0]).not.toHaveProperty('marginsByLine');
     });
 
     it('migrates v3 state with safe contracting-work defaults', () => {

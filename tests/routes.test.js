@@ -18,7 +18,9 @@ import {
     hasQuoteStartDraftData,
     hasRetailerStartDraftData,
     parseSketchReturnTarget,
-    resolveLoginRedirectTarget
+    readQuoteRouteContext,
+    resolveLoginRedirectTarget,
+    withQuoteRouteContext
 } from '../src/navigation/routes';
 import { createInitialQuoteState } from '../src/store/quoteStateSchema';
 
@@ -28,6 +30,18 @@ describe('navigation routes', () => {
         expect(getQuoteStepPath('configuration')).toBe('/quote/new/configuration');
         expect(getQuoteStepPath('pricing')).toBe('/quote/new/pricing');
         expect(getQuoteStepPath('summary')).toBe('/quote/new/summary');
+    });
+
+    it('serializes CRM and owner quote context through one route helper', () => {
+        expect(readQuoteRouteContext('?quoteOwnerUid=owner-1&crmDealId=deal-1')).toEqual({
+            crmDealId: 'deal-1',
+            quoteOwnerUid: 'owner-1'
+        });
+        expect(withQuoteRouteContext('/quote/new/summary', {
+            crmDealId: 'deal/1',
+            quoteOwnerUid: 'owner 1'
+        })).toBe('/quote/new/summary?crmDealId=deal%2F1&quoteOwnerUid=owner+1');
+        expect(withQuoteRouteContext('/quote/new/summary', {})).toBe('/quote/new/summary');
     });
 
     it('maps access-controlled routes back to dashboard when access is missing', () => {
@@ -216,11 +230,49 @@ describe('navigation routes', () => {
                 }
             }
         };
+        const customItemsState = {
+            ...emptyState,
+            gridSelections: {
+                BaHaMa: {
+                    items: {},
+                    addons: {},
+                    customAddonsByCategory: {},
+                    customItems: [{ id: 'custom-1', name: 'Specialprodukt' }]
+                }
+            }
+        };
+        const customAddonsState = {
+            ...emptyState,
+            gridSelections: {
+                BaHaMa: {
+                    items: {},
+                    addons: {},
+                    customItems: [],
+                    customAddonsByCategory: {
+                        special: [{ id: 'custom-addon-1', name: 'Specialtillval' }]
+                    }
+                }
+            }
+        };
+        const emptyGridState = {
+            ...emptyState,
+            gridSelections: {
+                BaHaMa: {
+                    items: {},
+                    addons: {},
+                    customItems: [],
+                    customAddonsByCategory: { special: [] }
+                }
+            }
+        };
 
         expect(hasConfiguredQuoteSelections(emptyState)).toBe(false);
         expect(hasConfiguredQuoteSelections({ ...emptyState, selectedLines: ['BaHaMa'] })).toBe(false);
+        expect(hasConfiguredQuoteSelections(emptyGridState)).toBe(false);
         expect(hasConfiguredQuoteSelections(builderState)).toBe(true);
         expect(hasConfiguredQuoteSelections(gridState)).toBe(true);
+        expect(hasConfiguredQuoteSelections(customItemsState)).toBe(true);
+        expect(hasConfiguredQuoteSelections(customAddonsState)).toBe(true);
     });
 
     it('resolves the retailer resume quote step from saved step and draft contents', () => {

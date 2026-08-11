@@ -122,7 +122,10 @@ vi.mock('../src/services/quoteRepositoryClient', () => ({
 }));
 
 vi.mock('../src/services/quoteSaveService', () => ({
-    saveQuoteToRepository: vi.fn()
+    quoteSave: {
+        save: vi.fn(),
+        repairCrm: vi.fn()
+    }
 }));
 
 vi.mock('../src/services/retailerDocumentService', () => ({
