@@ -1,17 +1,15 @@
 import type {
+    ContractingWorkState,
     ContractingWorkSummary,
     CustomerInfo,
-    ExportSummaryInput,
-    ExportSummaryResult,
-    ExportSummaryState,
     PdfTableOptions,
     PdfTableRow,
-    QuoteState,
+    QuoteExportLanguage,
+    QuoteTotalsResult,
     QuoteTotalsRow
 } from '../types/contracts';
 import type { PreparedQuote } from './quotePreparation';
 import { applyVat } from '../utils/vatHelper';
-import { calculateContractingWorkSummary } from './contractingWork';
 import {
     formatLocalizedValidityPeriod,
     getExportLabels,
@@ -20,12 +18,23 @@ import {
 
 type WorksheetCell = string | number;
 type WorksheetRow = WorksheetCell[];
-type ExportStateWithContracting = ExportSummaryState & Partial<Pick<QuoteState, 'contractingWork'>> & {
+type ExportStateWithContracting = {
+    customerInfo?: Partial<CustomerInfo>;
+    exportLanguage?: QuoteExportLanguage;
+    includesVat?: boolean;
+    globalDiscountPct?: number;
+    contractingWork?: ContractingWorkState;
     hideDiscountReferences?: boolean;
 };
 
 interface PreparedExcelValues {
-    productTotals: ExportSummaryResult;
+    productTotals: {
+        finalTotalSek: number;
+        grossTotalSek: number;
+        totalDiscountSek: number;
+        vatAmount: number;
+        totalWithVat: number;
+    };
     contractingSummary: Pick<ContractingWorkSummary,
         | 'customerRows'
         | 'baseTotalSek'
@@ -41,51 +50,14 @@ function roundSek(value: number | string | null | undefined): number {
     return Math.round(Number(value) || 0);
 }
 
-function safeCustomerInfo(state: ExportSummaryState): Partial<CustomerInfo> {
+function safeCustomerInfo(state: ExportStateWithContracting): Partial<CustomerInfo> {
     return state.customerInfo || {};
 }
 
-function isZeroNumber(value: number | string | null | undefined): boolean {
-    return Number(value) === 0;
-}
-
-export function buildExportSummary(
-    state: ExportSummaryState = {},
-    summaryData: ExportSummaryInput = {}
-): ExportSummaryResult {
-    const finalTotalSek = Number(summaryData.finalTotalSek) || 0;
-    const grossTotalSek = Number(summaryData.grossTotalSek) || 0;
-    const totalDiscountSek = Number(summaryData.totalDiscountSek) || 0;
-    const vatAmount = state.includesVat ? finalTotalSek * 0.25 : 0;
-    const totalWithVat = finalTotalSek + vatAmount;
-
-    return {
-        finalTotalSek,
-        grossTotalSek,
-        totalDiscountSek,
-        vatAmount,
-        totalWithVat
-    };
-}
-
-export function hasZeroDiscountSummary(summaryData: ExportSummaryInput = {}): boolean {
-    const totals = Array.isArray(summaryData?.totals) ? summaryData.totals : [];
-    return isZeroNumber(summaryData?.totalDiscountSek) && totals.every((row) => (
-        isZeroNumber(row?.discountPct) && isZeroNumber(row?.discountSek)
-    ));
-}
-
-export function shouldHideDiscountReferencesInPdf(
-    state: ExportSummaryState = {},
-    summaryData: ExportSummaryInput = {}
-): boolean {
-    return state?.hideZeroDiscountReferencesInPdf === true && hasZeroDiscountSummary(summaryData);
-}
-
 function buildExcelSheetDataInternal(
-    state: ExportStateWithContracting = {},
-    summaryData: ExportSummaryInput = {},
-    preparedValues?: PreparedExcelValues
+    state: ExportStateWithContracting,
+    summaryData: Partial<QuoteTotalsResult>,
+    preparedValues: PreparedExcelValues
 ): WorksheetRow[] {
     const customerInfo = safeCustomerInfo(state);
     const labels = getExportLabels(state.exportLanguage);
@@ -94,9 +66,8 @@ function buildExcelSheetDataInternal(
     const discountPctLabel = labels.discountPct.replace(/\n/g, ' ');
     const productRows = Array.isArray(summaryData.totals) ? summaryData.totals : [];
     const hideDiscountReferences = state.hideDiscountReferences === true;
-    const contractingSummary = preparedValues?.contractingSummary
-        ?? calculateContractingWorkSummary(state.contractingWork);
-    const totals = preparedValues?.productTotals ?? buildExportSummary(state, summaryData);
+    const contractingSummary = preparedValues.contractingSummary;
+    const totals = preparedValues.productTotals;
     const hasContractingWork = contractingSummary.customerRows.length > 0;
     const shouldRenderProductSection = productRows.length > 0 || !hasContractingWork;
     const wsData: WorksheetRow[] = [
@@ -269,13 +240,6 @@ function buildExcelSheetDataInternal(
     return wsData;
 }
 
-export function buildExcelSheetData(
-    state: ExportStateWithContracting = {},
-    summaryData: ExportSummaryInput = {}
-): WorksheetRow[] {
-    return buildExcelSheetDataInternal(state, summaryData);
-}
-
 export function buildPreparedExcelSheetData(prepared: PreparedQuote): WorksheetRow[] {
     const productTotals = prepared.commercial.productTotals;
     const contractingWork = prepared.commercial.contractingWork;
@@ -290,7 +254,15 @@ export function buildPreparedExcelSheetData(prepared: PreparedQuote): WorksheetR
             ataEnabled: contractingWork.ataEnabled,
             ataPercent: contractingWork.ataPercent
         }
-        : calculateContractingWorkSummary(undefined);
+        : {
+            customerRows: [],
+            baseTotalSek: 0,
+            allowanceSek: 0,
+            lowerIndicativeSek: 0,
+            upperIndicativeSek: 0,
+            ataEnabled: false,
+            ataPercent: 0
+        };
 
     const preparedRows = prepared.commercial.productRows.map((row, index) => ({
         ...row,

@@ -1275,10 +1275,6 @@ export interface PlannerProjectDetailsPatch {
     [key: `${string}.${string}`]: string | undefined;
 }
 
-export interface TermsAndPaymentPanelProps {
-    summaryData: QuoteTotalsResult;
-}
-
 export interface ErrorBoundaryProps {
     children?: ReactNode;
     resetHref?: string;

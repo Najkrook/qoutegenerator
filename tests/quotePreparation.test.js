@@ -104,6 +104,7 @@ describe('prepareQuote', () => {
         expect(result.presentation).toEqual({
             exportLanguage: 'sv',
             pdfThemeId: 'brixx',
+            allowedPdfThemeIds: ['brixx', 'custom', 'roslagsmarkisen'],
             equivalenceKey: expect.any(String)
         });
         expect(result.commercial).toEqual({
@@ -164,6 +165,7 @@ describe('prepareQuote', () => {
         });
         expect(result.visibility).toEqual({
             contractingWork: 'visible',
+            discountReferenceEligibility: 'ineligible',
             discountReferences: 'visible',
             legalTerms: 'visible',
             paymentBox: 'visible',
@@ -179,31 +181,51 @@ describe('prepareQuote', () => {
             name: 'unsupported language falls back to Swedish',
             state: { exportLanguage: 'de' },
             audience: {},
-            expected: { exportLanguage: 'sv', pdfThemeId: 'brixx' }
+            expected: {
+                exportLanguage: 'sv',
+                pdfThemeId: 'brixx',
+                allowedPdfThemeIds: ['brixx', 'custom', 'roslagsmarkisen']
+            }
         },
         {
             name: 'internal users may use every supported theme',
             state: { exportLanguage: 'en', pdfThemeId: 'roslagsmarkisen' },
             audience: {},
-            expected: { exportLanguage: 'en', pdfThemeId: 'roslagsmarkisen' }
+            expected: {
+                exportLanguage: 'en',
+                pdfThemeId: 'roslagsmarkisen',
+                allowedPdfThemeIds: ['brixx', 'custom', 'roslagsmarkisen']
+            }
         },
         {
             name: 'retailers may use an assigned theme',
             state: { pdfThemeId: 'roslagsmarkisen' },
             audience: { isRetailer: true, allowedPdfThemes: ['roslagsmarkisen'] },
-            expected: { exportLanguage: 'sv', pdfThemeId: 'roslagsmarkisen' }
+            expected: {
+                exportLanguage: 'sv',
+                pdfThemeId: 'roslagsmarkisen',
+                allowedPdfThemeIds: ['brixx', 'roslagsmarkisen']
+            }
         },
         {
             name: 'retailer unauthorized themes fall back to the default',
             state: { pdfThemeId: 'custom' },
             audience: { isRetailer: true, allowedPdfThemes: [] },
-            expected: { exportLanguage: 'sv', pdfThemeId: 'brixx' }
+            expected: {
+                exportLanguage: 'sv',
+                pdfThemeId: 'brixx',
+                allowedPdfThemeIds: ['brixx']
+            }
         },
         {
             name: 'missing themes fall back to the default',
             state: { pdfThemeId: null },
             audience: { isRetailer: true, allowedPdfThemes: ['roslagsmarkisen'] },
-            expected: { exportLanguage: 'sv', pdfThemeId: 'brixx' }
+            expected: {
+                exportLanguage: 'sv',
+                pdfThemeId: 'brixx',
+                allowedPdfThemeIds: ['brixx', 'roslagsmarkisen']
+            }
         }
     ])('$name', ({ state, audience, expected }) => {
         const result = prepare({ state, audience });
@@ -255,7 +277,8 @@ describe('prepareQuote', () => {
                 totalDiscountSek: 0,
                 finalTotalSek: 2000
             },
-            expected: 'hidden-zero'
+            expected: 'hidden-zero',
+            eligibility: 'eligible-zero'
         },
         {
             name: 'zero-discount references remain visible without the preference',
@@ -265,13 +288,15 @@ describe('prepareQuote', () => {
                 totalDiscountSek: 0,
                 finalTotalSek: 2000
             },
-            expected: 'visible'
+            expected: 'visible',
+            eligibility: 'eligible-zero'
         },
         {
             name: 'non-zero discount references remain visible despite the preference',
             state: { hideZeroDiscountReferencesInPdf: true },
             totals: {},
-            expected: 'visible'
+            expected: 'visible',
+            eligibility: 'ineligible'
         },
         {
             name: 'discount references remain visible when no product row qualifies',
@@ -282,10 +307,14 @@ describe('prepareQuote', () => {
                 totalDiscountSek: 0,
                 finalTotalSek: 0
             },
-            expected: 'visible'
+            expected: 'visible',
+            eligibility: 'ineligible'
         }
-    ])('$name', ({ state, totals, expected }) => {
-        expect(prepare({ state, totals }).visibility.discountReferences).toBe(expected);
+    ])('$name', ({ state, totals, expected, eligibility }) => {
+        const visibility = prepare({ state, totals }).visibility;
+
+        expect(visibility.discountReferences).toBe(expected);
+        expect(visibility.discountReferenceEligibility).toBe(eligibility);
     });
 
     it('retains explicit price-on-request meaning instead of treating it as an ordinary zero-priced row', () => {

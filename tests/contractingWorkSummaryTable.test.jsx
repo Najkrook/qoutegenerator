@@ -1,9 +1,9 @@
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { ContractingWorkSummaryTable } from '../src/components/features/ContractingWorkSummaryTable';
-import { QuoteContext } from '../src/store/QuoteContext';
 import { createInitialQuoteState } from '../src/store/quoteStateSchema';
+import { prepareQuote } from '../src/services/quotePreparation';
 
 function renderContractingSummary(overrides = {}) {
     const state = {
@@ -34,11 +34,26 @@ function renderContractingSummary(overrides = {}) {
         ...overrides
     };
 
-    return renderToStaticMarkup(
-        <QuoteContext.Provider value={{ state, dispatch: vi.fn() }}>
-            <ContractingWorkSummaryTable />
-        </QuoteContext.Provider>
-    );
+    const prepared = prepareQuote({
+        state,
+        totals: {
+            totals: [],
+            grossTotalSek: 0,
+            totalDiscountSek: 0,
+            finalTotalSek: 0,
+            globalDiscountAmt: 0
+        },
+        audience: { isRetailer: false }
+    });
+
+    return prepared.commercial.contractingWork
+        ? renderToStaticMarkup(
+            <ContractingWorkSummaryTable
+                contractingWork={prepared.commercial.contractingWork}
+                exportLanguage={prepared.presentation.exportLanguage}
+            />
+        )
+        : '';
 }
 
 describe('ContractingWorkSummaryTable', () => {

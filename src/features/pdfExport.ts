@@ -1,9 +1,5 @@
 import { jsPDF } from 'jspdf';
 import { notifyWarn, notifyError } from '../services/notificationService';
-import {
-    buildExportSummary,
-    shouldHideDiscountReferencesInPdf
-} from '../services/exportDataBuilders';
 import { calculateContractingWorkSummary } from '../services/contractingWork';
 import type { CustomerInfo, QuoteState, QuoteTotalsResult } from '../types/contracts';
 import {
@@ -27,7 +23,10 @@ type PdfExportState = Partial<QuoteState> & {
     customerInfo?: Partial<CustomerInfo>;
 };
 
-type PdfSummaryData = Partial<QuoteTotalsResult>;
+type PdfSummaryData = Partial<QuoteTotalsResult> & {
+    vatAmountSek?: number;
+    totalWithVatSek?: number;
+};
 
 type JsPdfDocument = InstanceType<typeof jsPDF>;
 
@@ -102,12 +101,9 @@ export function generatePDF(
         const pageHeight = doc.internal.pageSize.height;
         const customerInfo: Partial<CustomerInfo> = state.customerInfo || {};
         const quoteDate = customerInfo.date || new Date().toLocaleDateString('sv-SE');
-        const pdfLegalTemplatesEnabled = typeof window === 'undefined'
-            ? true
-            : window.FEATURE_PDF_LEGAL_TEMPLATES !== false;
-        const shouldRenderPaymentBox = pdfLegalTemplatesEnabled && state.includePaymentBox !== false;
-        const shouldRenderSignatureBlock = pdfLegalTemplatesEnabled && state.includeSignatureBlock !== false;
-        const hideDiscountReferences = shouldHideDiscountReferencesInPdf(state, summaryData);
+        const shouldRenderPaymentBox = state.includePaymentBox === true;
+        const shouldRenderSignatureBlock = state.includeSignatureBlock === true;
+        const hideDiscountReferences = state.hideZeroDiscountReferencesInPdf === true;
         const validUntilDate = computeValidUntilDateString(customerInfo.date, state.quoteValidityDays);
         const activeLayout = getPdfLayout(state.pdfThemeId);
         const exportLanguage = state.exportLanguage || 'sv';
@@ -153,7 +149,14 @@ export function generatePDF(
             notifyWarn('Avancerad PDF-tabell saknas. Exporterar med enkel layout.');
         }
 
-        const exportSummary = buildExportSummary(state, summaryData);
+        const finalTotalSek = summaryData.finalTotalSek || 0;
+        const exportSummary = {
+            finalTotalSek,
+            grossTotalSek: summaryData.grossTotalSek || 0,
+            totalDiscountSek: summaryData.totalDiscountSek || 0,
+            vatAmount: summaryData.vatAmountSek || 0,
+            totalWithVat: summaryData.totalWithVatSek ?? finalTotalSek
+        };
         const totalsState = {
             ...state,
             hideDiscountReferences,

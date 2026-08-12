@@ -1,4 +1,4 @@
-import { DEFAULT_PDF_THEME_ID, normalizePdfThemeId } from '../config/pdfThemes';
+import { DEFAULT_PDF_THEME_ID, PDF_THEME_OPTIONS, normalizePdfThemeId } from '../config/pdfThemes';
 import type {
     BuilderAddon,
     BuilderItem,
@@ -69,6 +69,7 @@ export interface PreparedQuote {
     presentation: {
         exportLanguage: QuoteExportLanguage;
         pdfThemeId: PdfThemeId;
+        allowedPdfThemeIds: PdfThemeId[];
         equivalenceKey: string;
     };
     commercial: {
@@ -108,6 +109,7 @@ export interface PreparedQuote {
     };
     visibility: {
         contractingWork: 'visible' | 'absent' | 'suppressed-retailer';
+        discountReferenceEligibility: 'eligible-zero' | 'ineligible';
         discountReferences: 'visible' | 'hidden-zero';
         legalTerms: 'visible' | 'hidden';
         paymentBox: 'visible' | 'hidden';
@@ -379,11 +381,16 @@ function createPersistenceSnapshot(
 function normalizePresentation(state: QuoteState, audience: QuotePreparationAudience): {
     exportLanguage: QuoteExportLanguage;
     pdfThemeId: PdfThemeId;
+    allowedPdfThemeIds: PdfThemeId[];
 } {
     const exportLanguage = normalizeExportLanguage(state.exportLanguage);
     const requestedTheme = normalizePdfThemeId(state.pdfThemeId);
     if (!audience.isRetailer) {
-        return { exportLanguage, pdfThemeId: requestedTheme };
+        return {
+            exportLanguage,
+            pdfThemeId: requestedTheme,
+            allowedPdfThemeIds: PDF_THEME_OPTIONS.map((option) => option.id)
+        };
     }
 
     const allowedThemes = new Set<PdfThemeId>([DEFAULT_PDF_THEME_ID]);
@@ -396,7 +403,8 @@ function normalizePresentation(state: QuoteState, audience: QuotePreparationAudi
 
     return {
         exportLanguage,
-        pdfThemeId: allowedThemes.has(requestedTheme) ? requestedTheme : DEFAULT_PDF_THEME_ID
+        pdfThemeId: allowedThemes.has(requestedTheme) ? requestedTheme : DEFAULT_PDF_THEME_ID,
+        allowedPdfThemeIds: [...allowedThemes]
     };
 }
 
@@ -582,8 +590,9 @@ export function prepareQuote({
     );
     const productTotals = validateAndPrepareProductTotals(state, totals, productRows);
     const contractingWork = prepareContractingWork(state, audience);
+    const canHideDiscountReferences = hasOnlyZeroDiscounts(productRows, productTotals.totalDiscountSek);
     const discountReferences: PreparedQuote['visibility']['discountReferences'] = state.hideZeroDiscountReferencesInPdf === true
-        && hasOnlyZeroDiscounts(productRows, productTotals.totalDiscountSek)
+        && canHideDiscountReferences
         ? 'hidden-zero'
         : 'visible';
     const customerInfo = cloneCustomerInfo(state.customerInfo);
@@ -595,7 +604,10 @@ export function prepareQuote({
         effectiveQuoteDate
     );
     const preparedMeaning = {
-        presentation: normalizedPresentation,
+        presentation: {
+            exportLanguage: normalizedPresentation.exportLanguage,
+            pdfThemeId: normalizedPresentation.pdfThemeId
+        },
         commercial: {
             productRows,
             productTotals,
@@ -627,6 +639,7 @@ export function prepareQuote({
                 : contractingWork
                     ? 'visible' as const
                     : 'absent' as const,
+            discountReferenceEligibility: canHideDiscountReferences ? 'eligible-zero' as const : 'ineligible' as const,
             discountReferences,
             legalTerms: state.includeTerms === true ? 'visible' as const : 'hidden' as const,
             paymentBox: state.includePaymentBox === true ? 'visible' as const : 'hidden' as const,
@@ -698,8 +711,12 @@ export function restorePreparedQuote({
     }
 
     const isRetailer = snapshot.visibility.contractingWork === 'suppressed-retailer';
-    const presentation = { ...snapshot.presentation };
+    const presentation = {
+        ...snapshot.presentation,
+        allowedPdfThemeIds: [snapshot.presentation.pdfThemeId]
+    };
     const customerInfo = cloneCustomerInfo(state.customerInfo);
+    customerInfo.date = snapshot.effectiveQuoteDate;
     const productRows: PreparedQuoteProductRow[] = snapshot.productRows.map((row, index) => ({
         ...row,
         source: { type: 'custom', index },
@@ -744,12 +761,21 @@ export function restorePreparedQuote({
     };
     const visibility: PreparedQuote['visibility'] = {
         contractingWork: snapshot.visibility.contractingWork,
+        discountReferenceEligibility: hasOnlyZeroDiscounts(
+            productRows,
+            snapshot.productTotals.totalDiscountSek
+        ) ? 'eligible-zero' : 'ineligible',
         discountReferences: snapshot.visibility.discountReferences,
         legalTerms: state.includeTerms === true ? 'visible' : 'hidden',
         paymentBox: state.includePaymentBox === true ? 'visible' : 'hidden',
         signatureBlock: state.includeSignatureBlock === true ? 'visible' : 'hidden'
     };
-    const preparedMeaning = { presentation, commercial, agreement, visibility };
+    const preparedMeaning = {
+        presentation: snapshot.presentation,
+        commercial,
+        agreement,
+        visibility
+    };
 
     return deepFreeze({
         presentation: {

@@ -285,26 +285,6 @@ describe('pdfExport helpers', () => {
         expect(pdfMockState.autoTableCalls[0].body[0][2]).toBe('Price on request');
     });
 
-    it('ignores the hide flag when discounts are present in the quote', () => {
-        const state = createStateFixture({
-            includeTerms: false,
-            includePaymentBox: false,
-            includeSignatureBlock: false,
-            hideZeroDiscountReferencesInPdf: true
-        });
-        const summary = computeQuoteTotals({
-            state,
-            catalogData: createCatalogFixture()
-        });
-
-        const pdfBlob = generatePDF(state, summary, true);
-
-        expect(pdfBlob).toBeInstanceOf(Blob);
-        expect(pdfMockState.autoTableCalls[0].head[0].some((h) => h.includes('Rabatt\ni SEK'))).toBe(true);
-        expect(pdfMockState.autoTableCalls[0].head[0]).toContain('Rabatt\ni %');
-        expect(pdfMockState.textCalls.map((call) => call.value).some((t) => t.includes('Total Rabatt'))).toBe(true);
-    });
-
     it('includes custom builder add-ons in the generated PDF table body', () => {
         const state = createZeroDiscountState({
             builderItems: [

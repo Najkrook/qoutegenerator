@@ -1,27 +1,31 @@
 import React, { type ChangeEvent } from 'react';
 import { useQuote } from '../../store/QuoteContext';
-import { catalogData } from '../../data/catalog';
-import { computeQuoteTotals } from '../../services/calculationEngine';
 import { applyVat } from '../../utils/vatHelper';
-import { hasZeroDiscountSummary } from '../../services/exportDataBuilders';
 import {
     getExportLabels,
-    normalizeExportLanguage,
     translateQuoteTotalsRowModel
 } from '../../services/exportLocalization';
+import type { PreparedQuote } from '../../services/quotePreparation';
 
 interface FinalSummaryTableProps {
     isMixedOffer?: boolean;
+    preparedQuote: PreparedQuote;
 }
 
-export function FinalSummaryTable({ isMixedOffer = false }: FinalSummaryTableProps) {
+export function FinalSummaryTable({ isMixedOffer = false, preparedQuote }: FinalSummaryTableProps) {
     const { state, dispatch } = useQuote();
-    const summaryData = computeQuoteTotals({
-        state,
-        catalogData
-    });
-    const { totals, grossTotalSek, totalDiscountSek, finalTotalSek, globalDiscountAmt } = summaryData;
-    const exportLanguage = normalizeExportLanguage(state.exportLanguage);
+    const totals = preparedQuote.commercial.productRows;
+    const {
+        grossTotalSek,
+        totalDiscountSek,
+        finalTotalSek,
+        globalDiscountAmt,
+        globalDiscountPct,
+        includesVat,
+        vatAmountSek,
+        totalWithVatSek
+    } = preparedQuote.commercial.productTotals;
+    const exportLanguage = preparedQuote.presentation.exportLanguage;
     const labels = getExportLabels(exportLanguage);
     const summaryLabels = exportLanguage === 'en'
         ? labels
@@ -40,13 +44,10 @@ export function FinalSummaryTable({ isMixedOffer = false }: FinalSummaryTablePro
         return null;
     }
 
-    const canHideDiscountReferences = hasZeroDiscountSummary(summaryData);
-    const hideZeroDiscount = state.hideZeroDiscountReferencesInPdf === true && canHideDiscountReferences;
+    const canHideDiscountReferences = preparedQuote.visibility.discountReferenceEligibility === 'eligible-zero';
+    const hideZeroDiscount = preparedQuote.visibility.discountReferences === 'hidden-zero';
 
     const formatSek = (value: number): string => Math.round(value).toLocaleString('sv-SE');
-
-    const vatAmount = state.includesVat ? finalTotalSek * 0.25 : 0;
-    const totalWithVat = finalTotalSek + vatAmount;
 
     return (
         <div className="space-y-6">
@@ -71,7 +72,7 @@ export function FinalSummaryTable({ isMixedOffer = false }: FinalSummaryTablePro
                 <label className="flex items-center gap-2 cursor-pointer select-none">
                     <input
                         type="checkbox"
-                        checked={state.includesVat}
+                        checked={includesVat}
                         onChange={(event: ChangeEvent<HTMLInputElement>) => dispatch({
                             type: 'SET_INCLUDES_VAT',
                             payload: event.target.checked
@@ -89,14 +90,14 @@ export function FinalSummaryTable({ isMixedOffer = false }: FinalSummaryTablePro
                             <th className="p-4 border-b border-panel-border">{summaryLabels.model}</th>
                             <th className="p-4 border-b border-panel-border">{summaryLabels.size}</th>
                             {!hideZeroDiscount && (
-                                <th className="p-4 border-b border-panel-border text-right whitespace-nowrap">{state.includesVat ? `${summaryLabels.yourPrice} (${summaryLabels.inclVat})` : summaryLabels.yourPrice}</th>
+                                <th className="p-4 border-b border-panel-border text-right whitespace-nowrap">{includesVat ? `${summaryLabels.yourPrice} (${summaryLabels.inclVat})` : summaryLabels.yourPrice}</th>
                             )}
                             {hideZeroDiscount && (
-                                <th className="p-4 border-b border-panel-border text-right whitespace-nowrap text-primary">{state.includesVat ? `${summaryLabels.recommendedPrice} (${summaryLabels.inclVat})` : summaryLabels.recommendedPrice}</th>
+                                <th className="p-4 border-b border-panel-border text-right whitespace-nowrap text-primary">{includesVat ? `${summaryLabels.recommendedPrice} (${summaryLabels.inclVat})` : summaryLabels.recommendedPrice}</th>
                             )}
                             <th className="p-4 border-b border-panel-border text-center whitespace-nowrap">{summaryLabels.quantity}</th>
                             {!hideZeroDiscount && (
-                                <th className="p-4 border-b border-panel-border text-right whitespace-nowrap">{state.includesVat ? `${summaryLabels.recommendedPrice} (${summaryLabels.inclVat})` : summaryLabels.recommendedPrice}</th>
+                                <th className="p-4 border-b border-panel-border text-right whitespace-nowrap">{includesVat ? `${summaryLabels.recommendedPrice} (${summaryLabels.inclVat})` : summaryLabels.recommendedPrice}</th>
                             )}
                             {!hideZeroDiscount && (
                                 <th className="p-4 border-b border-panel-border text-right whitespace-nowrap">{summaryLabels.discountPct}</th>
@@ -115,18 +116,18 @@ export function FinalSummaryTable({ isMixedOffer = false }: FinalSummaryTablePro
                                     <td className="p-3 text-sm text-text-secondary">{row.size}</td>
                                     {!hideZeroDiscount && (
                                         <td className="p-3 text-sm text-right text-primary font-bold whitespace-nowrap">
-                                            {isReq ? summaryLabels.priceUponRequest : `${formatSek(applyVat(row.net, state.includesVat))} SEK`}
+                                            {isReq ? summaryLabels.priceUponRequest : `${formatSek(applyVat(row.net, includesVat))} SEK`}
                                         </td>
                                     )}
                                     {hideZeroDiscount && (
                                         <td className="p-3 text-sm text-right text-primary font-bold whitespace-nowrap">
-                                            {isReq ? summaryLabels.priceUponRequest : `${formatSek(applyVat(row.gross, state.includesVat))} SEK`}
+                                            {isReq ? summaryLabels.priceUponRequest : `${formatSek(applyVat(row.gross, includesVat))} SEK`}
                                         </td>
                                     )}
                                     <td className="p-3 text-sm text-center whitespace-nowrap">{row.qty}</td>
                                     {!hideZeroDiscount && (
                                         <td className="p-3 text-sm text-right text-text-secondary whitespace-nowrap">
-                                            {isReq ? summaryLabels.priceUponRequest : `${formatSek(applyVat(row.gross, state.includesVat))} SEK`}
+                                            {isReq ? summaryLabels.priceUponRequest : `${formatSek(applyVat(row.gross, includesVat))} SEK`}
                                         </td>
                                     )}
                                     {!hideZeroDiscount && (
@@ -140,8 +141,8 @@ export function FinalSummaryTable({ isMixedOffer = false }: FinalSummaryTablePro
 
                         {globalDiscountAmt > 0 && (
                             <tr className="bg-black/10 italic text-text-secondary">
-                                <td colSpan={2} className="p-3 text-sm">{summaryLabels.globalDiscount} ({state.globalDiscountPct}%)</td>
-                                <td className="p-3 text-sm text-right text-danger font-bold whitespace-nowrap">-{formatSek(applyVat(globalDiscountAmt, state.includesVat))} SEK</td>
+                                <td colSpan={2} className="p-3 text-sm">{summaryLabels.globalDiscount} ({globalDiscountPct}%)</td>
+                                <td className="p-3 text-sm text-right text-danger font-bold whitespace-nowrap">-{formatSek(applyVat(globalDiscountAmt, includesVat))} SEK</td>
                                 <td colSpan={hideZeroDiscount ? 1 : 3}></td>
                             </tr>
                         )}
@@ -152,19 +153,19 @@ export function FinalSummaryTable({ isMixedOffer = false }: FinalSummaryTablePro
                                 {isMixedOffer ? summaryLabels.productTotalExVat : summaryLabels.totalExVat}
                             </td>
                             <td className="p-4 text-right font-bold text-primary text-3xl whitespace-nowrap">{formatSek(finalTotalSek)} SEK</td>
-                            <td colSpan={2} className="p-4 text-right text-xs uppercase font-bold text-text-secondary whitespace-nowrap">{summaryLabels.gross}{state.includesVat ? ` (${totalsVatLabel})` : ''}: {formatSek(applyVat(grossTotalSek, state.includesVat))} SEK</td>
-                            <td className="p-4 text-right text-danger font-bold text-xs">{summaryLabels.totalDiscount}{state.includesVat ? ` (${totalsVatLabel})` : ''}:<br />-{formatSek(applyVat(totalDiscountSek, state.includesVat))} SEK</td>
+                            <td colSpan={2} className="p-4 text-right text-xs uppercase font-bold text-text-secondary whitespace-nowrap">{summaryLabels.gross}{includesVat ? ` (${totalsVatLabel})` : ''}: {formatSek(applyVat(grossTotalSek, includesVat))} SEK</td>
+                            <td className="p-4 text-right text-danger font-bold text-xs">{summaryLabels.totalDiscount}{includesVat ? ` (${totalsVatLabel})` : ''}:<br />-{formatSek(applyVat(totalDiscountSek, includesVat))} SEK</td>
                         </tr>
-                        {state.includesVat && (
+                        {includesVat && (
                             <>
                                 <tr className="border-t border-panel-border/30">
                                     <td colSpan={2} className="p-2 text-right text-xs uppercase font-bold text-text-secondary">{summaryLabels.vat25}</td>
-                                    <td className="p-2 text-right font-bold text-text-secondary whitespace-nowrap">{formatSek(vatAmount)} SEK</td>
+                                    <td className="p-2 text-right font-bold text-text-secondary whitespace-nowrap">{formatSek(vatAmountSek)} SEK</td>
                                     <td colSpan={hideZeroDiscount ? 1 : 3}></td>
                                 </tr>
                                 <tr className="bg-primary/5">
                                     <td colSpan={2} className="p-4 text-right text-lg uppercase font-black text-white">{summaryLabels.totalAmountDue} ({totalsVatLabel})</td>
-                                    <td className="p-4 text-right font-black text-2xl text-primary whitespace-nowrap">{formatSek(totalWithVat)} SEK</td>
+                                    <td className="p-4 text-right font-black text-2xl text-primary whitespace-nowrap">{formatSek(totalWithVatSek)} SEK</td>
                                     <td colSpan={hideZeroDiscount ? 1 : 3}></td>
                                 </tr>
                             </>

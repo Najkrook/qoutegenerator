@@ -373,50 +373,6 @@ describe('SummaryExport PDF override', () => {
         });
     });
 
-    it('restricts PDF themes for retailers and allows all for admins', async () => {
-        const { container: adminContainer } = await renderSummaryExport({
-            authOverrides: { accessLevel: 'admin', isRetailer: false }
-        });
-        const adminSelect = adminContainer.querySelector('select[name="pdfThemeId"]');
-        expect(Array.from(adminSelect.options).map(o => o.value)).toEqual(['brixx', 'custom', 'roslagsmarkisen']);
-
-        const { container: retailerContainer1 } = await renderSummaryExport({
-            authOverrides: {
-                accessLevel: 'retailer',
-                isRetailer: true,
-                retailer: { id: 'ret-1', pdfThemes: [] }
-            }
-        });
-        const retSelect1 = retailerContainer1.querySelector('select[name="pdfThemeId"]');
-        expect(Array.from(retSelect1.options).map(o => o.value)).toEqual(['brixx']);
-
-        const { container: retailerContainer2 } = await renderSummaryExport({
-            authOverrides: {
-                accessLevel: 'retailer',
-                isRetailer: true,
-                retailer: { id: 'ret-2', pdfThemes: ['roslagsmarkisen'] }
-            }
-        });
-        const retSelect2 = retailerContainer2.querySelector('select[name="pdfThemeId"]');
-        expect(Array.from(retSelect2.options).map(o => o.value)).toEqual(['brixx', 'roslagsmarkisen']);
-    });
-
-    it('forces fallback to default theme if an unauthorized theme is loaded in state', async () => {
-        const { dispatch } = await renderSummaryExport({
-            authOverrides: {
-                accessLevel: 'retailer',
-                isRetailer: true,
-                retailer: { id: 'ret-1', pdfThemes: [] }
-            },
-            stateOverrides: { pdfThemeId: 'custom' }
-        });
-        
-        expect(dispatch).toHaveBeenCalledWith({
-            type: 'SET_PDF_THEME_ID',
-            payload: 'brixx'
-        });
-    });
-
     it('shows one save action and keeps legacy PDF export inside the warning when quoteNumber is missing', async () => {
         const { container } = await renderSummaryExport({
             stateOverrides: { quoteNumber: null }
@@ -711,7 +667,7 @@ describe('SummaryExport PDF override', () => {
         }));
     });
 
-    it('removes persisted contracting work from retailer preview and export payloads', async () => {
+    it('passes the prepared persistence state to deep save and only saved identity to order submission', async () => {
         const { container } = await renderSummaryExport({
             authOverrides: {
                 accessLevel: 'retailer',
@@ -732,8 +688,8 @@ describe('SummaryExport PDF override', () => {
                     projectName: 'Hidden retailer project',
                     rows: [{
                         id: 'hidden-work',
-                        workPackage: 'Hidden retailer work',
-                        scope: 'Must not be exported',
+                        workPackage: 'Retailer-ineligible work',
+                        scope: 'Saved only through preparation',
                         unit: 'work',
                         priceExVatSek: 50000
                     }],
@@ -742,28 +698,6 @@ describe('SummaryExport PDF override', () => {
                 }
             }
         });
-        await waitForPreviewDebounce();
-
-        expect(container.textContent).not.toContain('Hidden retailer work');
-        expect(createQuotePdfBlob).toHaveBeenCalledWith(
-            expect.objectContaining({
-                commercial: expect.objectContaining({ contractingWork: null }),
-                visibility: expect.objectContaining({ contractingWork: 'suppressed-retailer' }),
-                persistenceSnapshot: expect.objectContaining({
-                    contractingWork: expect.objectContaining({ enabled: false, rows: [] })
-                })
-            })
-        );
-
-        await clickButton(container, 'Exportera Excel');
-
-        expect(excelExportState.generateExcel).toHaveBeenCalledWith(
-            expect.objectContaining({
-                commercial: expect.objectContaining({ contractingWork: null }),
-                visibility: expect.objectContaining({ contractingWork: 'suppressed-retailer' })
-            })
-        );
-
         await clickButton(container, 'Spara ny version');
 
         expect(quoteSaveState.save).toHaveBeenCalledWith(

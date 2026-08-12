@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useQuote } from '../store/QuoteContext';
 import { useAuth } from '../store/AuthContext';
 import { catalogData } from '../data/catalog';
-import { PDF_THEME_OPTIONS, normalizePdfThemeId, DEFAULT_PDF_THEME_ID } from '../config/pdfThemes';
+import { PDF_THEME_OPTIONS } from '../config/pdfThemes';
 import { computeQuoteTotals } from '../services/calculationEngine';
 import { CustomerInfoForm } from '../components/features/CustomerInfoForm';
 import { FinalSummaryTable } from '../components/features/FinalSummaryTable';
@@ -16,9 +16,6 @@ import { downloadBlob, saveBlobWithPicker } from '../utils/fileUtils';
 import { createQuotePdfBlob } from '../services/quotePdfService';
 import { quoteSave } from '../services/quoteSaveService';
 import { safeLogActivity } from '../services/activityLogService';
-import { hasZeroDiscountSummary } from '../services/exportDataBuilders';
-import { normalizeExportLanguage } from '../services/exportLocalization';
-import { calculateContractingWorkSummary } from '../services/contractingWork';
 import { prepareQuote } from '../services/quotePreparation';
 import type { PreparedQuote } from '../services/quotePreparation';
 import { buildQuoteRevisionLink } from '../navigation/quoteLinks';
@@ -36,6 +33,7 @@ import {
 import { getErrorMessage } from '../utils/runtime';
 import type {
     OrderRequestRecord,
+    PdfThemeId,
     QuoteState,
     QuoteTotalsResult,
     SavedQuoteStatePatch,
@@ -56,20 +54,6 @@ interface PendingQuoteSaveRetry {
 }
 
 const QUOTE_SAVE_RETRY_STORAGE_PREFIX = 'quote-generator:pending-save-retry:';
-
-const RETAILER_SAFE_CONTRACTING_WORK: QuoteState['contractingWork'] = {
-    enabled: false,
-    projectName: '',
-    rows: [],
-    margin: {
-        enabled: false,
-        percent: 15
-    },
-    ata: {
-        enabled: false,
-        percent: 15
-    }
-};
 
 function getQuoteSaveRetryStorageKey(userUid: string | null | undefined): string | null {
     const normalizedUid = String(userUid || '').trim();
@@ -269,30 +253,6 @@ export function SummaryExport({
     );
     const saveLabel = state.activeQuoteId ? 'Spara ny version' : 'Spara offert';
 
-    const allowedThemeOptions = useMemo(() => {
-        if (!isRetailer) {
-            return PDF_THEME_OPTIONS;
-        }
-        const allowedIds = new Set<string>([DEFAULT_PDF_THEME_ID, ...(retailer?.pdfThemes || [])]);
-        return PDF_THEME_OPTIONS.filter((theme) => allowedIds.has(theme.id));
-    }, [isRetailer, retailer?.pdfThemes]);
-
-    const selectedPdfThemeId = normalizePdfThemeId(state.pdfThemeId);
-    const selectedExportLanguage = normalizeExportLanguage(state.exportLanguage);
-    const hasProducts = summaryData.totals.length > 0;
-    const hasContractingWork = !isRetailer
-        && calculateContractingWorkSummary(state.contractingWork).activeRows.length > 0;
-
-    const effectivePdfThemeId = allowedThemeOptions.some(t => t.id === selectedPdfThemeId)
-        ? selectedPdfThemeId
-        : DEFAULT_PDF_THEME_ID;
-
-    const effectiveState = useMemo(() => ({
-        ...state,
-        pdfThemeId: effectivePdfThemeId,
-        exportLanguage: selectedExportLanguage,
-        contractingWork: isRetailer ? RETAILER_SAFE_CONTRACTING_WORK : state.contractingWork
-    }), [state, effectivePdfThemeId, selectedExportLanguage, isRetailer]);
     const preparedQuote = useMemo(() => prepareQuote({
         state,
         totals: summaryData,
@@ -304,12 +264,21 @@ export function SummaryExport({
         }
     }), [state, summaryData, isRetailer, retailer?.pdfThemes]);
     const preparedEquivalenceKey = preparedQuote.presentation.equivalenceKey;
+    const selectedPdfThemeId = preparedQuote.presentation.pdfThemeId;
+    const selectedExportLanguage = preparedQuote.presentation.exportLanguage;
+    const effectiveState = preparedQuote.persistenceSnapshot;
+    const allowedThemeOptions = useMemo(() => {
+        const allowedIds = new Set(preparedQuote.presentation.allowedPdfThemeIds);
+        return PDF_THEME_OPTIONS.filter((theme) => allowedIds.has(theme.id));
+    }, [preparedQuote.presentation.allowedPdfThemeIds]);
+    const hasProducts = preparedQuote.commercial.productRows.length > 0;
+    const hasContractingWork = preparedQuote.visibility.contractingWork === 'visible';
 
     useEffect(() => {
-        if (selectedPdfThemeId && !allowedThemeOptions.some(t => t.id === selectedPdfThemeId)) {
-            dispatch({ type: 'SET_PDF_THEME_ID', payload: DEFAULT_PDF_THEME_ID });
+        if (state.pdfThemeId !== selectedPdfThemeId) {
+            dispatch({ type: 'SET_PDF_THEME_ID', payload: selectedPdfThemeId });
         }
-    }, [selectedPdfThemeId, allowedThemeOptions, dispatch]);
+    }, [selectedPdfThemeId, state.pdfThemeId, dispatch]);
 
     const canSubmitOrderRequest = Boolean(
         isRetailer
@@ -317,7 +286,8 @@ export function SummaryExport({
     );
 
     useEffect(() => {
-        if (hasZeroDiscountSummary(summaryData) || state.hideZeroDiscountReferencesInPdf !== true) {
+        if (preparedQuote.visibility.discountReferenceEligibility === 'eligible-zero'
+            || state.hideZeroDiscountReferencesInPdf !== true) {
             return;
         }
 
@@ -325,7 +295,7 @@ export function SummaryExport({
             type: 'SET_HIDE_ZERO_DISCOUNT_REFERENCES_IN_PDF',
             payload: false
         });
-    }, [dispatch, state.hideZeroDiscountReferencesInPdf, summaryData]);
+    }, [dispatch, preparedQuote.visibility.discountReferenceEligibility, state.hideZeroDiscountReferencesInPdf]);
 
     useEffect(() => {
         let cancelled = false;
@@ -460,7 +430,7 @@ export function SummaryExport({
     const handlePdfThemeChange = (event: React.ChangeEvent<HTMLSelectElement>): void => {
         dispatch({
             type: 'SET_PDF_THEME_ID',
-            payload: normalizePdfThemeId(event.target.value)
+            payload: event.target.value as PdfThemeId
         });
     };
 
@@ -697,15 +667,24 @@ export function SummaryExport({
                         </section>
 
                         <section>
-                            <TermsAndPaymentPanel summaryData={summaryData} />
+                            <TermsAndPaymentPanel />
                         </section>
 
 
                         <section className="rounded-panel border border-border bg-surface-raised p-6 shadow-panel">
                             <h2 className="mb-6 text-lg font-bold text-text">Summering</h2>
-                            {hasProducts ? <FinalSummaryTable isMixedOffer={hasContractingWork} /> : null}
+                            {hasProducts ? (
+                                <FinalSummaryTable
+                                    isMixedOffer={hasContractingWork}
+                                    preparedQuote={preparedQuote}
+                                />
+                            ) : null}
                             {hasContractingWork ? (
-                                <ContractingWorkSummaryTable className={hasProducts ? 'mt-8' : ''} />
+                                <ContractingWorkSummaryTable
+                                    className={hasProducts ? 'mt-8' : ''}
+                                    contractingWork={preparedQuote.commercial.contractingWork!}
+                                    exportLanguage={preparedQuote.presentation.exportLanguage}
+                                />
                             ) : null}
                             {hasProducts ? <MarginSummaryPanel summaryData={summaryData} className="mt-6" /> : null}
                             <section className="mt-8 flex flex-col gap-6">
@@ -896,7 +875,7 @@ export function SummaryExport({
                                 Offert tema
                                 <select
                                     name="pdfThemeId"
-                                    value={effectivePdfThemeId}
+                                    value={selectedPdfThemeId}
                                     onChange={handlePdfThemeChange}
                                     className="h-10 w-full rounded-control border border-control-border bg-input px-3 text-sm font-semibold normal-case tracking-normal text-text transition-colors hover:bg-surface-hover"
                                 >

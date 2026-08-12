@@ -1,20 +1,9 @@
-import type { PdfExportModule, QuoteState, QuoteTotalsResult } from '../types/contracts';
+import type { PdfExportModule } from '../types/contracts';
 import type { PreparedQuote } from './quotePreparation';
 
-function isPreparedQuote(value: PreparedQuote | QuoteState): value is PreparedQuote {
-    return value != null
-        && typeof value === 'object'
-        && 'presentation' in value
-        && 'commercial' in value
-        && 'persistenceSnapshot' in value;
-}
-
-function adaptPreparedQuote(prepared: PreparedQuote): {
-    state: QuoteState;
-    summaryData: QuoteTotalsResult;
-} {
+function adaptPreparedQuote(prepared: PreparedQuote) {
     const contractingWork = prepared.commercial.contractingWork;
-    const state: QuoteState = {
+    const state = {
         ...prepared.persistenceSnapshot,
         customerInfo: {
             ...prepared.agreement.customerInfo,
@@ -68,16 +57,16 @@ function adaptPreparedQuote(prepared: PreparedQuote): {
             grossTotalSek: productTotals.grossTotalSek,
             totalDiscountSek: productTotals.totalDiscountSek,
             finalTotalSek: productTotals.finalTotalSek,
-            globalDiscountAmt: productTotals.globalDiscountAmt
+            globalDiscountAmt: productTotals.globalDiscountAmt,
+            vatAmountSek: productTotals.vatAmountSek,
+            totalWithVatSek: productTotals.totalWithVatSek
         }
     };
 }
 
 export async function createQuotePdfBlob(prepared: PreparedQuote): Promise<Blob | null>;
-export async function createQuotePdfBlob(state: QuoteState, summaryData: QuoteTotalsResult): Promise<Blob | null>;
 export async function createQuotePdfBlob(
-    input: PreparedQuote | QuoteState,
-    legacySummaryData?: QuoteTotalsResult
+    prepared: PreparedQuote
 ): Promise<Blob | null> {
     try {
         const pdfModule: PdfExportModule = await import('../features/pdfExport');
@@ -87,9 +76,7 @@ export async function createQuotePdfBlob(
             return null;
         }
 
-        const { state, summaryData } = isPreparedQuote(input)
-            ? adaptPreparedQuote(input)
-            : { state: input, summaryData: legacySummaryData as QuoteTotalsResult };
+        const { state, summaryData } = adaptPreparedQuote(prepared);
         const result = await generatePDF(state, summaryData, true);
         return result ?? null;
     } catch (error) {

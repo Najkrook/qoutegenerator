@@ -19,16 +19,15 @@ import {
     saveTemplate,
     deleteTemplate
 } from '../../services/templateService';
-import { hasZeroDiscountSummary } from '../../services/exportDataBuilders';
 import { notifyError, notifySuccess } from '../../services/notificationService';
-import type { LegalTemplateOption, TermsAndPaymentPanelProps } from '../../types/contracts';
+import type { LegalTemplateOption } from '../../types/contracts';
 
 function normalizePositiveInt(value: string, fallback: number): number {
     const parsed = Number.parseInt(value, 10);
     return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
 }
 
-export function TermsAndPaymentPanel({ summaryData }: TermsAndPaymentPanelProps) {
+export function TermsAndPaymentPanel() {
     const { state, dispatch } = useQuote();
     const { user, canViewEverything } = useAuth();
     const [paymentDaysInput, setPaymentDaysInput] = useState(String(state.paymentTermsDays));
