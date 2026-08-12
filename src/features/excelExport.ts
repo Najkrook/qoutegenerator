@@ -1,9 +1,10 @@
 import * as XLSX from 'xlsx';
-import { buildExcelSheetData } from '../services/exportDataBuilders';
+import { buildPreparedExcelSheetData } from '../services/exportDataBuilders';
 import { getExportLabels } from '../services/exportLocalization';
+import type { PreparedQuote } from '../services/quotePreparation';
 
-export function generateExcel(state, summaryData) {
-    const wsData = buildExcelSheetData(state, summaryData);
+export function generateExcel(prepared: PreparedQuote): void {
+    const wsData = buildPreparedExcelSheetData(prepared);
 
     const ws = XLSX.utils.aoa_to_sheet(wsData);
     ws['!cols'] = [
@@ -45,11 +46,11 @@ export function generateExcel(state, summaryData) {
     }
 
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, getExportLabels(state?.exportLanguage).sheetName);
+    XLSX.utils.book_append_sheet(wb, ws, getExportLabels(prepared.presentation.exportLanguage).sheetName);
 
     XLSX.writeFile(
         wb,
-        state?.exportLanguage === 'en' ? 'Quote.xlsx' : 'Offert.xlsx',
+        prepared.presentation.exportLanguage === 'en' ? 'Quote.xlsx' : 'Offert.xlsx',
         { cellStyles: true }
     );
 }

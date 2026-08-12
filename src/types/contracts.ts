@@ -979,10 +979,6 @@ export interface PdfExportModule {
     generatePDF: (state: QuoteState, summaryData: QuoteTotalsResult, returnBlob?: boolean) => Blob | Promise<Blob | null> | null;
 }
 
-export interface ExcelExportModule {
-    generateExcel: (state: QuoteState, summaryData: QuoteTotalsResult) => Promise<void> | void;
-}
-
 export interface QuoteRepository {
     createQuote(input: CreateQuoteInput): Promise<{ quoteId: string; metadata: QuoteMetadata; revision: QuoteRevision }>;
     saveQuoteRevision(input: QuoteRevisionSaveInput): Promise<{ metadata: QuoteMetadata; revision: QuoteRevision }>;

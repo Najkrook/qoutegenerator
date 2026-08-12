@@ -119,6 +119,7 @@ describe('prepareQuote', () => {
                 totalDiscountSek: 200,
                 finalTotalSek: 1800,
                 globalDiscountAmt: 0,
+                globalDiscountPct: 0,
                 vatBasisSek: 1800,
                 vatAmountSek: 450,
                 totalWithVatSek: 2250

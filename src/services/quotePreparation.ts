@@ -74,6 +74,7 @@ export interface PreparedQuote {
             totalDiscountSek: number;
             finalTotalSek: number;
             globalDiscountAmt: number;
+            globalDiscountPct: number;
             vatBasisSek: number;
             vatAmountSek: number;
             totalWithVatSek: number;
@@ -396,6 +397,10 @@ function validateAndPrepareProductTotals(
     const totalDiscountSek = requireFinite(totals.totalDiscountSek, 'totalDiscountSek');
     const finalTotalSek = requireFinite(totals.finalTotalSek, 'finalTotalSek');
     const globalDiscountAmt = requireFinite(totals.globalDiscountAmt, 'globalDiscountAmt');
+    const globalDiscountPct = requireFinite(state.globalDiscountPct, 'globalDiscountPct');
+    if (globalDiscountPct < 0 || globalDiscountPct > 100) {
+        invalidCommercial('globalDiscountPct', 'expected a percentage between 0 and 100');
+    }
     const rowGrossTotal = rows.reduce((sum, row) => sum + row.gross, 0);
     const rowDiscountTotal = rows.reduce((sum, row) => sum + row.discountSek, 0);
     const rowNetTotal = rows.reduce((sum, row) => sum + row.net, 0);
@@ -414,6 +419,7 @@ function validateAndPrepareProductTotals(
         totalDiscountSek,
         finalTotalSek,
         globalDiscountAmt,
+        globalDiscountPct,
         vatBasisSek,
         vatAmountSek,
         totalWithVatSek: vatBasisSek + vatAmountSek

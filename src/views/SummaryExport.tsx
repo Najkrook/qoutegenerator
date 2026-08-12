@@ -20,6 +20,7 @@ import { hasZeroDiscountSummary } from '../services/exportDataBuilders';
 import { normalizeExportLanguage } from '../services/exportLocalization';
 import { calculateContractingWorkSummary } from '../services/contractingWork';
 import { prepareQuote } from '../services/quotePreparation';
+import type { PreparedQuote } from '../services/quotePreparation';
 import { buildQuoteRevisionLink } from '../navigation/quoteLinks';
 import {
     getOrderRequestStatusLabel,
@@ -34,7 +35,6 @@ import {
 } from '../services/notificationService';
 import { getErrorMessage } from '../utils/runtime';
 import type {
-    ExcelExportModule,
     OrderRequestRecord,
     QuoteState,
     QuoteTotalsResult,
@@ -185,15 +185,15 @@ export function getPdfExportBlockReason(quoteNumber: QuoteState['quoteNumber'] |
     return 'Offerten saknar offertnummer. Spara offerten f\u00F6r att tilldela ett nummer, eller exportera \u00E4nd\u00E5 utan nummer.';
 }
 
-async function exportExcelWorkbook(state: QuoteState, summaryData: QuoteTotalsResult): Promise<void> {
-    const excelModule: ExcelExportModule = await import('../features/excelExport');
+async function exportExcelWorkbook(prepared: PreparedQuote): Promise<void> {
+    const excelModule = await import('../features/excelExport');
     const { generateExcel } = excelModule;
 
     if (typeof generateExcel !== 'function') {
         throw new Error('Excel export is unavailable.');
     }
 
-    await generateExcel(state, summaryData);
+    await generateExcel(prepared);
 }
 
 function warnIfActivityLogFailed(result: ActivityLogResultLike | null | undefined, message: string): void {
@@ -526,10 +526,10 @@ export function SummaryExport({
             return;
         }
 
-        const excelFileName = effectiveState.exportLanguage === 'en' ? 'Quote.xlsx' : 'Offert.xlsx';
+        const excelFileName = preparedQuote.presentation.exportLanguage === 'en' ? 'Quote.xlsx' : 'Offert.xlsx';
 
         try {
-            await exportExcelWorkbook(effectiveState, summaryData);
+            await exportExcelWorkbook(preparedQuote);
             void safeLogActivity({
                 user,
                 eventType: 'quote_export_excel',

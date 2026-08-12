@@ -697,8 +697,11 @@ describe('SummaryExport PDF override', () => {
         await clickButton(container, 'Exportera Excel');
 
         expect(excelExportState.generateExcel).toHaveBeenCalledWith(
-            expect.objectContaining({ exportLanguage: 'en' }),
-            expect.any(Object)
+            expect.objectContaining({
+                presentation: expect.objectContaining({ exportLanguage: 'en' }),
+                commercial: expect.any(Object),
+                visibility: expect.any(Object)
+            })
         );
         expect(activityState.safeLogActivity).toHaveBeenCalledWith(expect.objectContaining({
             details: 'Excel exporterad: Quote.xlsx',
@@ -756,13 +759,9 @@ describe('SummaryExport PDF override', () => {
 
         expect(excelExportState.generateExcel).toHaveBeenCalledWith(
             expect.objectContaining({
-                contractingWork: expect.objectContaining({
-                    enabled: false,
-                    rows: [],
-                    margin: { enabled: false, percent: 15 }
-                })
-            }),
-            expect.any(Object)
+                commercial: expect.objectContaining({ contractingWork: null }),
+                visibility: expect.objectContaining({ contractingWork: 'suppressed-retailer' })
+            })
         );
 
         await clickButton(container, 'Spara ny version');
