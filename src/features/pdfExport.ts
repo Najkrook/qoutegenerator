@@ -64,8 +64,7 @@ function createPdfDocument(): JsPdfDocument {
 
 export function computeValidUntilDateString(
     quoteDateValue: string | null | undefined,
-    quoteValidityDays: unknown,
-    nowDate = new Date()
+    quoteValidityDays: unknown
 ): string {
     const validityDays = normalizePositiveInt(quoteValidityDays, 14);
     let baseDate: Date | null = null;
@@ -80,9 +79,7 @@ export function computeValidUntilDateString(
         }
     }
 
-    if (!baseDate) {
-        baseDate = new Date(nowDate.getTime());
-    }
+    if (!baseDate) return '';
 
     const validUntil = new Date(baseDate.getTime());
     validUntil.setDate(validUntil.getDate() + validityDays);
@@ -100,7 +97,7 @@ export function generatePDF(
         const pageWidth = doc.internal.pageSize.width;
         const pageHeight = doc.internal.pageSize.height;
         const customerInfo: Partial<CustomerInfo> = state.customerInfo || {};
-        const quoteDate = customerInfo.date || new Date().toLocaleDateString('sv-SE');
+        const quoteDate = customerInfo.date || '';
         const shouldRenderPaymentBox = state.includePaymentBox === true;
         const shouldRenderSignatureBlock = state.includeSignatureBlock === true;
         const hideDiscountReferences = state.hideZeroDiscountReferencesInPdf === true;

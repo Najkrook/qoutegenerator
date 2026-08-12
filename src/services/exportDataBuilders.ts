@@ -75,7 +75,7 @@ function buildExcelSheetDataInternal(
         [labels.company, customerInfo.company || customerInfo.name || ''],
         [labels.projectReference, customerInfo.reference || ''],
         [labels.customerReference, customerInfo.customerReference || ''],
-        [labels.date, customerInfo.date || new Date().toLocaleDateString()],
+        [labels.date, customerInfo.date || ''],
         [labels.validityPeriod, formatLocalizedValidityPeriod(customerInfo.validity, state.exportLanguage)]
     ];
 

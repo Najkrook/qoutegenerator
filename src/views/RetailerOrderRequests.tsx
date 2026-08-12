@@ -507,11 +507,11 @@ export function RetailerOrderRequests({ onBack }: RetailerOrderRequestsProps) {
                                     <p className="mt-4 text-sm italic text-text-secondary">Laddar produkter från sparad offertversion...</p>
                                 ) : selectedRequestItems.status === 'missing' ? (
                                     <div className="mt-4 rounded-lg border border-panel-border bg-panel-bg p-4 text-sm text-text-secondary">
-                                        Den sparade offertversionen kunde inte hittas för denna orderförfrågan. PDF-export finns fortfarande kvar som fallback vid behov.
+                                        Den sparade offertversionen kunde inte hittas. Öppna och spara offerten på nytt innan ordern granskas eller exporteras.
                                     </div>
                                 ) : selectedRequestItems.status === 'error' ? (
                                     <div className="mt-4 rounded-lg border border-panel-border bg-panel-bg p-4 text-sm text-text-secondary">
-                                        Kunde inte bygga produktöversikten från den sparade offertversionen. PDF-export finns fortfarande tillgänglig.
+                                        Kunde inte läsa offertversionens frysta prisunderlag. Försök igen eller öppna och spara offerten på nytt.
                                     </div>
                                 ) : selectedRequestItems.rows.length === 0 ? (
                                     <p className="mt-4 text-sm italic text-text-secondary">Inga produkter kunde utläsas från den sparade offertversionen.</p>

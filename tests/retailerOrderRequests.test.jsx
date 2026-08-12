@@ -496,7 +496,7 @@ describe('RetailerOrderRequests', () => {
         const itemsSection = getItemsSection(container);
 
         expect(itemsSection.textContent).toContain('Den sparade offertversionen kunde inte hittas');
-        expect(itemsSection.textContent).toContain('PDF-export finns fortfarande kvar som fallback');
+        expect(itemsSection.textContent).toContain('Öppna och spara offerten på nytt');
     });
 
     it('updates the compact item list when switching between order requests', async () => {

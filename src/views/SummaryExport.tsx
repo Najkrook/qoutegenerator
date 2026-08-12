@@ -139,7 +139,7 @@ function sanitizeFileNamePart(value: string): string {
 function buildPdfFileName(customerInfo: QuoteState['customerInfo'], exportLanguage: QuoteState['exportLanguage'] = 'sv'): string {
     const rawRef = customerInfo.reference?.trim();
     const rawName = customerInfo.company?.trim() || customerInfo.name?.trim();
-    const date = customerInfo.date || new Date().toISOString().slice(0, 10);
+    const date = customerInfo.date || '';
     const base = rawRef || rawName || (exportLanguage === 'en' ? 'Quote' : 'Offert');
     const safeBase = sanitizeFileNamePart(base);
     return `${safeBase || (exportLanguage === 'en' ? 'Quote' : 'Offert')}-${date}.pdf`;
