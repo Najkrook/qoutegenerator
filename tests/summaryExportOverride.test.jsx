@@ -76,7 +76,8 @@ vi.mock('../src/services/calculationEngine', () => ({
         totals: [],
         finalTotalSek: 0,
         grossTotalSek: 0,
-        totalDiscountSek: 0
+        totalDiscountSek: 0,
+        globalDiscountAmt: 0
     })
 }));
 
@@ -186,19 +187,23 @@ async function renderSummaryExport({ stateOverrides = {}, authOverrides = {}, pr
     const root = createRoot(container);
     const dispatch = vi.fn();
 
-    await act(async () => {
-        root.render(
-            <AuthContext.Provider value={createAuthValue(authOverrides)}>
-                <QuoteContext.Provider value={{ state: createQuoteState(stateOverrides), dispatch }}>
-                    <SummaryExport onPrev={() => {}} {...props} />
-                </QuoteContext.Provider>
-            </AuthContext.Provider>
-        );
-        await Promise.resolve();
-    });
+    const renderWith = async (nextStateOverrides = stateOverrides) => {
+        await act(async () => {
+            root.render(
+                <AuthContext.Provider value={createAuthValue(authOverrides)}>
+                    <QuoteContext.Provider value={{ state: createQuoteState(nextStateOverrides), dispatch }}>
+                        <SummaryExport onPrev={() => {}} {...props} />
+                    </QuoteContext.Provider>
+                </AuthContext.Provider>
+            );
+            await Promise.resolve();
+        });
+    };
+
+    await renderWith();
 
     mountedRoots.push({ root, container });
-    return { container, dispatch };
+    return { container, dispatch, rerender: renderWith };
 }
 
 function findButton(container, label) {
@@ -355,8 +360,9 @@ describe('SummaryExport PDF override', () => {
         expect(container.textContent).toContain('Exportspråk');
         expect(findButton(container, 'EN').getAttribute('aria-pressed')).toBe('true');
         expect(createQuotePdfBlob).toHaveBeenCalledWith(
-            expect.objectContaining({ exportLanguage: 'en' }),
-            expect.any(Object)
+            expect.objectContaining({
+                presentation: expect.objectContaining({ exportLanguage: 'en' })
+            })
         );
 
         await clickButton(container, 'SV');
@@ -465,6 +471,33 @@ describe('SummaryExport PDF override', () => {
 
         expect(createQuotePdfBlob).toHaveBeenCalledTimes(1);
         expect(fileUtilsState.saveBlobWithPicker).toHaveBeenCalledTimes(1);
+    });
+
+    it('reuses preview caching for equivalent prepared meaning and invalidates it when meaning changes', async () => {
+        const { rerender } = await renderSummaryExport({
+            stateOverrides: { quoteNumber: 'BRIXX - 260423-102' }
+        });
+        await waitForPreviewDebounce();
+        expect(createQuotePdfBlob).toHaveBeenCalledTimes(1);
+
+        await rerender({
+            quoteNumber: 'BRIXX - 260423-102',
+            draftUpdatedAtMs: 123
+        });
+        await waitForPreviewDebounce();
+        expect(createQuotePdfBlob).toHaveBeenCalledTimes(1);
+
+        await rerender({
+            quoteNumber: 'BRIXX - 260423-102',
+            customerInfo: {
+                ...createInitialQuoteState().customerInfo,
+                name: 'Grace',
+                company: 'Brixx',
+                date: '2026-04-23'
+            }
+        });
+        await waitForPreviewDebounce();
+        expect(createQuotePdfBlob).toHaveBeenCalledTimes(2);
     });
 
     it('shows one version-save action and blocks delivery actions while saving', async () => {
@@ -711,15 +744,12 @@ describe('SummaryExport PDF override', () => {
         expect(container.textContent).not.toContain('Hidden retailer work');
         expect(createQuotePdfBlob).toHaveBeenCalledWith(
             expect.objectContaining({
-                contractingWork: {
-                    enabled: false,
-                    projectName: '',
-                    rows: [],
-                    margin: { enabled: false, percent: 15 },
-                    ata: { enabled: false, percent: 15 }
-                }
-            }),
-            expect.any(Object)
+                commercial: expect.objectContaining({ contractingWork: null }),
+                visibility: expect.objectContaining({ contractingWork: 'suppressed-retailer' }),
+                persistenceSnapshot: expect.objectContaining({
+                    contractingWork: expect.objectContaining({ enabled: false, rows: [] })
+                })
+            })
         );
 
         await clickButton(container, 'Exportera Excel');

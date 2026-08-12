@@ -19,6 +19,7 @@ import { safeLogActivity } from '../services/activityLogService';
 import { hasZeroDiscountSummary } from '../services/exportDataBuilders';
 import { normalizeExportLanguage } from '../services/exportLocalization';
 import { calculateContractingWorkSummary } from '../services/contractingWork';
+import { prepareQuote } from '../services/quotePreparation';
 import { buildQuoteRevisionLink } from '../navigation/quoteLinks';
 import {
     getOrderRequestStatusLabel,
@@ -256,8 +257,7 @@ export function SummaryExport({
     const attemptedReopenRepairRef = useRef<string | null>(null);
     const previewPdfRef = useRef<{
         blob: Blob;
-        state: QuoteState;
-        summary: QuoteTotalsResult;
+        equivalenceKey: string;
     } | null>(null);
     const exportBlockReason = getPdfExportBlockReason(state.quoteNumber);
     const hasQuoteNumber = Boolean(String(state.quoteNumber || '').trim());
@@ -292,6 +292,15 @@ export function SummaryExport({
         exportLanguage: selectedExportLanguage,
         contractingWork: isRetailer ? RETAILER_SAFE_CONTRACTING_WORK : state.contractingWork
     }), [state, effectivePdfThemeId, selectedExportLanguage, isRetailer]);
+    const preparedQuote = useMemo(() => prepareQuote({
+        state,
+        totals: summaryData,
+        audience: {
+            isRetailer,
+            allowedPdfThemes: retailer?.pdfThemes || []
+        }
+    }), [state, summaryData, isRetailer, retailer?.pdfThemes]);
+    const preparedEquivalenceKey = preparedQuote.presentation.equivalenceKey;
 
     useEffect(() => {
         if (selectedPdfThemeId && !allowedThemeOptions.some(t => t.id === selectedPdfThemeId)) {
@@ -323,7 +332,7 @@ export function SummaryExport({
         const timerId = globalThis.setTimeout(() => {
             void (async () => {
                 try {
-                    const pdfBlob = await createQuotePdfBlob(effectiveState, summaryData);
+                    const pdfBlob = await createQuotePdfBlob(preparedQuote);
                     if (cancelled) return;
 
                     if (!pdfBlob) {
@@ -334,8 +343,7 @@ export function SummaryExport({
 
                     previewPdfRef.current = {
                         blob: pdfBlob,
-                        state: effectiveState,
-                        summary: summaryData
+                        equivalenceKey: preparedEquivalenceKey
                     };
                     const nextUrl = URL.createObjectURL(pdfBlob);
                     if (previewUrlRef.current) {
@@ -359,7 +367,7 @@ export function SummaryExport({
             cancelled = true;
             globalThis.clearTimeout(timerId);
         };
-    }, [effectiveState, summaryData]);
+    }, [preparedEquivalenceKey]);
 
     useEffect(() => {
         if (!canSubmitOrderRequest || !state.activeQuoteId) {
@@ -465,20 +473,18 @@ export function SummaryExport({
 
         const fileName = buildPdfFileName(state.customerInfo, selectedExportLanguage);
         const cachedPreview = previewPdfRef.current;
-        const pdfBlob = cachedPreview?.state === effectiveState
-            && cachedPreview.summary === summaryData
+        const pdfBlob = cachedPreview?.equivalenceKey === preparedEquivalenceKey
             ? cachedPreview.blob
-            : await createQuotePdfBlob(effectiveState, summaryData);
+            : await createQuotePdfBlob(preparedQuote);
         if (!pdfBlob) {
             notifyError('Kunde inte skapa PDF.');
             return;
         }
 
-        if (cachedPreview?.state !== effectiveState || cachedPreview.summary !== summaryData) {
+        if (cachedPreview?.equivalenceKey !== preparedEquivalenceKey) {
             previewPdfRef.current = {
                 blob: pdfBlob,
-                state: effectiveState,
-                summary: summaryData
+                equivalenceKey: preparedEquivalenceKey
             };
         }
 

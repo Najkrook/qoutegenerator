@@ -108,7 +108,8 @@ vi.mock('../src/services/calculationEngine', () => ({
         totals: [],
         finalTotalSek: 0,
         grossTotalSek: 0,
-        totalDiscountSek: 0
+        totalDiscountSek: 0,
+        globalDiscountAmt: 0
     })
 }));
 
