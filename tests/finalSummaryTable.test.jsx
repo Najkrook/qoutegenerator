@@ -39,6 +39,7 @@ function renderSummary(stateOverrides = {}) {
     const preparedQuote = prepareQuote({
         state,
         totals: computeQuoteTotals({ state, catalogData }),
+        fallbackDate: '2026-08-12',
         audience: { isRetailer: false }
     });
 

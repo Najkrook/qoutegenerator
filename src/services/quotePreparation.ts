@@ -189,15 +189,15 @@ function cloneRowSource(source: QuoteTotalsRow['source']): QuoteTotalsRow['sourc
 function normalizeEffectiveQuoteDate(value: unknown, fallbackDate: unknown): string {
     const requested = String(value || '').trim();
     const fallback = String(fallbackDate || '').trim();
-    const candidate = requested || fallback;
-    const parsed = /^\d{4}-\d{2}-\d{2}$/u.test(candidate)
-        ? new Date(`${candidate}T00:00:00`)
-        : null;
-
-    if (parsed && !Number.isNaN(parsed.getTime())) {
-        return candidate;
+    for (const candidate of [requested, fallback]) {
+        const parsed = /^\d{4}-\d{2}-\d{2}$/u.test(candidate)
+            ? new Date(`${candidate}T00:00:00Z`)
+            : null;
+        if (parsed && !Number.isNaN(parsed.getTime()) && parsed.toISOString().slice(0, 10) === candidate) {
+            return candidate;
+        }
     }
-    return new Date().toISOString().slice(0, 10);
+    return invalidCommercial('customerInfo.date', 'expected a valid YYYY-MM-DD date or explicit fallbackDate');
 }
 
 function cloneCustomerInfo(customerInfo: QuoteState['customerInfo']): CustomerInfo {
@@ -573,7 +573,7 @@ export function prepareQuote({
     state,
     totals,
     audience,
-    fallbackDate = new Date().toISOString().slice(0, 10),
+    fallbackDate,
     catalogData = defaultCatalogData
 }: {
     state: QuoteState;
@@ -665,7 +665,8 @@ export function createQuoteCommercialSnapshot(prepared: PreparedQuote): QuoteCom
         schemaVersion: 1,
         presentation: {
             exportLanguage: prepared.presentation.exportLanguage,
-            pdfThemeId: prepared.presentation.pdfThemeId
+            pdfThemeId: prepared.presentation.pdfThemeId,
+            allowedPdfThemeIds: [...prepared.presentation.allowedPdfThemeIds]
         },
         effectiveQuoteDate: prepared.agreement.effectiveQuoteDate,
         productRows: prepared.commercial.productRows.map((row) => ({
@@ -699,11 +700,13 @@ export function createQuoteCommercialSnapshot(prepared: PreparedQuote): QuoteCom
 export function restorePreparedQuote({
     state,
     commercialSnapshot,
-    quoteIdentity
+    quoteIdentity,
+    audience
 }: {
     state: QuoteState;
     commercialSnapshot: unknown;
     quoteIdentity?: PreparedQuote['agreement']['quoteIdentity'];
+    audience?: QuotePreparationAudience;
 }): PreparedQuote {
     const snapshot = normalizeQuoteCommercialSnapshot(commercialSnapshot);
     if (!snapshot) {
@@ -711,10 +714,14 @@ export function restorePreparedQuote({
     }
 
     const isRetailer = snapshot.visibility.contractingWork === 'suppressed-retailer';
-    const presentation = {
-        ...snapshot.presentation,
-        allowedPdfThemeIds: [snapshot.presentation.pdfThemeId]
-    };
+    const presentation = normalizePresentation({
+        ...state,
+        exportLanguage: snapshot.presentation.exportLanguage,
+        pdfThemeId: snapshot.presentation.pdfThemeId
+    }, audience || {
+        isRetailer,
+        allowedPdfThemes: snapshot.presentation.allowedPdfThemeIds
+    });
     const customerInfo = cloneCustomerInfo(state.customerInfo);
     customerInfo.date = snapshot.effectiveQuoteDate;
     const productRows: PreparedQuoteProductRow[] = snapshot.productRows.map((row, index) => ({
@@ -771,7 +778,10 @@ export function restorePreparedQuote({
         signatureBlock: state.includeSignatureBlock === true ? 'visible' : 'hidden'
     };
     const preparedMeaning = {
-        presentation: snapshot.presentation,
+        presentation: {
+            exportLanguage: presentation.exportLanguage,
+            pdfThemeId: presentation.pdfThemeId
+        },
         commercial,
         agreement,
         visibility

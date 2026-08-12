@@ -43,6 +43,7 @@ function renderContractingSummary(overrides = {}) {
             finalTotalSek: 0,
             globalDiscountAmt: 0
         },
+        fallbackDate: '2026-08-12',
         audience: { isRetailer: false }
     });
 

@@ -1,5 +1,30 @@
-import type { PdfExportModule } from '../types/contracts';
+import type { ContractingWorkSummary, PdfExportModule } from '../types/contracts';
 import type { PreparedQuote } from './quotePreparation';
+
+function adaptPreparedContractingSummary(
+    prepared: PreparedQuote
+): ContractingWorkSummary | undefined {
+    const contractingWork = prepared.commercial.contractingWork;
+    if (!contractingWork) {
+        return undefined;
+    }
+
+    const customerRows = contractingWork.rows.map((row) => ({ ...row }));
+    return {
+        activeRows: customerRows.map((row) => ({ ...row })),
+        customerRows,
+        costTotalSek: contractingWork.baseTotalSek,
+        baseTotalSek: contractingWork.baseTotalSek,
+        marginEnabled: false,
+        marginPercent: 0,
+        marginAmountSek: 0,
+        allowanceSek: contractingWork.allowanceSek,
+        lowerIndicativeSek: contractingWork.lowerIndicativeSek,
+        upperIndicativeSek: contractingWork.upperIndicativeSek,
+        ataEnabled: contractingWork.ataEnabled,
+        ataPercent: contractingWork.ataPercent
+    };
+}
 
 function adaptPreparedQuote(prepared: PreparedQuote) {
     const contractingWork = prepared.commercial.contractingWork;
@@ -52,6 +77,7 @@ function adaptPreparedQuote(prepared: PreparedQuote) {
 
     return {
         state,
+        contractingSummary: adaptPreparedContractingSummary(prepared),
         summaryData: {
             totals: productRows,
             grossTotalSek: productTotals.grossTotalSek,
@@ -76,8 +102,8 @@ export async function createQuotePdfBlob(
             return null;
         }
 
-        const { state, summaryData } = adaptPreparedQuote(prepared);
-        const result = await generatePDF(state, summaryData, true);
+        const { state, summaryData, contractingSummary } = adaptPreparedQuote(prepared);
+        const result = await generatePDF(state, summaryData, true, contractingSummary);
         return result ?? null;
     } catch (error) {
         console.error('Failed to load PDF export module:', error);

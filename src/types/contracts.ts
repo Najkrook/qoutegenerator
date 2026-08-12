@@ -611,6 +611,7 @@ export interface QuoteCommercialSnapshot {
     presentation: {
         exportLanguage: QuoteExportLanguage;
         pdfThemeId: PdfThemeId;
+        allowedPdfThemeIds: PdfThemeId[];
     };
     effectiveQuoteDate: string;
     productRows: QuoteCommercialSnapshotProductRow[];
@@ -1039,7 +1040,12 @@ export interface PdfTableOptions {
 export type PdfTableRow = string[];
 
 export interface PdfExportModule {
-    generatePDF: (state: QuoteState, summaryData: QuoteTotalsResult, returnBlob?: boolean) => Blob | Promise<Blob | null> | null;
+    generatePDF: (
+        state: QuoteState,
+        summaryData: QuoteTotalsResult,
+        returnBlob?: boolean,
+        preparedContractingSummary?: ContractingWorkSummary
+    ) => Blob | Promise<Blob | null> | null;
 }
 
 export interface QuoteRepository {

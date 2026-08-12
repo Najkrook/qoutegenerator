@@ -1,5 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { catalogData } from '../data/catalog';
 import { getCatalogLineName } from '../data/catalogLookup';
+import { computeQuoteTotals } from '../services/calculationEngine';
 import { quoteRepository } from '../services/quoteRepositoryClient';
 import {
     getOrderRequestStatusLabel,
@@ -7,7 +9,7 @@ import {
     orderRequestService
 } from '../services/orderRequestService';
 import { createQuotePdfBlob } from '../services/quotePdfService';
-import { restorePreparedQuote, type PreparedQuote } from '../services/quotePreparation';
+import { prepareQuote, restorePreparedQuote, type PreparedQuote } from '../services/quotePreparation';
 import {
     notifyError,
     notifyInfo,
@@ -42,6 +44,12 @@ interface OrderRequestItemOverviewRow {
 interface OrderRequestItemOverviewState {
     status: OrderRequestItemOverviewStatus;
     rows: OrderRequestItemOverviewRow[];
+    usesCurrentCatalog?: boolean;
+}
+
+interface SubmittedQuoteData {
+    preparedQuote: PreparedQuote;
+    usesCurrentCatalog: boolean;
 }
 
 function formatCurrencySek(value: number): string {
@@ -78,7 +86,7 @@ function buildOrderRequestItemsCacheKey(request: OrderRequestRecord): string {
 
 async function loadSubmittedQuoteData(
     request: OrderRequestRecord
-): Promise<PreparedQuote | null> {
+): Promise<SubmittedQuoteData | null> {
     const revision = await quoteRepository.getQuoteRevisionByVersion({
         userId: request.quoteOwnerUid,
         quoteId: request.quoteId,
@@ -97,16 +105,35 @@ async function loadSubmittedQuoteData(
         'draft'
     );
     const state = hydrateQuoteState(payload);
-    return restorePreparedQuote({
-        state,
-        commercialSnapshot: revision.commercialSnapshot,
-        quoteIdentity: {
-            quoteId: request.quoteId,
-            quoteNumber: request.quoteNumber,
-            version: request.quoteVersion,
-            status: state.quoteStatus
-        }
-    });
+    const quoteIdentity = {
+        quoteId: request.quoteId,
+        quoteNumber: request.quoteNumber,
+        version: request.quoteVersion,
+        status: state.quoteStatus
+    };
+
+    if (revision.commercialSnapshot) {
+        return {
+            preparedQuote: restorePreparedQuote({
+                state,
+                commercialSnapshot: revision.commercialSnapshot,
+                quoteIdentity
+            }),
+            usesCurrentCatalog: false
+        };
+    }
+
+    const totals = computeQuoteTotals({ state, catalogData });
+    return {
+        preparedQuote: prepareQuote({
+            state,
+            totals,
+            audience: { isRetailer: true, allowedPdfThemes: [] },
+            fallbackDate: new Date().toISOString().slice(0, 10),
+            catalogData
+        }),
+        usesCurrentCatalog: true
+    };
 }
 
 function buildOrderRequestItemOverviewRows(preparedQuote: PreparedQuote): OrderRequestItemOverviewRow[] {
@@ -175,8 +202,8 @@ export function RetailerOrderRequests({ onBack }: RetailerOrderRequestsProps) {
     );
     const selectedRequestItemsKey = selectedRequest ? buildOrderRequestItemsCacheKey(selectedRequest) : '';
     const selectedRequestItems = selectedRequestItemsKey
-        ? itemOverviewByKey[selectedRequestItemsKey] || { status: 'idle', rows: [] }
-        : { status: 'idle', rows: [] };
+        ? itemOverviewByKey[selectedRequestItemsKey] || { status: 'idle', rows: [], usesCurrentCatalog: false }
+        : { status: 'idle', rows: [], usesCurrentCatalog: false };
 
     const loadOrderRequestItems = useCallback(async (request: OrderRequestRecord): Promise<void> => {
         const cacheKey = buildOrderRequestItemsCacheKey(request);
@@ -201,9 +228,9 @@ export function RetailerOrderRequests({ onBack }: RetailerOrderRequestsProps) {
         }));
 
         try {
-            const preparedQuote = await loadSubmittedQuoteData(request);
+            const submittedQuoteData = await loadSubmittedQuoteData(request);
 
-            if (!preparedQuote) {
+            if (!submittedQuoteData) {
                 const missingState: OrderRequestItemOverviewState = {
                     status: 'missing',
                     rows: []
@@ -222,7 +249,8 @@ export function RetailerOrderRequests({ onBack }: RetailerOrderRequestsProps) {
 
             const readyState: OrderRequestItemOverviewState = {
                 status: 'ready',
-                rows: buildOrderRequestItemOverviewRows(preparedQuote)
+                rows: buildOrderRequestItemOverviewRows(submittedQuoteData.preparedQuote),
+                usesCurrentCatalog: submittedQuoteData.usesCurrentCatalog
             };
 
             itemOverviewCacheRef.current = {
@@ -290,14 +318,18 @@ export function RetailerOrderRequests({ onBack }: RetailerOrderRequestsProps) {
 
         setExportingId(selectedRequest.id);
         try {
-            const preparedQuote = await loadSubmittedQuoteData(selectedRequest);
+            const submittedQuoteData = await loadSubmittedQuoteData(selectedRequest);
 
-            if (!preparedQuote) {
+            if (!submittedQuoteData) {
                 notifyError('Kunde inte hitta den sparade offertversionen för orderförfrågan.');
                 return;
             }
 
-            const pdfBlob = await createQuotePdfBlob(preparedQuote);
+            if (submittedQuoteData.usesCurrentCatalog) {
+                notifyWarn('Äldre offertversion: PDF:en återskapas med dagens produktkatalog och kan avvika från den ursprungliga offerten.');
+            }
+
+            const pdfBlob = await createQuotePdfBlob(submittedQuoteData.preparedQuote);
 
             if (!pdfBlob) {
                 notifyError('Kunde inte skapa PDF för den valda offertversionen.');
@@ -502,6 +534,16 @@ export function RetailerOrderRequests({ onBack }: RetailerOrderRequestsProps) {
                                         Snabböversikt från offertversion v{selectedRequest.quoteVersion}.
                                     </span>
                                 </div>
+
+                                {selectedRequestItems.usesCurrentCatalog && (
+                                    <div
+                                        role="status"
+                                        data-testid="legacy-order-catalog-warning"
+                                        className="mt-4 rounded-lg border border-amber-400/40 bg-amber-400/10 p-4 text-sm text-text-primary"
+                                    >
+                                        Äldre offertversion: produkter och priser återskapas med dagens produktkatalog och kan avvika från den ursprungliga offerten. Orderförfrågan är fortfarande kopplad till offertversion v{selectedRequest.quoteVersion}.
+                                    </div>
+                                )}
 
                                 {selectedRequestItems.status === 'loading' || selectedRequestItems.status === 'idle' ? (
                                     <p className="mt-4 text-sm italic text-text-secondary">Laddar produkter från sparad offertversion...</p>

@@ -548,6 +548,76 @@ describe('pdfExport helpers', () => {
         expect(textValues).not.toContain('Total excl. VAT:');
     });
 
+    it('renders frozen prepared contracting rows and aggregate amounts without recalculating them', () => {
+        const state = createZeroDiscountState({
+            exportLanguage: 'en',
+            builderItems: [],
+            gridSelections: {},
+            customCosts: [],
+            contractingWork: {
+                enabled: true,
+                projectName: 'Frozen project',
+                rows: [{
+                    id: 'current-row',
+                    workPackage: 'Current mutable work',
+                    scope: 'Must not be rendered',
+                    unit: 'project',
+                    priceExVatSek: 9999
+                }],
+                margin: { enabled: true, percent: 50 },
+                ata: { enabled: true, percent: 50 }
+            }
+        });
+        const summary = computeQuoteTotals({ state, catalogData: createCatalogFixture() });
+        const frozenContractingSummary = {
+            activeRows: [{
+                id: 'saved-row',
+                workPackage: 'Saved installation',
+                scope: 'Frozen customer scope',
+                unit: 'project',
+                priceExVatSek: 1225
+            }],
+            customerRows: [{
+                id: 'saved-row',
+                workPackage: 'Saved installation',
+                scope: 'Frozen customer scope',
+                unit: 'project',
+                priceExVatSek: 1225
+            }],
+            costTotalSek: 1225,
+            baseTotalSek: 1225,
+            marginEnabled: false,
+            marginPercent: 0,
+            marginAmountSek: 0,
+            allowanceSek: 123,
+            lowerIndicativeSek: 1102,
+            upperIndicativeSek: 1348,
+            ataEnabled: true,
+            ataPercent: 10
+        };
+
+        const pdfBlob = generatePDF(state, summary, true, frozenContractingSummary);
+        const textValues = pdfMockState.textCalls.map((call) => call.value);
+        const contractingTable = pdfMockState.autoTableCalls[0];
+
+        expect(pdfBlob).toBeInstanceOf(Blob);
+        expect(contractingTable.body).toEqual([[
+            'Saved installation',
+            'Frozen customer scope',
+            'project',
+            '1 225 SEK'
+        ]]);
+        expect(textValues).toEqual(expect.arrayContaining([
+            '1 225 SEK',
+            'Variation work allowance (±10%)',
+            '123 SEK',
+            '1 102 SEK',
+            '1 348 SEK'
+        ]));
+        expect([...textValues, ...contractingTable.body.flat()].join(' '))
+            .not.toMatch(/Current mutable work|9 999|14 999/);
+    });
+
     it('keeps mixed product and contracting sections separate in the PDF', () => {
         const state = createZeroDiscountState({
             contractingWork: {

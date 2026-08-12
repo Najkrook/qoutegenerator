@@ -40,7 +40,11 @@ function revision(overrides = {}) {
 function commercialSnapshot(overrides = {}) {
     return {
         schemaVersion: 1,
-        presentation: { exportLanguage: 'sv', pdfThemeId: 'brixx' },
+        presentation: {
+            exportLanguage: 'sv',
+            pdfThemeId: 'brixx',
+            allowedPdfThemeIds: ['brixx']
+        },
         effectiveQuoteDate: '2026-05-21',
         productRows: [{
             model: 'BaHaMa Jumbrella',
@@ -57,7 +61,7 @@ function commercialSnapshot(overrides = {}) {
             line: 'BaHaMa'
         }],
         productTotals: {
-            includesVat: false,
+            includesVat: true,
             grossTotalSek: 1000,
             totalDiscountSek: 0,
             finalTotalSek: 1000,
@@ -199,7 +203,7 @@ describeQuoteRules('Quote Save Firestore rules', () => {
         ));
     });
 
-    it('accepts the versioned commercial snapshot envelope and rejects unknown top-level fields', async () => {
+    it('accepts the versioned commercial snapshot envelope and rejects unknown fixed nested fields', async () => {
         const db = testEnv.authenticatedContext('owner-uid').firestore();
         await assertSucceeds(setDoc(
             doc(db, 'users', 'owner-uid', 'quotes', 'quote-1', 'revisions', 'intent_snapshot'),
@@ -210,6 +214,50 @@ describeQuoteRules('Quote Save Firestore rules', () => {
             revision({
                 commercialSnapshot: commercialSnapshot({ marginAnalysis: { profit: 999999 } }),
                 saveIntentId: 'bad-snapshot'
+            })
+        ));
+        await assertFails(setDoc(
+            doc(db, 'users', 'owner-uid', 'quotes', 'quote-1', 'revisions', 'intent_bad-totals'),
+            revision({
+                commercialSnapshot: commercialSnapshot({
+                    productTotals: {
+                        ...commercialSnapshot().productTotals,
+                        marginAnalysis: { profit: 999999 }
+                    }
+                }),
+                saveIntentId: 'bad-totals'
+            })
+        ));
+        await assertFails(setDoc(
+            doc(db, 'users', 'owner-uid', 'quotes', 'quote-1', 'revisions', 'intent_bad-theme'),
+            revision({
+                commercialSnapshot: commercialSnapshot({
+                    presentation: {
+                        ...commercialSnapshot().presentation,
+                        allowedPdfThemeIds: ['brixx'],
+                        internalThemePolicy: true
+                    }
+                }),
+                saveIntentId: 'bad-theme'
+            })
+        ));
+        await assertFails(setDoc(
+            doc(db, 'users', 'owner-uid', 'quotes', 'quote-1', 'revisions', 'intent_bad-work'),
+            revision({
+                commercialSnapshot: commercialSnapshot({
+                    contractingWork: {
+                        projectName: 'Projekt',
+                        rows: [],
+                        baseTotalSek: 0,
+                        ataEnabled: false,
+                        ataPercent: 15,
+                        allowanceSek: 0,
+                        lowerIndicativeSek: 0,
+                        upperIndicativeSek: 0,
+                        internalMargins: { BaHaMa: 55 }
+                    }
+                }),
+                saveIntentId: 'bad-work'
             })
         ));
     });

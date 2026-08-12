@@ -471,6 +471,27 @@ describe('prepareQuote', () => {
         expect(nextDay.presentation.equivalenceKey).not.toBe(first.presentation.equivalenceKey);
     });
 
+    it('fails deterministically when neither the quote nor caller supplies a valid date', () => {
+        const state = createState({
+            customerInfo: {
+                ...createState().customerInfo,
+                date: ''
+            }
+        });
+
+        expect(() => prepareQuote({
+            state,
+            totals: createTotals(),
+            audience: { isRetailer: false }
+        })).toThrow(/customerInfo\.date/u);
+        expect(() => prepareQuote({
+            state,
+            totals: createTotals(),
+            fallbackDate: 'not-a-date',
+            audience: { isRetailer: false }
+        })).toThrow(/customerInfo\.date/u);
+    });
+
     it('does not mutate inputs and produces equal values and keys for equivalent inputs', () => {
         const state = createState();
         const totals = createTotals();

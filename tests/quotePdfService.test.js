@@ -18,6 +18,10 @@ function createPreparedQuote() {
         exportLanguage: 'en',
         pdfThemeId: 'roslagsmarkisen',
         hideZeroDiscountReferencesInPdf: true,
+        customerInfo: {
+            ...createInitialQuoteState().customerInfo,
+            date: '2026-08-12'
+        },
         contractingWork: {
             enabled: true,
             projectName: 'Terrace',
@@ -102,7 +106,33 @@ describe('createQuotePdfBlob', () => {
                 finalTotalSek: 1000,
                 globalDiscountAmt: 0
             }),
-            true
+            true,
+            {
+                activeRows: [{
+                    id: 'work-1',
+                    workPackage: 'Installation',
+                    scope: 'Complete installation',
+                    unit: 'project',
+                    priceExVatSek: 1200
+                }],
+                customerRows: [{
+                    id: 'work-1',
+                    workPackage: 'Installation',
+                    scope: 'Complete installation',
+                    unit: 'project',
+                    priceExVatSek: 1200
+                }],
+                costTotalSek: 1200,
+                baseTotalSek: 1200,
+                marginEnabled: false,
+                marginPercent: 0,
+                marginAmountSek: 0,
+                allowanceSek: 120,
+                lowerIndicativeSek: 1080,
+                upperIndicativeSek: 1320,
+                ataEnabled: true,
+                ataPercent: 10
+            }
         );
     });
 

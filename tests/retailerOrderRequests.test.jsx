@@ -117,7 +117,7 @@ function formatSek(value) {
 function snapshotFromTotals(totals) {
     return {
         schemaVersion: 1,
-        presentation: { exportLanguage: 'sv', pdfThemeId: 'brixx' },
+        presentation: { exportLanguage: 'sv', pdfThemeId: 'brixx', allowedPdfThemeIds: ['brixx'] },
         effectiveQuoteDate: '2026-05-21',
         productRows: totals.totals.map((row) => ({
             model: row.model,
@@ -134,7 +134,7 @@ function snapshotFromTotals(totals) {
             line: row.line
         })),
         productTotals: {
-            includesVat: false,
+            includesVat: true,
             grossTotalSek: totals.grossTotalSek,
             totalDiscountSek: totals.totalDiscountSek,
             finalTotalSek: totals.finalTotalSek,
@@ -382,7 +382,7 @@ describe('RetailerOrderRequests', () => {
             summary: { finalTotalSek: 11134, grossTotalSek: 11134, totalDiscountSek: 0 },
             commercialSnapshot: {
                 schemaVersion: 1,
-                presentation: { exportLanguage: 'en', pdfThemeId: 'brixx' },
+                presentation: { exportLanguage: 'en', pdfThemeId: 'brixx', allowedPdfThemeIds: ['brixx'] },
                 effectiveQuoteDate: '2026-05-21',
                 productRows: [{
                     model: 'Frozen catalog name',
@@ -399,7 +399,7 @@ describe('RetailerOrderRequests', () => {
                     line: 'ClickitUp'
                 }],
                 productTotals: {
-                    includesVat: false,
+                    includesVat: true,
                     grossTotalSek: 11134,
                     totalDiscountSek: 0,
                     finalTotalSek: 11134,
@@ -431,6 +431,66 @@ describe('RetailerOrderRequests', () => {
         expect(createQuotePdfBlob).toHaveBeenCalledWith(expect.objectContaining({
             commercial: expect.objectContaining({
                 productRows: [expect.objectContaining({ model: 'Frozen catalog name', unitPrice: 11134 })]
+            })
+        }));
+    });
+
+    it('keeps a legacy request on its original version while clearly warning about current-catalog reconstruction', async () => {
+        quoteRepositoryMocks.getQuoteRevisionByVersion.mockResolvedValue({
+            revisionId: 'quote-1-revision-2',
+            quoteId: 'quote-1',
+            version: 2,
+            state: {
+                ...createInitialQuoteState(),
+                activeQuoteId: 'quote-1',
+                quoteNumber: 'BRIXX - 260521-101',
+                activeQuoteVersion: 2,
+                selectedLines: ['BaHaMa'],
+                customerInfo: {
+                    ...createInitialQuoteState().customerInfo,
+                    date: '2026-05-21'
+                }
+            },
+            summary: { finalTotalSek: 20200, grossTotalSek: 24300, totalDiscountSek: 4100 },
+            commercialSnapshot: null,
+            savedAtMs: 100,
+            savedBy: 'retailer@example.com',
+            savedByUid: 'retailer-1',
+            changeNote: ''
+        });
+
+        const { container } = await renderRetailerOrders();
+        const itemsSection = getItemsSection(container);
+
+        expect(itemsSection.textContent).toContain('BaHaMa Jumbrella');
+        expect(itemsSection.textContent).toContain('dagens produktkatalog');
+        expect(itemsSection.textContent).toContain('offertversion v2');
+        expect(calculationMocks.computeQuoteTotals).toHaveBeenCalledWith(expect.objectContaining({
+            catalogData: expect.any(Object),
+            state: expect.objectContaining({
+                activeQuoteId: 'quote-1',
+                activeQuoteVersion: 2
+            })
+        }));
+        expect(quoteRepositoryMocks.getQuoteRevisionByVersion).toHaveBeenCalledWith({
+            userId: 'retailer-1',
+            quoteId: 'quote-1',
+            version: 2
+        });
+
+        await act(async () => {
+            findButton(container, 'Exportera PDF').click();
+        });
+        await flushUi();
+
+        expect(notificationMocks.notifyWarn).toHaveBeenCalledWith(expect.stringContaining('dagens produktkatalog'));
+        expect(createQuotePdfBlob).toHaveBeenCalledWith(expect.objectContaining({
+            agreement: expect.objectContaining({
+                quoteIdentity: expect.objectContaining({
+                    quoteId: 'quote-1',
+                    quoteNumber: 'BRIXX - 260521-101',
+                    version: 2
+                })
             })
         }));
     });

@@ -345,6 +345,10 @@ export function createOrderRequestService(deps: OrderRequestServiceDeps = {}): O
         const preparedQuote = restorePreparedQuote({
             state: savedState,
             commercialSnapshot: revision.commercialSnapshot,
+            audience: {
+                isRetailer: true,
+                allowedPdfThemes: retailer.pdfThemes || []
+            },
             quoteIdentity: {
                 quoteId: normalizedQuoteId,
                 quoteNumber: latest.metadata.quoteNumber,

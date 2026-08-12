@@ -1,7 +1,12 @@
 import { jsPDF } from 'jspdf';
 import { notifyWarn, notifyError } from '../services/notificationService';
 import { calculateContractingWorkSummary } from '../services/contractingWork';
-import type { CustomerInfo, QuoteState, QuoteTotalsResult } from '../types/contracts';
+import type {
+    ContractingWorkSummary,
+    CustomerInfo,
+    QuoteState,
+    QuoteTotalsResult
+} from '../types/contracts';
 import {
     getPdfLayout,
     drawHeader,
@@ -89,7 +94,8 @@ export function computeValidUntilDateString(
 export function generatePDF(
     state: PdfExportState,
     summaryData: PdfSummaryData,
-    returnBlob = false
+    returnBlob = false,
+    preparedContractingSummary?: ContractingWorkSummary
 ): Blob | null {
     const doc = createPdfDocument();
 
@@ -106,7 +112,9 @@ export function generatePDF(
         const exportLanguage = state.exportLanguage || 'sv';
         const productRows = Array.isArray(summaryData.totals) ? summaryData.totals : [];
         const hasProducts = productRows.length > 0;
-        const hasContractingWork = calculateContractingWorkSummary(state.contractingWork).activeRows.length > 0;
+        const contractingSummary = preparedContractingSummary
+            ?? calculateContractingWorkSummary(state.contractingWork);
+        const hasContractingWork = contractingSummary.activeRows.length > 0;
         const shouldRenderLegacyEmptyProductSection = !hasProducts && !hasContractingWork;
         const drawMainHeader = () => drawHeader(doc, {
             pageWidth,
@@ -181,6 +189,7 @@ export function generatePDF(
         if (hasContractingWork) {
             finalY = renderContractingWorkSection(doc, {
                 contractingWork: state.contractingWork,
+                summary: contractingSummary,
                 formatSEK: formatSek,
                 currentY: hasProducts ? finalY + 12 : finalY,
                 pageWidth,
