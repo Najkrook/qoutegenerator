@@ -3,13 +3,32 @@ import { createQuoteSaveModule } from '../src/services/quoteSaveService';
 import { createQuoteRepository } from '../src/services/quoteRepository';
 import { createInitialQuoteState } from '../src/store/quoteStateSchema';
 import { createFirestoreMock } from './fixtures/firestoreMock';
+import { catalogData } from '../src/data/catalog';
+import { computeQuoteTotals } from '../src/services/calculationEngine';
 
 const ACTOR = { uid: 'actor-1', email: 'sales@example.com' };
 const SUMMARY = {
-    finalTotalSek: 125000,
+    finalTotalSek: 126000,
     grossTotalSek: 140000,
-    totalDiscountSek: 15000,
-    totals: [],
+    totalDiscountSek: 14000,
+    totals: [{
+        model: 'Jumbrella',
+        size: '4x4',
+        unitPrice: 140000,
+        qty: 1,
+        gross: 140000,
+        discountPct: 10,
+        discountSek: 14000,
+        net: 126000,
+        isAddon: false,
+        source: { type: 'builder', itemId: 'item-1' },
+        line: 'BaHaMa',
+        sortModel: 'Jumbrella',
+        sortSizeRaw: '4x4',
+        sortKind: 'dimension',
+        sortDimensions: [4, 4],
+        originalIndex: 0
+    }],
     globalDiscountAmt: 0
 };
 
@@ -269,6 +288,68 @@ describe('Quote Save module', () => {
             latestSaveIntentId: 'intent-1'
         });
         expect(revisionPaths(harness.firestore, 'actor-1', result.quote.quoteId)).toHaveLength(1);
+    });
+
+    it('persists a frozen commercial snapshot through the deep Quote Save seam', async () => {
+        const originalCatalog = structuredClone(catalogData);
+        const harness = createHarness({
+            moduleOptions: {
+                catalogData: originalCatalog,
+                calculateTotals: (draft) => computeQuoteTotals({
+                    state: draft,
+                    catalogData: originalCatalog
+                }),
+                today: () => '2026-08-12'
+            }
+        });
+        const initial = createInitialQuoteState();
+        const state = quoteState({
+            builderItems: [],
+            selectedLines: ['ClickitUp'],
+            exportLanguage: 'en',
+            customerInfo: {
+                ...initial.customerInfo,
+                company: 'Family Restaurant AB',
+                date: ''
+            },
+            gridSelections: {
+                ClickitUp: {
+                    items: {
+                        'ClickitUp Sektion|1000': { qty: 1, discountPct: 0 }
+                    },
+                    addons: {},
+                    customAddonsByCategory: {},
+                    customItems: []
+                }
+            }
+        });
+
+        const result = await harness.module.save({
+            actor: ACTOR,
+            state,
+            target: { kind: 'new' }
+        });
+        const saved = await harness.repository.getQuoteLatestRevision({
+            userId: ACTOR.uid,
+            quoteId: result.quote.quoteId
+        });
+
+        expect(saved.revision.state.customerInfo.date).toBe('2026-08-12');
+        expect(saved.revision.commercialSnapshot).toMatchObject({
+            schemaVersion: 1,
+            effectiveQuoteDate: '2026-08-12',
+            productTotals: {
+                finalTotalSek: 14158
+            }
+        });
+        expect(saved.revision.commercialSnapshot.productRows).toEqual(expect.arrayContaining([
+            expect.objectContaining({
+                model: 'ClickitUp section',
+                unitPrice: 11134,
+                qty: 1
+            })
+        ]));
+        expect(saved.revision.state).not.toHaveProperty('commercialSnapshot');
     });
 
     it('preserves Quote Owner and Quote Origin across revisions saved by another actor', async () => {

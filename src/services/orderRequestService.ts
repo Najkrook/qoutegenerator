@@ -6,9 +6,7 @@ import type {
     OrderRequestRecord,
     OrderRequestService,
     OrderRequestStatus,
-    QuoteState,
-    QuoteSummary,
-    QuoteTotalsResult,
+    QuoteRepository,
     RawOrderRequestDoc,
     RetailerRecord,
     SubscribeOrderRequestByIdInput,
@@ -32,6 +30,8 @@ import {
 } from './firebase';
 import { safeLogActivity } from './activityLogService';
 import { readSnapshotData } from '../utils/runtime';
+import { hydrateQuoteState } from '../store/quoteStateSchema';
+import { restorePreparedQuote, type PreparedQuote } from './quotePreparation';
 
 const ORDER_REQUEST_COLLECTION = 'order_requests';
 const ORDER_REQUEST_STATUS_VALUES: OrderRequestStatus[] = ['new', 'reviewing', 'completed'];
@@ -59,6 +59,7 @@ interface OrderRequestServiceDeps {
         }) => void,
         onError?: (error: unknown) => void
     ) => () => void;
+    quoteRepository?: Pick<QuoteRepository, 'getQuoteLatestRevision' | 'getQuoteRevisionByVersion'>;
 }
 
 function isObject(value: unknown): value is UnknownRecord {
@@ -135,19 +136,18 @@ export function normalizeOrderRequestRecord(source: { id?: unknown; data?: (() =
 function buildOrderRequestPayload({
     user,
     retailer,
-    state,
-    summary,
+    preparedQuote,
     nowMs
 }: {
     user: AccessUser;
     retailer: RetailerRecord;
-    state: QuoteState;
-    summary: QuoteSummary | QuoteTotalsResult;
+    preparedQuote: PreparedQuote;
     nowMs: number;
 }): OrderRequestRecord {
-    const quoteId = String(state.activeQuoteId || '').trim();
-    const quoteNumber = String(state.quoteNumber || '').trim();
-    const quoteVersion = Math.max(1, toNumber(state.activeQuoteVersion, 1));
+    const quoteIdentity = preparedQuote.agreement.quoteIdentity;
+    const quoteId = String(quoteIdentity.quoteId || '').trim();
+    const quoteNumber = String(quoteIdentity.quoteNumber || '').trim();
+    const quoteVersion = Math.max(1, toNumber(quoteIdentity.version, 1));
     const retailerId = String(retailer.id || '').trim();
     const retailerName = String(retailer.name || '').trim();
     const retailerEmail = String(retailer.email || user.email || '').trim().toLowerCase();
@@ -163,7 +163,8 @@ function buildOrderRequestPayload({
     }
 
     const id = buildOrderRequestId(quoteId, quoteVersion);
-    const customerName = String(state.customerInfo.name || state.customerInfo.company || '').trim();
+    const customerInfo = preparedQuote.agreement.customerInfo;
+    const customerName = String(customerInfo.name || customerInfo.company || '').trim();
 
     return {
         id,
@@ -175,11 +176,11 @@ function buildOrderRequestPayload({
         retailerName,
         retailerEmail,
         customerName,
-        company: String(state.customerInfo.company || '').trim(),
-        reference: String(state.customerInfo.reference || '').trim(),
-        customerReference: String(state.customerInfo.customerReference || '').trim(),
-        selectedLines: Array.isArray(state.selectedLines) ? [...state.selectedLines].map((line) => String(line || '')) : [],
-        totalSek: toNumber(summary.finalTotalSek, 0),
+        company: String(customerInfo.company || '').trim(),
+        reference: String(customerInfo.reference || '').trim(),
+        customerReference: String(customerInfo.customerReference || '').trim(),
+        selectedLines: preparedQuote.persistenceSnapshot.selectedLines.map((line) => String(line || '')),
+        totalSek: preparedQuote.commercial.productTotals.finalTotalSek,
         status: 'new',
         createdAtMs: nowMs,
         updatedAtMs: nowMs,
@@ -238,7 +239,8 @@ export function createOrderRequestService(deps: OrderRequestServiceDeps = {}): O
         orderBy: makeOrderBy,
         where: makeWhere,
         limit: makeLimit,
-        onSnapshot: subscribeToSnapshot
+        onSnapshot: subscribeToSnapshot,
+        quoteRepository: quoteRevisionRepository
     } = deps;
 
     function assertDeps(names: string[]): void {
@@ -301,8 +303,8 @@ export function createOrderRequestService(deps: OrderRequestServiceDeps = {}): O
     async function createOrderRequest({
         user,
         retailer,
-        state,
-        summary
+        quoteId,
+        quoteVersion
     }: CreateOrderRequestInput): Promise<OrderRequestRecord> {
         assertDeps(['db', 'doc', 'getDoc', 'setDoc']);
         if (!user?.uid) {
@@ -311,13 +313,51 @@ export function createOrderRequestService(deps: OrderRequestServiceDeps = {}): O
         if (!retailer) {
             throw new Error('Order request requires a retailer profile.');
         }
+        const normalizedQuoteId = String(quoteId || '').trim();
+        const normalizedQuoteVersion = Math.max(1, toNumber(quoteVersion, 0));
+        if (!normalizedQuoteId || !quoteVersion) {
+            throw new Error('Order request requires a saved quote version.');
+        }
+
+        const revisionRepository = quoteRevisionRepository
+            || (await import('./quoteRepositoryClient')).quoteRepository;
+        const [latest, revision] = await Promise.all([
+            revisionRepository.getQuoteLatestRevision({
+                userId: String(user.uid),
+                quoteId: normalizedQuoteId
+            }),
+            revisionRepository.getQuoteRevisionByVersion({
+                userId: String(user.uid),
+                quoteId: normalizedQuoteId,
+                version: normalizedQuoteVersion
+            })
+        ]);
+        if (!latest?.metadata || !revision) {
+            throw new Error('Saved quote revision not found.');
+        }
+
+        const savedState = hydrateQuoteState({
+            ...revision.state,
+            activeQuoteId: normalizedQuoteId,
+            quoteNumber: latest.metadata.quoteNumber,
+            activeQuoteVersion: normalizedQuoteVersion
+        });
+        const preparedQuote = restorePreparedQuote({
+            state: savedState,
+            commercialSnapshot: revision.commercialSnapshot,
+            quoteIdentity: {
+                quoteId: normalizedQuoteId,
+                quoteNumber: latest.metadata.quoteNumber,
+                version: normalizedQuoteVersion,
+                status: savedState.quoteStatus
+            }
+        });
 
         const nowMs = Date.now();
         const record = buildOrderRequestPayload({
             user,
             retailer,
-            state,
-            summary,
+            preparedQuote,
             nowMs
         });
         const ref = makeDoc(dbRef, ORDER_REQUEST_COLLECTION, record.id);

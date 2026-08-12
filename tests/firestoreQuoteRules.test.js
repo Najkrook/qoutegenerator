@@ -37,6 +37,42 @@ function revision(overrides = {}) {
     };
 }
 
+function commercialSnapshot(overrides = {}) {
+    return {
+        schemaVersion: 1,
+        presentation: { exportLanguage: 'sv', pdfThemeId: 'brixx' },
+        effectiveQuoteDate: '2026-05-21',
+        productRows: [{
+            model: 'BaHaMa Jumbrella',
+            size: '3x3',
+            unitPrice: 1000,
+            qty: 1,
+            gross: 1000,
+            discountPct: 0,
+            discountSek: 0,
+            net: 1000,
+            isAddon: false,
+            isCustom: false,
+            priceUponRequest: false,
+            line: 'BaHaMa'
+        }],
+        productTotals: {
+            includesVat: false,
+            grossTotalSek: 1000,
+            totalDiscountSek: 0,
+            finalTotalSek: 1000,
+            globalDiscountAmt: 0,
+            globalDiscountPct: 0,
+            vatBasisSek: 1000,
+            vatAmountSek: 250,
+            totalWithVatSek: 1250
+        },
+        contractingWork: null,
+        visibility: { contractingWork: 'absent', discountReferences: 'visible' },
+        ...overrides
+    };
+}
+
 function crmIssue(overrides = {}) {
     return {
         code: 'unavailable',
@@ -160,6 +196,21 @@ describeQuoteRules('Quote Save Firestore rules', () => {
         await assertFails(setDoc(
             doc(db, 'users', 'owner-uid', 'quotes', 'quote-1', 'revisions', 'intent_other'),
             revision({ saveIntentId: 'same-intent' })
+        ));
+    });
+
+    it('accepts the versioned commercial snapshot envelope and rejects unknown top-level fields', async () => {
+        const db = testEnv.authenticatedContext('owner-uid').firestore();
+        await assertSucceeds(setDoc(
+            doc(db, 'users', 'owner-uid', 'quotes', 'quote-1', 'revisions', 'intent_snapshot'),
+            revision({ commercialSnapshot: commercialSnapshot(), saveIntentId: 'snapshot' })
+        ));
+        await assertFails(setDoc(
+            doc(db, 'users', 'owner-uid', 'quotes', 'quote-1', 'revisions', 'intent_bad-snapshot'),
+            revision({
+                commercialSnapshot: commercialSnapshot({ marginAnalysis: { profit: 999999 } }),
+                saveIntentId: 'bad-snapshot'
+            })
         ));
     });
 });

@@ -99,12 +99,10 @@ vi.mock('../src/views/historyPayload', () => ({
         quoteStatus
     })
 }));
-vi.mock('../src/store/quoteStateSchema', () => ({
-    hydrateQuoteState: (input) => input
-}));
-
 import { RetailerOrderRequests } from '../src/views/RetailerOrderRequests';
 import { AuthContext } from '../src/store/AuthContext';
+import { createInitialQuoteState } from '../src/store/quoteStateSchema';
+import { createQuotePdfBlob } from '../src/services/quotePdfService';
 
 const mountedRoots = [];
 
@@ -114,6 +112,41 @@ function formatSek(value) {
         currency: 'SEK',
         maximumFractionDigits: 0
     }).format(value);
+}
+
+function snapshotFromTotals(totals) {
+    return {
+        schemaVersion: 1,
+        presentation: { exportLanguage: 'sv', pdfThemeId: 'brixx' },
+        effectiveQuoteDate: '2026-05-21',
+        productRows: totals.totals.map((row) => ({
+            model: row.model,
+            size: row.size,
+            unitPrice: row.unitPrice,
+            qty: row.qty,
+            gross: row.gross,
+            discountPct: row.discountPct,
+            discountSek: row.discountSek,
+            net: row.net,
+            isAddon: row.isAddon === true,
+            isCustom: row.isCustom === true,
+            priceUponRequest: row.priceUponRequest === true,
+            line: row.line
+        })),
+        productTotals: {
+            includesVat: false,
+            grossTotalSek: totals.grossTotalSek,
+            totalDiscountSek: totals.totalDiscountSek,
+            finalTotalSek: totals.finalTotalSek,
+            globalDiscountAmt: totals.globalDiscountAmt,
+            globalDiscountPct: 0,
+            vatBasisSek: totals.finalTotalSek,
+            vatAmountSek: totals.finalTotalSek * 0.25,
+            totalWithVatSek: totals.finalTotalSek * 1.25
+        },
+        contractingWork: null,
+        visibility: { contractingWork: 'suppressed-retailer', discountReferences: 'visible' }
+    };
 }
 
 function createAuthValue(overrides = {}) {
@@ -213,12 +246,14 @@ beforeEach(() => {
             return null;
         }
 
+        const totals = calculationMocks.computeQuoteTotals({ state: { activeQuoteId: quoteId } });
         return {
             revisionId: `${quoteId}-revision-${version}`,
             quoteId,
             version,
             state: { quoteId, version },
             summary: {},
+            commercialSnapshot: snapshotFromTotals(totals),
             savedAtMs: 100,
             savedBy: 'admin@example.com',
             savedByUid: 'admin-1',
@@ -332,6 +367,74 @@ afterEach(() => {
 });
 
 describe('RetailerOrderRequests', () => {
+    it('uses the saved commercial snapshot for the overview and PDF without recalculating the current catalog', async () => {
+        quoteRepositoryMocks.getQuoteRevisionByVersion.mockResolvedValue({
+            revisionId: 'quote-1-revision-2',
+            quoteId: 'quote-1',
+            version: 2,
+            state: {
+                ...createInitialQuoteState(),
+                activeQuoteId: 'quote-1',
+                quoteNumber: 'BRIXX - 260521-101',
+                activeQuoteVersion: 2,
+                selectedLines: ['ClickitUp']
+            },
+            summary: { finalTotalSek: 11134, grossTotalSek: 11134, totalDiscountSek: 0 },
+            commercialSnapshot: {
+                schemaVersion: 1,
+                presentation: { exportLanguage: 'en', pdfThemeId: 'brixx' },
+                effectiveQuoteDate: '2026-05-21',
+                productRows: [{
+                    model: 'Frozen catalog name',
+                    size: '1000',
+                    unitPrice: 11134,
+                    qty: 1,
+                    gross: 11134,
+                    discountPct: 0,
+                    discountSek: 0,
+                    net: 11134,
+                    isAddon: false,
+                    isCustom: false,
+                    priceUponRequest: false,
+                    line: 'ClickitUp'
+                }],
+                productTotals: {
+                    includesVat: false,
+                    grossTotalSek: 11134,
+                    totalDiscountSek: 0,
+                    finalTotalSek: 11134,
+                    globalDiscountAmt: 0,
+                    globalDiscountPct: 0,
+                    vatBasisSek: 11134,
+                    vatAmountSek: 2783.5,
+                    totalWithVatSek: 13917.5
+                },
+                contractingWork: null,
+                visibility: { contractingWork: 'suppressed-retailer', discountReferences: 'visible' }
+            },
+            savedAtMs: 100,
+            savedBy: 'admin@example.com',
+            savedByUid: 'admin-1',
+            changeNote: ''
+        });
+
+        const { container } = await renderRetailerOrders();
+        expect(getItemsSection(container).textContent).toContain('Frozen catalog name');
+        expect(getItemsSection(container).textContent).toContain(formatSek(11134));
+        expect(calculationMocks.computeQuoteTotals).not.toHaveBeenCalled();
+
+        await act(async () => {
+            findButton(container, 'Exportera PDF').click();
+        });
+        await flushUi();
+
+        expect(createQuotePdfBlob).toHaveBeenCalledWith(expect.objectContaining({
+            commercial: expect.objectContaining({
+                productRows: [expect.objectContaining({ model: 'Frozen catalog name', unitPrice: 11134 })]
+            })
+        }));
+    });
+
     it('renders the inbox list, request details, and compact product overview', async () => {
         const { container } = await renderRetailerOrders();
         const itemsSection = getItemsSection(container);

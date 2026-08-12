@@ -562,6 +562,66 @@ export interface QuoteTotalsResult extends QuoteSummary {
     globalDiscountAmt: number;
 }
 
+export interface QuoteCommercialSnapshotProductRow {
+    model: string;
+    size: string;
+    unitPrice: number;
+    qty: number;
+    gross: number;
+    discountPct: number;
+    discountSek: number;
+    net: number;
+    isAddon: boolean;
+    isCustom: boolean;
+    priceUponRequest: boolean;
+    line: string;
+}
+
+export interface QuoteCommercialSnapshotProductTotals {
+    includesVat: boolean;
+    grossTotalSek: number;
+    totalDiscountSek: number;
+    finalTotalSek: number;
+    globalDiscountAmt: number;
+    globalDiscountPct: number;
+    vatBasisSek: number;
+    vatAmountSek: number;
+    totalWithVatSek: number;
+}
+
+export interface QuoteCommercialSnapshotContractingWork {
+    projectName: string;
+    rows: Array<{
+        id: string;
+        workPackage: string;
+        scope: string;
+        unit: string;
+        priceExVatSek: number;
+    }>;
+    baseTotalSek: number;
+    ataEnabled: boolean;
+    ataPercent: number;
+    allowanceSek: number;
+    lowerIndicativeSek: number;
+    upperIndicativeSek: number;
+}
+
+export interface QuoteCommercialSnapshot {
+    schemaVersion: 1;
+    presentation: {
+        exportLanguage: QuoteExportLanguage;
+        pdfThemeId: PdfThemeId;
+    };
+    effectiveQuoteDate: string;
+    productRows: QuoteCommercialSnapshotProductRow[];
+    productTotals: QuoteCommercialSnapshotProductTotals;
+    contractingWork: QuoteCommercialSnapshotContractingWork | null;
+    visibility: {
+        contractingWork: 'visible' | 'absent' | 'suppressed-retailer';
+        discountReferences: 'visible' | 'hidden-zero';
+    };
+}
+
 export interface QuoteReference {
     ownerUid: string;
     quoteId: string;
@@ -631,6 +691,7 @@ export interface QuoteRevision {
     savedByUid: string;
     state: RepositoryQuoteStatePayload;
     summary: RepositoryQuoteSummaryPayload;
+    commercialSnapshot: QuoteCommercialSnapshot | null;
     changeNote: string;
     saveIntentId?: string | null;
 }
@@ -709,6 +770,7 @@ export interface QuoteRevisionSaveInput {
     quoteId: string;
     state: RepositoryQuoteStatePayload;
     summary: Partial<QuoteSummary> | RawQuoteSummary;
+    commercialSnapshot?: QuoteCommercialSnapshot | null;
     customerInfo?: Partial<CustomerInfo>;
     status?: QuoteStatus | string;
     changeNote?: string;
@@ -818,6 +880,7 @@ export interface RawQuoteRevisionDoc extends UnknownRecord {
     savedByUid?: unknown;
     state?: RepositoryQuoteStatePayload;
     summary?: RepositoryQuoteSummaryPayload;
+    commercialSnapshot?: unknown;
     changeNote?: unknown;
     saveIntentId?: unknown;
 }
@@ -831,8 +894,8 @@ export interface SavedQuoteLike {
 export interface CreateOrderRequestInput {
     user: AccessUser | null;
     retailer: RetailerRecord | null;
-    state: QuoteState;
-    summary: QuoteSummary | QuoteTotalsResult;
+    quoteId: string;
+    quoteVersion: number;
 }
 
 export interface GetOrderRequestByQuoteVersionInput {

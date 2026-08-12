@@ -16,7 +16,10 @@ function adaptPreparedQuote(prepared: PreparedQuote): {
     const contractingWork = prepared.commercial.contractingWork;
     const state: QuoteState = {
         ...prepared.persistenceSnapshot,
-        customerInfo: prepared.agreement.customerInfo,
+        customerInfo: {
+            ...prepared.agreement.customerInfo,
+            date: prepared.agreement.effectiveQuoteDate
+        },
         includesVat: prepared.commercial.productTotals.includesVat,
         exportLanguage: prepared.presentation.exportLanguage,
         pdfThemeId: prepared.presentation.pdfThemeId,
@@ -53,11 +56,15 @@ function adaptPreparedQuote(prepared: PreparedQuote): {
             }
     };
     const productTotals = prepared.commercial.productTotals;
+    const productRows = prepared.commercial.productRows.map((row, index) => ({
+        ...row,
+        source: { type: 'custom' as const, index }
+    }));
 
     return {
         state,
         summaryData: {
-            totals: prepared.commercial.productRows,
+            totals: productRows,
             grossTotalSek: productTotals.grossTotalSek,
             totalDiscountSek: productTotals.totalDiscountSek,
             finalTotalSek: productTotals.finalTotalSek,

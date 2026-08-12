@@ -601,8 +601,9 @@ service cloud.firestore {
       let state = request.resource.data.get('state', {});
       return request.resource.data.keys().hasOnly([
           'quoteId', 'version', 'savedAtMs', 'savedBy', 'savedByUid',
-          'state', 'summary', 'changeNote', 'saveIntentId'
+          'state', 'summary', 'commercialSnapshot', 'changeNote', 'saveIntentId'
         ])
+        && hasValidCommercialSnapshot()
         && hasCustomerSafeQuoteStateShape(state)
         && state.get('crmDealId', null) == null
         && state.get('crmSynchronizationIssue', null) == null
@@ -622,6 +623,26 @@ service cloud.firestore {
         && state.get('grossProfit', null) == null
         && state.get('actualMargin', null) == null
         && state.get('reviewCode', null) == null;
+    }
+
+    function hasValidCommercialSnapshot() {
+      let snapshot = request.resource.data.get('commercialSnapshot', null);
+      return snapshot == null || (
+        snapshot is map
+        && snapshot.keys().hasOnly([
+          'schemaVersion', 'presentation', 'effectiveQuoteDate', 'productRows',
+          'productTotals', 'contractingWork', 'visibility'
+        ])
+        && snapshot.schemaVersion == 1
+        && snapshot.presentation is map
+        && snapshot.presentation.keys().hasOnly(['exportLanguage', 'pdfThemeId'])
+        && snapshot.effectiveQuoteDate is string
+        && snapshot.productRows is list
+        && snapshot.productTotals is map
+        && (snapshot.contractingWork == null || snapshot.contractingWork is map)
+        && snapshot.visibility is map
+        && snapshot.visibility.keys().hasOnly(['contractingWork', 'discountReferences'])
+      );
     }
 
     function hasValidQuoteRevisionSaveIntent(revisionId) {

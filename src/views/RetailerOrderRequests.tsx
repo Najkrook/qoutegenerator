@@ -1,7 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { catalogData } from '../data/catalog';
 import { getCatalogLineName } from '../data/catalogLookup';
-import { computeQuoteTotals } from '../services/calculationEngine';
 import { quoteRepository } from '../services/quoteRepositoryClient';
 import {
     getOrderRequestStatusLabel,
@@ -9,6 +7,7 @@ import {
     orderRequestService
 } from '../services/orderRequestService';
 import { createQuotePdfBlob } from '../services/quotePdfService';
+import { restorePreparedQuote, type PreparedQuote } from '../services/quotePreparation';
 import {
     notifyError,
     notifyInfo,
@@ -23,8 +22,6 @@ import { useAuth } from '../store/AuthContext';
 import type {
     OrderRequestRecord,
     OrderRequestStatus,
-    QuoteState,
-    QuoteTotalsResult,
     RetailerOrderRequestsProps
 } from '../types/contracts';
 
@@ -81,7 +78,7 @@ function buildOrderRequestItemsCacheKey(request: OrderRequestRecord): string {
 
 async function loadSubmittedQuoteData(
     request: OrderRequestRecord
-): Promise<{ state: QuoteState; summaryData: QuoteTotalsResult } | null> {
+): Promise<PreparedQuote | null> {
     const revision = await quoteRepository.getQuoteRevisionByVersion({
         userId: request.quoteOwnerUid,
         quoteId: request.quoteId,
@@ -100,13 +97,20 @@ async function loadSubmittedQuoteData(
         'draft'
     );
     const state = hydrateQuoteState(payload);
-    const summaryData = computeQuoteTotals({ state, catalogData });
-
-    return { state, summaryData };
+    return restorePreparedQuote({
+        state,
+        commercialSnapshot: revision.commercialSnapshot,
+        quoteIdentity: {
+            quoteId: request.quoteId,
+            quoteNumber: request.quoteNumber,
+            version: request.quoteVersion,
+            status: state.quoteStatus
+        }
+    });
 }
 
-function buildOrderRequestItemOverviewRows(summaryData: QuoteTotalsResult): OrderRequestItemOverviewRow[] {
-    return summaryData.totals.map((row, index) => ({
+function buildOrderRequestItemOverviewRows(preparedQuote: PreparedQuote): OrderRequestItemOverviewRow[] {
+    return preparedQuote.commercial.productRows.map((row, index) => ({
         id: `${row.source.type}-${index}`,
         model: row.model || '-',
         size: row.size || '-',
@@ -197,9 +201,9 @@ export function RetailerOrderRequests({ onBack }: RetailerOrderRequestsProps) {
         }));
 
         try {
-            const submittedQuoteData = await loadSubmittedQuoteData(request);
+            const preparedQuote = await loadSubmittedQuoteData(request);
 
-            if (!submittedQuoteData) {
+            if (!preparedQuote) {
                 const missingState: OrderRequestItemOverviewState = {
                     status: 'missing',
                     rows: []
@@ -218,7 +222,7 @@ export function RetailerOrderRequests({ onBack }: RetailerOrderRequestsProps) {
 
             const readyState: OrderRequestItemOverviewState = {
                 status: 'ready',
-                rows: buildOrderRequestItemOverviewRows(submittedQuoteData.summaryData)
+                rows: buildOrderRequestItemOverviewRows(preparedQuote)
             };
 
             itemOverviewCacheRef.current = {
@@ -286,14 +290,14 @@ export function RetailerOrderRequests({ onBack }: RetailerOrderRequestsProps) {
 
         setExportingId(selectedRequest.id);
         try {
-            const submittedQuoteData = await loadSubmittedQuoteData(selectedRequest);
+            const preparedQuote = await loadSubmittedQuoteData(selectedRequest);
 
-            if (!submittedQuoteData) {
+            if (!preparedQuote) {
                 notifyError('Kunde inte hitta den sparade offertversionen för orderförfrågan.');
                 return;
             }
 
-            const pdfBlob = await createQuotePdfBlob(submittedQuoteData.state, submittedQuoteData.summaryData);
+            const pdfBlob = await createQuotePdfBlob(preparedQuote);
 
             if (!pdfBlob) {
                 notifyError('Kunde inte skapa PDF för den valda offertversionen.');

@@ -71,6 +71,7 @@ function prepare(overrides = {}) {
     return prepareQuote({
         state: createState(overrides.state),
         totals: createTotals(overrides.totals),
+        fallbackDate: overrides.fallbackDate || '2026-08-12',
         audience: {
             isRetailer: false,
             allowedPdfThemes: [],
@@ -143,6 +144,7 @@ describe('prepareQuote', () => {
         });
         expect(result.agreement).toEqual({
             customerInfo: createState().customerInfo,
+            effectiveQuoteDate: '2026-08-12',
             quoteIdentity: {
                 quoteId: 'quote-1',
                 quoteNumber: 'BRIXX - 260812-101',
@@ -345,9 +347,43 @@ describe('prepareQuote', () => {
         state.unknownSecret = 'do-not-copy';
         state.marginSettings = { BaHaMa: 42 };
         state.marginAnalysis = { profit: 999999 };
+        state.inventoryData = {
+            bahama: [{ id: 'inventory-1', label: 'keep-inventory', marginAnalysis: { profit: 111111 } }]
+        };
+        state.inventoryBasket = [{ id: 'basket-1', label: 'keep-basket', costPrice: 222222 }];
+        state.sketchDraft = {
+            items: [{ id: 'sketch-1', label: 'keep-sketch', internalMargins: { BaHaMa: 333333 } }]
+        };
+        state.advancedSketchDraft = {
+            scene: { label: 'keep-advanced-sketch', grossProfit: 444444 }
+        };
+        state.builderItems = [{
+            id: 'builder-1',
+            line: 'BaHaMa',
+            model: 'Jumbrella',
+            size: '3x3',
+            qty: 1,
+            discountPct: 0,
+            addons: [],
+            marginSettings: { BaHaMa: 55 }
+        }];
+        state.gridSelections = {
+            ClickitUp: {
+                items: {
+                    'ClickitUp Sektion|500x500': {
+                        qty: 1,
+                        discountPct: 0,
+                        marginAnalysis: { profit: 555555 }
+                    }
+                },
+                addons: {},
+                customAddonsByCategory: {}
+            }
+        };
         const totals = createTotals();
         totals.totals[0].unknownRowSecret = 'do-not-copy-row';
         totals.totals[0].marginAnalysis = { profit: 1000 };
+        totals.totals[0].source.reviewCode = 'private-review-code';
 
         const serialized = JSON.stringify(prepareQuote({
             state,
@@ -359,6 +395,51 @@ describe('prepareQuote', () => {
         expect(serialized).not.toContain('marginSettings');
         expect(serialized).not.toContain('marginAnalysis');
         expect(serialized).not.toContain('999999');
+        expect(serialized).not.toContain('costPrice');
+        expect(serialized).not.toContain('internalMargins');
+        expect(serialized).not.toContain('grossProfit');
+        expect(serialized).not.toContain('reviewCode');
+        expect(serialized).not.toContain('111111');
+        expect(serialized).not.toContain('222222');
+        expect(serialized).not.toContain('333333');
+        expect(serialized).not.toContain('444444');
+        expect(serialized).not.toContain('555555');
+        expect(serialized).toContain('keep-inventory');
+        expect(serialized).toContain('keep-basket');
+    });
+
+    it('resolves one deterministic effective date for persistence and every downstream adapter', () => {
+        const state = createState({
+            customerInfo: {
+                ...createState().customerInfo,
+                date: ''
+            }
+        });
+
+        const first = prepareQuote({
+            state,
+            totals: createTotals(),
+            fallbackDate: '2026-08-13',
+            audience: { isRetailer: false }
+        });
+        const equivalent = prepareQuote({
+            state: structuredClone(state),
+            totals: createTotals(),
+            fallbackDate: '2026-08-13',
+            audience: { isRetailer: false }
+        });
+        const nextDay = prepareQuote({
+            state: structuredClone(state),
+            totals: createTotals(),
+            fallbackDate: '2026-08-14',
+            audience: { isRetailer: false }
+        });
+
+        expect(first.agreement.effectiveQuoteDate).toBe('2026-08-13');
+        expect(first.agreement.customerInfo.date).toBe('');
+        expect(first.persistenceSnapshot.customerInfo.date).toBe('2026-08-13');
+        expect(equivalent.presentation.equivalenceKey).toBe(first.presentation.equivalenceKey);
+        expect(nextDay.presentation.equivalenceKey).not.toBe(first.presentation.equivalenceKey);
     });
 
     it('does not mutate inputs and produces equal values and keys for equivalent inputs', () => {

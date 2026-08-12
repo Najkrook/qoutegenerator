@@ -781,16 +781,11 @@ describe('SummaryExport PDF override', () => {
         await clickButton(container, 'Skicka orderförfrågan');
 
         expect(orderRequestState.createOrderRequest).toHaveBeenCalledWith(
-            expect.objectContaining({
-                state: expect.objectContaining({
-                    contractingWork: expect.objectContaining({
-                        enabled: false,
-                        rows: [],
-                        margin: { enabled: false, percent: 15 }
-                    })
-                })
-            })
+            expect.objectContaining({ quoteId: 'quote-1', quoteVersion: 2 })
         );
+        expect(orderRequestState.createOrderRequest.mock.calls[0][0]).not.toHaveProperty('state');
+        expect(orderRequestState.createOrderRequest.mock.calls[0][0]).not.toHaveProperty('summary');
+        expect(orderRequestState.createOrderRequest.mock.calls[0][0]).not.toHaveProperty('preparedQuote');
     });
 
     it('shows the retailer order request CTA only for retailer users', async () => {

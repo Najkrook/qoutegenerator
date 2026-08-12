@@ -253,6 +253,7 @@ export function SummaryExport({
     const [isSubmittingOrderRequest, setIsSubmittingOrderRequest] = useState(false);
     const [hasJustSubmittedOrderRequest, setHasJustSubmittedOrderRequest] = useState(false);
     const previewUrlRef = useRef<string>('');
+    const preparationFallbackDateRef = useRef(new Date().toISOString().slice(0, 10));
     const reopenedQuoteIdRef = useRef(state.activeQuoteId);
     const attemptedReopenRepairRef = useRef<string | null>(null);
     const previewPdfRef = useRef<{
@@ -295,6 +296,8 @@ export function SummaryExport({
     const preparedQuote = useMemo(() => prepareQuote({
         state,
         totals: summaryData,
+        fallbackDate: preparationFallbackDateRef.current,
+        catalogData,
         audience: {
             isRetailer,
             allowedPdfThemes: retailer?.pdfThemes || []
@@ -471,7 +474,10 @@ export function SummaryExport({
             return;
         }
 
-        const fileName = buildPdfFileName(state.customerInfo, selectedExportLanguage);
+        const fileName = buildPdfFileName({
+            ...preparedQuote.agreement.customerInfo,
+            date: preparedQuote.agreement.effectiveQuoteDate
+        }, preparedQuote.presentation.exportLanguage);
         const cachedPreview = previewPdfRef.current;
         const pdfBlob = cachedPreview?.equivalenceKey === preparedEquivalenceKey
             ? cachedPreview.blob
@@ -492,7 +498,7 @@ export function SummaryExport({
         if (pickerResult === 'saved') {
             logPdfExportActivity({
                 user,
-                state: effectiveState,
+                state: preparedQuote.persistenceSnapshot,
                 fileName,
                 missingQuoteNumber: !state.quoteNumber
             });
@@ -513,7 +519,7 @@ export function SummaryExport({
             downloadBlob(pdfBlob, fileName);
             logPdfExportActivity({
                 user,
-                state: effectiveState,
+                state: preparedQuote.persistenceSnapshot,
                 fileName,
                 missingQuoteNumber: !state.quoteNumber
             });
@@ -588,7 +594,7 @@ export function SummaryExport({
                 }
                 : { kind: 'new' as const, crmDealId };
             const draftSignature = buildQuoteSaveDraftSignature({
-                state: effectiveState,
+                state: preparedQuote.persistenceSnapshot,
                 ownerUid,
                 quoteId: state.activeQuoteId || null,
                 crmDealId,
@@ -598,7 +604,7 @@ export function SummaryExport({
             const outcome = await quoteSave.save({
                 actor: user,
                 retailer,
-                state: effectiveState,
+                state: preparedQuote.persistenceSnapshot,
                 target: saveTarget,
                 canManageAllQuotes: canViewEverything,
                 retrySaveIntentId
@@ -654,8 +660,8 @@ export function SummaryExport({
             const createdRequest = await orderRequestService.createOrderRequest({
                 user,
                 retailer,
-                state: effectiveState,
-                summary: summaryData
+                quoteId: String(state.activeQuoteId),
+                quoteVersion: state.activeQuoteVersion
             });
             setOrderRequest(createdRequest);
             setHasJustSubmittedOrderRequest(true);

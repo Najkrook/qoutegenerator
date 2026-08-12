@@ -2,18 +2,23 @@ import { DEFAULT_PDF_THEME_ID, normalizePdfThemeId } from '../config/pdfThemes';
 import type {
     BuilderAddon,
     BuilderItem,
+    CatalogData,
     ContractingWorkState,
     CustomerInfo,
     GridLineSelection,
     PdfThemeId,
+    QuoteCommercialSnapshot,
     QuoteExportLanguage,
     QuoteState,
     QuoteStatus,
     QuoteTotalsResult,
     QuoteTotalsRow
 } from '../types/contracts';
+import { catalogData as defaultCatalogData } from '../data/catalog';
 import { calculateContractingWorkSummary } from './contractingWork';
-import { normalizeExportLanguage } from './exportLocalization';
+import { normalizeExportLanguage, translateQuoteTotalsRowModel } from './exportLocalization';
+import { stripPrivateQuoteStateData } from '../utils/quoteStateSanitization';
+import { normalizeQuoteCommercialSnapshot } from './quoteCommercialSnapshot';
 
 const SEK_RECONCILIATION_TOLERANCE = 1;
 
@@ -83,6 +88,7 @@ export interface PreparedQuote {
     };
     agreement: {
         customerInfo: CustomerInfo;
+        effectiveQuoteDate: string;
         quoteIdentity: {
             quoteId: string | null;
             quoteNumber: string | null;
@@ -138,11 +144,58 @@ function requireReconciled(actual: number, expected: number, field: string): voi
     }
 }
 
-function cloneJsonValue<T>(value: T): T {
+function cloneSafeJsonValue<T>(value: T): T {
     if (value === undefined || value === null) {
         return value;
     }
-    return JSON.parse(JSON.stringify(value)) as T;
+    return JSON.parse(JSON.stringify(stripPrivateQuoteStateData(value))) as T;
+}
+
+function cloneRowSource(source: QuoteTotalsRow['source']): QuoteTotalsRow['source'] {
+    switch (source?.type) {
+        case 'builder':
+            return { type: source.type, itemId: String(source.itemId) };
+        case 'builder-addon':
+            return { type: source.type, itemId: String(source.itemId), addonId: String(source.addonId) };
+        case 'builder-custom-addon':
+            return {
+                type: source.type,
+                itemId: String(source.itemId),
+                rowId: String(source.rowId),
+                categoryId: String(source.categoryId)
+            };
+        case 'grid':
+            return { type: source.type, lineId: String(source.lineId), key: String(source.key) };
+        case 'grid-addon':
+            return { type: source.type, lineId: String(source.lineId), addonId: String(source.addonId) };
+        case 'grid-custom-addon':
+            return {
+                type: source.type,
+                lineId: String(source.lineId),
+                categoryId: String(source.categoryId),
+                rowId: String(source.rowId)
+            };
+        case 'grid-custom-item':
+            return { type: source.type, lineId: String(source.lineId), rowId: String(source.rowId) };
+        case 'custom':
+            return { type: source.type, index: Number(source.index) };
+        default:
+            return { type: 'custom', index: -1 };
+    }
+}
+
+function normalizeEffectiveQuoteDate(value: unknown, fallbackDate: unknown): string {
+    const requested = String(value || '').trim();
+    const fallback = String(fallbackDate || '').trim();
+    const candidate = requested || fallback;
+    const parsed = /^\d{4}-\d{2}-\d{2}$/u.test(candidate)
+        ? new Date(`${candidate}T00:00:00`)
+        : null;
+
+    if (parsed && !Number.isNaN(parsed.getTime())) {
+        return candidate;
+    }
+    return new Date().toISOString().slice(0, 10);
 }
 
 function cloneCustomerInfo(customerInfo: QuoteState['customerInfo']): CustomerInfo {
@@ -264,7 +317,8 @@ function createSuppressedContractingWork(): ContractingWorkState {
 function createPersistenceSnapshot(
     state: QuoteState,
     presentation: { exportLanguage: QuoteExportLanguage; pdfThemeId: PdfThemeId },
-    isRetailer: boolean
+    isRetailer: boolean,
+    effectiveQuoteDate: string
 ): QuoteState {
     return {
         stateVersion: state.stateVersion,
@@ -291,16 +345,19 @@ function createPersistenceSnapshot(
         globalDiscountPct: state.globalDiscountPct,
         prevGlobalDiscountPct: state.prevGlobalDiscountPct,
         exchangeRate: state.exchangeRate,
-        customerInfo: cloneCustomerInfo(state.customerInfo),
-        inventoryData: cloneJsonValue(state.inventoryData),
-        cloudInventoryData: cloneJsonValue(state.cloudInventoryData),
-        sketchDraft: cloneJsonValue(state.sketchDraft),
-        advancedSketchDraft: cloneJsonValue(state.advancedSketchDraft),
+        customerInfo: {
+            ...cloneCustomerInfo(state.customerInfo),
+            date: effectiveQuoteDate
+        },
+        inventoryData: cloneSafeJsonValue(state.inventoryData),
+        cloudInventoryData: cloneSafeJsonValue(state.cloudInventoryData),
+        sketchDraft: cloneSafeJsonValue(state.sketchDraft),
+        advancedSketchDraft: cloneSafeJsonValue(state.advancedSketchDraft),
         sketchMeta: {
             addedBahamaLine: state.sketchMeta?.addedBahamaLine === true,
             addedFiestaLine: state.sketchMeta?.addedFiestaLine === true
         },
-        inventoryBasket: cloneJsonValue(state.inventoryBasket),
+        inventoryBasket: cloneSafeJsonValue(state.inventoryBasket),
         activeQuoteId: state.activeQuoteId ? String(state.activeQuoteId) : null,
         quoteNumber: state.quoteNumber ? String(state.quoteNumber) : null,
         activeQuoteVersion: state.activeQuoteVersion,
@@ -343,7 +400,11 @@ function normalizePresentation(state: QuoteState, audience: QuotePreparationAudi
     };
 }
 
-function prepareProductRows(totals: QuoteTotalsResult): PreparedQuoteProductRow[] {
+function prepareProductRows(
+    totals: QuoteTotalsResult,
+    exportLanguage: QuoteExportLanguage,
+    quoteCatalogData: CatalogData
+): PreparedQuoteProductRow[] {
     if (!Array.isArray(totals?.totals)) {
         invalidCommercial('totals', 'expected an array');
     }
@@ -366,7 +427,7 @@ function prepareProductRows(totals: QuoteTotalsResult): PreparedQuoteProductRow[
         requireReconciled(net, gross - discountSek, `totals[${index}].net`);
 
         return {
-            model: String(row?.model || ''),
+            model: translateQuoteTotalsRowModel(row, exportLanguage, quoteCatalogData),
             size: String(row?.size || ''),
             unitPrice,
             qty,
@@ -377,7 +438,7 @@ function prepareProductRows(totals: QuoteTotalsResult): PreparedQuoteProductRow[
             isAddon: row?.isAddon === true,
             isCustom: row?.isCustom === true,
             priceUponRequest: row?.priceUponRequest === true,
-            source: cloneJsonValue(row.source),
+            source: cloneRowSource(row.source),
             line: String(row?.line || ''),
             sortModel: String(row?.sortModel || ''),
             sortSizeRaw: String(row?.sortSizeRaw || ''),
@@ -503,14 +564,22 @@ function deepFreeze<T>(value: T): T {
 export function prepareQuote({
     state,
     totals,
-    audience
+    audience,
+    fallbackDate = new Date().toISOString().slice(0, 10),
+    catalogData = defaultCatalogData
 }: {
     state: QuoteState;
     totals: QuoteTotalsResult;
     audience: QuotePreparationAudience;
+    fallbackDate?: string;
+    catalogData?: CatalogData;
 }): PreparedQuote {
     const normalizedPresentation = normalizePresentation(state, audience);
-    const productRows = prepareProductRows(totals);
+    const productRows = prepareProductRows(
+        totals,
+        normalizedPresentation.exportLanguage,
+        catalogData
+    );
     const productTotals = validateAndPrepareProductTotals(state, totals, productRows);
     const contractingWork = prepareContractingWork(state, audience);
     const discountReferences: PreparedQuote['visibility']['discountReferences'] = state.hideZeroDiscountReferencesInPdf === true
@@ -518,7 +587,13 @@ export function prepareQuote({
         ? 'hidden-zero'
         : 'visible';
     const customerInfo = cloneCustomerInfo(state.customerInfo);
-    const persistenceSnapshot = createPersistenceSnapshot(state, normalizedPresentation, audience.isRetailer);
+    const effectiveQuoteDate = normalizeEffectiveQuoteDate(customerInfo.date, fallbackDate);
+    const persistenceSnapshot = createPersistenceSnapshot(
+        state,
+        normalizedPresentation,
+        audience.isRetailer,
+        effectiveQuoteDate
+    );
     const preparedMeaning = {
         presentation: normalizedPresentation,
         commercial: {
@@ -528,6 +603,7 @@ export function prepareQuote({
         },
         agreement: {
             customerInfo,
+            effectiveQuoteDate,
             quoteIdentity: {
                 quoteId: state.activeQuoteId ? String(state.activeQuoteId) : null,
                 quoteNumber: state.quoteNumber ? String(state.quoteNumber) : null,
@@ -569,4 +645,120 @@ export function prepareQuote({
     };
 
     return deepFreeze(result);
+}
+
+export function createQuoteCommercialSnapshot(prepared: PreparedQuote): QuoteCommercialSnapshot {
+    return {
+        schemaVersion: 1,
+        presentation: {
+            exportLanguage: prepared.presentation.exportLanguage,
+            pdfThemeId: prepared.presentation.pdfThemeId
+        },
+        effectiveQuoteDate: prepared.agreement.effectiveQuoteDate,
+        productRows: prepared.commercial.productRows.map((row) => ({
+            model: row.model,
+            size: row.size,
+            unitPrice: row.unitPrice,
+            qty: row.qty,
+            gross: row.gross,
+            discountPct: row.discountPct,
+            discountSek: row.discountSek,
+            net: row.net,
+            isAddon: row.isAddon,
+            isCustom: row.isCustom,
+            priceUponRequest: row.priceUponRequest,
+            line: row.line
+        })),
+        productTotals: { ...prepared.commercial.productTotals },
+        contractingWork: prepared.commercial.contractingWork
+            ? {
+                ...prepared.commercial.contractingWork,
+                rows: prepared.commercial.contractingWork.rows.map((row) => ({ ...row }))
+            }
+            : null,
+        visibility: {
+            contractingWork: prepared.visibility.contractingWork,
+            discountReferences: prepared.visibility.discountReferences
+        }
+    };
+}
+
+export function restorePreparedQuote({
+    state,
+    commercialSnapshot,
+    quoteIdentity
+}: {
+    state: QuoteState;
+    commercialSnapshot: unknown;
+    quoteIdentity?: PreparedQuote['agreement']['quoteIdentity'];
+}): PreparedQuote {
+    const snapshot = normalizeQuoteCommercialSnapshot(commercialSnapshot);
+    if (!snapshot) {
+        throw new QuotePreparationError('commercialSnapshot', 'Saved Quote Revision has no valid commercial snapshot.');
+    }
+
+    const isRetailer = snapshot.visibility.contractingWork === 'suppressed-retailer';
+    const presentation = { ...snapshot.presentation };
+    const customerInfo = cloneCustomerInfo(state.customerInfo);
+    const productRows: PreparedQuoteProductRow[] = snapshot.productRows.map((row, index) => ({
+        ...row,
+        source: { type: 'custom', index },
+        sortModel: row.model,
+        sortSizeRaw: row.size,
+        sortKind: 'text',
+        sortDimensions: [],
+        originalIndex: index
+    }));
+    const persistenceSnapshot = createPersistenceSnapshot(
+        state,
+        presentation,
+        isRetailer,
+        snapshot.effectiveQuoteDate
+    );
+    const agreement: PreparedQuote['agreement'] = {
+        customerInfo,
+        effectiveQuoteDate: snapshot.effectiveQuoteDate,
+        quoteIdentity: quoteIdentity || {
+            quoteId: state.activeQuoteId ? String(state.activeQuoteId) : null,
+            quoteNumber: state.quoteNumber ? String(state.quoteNumber) : null,
+            version: state.activeQuoteVersion,
+            status: state.quoteStatus
+        },
+        legalTerms: {
+            included: state.includeTerms === true,
+            text: String(state.termsText || ''),
+            templateId: String(state.termsTemplateId || ''),
+            customized: state.termsCustomized === true
+        },
+        paymentTermsDays: state.paymentTermsDays,
+        validityDays: state.quoteValidityDays,
+        includePaymentBox: state.includePaymentBox === true,
+        includeSignatureBlock: state.includeSignatureBlock === true
+    };
+    const commercial: PreparedQuote['commercial'] = {
+        productRows,
+        productTotals: { ...snapshot.productTotals },
+        contractingWork: snapshot.contractingWork
+            ? { ...snapshot.contractingWork, rows: snapshot.contractingWork.rows.map((row) => ({ ...row })) }
+            : null
+    };
+    const visibility: PreparedQuote['visibility'] = {
+        contractingWork: snapshot.visibility.contractingWork,
+        discountReferences: snapshot.visibility.discountReferences,
+        legalTerms: state.includeTerms === true ? 'visible' : 'hidden',
+        paymentBox: state.includePaymentBox === true ? 'visible' : 'hidden',
+        signatureBlock: state.includeSignatureBlock === true ? 'visible' : 'hidden'
+    };
+    const preparedMeaning = { presentation, commercial, agreement, visibility };
+
+    return deepFreeze({
+        presentation: {
+            ...presentation,
+            equivalenceKey: canonicalStringify(preparedMeaning)
+        },
+        commercial,
+        agreement,
+        visibility,
+        persistenceSnapshot
+    });
 }

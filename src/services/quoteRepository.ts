@@ -29,6 +29,7 @@ import type {
     UpdateQuoteStatusInput
 } from '../types/contracts';
 import { stripPrivateQuoteStateData } from '../utils/quoteStateSanitization';
+import { normalizeQuoteCommercialSnapshot } from './quoteCommercialSnapshot';
 
 export const QUOTE_STATUS_VALUES: QuoteStatus[] = ['draft', 'sent', 'won', 'lost', 'archived'];
 
@@ -269,6 +270,7 @@ function buildRevisionData({
     user,
     state,
     summary,
+    commercialSnapshot = null,
     changeNote = '',
     saveIntentId = null
 }: QuoteRevisionSaveInput & { version: number; nowMs: number }): NormalizedRevisionRecord {
@@ -286,6 +288,7 @@ function buildRevisionData({
             grossTotalSek: toNumber(safeSummary.grossTotalSek, 0) || 0,
             totalDiscountSek: toNumber(safeSummary.totalDiscountSek, 0) || 0
         },
+        commercialSnapshot: normalizeQuoteCommercialSnapshot(commercialSnapshot),
         changeNote: String(changeNote || ''),
         saveIntentId: saveIntentId ? String(saveIntentId) : null
     };
@@ -380,6 +383,7 @@ function buildRevisionWriteDoc(revision: NormalizedRevisionRecord): RawQuoteRevi
         savedByUid: revision.savedByUid,
         state: revision.state,
         summary: revision.summary,
+        commercialSnapshot: revision.commercialSnapshot,
         changeNote: revision.changeNote,
         saveIntentId: revision.saveIntentId || null
     };
@@ -443,6 +447,7 @@ function normalizeQuoteRevision(
             grossTotalSek: 0,
             totalDiscountSek: 0
         }),
+        commercialSnapshot: normalizeQuoteCommercialSnapshot(safeRaw.commercialSnapshot),
         changeNote: String(safeRaw.changeNote || ''),
         saveIntentId: safeRaw.saveIntentId ? String(safeRaw.saveIntentId) : null
     };
@@ -520,6 +525,7 @@ export function createQuoteRepository(deps: QuoteRepositoryDeps = {} as QuoteRep
         quoteId,
         state,
         summary,
+        commercialSnapshot = null,
         customerInfo = {},
         status = 'draft',
         changeNote,
@@ -563,6 +569,7 @@ export function createQuoteRepository(deps: QuoteRepositoryDeps = {} as QuoteRep
             user,
             state,
             summary,
+            commercialSnapshot,
             changeNote,
             saveIntentId
         });
@@ -599,6 +606,7 @@ export function createQuoteRepository(deps: QuoteRepositoryDeps = {} as QuoteRep
         quoteId,
         state,
         summary,
+        commercialSnapshot = null,
         customerInfo = {},
         status = 'draft',
         changeNote = '',
@@ -617,6 +625,7 @@ export function createQuoteRepository(deps: QuoteRepositoryDeps = {} as QuoteRep
             quoteId,
             state,
             summary,
+            commercialSnapshot,
             customerInfo,
             status,
             changeNote,
@@ -668,6 +677,7 @@ export function createQuoteRepository(deps: QuoteRepositoryDeps = {} as QuoteRep
                 user,
                 state,
                 summary,
+                commercialSnapshot,
                 changeNote,
                 saveIntentId
             });
@@ -704,6 +714,7 @@ export function createQuoteRepository(deps: QuoteRepositoryDeps = {} as QuoteRep
         ownerUid,
         state,
         summary,
+        commercialSnapshot = null,
         customerInfo = {},
         status = 'draft',
         changeNote = 'Initial save',
@@ -733,6 +744,7 @@ export function createQuoteRepository(deps: QuoteRepositoryDeps = {} as QuoteRep
                 user,
                 state,
                 summary,
+                commercialSnapshot,
                 changeNote,
                 saveIntentId
             });
@@ -974,6 +986,7 @@ export function createQuoteRepository(deps: QuoteRepositoryDeps = {} as QuoteRep
                         grossTotalSek: 0,
                         totalDiscountSek: 0
                     }),
+                    commercialSnapshot: null,
                     changeNote: 'Legacy snapshot'
                 }
             };

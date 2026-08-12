@@ -292,8 +292,16 @@ export function buildPreparedExcelSheetData(prepared: PreparedQuote): WorksheetR
         }
         : calculateContractingWorkSummary(undefined);
 
+    const preparedRows = prepared.commercial.productRows.map((row, index) => ({
+        ...row,
+        source: { type: 'custom' as const, index }
+    }));
+
     return buildExcelSheetDataInternal({
-        customerInfo: prepared.agreement.customerInfo,
+        customerInfo: {
+            ...prepared.agreement.customerInfo,
+            date: prepared.agreement.effectiveQuoteDate
+        },
         exportLanguage: prepared.presentation.exportLanguage,
         includesVat: productTotals.includesVat,
         globalDiscountPct: productTotals.globalDiscountPct,
@@ -311,7 +319,7 @@ export function buildPreparedExcelSheetData(prepared: PreparedQuote): WorksheetR
             }
             : undefined
     }, {
-        totals: prepared.commercial.productRows,
+        totals: preparedRows,
         grossTotalSek: productTotals.grossTotalSek,
         totalDiscountSek: productTotals.totalDiscountSek,
         finalTotalSek: productTotals.finalTotalSek,
