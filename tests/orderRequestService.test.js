@@ -58,12 +58,15 @@ function createSavedQuoteState(overrides = {}) {
     };
 }
 
-function createSavedRevisionDocs(state = createSavedQuoteState()) {
+function createSavedRevisionDocs(
+    state = createSavedQuoteState(),
+    audience = { isRetailer: true }
+) {
     const totals = computeQuoteTotals({ state, catalogData: {} });
     const prepared = prepareQuote({
         state,
         totals,
-        audience: { isRetailer: true },
+        audience,
         fallbackDate: '2026-05-21',
         catalogData: {}
     });
@@ -119,6 +122,27 @@ describe('orderRequestService', () => {
         });
 
         vi.useRealTimers();
+    });
+
+    it('persists the PDF theme approved at submission instead of the saved but revoked theme', async () => {
+        const state = createSavedQuoteState({ pdfThemeId: 'custom' });
+        const savedDocs = createSavedRevisionDocs(state, {
+            isRetailer: true,
+            allowedPdfThemes: ['custom']
+        });
+        const { service, mock } = buildService(savedDocs);
+
+        const record = await service.createOrderRequest({
+            user,
+            retailer: { ...retailer, pdfThemes: [] },
+            quoteId: 'quote_1',
+            quoteVersion: 2
+        });
+
+        expect(record.pdfThemeId).toBe('brixx');
+        expect(mock.__docs.get(`order_requests/${record.id}`)).toMatchObject({
+            pdfThemeId: 'brixx'
+        });
     });
 
     it('returns the existing request when the same quote version is submitted again', async () => {

@@ -703,6 +703,7 @@ export interface OrderRequestRecord {
     quoteId: string;
     quoteNumber: string;
     quoteVersion: number;
+    pdfThemeId: PdfThemeId;
     retailerId: string;
     retailerName: string;
     retailerEmail: string;
@@ -944,6 +945,7 @@ export interface RawOrderRequestDoc extends UnknownRecord {
     quoteId?: unknown;
     quoteNumber?: unknown;
     quoteVersion?: unknown;
+    pdfThemeId?: unknown;
     retailerId?: unknown;
     retailerName?: unknown;
     retailerEmail?: unknown;

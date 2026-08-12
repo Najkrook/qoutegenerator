@@ -125,6 +125,10 @@ async function loadSubmittedQuoteData(
             preparedQuote: restorePreparedQuote({
                 state,
                 commercialSnapshot: revision.commercialSnapshot,
+                audience: {
+                    isRetailer: true,
+                    allowedPdfThemes: request.pdfThemeId === 'brixx' ? [] : [request.pdfThemeId]
+                },
                 quoteIdentity
             }),
             usesCurrentCatalog: false
@@ -136,7 +140,10 @@ async function loadSubmittedQuoteData(
         preparedQuote: prepareQuote({
             state,
             totals,
-            audience: { isRetailer: true, allowedPdfThemes: [] },
+            audience: {
+                isRetailer: true,
+                allowedPdfThemes: request.pdfThemeId === 'brixx' ? [] : [request.pdfThemeId]
+            },
             fallbackDate: getLegacyRevisionFallbackDate(revision.savedAtMs),
             catalogData
         }),

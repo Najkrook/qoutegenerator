@@ -507,6 +507,7 @@ service cloud.firestore {
         && request.resource.data.quoteId is string
         && request.resource.data.quoteNumber is string
         && request.resource.data.quoteVersion is int
+        && request.resource.data.pdfThemeId in ['brixx', 'custom', 'roslagsmarkisen']
         && request.resource.data.retailerId is string
         && request.resource.data.retailerName is string
         && request.resource.data.retailerEmail is string

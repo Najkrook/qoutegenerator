@@ -14,6 +14,7 @@ const orderRequestMocks = vi.hoisted(() => ({
         quoteId: 'quote-1',
         quoteNumber: 'BRIXX - 260521-101',
         quoteVersion: 2,
+        pdfThemeId: 'brixx',
         retailerId: 'retailer-doc-1',
         retailerName: 'Nordvind',
         retailerEmail: 'retailer@example.com',
@@ -216,6 +217,7 @@ function createRequest(overrides = {}) {
         quoteId: 'quote-1',
         quoteNumber: 'BRIXX - 260521-101',
         quoteVersion: 2,
+        pdfThemeId: 'brixx',
         retailerId: 'retailer-doc-1',
         retailerName: 'Nordvind',
         retailerEmail: 'retailer@example.com',
@@ -367,7 +369,7 @@ afterEach(() => {
 });
 
 describe('RetailerOrderRequests', () => {
-    it('uses the saved commercial snapshot for the overview and PDF without recalculating the current catalog', async () => {
+    it('uses frozen commercial data but the theme approved when the order was submitted', async () => {
         quoteRepositoryMocks.getQuoteRevisionByVersion.mockResolvedValue({
             revisionId: 'quote-1-revision-2',
             quoteId: 'quote-1',
@@ -382,7 +384,7 @@ describe('RetailerOrderRequests', () => {
             summary: { finalTotalSek: 11134, grossTotalSek: 11134, totalDiscountSek: 0 },
             commercialSnapshot: {
                 schemaVersion: 1,
-                presentation: { exportLanguage: 'en', pdfThemeId: 'brixx', allowedPdfThemeIds: ['brixx'] },
+                presentation: { exportLanguage: 'en', pdfThemeId: 'custom', allowedPdfThemeIds: ['brixx', 'custom'] },
                 effectiveQuoteDate: '2026-05-21',
                 productRows: [{
                     model: 'Frozen catalog name',
@@ -429,6 +431,7 @@ describe('RetailerOrderRequests', () => {
         await flushUi();
 
         expect(createQuotePdfBlob).toHaveBeenCalledWith(expect.objectContaining({
+            presentation: expect.objectContaining({ pdfThemeId: 'brixx' }),
             commercial: expect.objectContaining({
                 productRows: [expect.objectContaining({ model: 'Frozen catalog name', unitPrice: 11134 })]
             })

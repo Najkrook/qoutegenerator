@@ -32,6 +32,7 @@ import { safeLogActivity } from './activityLogService';
 import { readSnapshotData } from '../utils/runtime';
 import { hydrateQuoteState } from '../store/quoteStateSchema';
 import { restorePreparedQuote, type PreparedQuote } from './quotePreparation';
+import { normalizePdfThemeId } from '../config/pdfThemes';
 
 const ORDER_REQUEST_COLLECTION = 'order_requests';
 const ORDER_REQUEST_STATUS_VALUES: OrderRequestStatus[] = ['new', 'reviewing', 'completed'];
@@ -114,6 +115,7 @@ export function normalizeOrderRequestRecord(source: { id?: unknown; data?: (() =
         quoteId: String(raw.quoteId || ''),
         quoteNumber: String(raw.quoteNumber || ''),
         quoteVersion: Math.max(1, toNumber(raw.quoteVersion, 1)),
+        pdfThemeId: normalizePdfThemeId(raw.pdfThemeId),
         retailerId: String(raw.retailerId || ''),
         retailerName: String(raw.retailerName || ''),
         retailerEmail: String(raw.retailerEmail || ''),
@@ -172,6 +174,7 @@ function buildOrderRequestPayload({
         quoteId,
         quoteNumber,
         quoteVersion,
+        pdfThemeId: preparedQuote.presentation.pdfThemeId,
         retailerId,
         retailerName,
         retailerEmail,
