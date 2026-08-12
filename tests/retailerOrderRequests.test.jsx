@@ -448,12 +448,12 @@ describe('RetailerOrderRequests', () => {
                 selectedLines: ['BaHaMa'],
                 customerInfo: {
                     ...createInitialQuoteState().customerInfo,
-                    date: '2026-05-21'
+                    date: ''
                 }
             },
             summary: { finalTotalSek: 20200, grossTotalSek: 24300, totalDiscountSek: 4100 },
             commercialSnapshot: null,
-            savedAtMs: 100,
+            savedAtMs: new Date('2026-05-21T08:00:00.000Z').getTime(),
             savedBy: 'retailer@example.com',
             savedByUid: 'retailer-1',
             changeNote: ''
@@ -486,6 +486,7 @@ describe('RetailerOrderRequests', () => {
         expect(notificationMocks.notifyWarn).toHaveBeenCalledWith(expect.stringContaining('dagens produktkatalog'));
         expect(createQuotePdfBlob).toHaveBeenCalledWith(expect.objectContaining({
             agreement: expect.objectContaining({
+                effectiveQuoteDate: '2026-05-21',
                 quoteIdentity: expect.objectContaining({
                     quoteId: 'quote-1',
                     quoteNumber: 'BRIXX - 260521-101',

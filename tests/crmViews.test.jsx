@@ -63,6 +63,12 @@ import {
 
 const NOW = new Date('2026-07-23T10:00:00+02:00').getTime();
 
+function toLocalDateTimeInputValue(value) {
+    const date = new Date(value);
+    const pad = (part) => String(part).padStart(2, '0');
+    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
+
 const companies = [{
     id: 'company-1',
     name: 'Acme Utemiljö',
@@ -581,7 +587,7 @@ describe('CRM views', () => {
         fireEvent.click(within(task).getByRole('button', { name: 'Välj datum' }));
         const customDialog = screen.getByRole('dialog', { name: 'Flytta uppgift' });
         fireEvent.change(within(customDialog).getByLabelText('Nytt datum och tid *'), {
-            target: { value: '2026-07-23T09:00' }
+            target: { value: toLocalDateTimeInputValue(NOW - 60 * 60 * 1000) }
         });
         fireEvent.submit(customDialog.querySelector('form'));
 

@@ -84,6 +84,14 @@ function buildOrderRequestItemsCacheKey(request: OrderRequestRecord): string {
     return `${request.quoteId}__v${request.quoteVersion}`;
 }
 
+function getLegacyRevisionFallbackDate(savedAtMs: unknown): string {
+    const parsed = Number(savedAtMs);
+    if (!Number.isFinite(parsed) || parsed <= 0) {
+        return '1970-01-01';
+    }
+    return new Date(parsed).toISOString().slice(0, 10);
+}
+
 async function loadSubmittedQuoteData(
     request: OrderRequestRecord
 ): Promise<SubmittedQuoteData | null> {
@@ -129,7 +137,7 @@ async function loadSubmittedQuoteData(
             state,
             totals,
             audience: { isRetailer: true, allowedPdfThemes: [] },
-            fallbackDate: new Date().toISOString().slice(0, 10),
+            fallbackDate: getLegacyRevisionFallbackDate(revision.savedAtMs),
             catalogData
         }),
         usesCurrentCatalog: true
