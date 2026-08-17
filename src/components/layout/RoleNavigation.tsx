@@ -1,6 +1,28 @@
-import React, { useEffect, useId, useRef, useState } from 'react';
+import React, { useEffect, useRef } from 'react';
+import {
+    IconActivity,
+    IconBriefcase,
+    IconBuildingStore,
+    IconCalendarWeek,
+    IconClipboardList,
+    IconFilePlus,
+    IconFiles,
+    IconFolder,
+    IconHistory,
+    IconHome2,
+    IconPackage,
+    IconPencil,
+    IconQrcode,
+    IconScan,
+    IconShoppingCart,
+    type TablerIcon
+} from '@tabler/icons-react';
 import { NavLink, useLocation } from 'react-router-dom';
-import { APP_PATHS, APP_ROUTE_IDS } from '../../navigation/routes';
+import {
+    APP_PATHS,
+    APP_ROUTE_IDS,
+    getQuoteRouteStepFromPath
+} from '../../navigation/routes';
 import { Button } from '../ui/Button';
 
 interface RoleNavigationProps {
@@ -33,7 +55,30 @@ interface NavigationGroup {
     items: NavigationItem[];
 }
 
-type NavigationSurface = 'desktop' | 'panel' | 'mobile';
+type NavigationSurface = 'desktop-primary' | 'desktop-secondary' | 'mobile';
+
+interface NavigationVisual {
+    colorClassName: string;
+    icon: TablerIcon;
+}
+
+const NAVIGATION_VISUALS: Record<string, NavigationVisual> = {
+    'new-quote': { icon: IconFilePlus, colorClassName: 'text-emerald-500' },
+    [APP_PATHS[APP_ROUTE_IDS.dashboard]]: { icon: IconHome2, colorClassName: 'text-sky-500' },
+    [APP_PATHS[APP_ROUTE_IDS.quotes]]: { icon: IconFiles, colorClassName: 'text-violet-500' },
+    [APP_PATHS[APP_ROUTE_IDS.crmDashboard]]: { icon: IconBriefcase, colorClassName: 'text-amber-500' },
+    [APP_PATHS[APP_ROUTE_IDS.retailerOrders]]: { icon: IconClipboardList, colorClassName: 'text-rose-500' },
+    [APP_PATHS[APP_ROUTE_IDS.sketch]]: { icon: IconPencil, colorClassName: 'text-cyan-500' },
+    [APP_PATHS[APP_ROUTE_IDS.qrScanner]]: { icon: IconScan, colorClassName: 'text-lime-500' },
+    [APP_PATHS[APP_ROUTE_IDS.inventory]]: { icon: IconPackage, colorClassName: 'text-orange-500' },
+    [APP_PATHS[APP_ROUTE_IDS.planner]]: { icon: IconCalendarWeek, colorClassName: 'text-indigo-500' },
+    [APP_PATHS[APP_ROUTE_IDS.retailers]]: { icon: IconBuildingStore, colorClassName: 'text-fuchsia-500' },
+    [APP_PATHS[APP_ROUTE_IDS.retailerOrderHistory]]: { icon: IconShoppingCart, colorClassName: 'text-teal-500' },
+    [APP_PATHS[APP_ROUTE_IDS.retailerDocuments]]: { icon: IconFolder, colorClassName: 'text-blue-500' },
+    [APP_PATHS[APP_ROUTE_IDS.activity]]: { icon: IconActivity, colorClassName: 'text-yellow-500' },
+    [APP_PATHS[APP_ROUTE_IDS.inventoryLogs]]: { icon: IconHistory, colorClassName: 'text-slate-400' },
+    [APP_PATHS[APP_ROUTE_IDS.inventoryQr]]: { icon: IconQrcode, colorClassName: 'text-pink-500' }
+};
 
 function getNavigationGroups({
     canAccessQuoteHistory,
@@ -173,63 +218,37 @@ function getNavigationGroups({
     return groups;
 }
 
-function getPrimaryItemLabels({
-    canAccessSketch,
-    canViewEverything,
-    isRetailer
-}: Pick<RoleNavigationProps, 'canAccessSketch' | 'canViewEverything' | 'isRetailer'>): Set<string> {
-    const labels = new Set(['Hem', 'Ny offert', 'Offerter', 'CRM']);
-
-    if (!canViewEverything && canAccessSketch) {
-        labels.add('Skiss');
-    }
-    if (isRetailer) {
-        labels.add('Mina ordrar');
-        labels.add('Dokument');
-    }
-
-    return labels;
-}
-
-function isLinkActive(item: Extract<NavigationItem, { kind: 'link' }>, pathname: string): boolean {
-    const [targetPath] = item.to.split(/[?#]/, 1);
-    if (item.end || targetPath === APP_PATHS[APP_ROUTE_IDS.dashboard]) {
-        return pathname === targetPath;
-    }
-
-    return pathname === targetPath || pathname.startsWith(`${targetPath}/`);
+function getPrimaryItemLabels(): Set<string> {
+    return new Set(['Hem', 'Ny offert', 'Offerter', 'CRM']);
 }
 
 function linkClasses(isActive: boolean, surface: NavigationSurface): string {
     return [
-        'rounded-control text-sm font-medium no-underline transition-colors',
+        'rounded-control font-medium no-underline transition-colors',
         'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring',
-        surface === 'desktop'
-            ? 'inline-flex min-h-9 shrink-0 items-center whitespace-nowrap px-3 py-2'
-            : 'block w-full px-3 py-2.5 text-left',
+        surface === 'desktop-primary'
+            ? 'inline-flex min-h-9 shrink-0 items-center gap-2 whitespace-nowrap px-3 py-2 text-sm'
+            : surface === 'desktop-secondary'
+                ? 'inline-flex min-h-8 shrink-0 items-center gap-1 whitespace-nowrap px-1 py-1.5 text-[11px] xl:gap-1.5 xl:px-2 xl:text-xs'
+                : 'flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm',
         isActive
             ? 'bg-action-soft text-action-soft-text'
             : 'text-text-muted hover:bg-surface-hover hover:text-text'
     ].join(' ');
 }
 
-function actionClasses(surface: NavigationSurface): string {
+function actionClasses(isActive: boolean, surface: NavigationSurface): string {
     return [
-        'rounded-control bg-action text-on-action text-sm font-semibold transition-colors hover:bg-action-hover',
+        'rounded-control font-semibold transition-colors',
         'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring',
-        surface === 'desktop'
-            ? 'inline-flex min-h-9 shrink-0 items-center whitespace-nowrap px-3 py-2'
-            : 'block w-full px-3 py-2.5 text-left'
-    ].join(' ');
-}
-
-function disclosureClasses(active: boolean): string {
-    return [
-        'inline-flex min-h-9 shrink-0 items-center whitespace-nowrap rounded-control border px-3 py-2 text-sm font-semibold transition-colors',
-        'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring',
-        active
-            ? 'border-action/40 bg-action-soft text-action-soft-text'
-            : 'border-control-border bg-surface-raised text-text hover:bg-surface-hover'
+        surface === 'desktop-primary'
+            ? 'inline-flex min-h-9 shrink-0 items-center gap-2 whitespace-nowrap px-3 py-2 text-sm'
+            : surface === 'desktop-secondary'
+                ? 'inline-flex min-h-8 shrink-0 items-center gap-1 whitespace-nowrap px-1 py-1.5 text-[11px] xl:gap-1.5 xl:px-2 xl:text-xs'
+                : 'flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm',
+        isActive
+            ? 'bg-action-soft text-action-soft-text'
+            : 'text-text-muted hover:bg-surface-hover hover:text-text'
     ].join(' ');
 }
 
@@ -241,74 +260,17 @@ export function RoleNavigation({
     ...accessProps
 }: RoleNavigationProps) {
     const groups = getNavigationGroups({ ...accessProps, sketchHref });
-    const primaryItemLabels = getPrimaryItemLabels(accessProps);
+    const primaryItemLabels = getPrimaryItemLabels();
     const primaryItems = groups.flatMap((group) => (
         group.items.filter((item) => primaryItemLabels.has(item.label))
     ));
-    const secondaryGroups = groups
-        .map((group) => ({
-            ...group,
-            items: group.items.filter((item) => !primaryItemLabels.has(item.label))
-        }))
-        .filter((group) => group.items.length > 0);
+    const secondaryItems = groups.flatMap((group) => (
+        group.items.filter((item) => !primaryItemLabels.has(item.label))
+    ));
     const location = useLocation();
-    const activeSecondaryItem = secondaryGroups
-        .flatMap((group) => group.items)
-        .find((item) => item.kind === 'link' && isLinkActive(item, location.pathname));
-    const [moreOpen, setMoreOpen] = useState(false);
+    const isQuoteRoute = getQuoteRouteStepFromPath(location.pathname) !== null;
     const drawerRef = useRef<HTMLElement | null>(null);
     const closeButtonRef = useRef<HTMLButtonElement | null>(null);
-    const desktopNavigationRef = useRef<HTMLElement | null>(null);
-    const moreButtonRef = useRef<HTMLButtonElement | null>(null);
-    const morePanelRef = useRef<HTMLDivElement | null>(null);
-    const morePanelId = useId();
-
-    useEffect(() => {
-        setMoreOpen(false);
-    }, [location.pathname, location.search]);
-
-    useEffect(() => {
-        if (!moreOpen) {
-            return;
-        }
-
-        const handlePointerDown = (event: PointerEvent) => {
-            if (
-                event.target instanceof Node
-                && !desktopNavigationRef.current?.contains(event.target)
-            ) {
-                setMoreOpen(false);
-            }
-        };
-        const handleFocusIn = (event: FocusEvent) => {
-            if (
-                event.target instanceof Node
-                && !desktopNavigationRef.current?.contains(event.target)
-            ) {
-                setMoreOpen(false);
-            }
-        };
-        const handleKeyDown = (event: KeyboardEvent) => {
-            if (event.key !== 'Escape') {
-                return;
-            }
-
-            event.preventDefault();
-            setMoreOpen(false);
-            window.requestAnimationFrame(() => {
-                moreButtonRef.current?.focus();
-            });
-        };
-
-        document.addEventListener('pointerdown', handlePointerDown);
-        document.addEventListener('focusin', handleFocusIn);
-        document.addEventListener('keydown', handleKeyDown);
-        return () => {
-            document.removeEventListener('pointerdown', handlePointerDown);
-            document.removeEventListener('focusin', handleFocusIn);
-            document.removeEventListener('keydown', handleKeyDown);
-        };
-    }, [moreOpen]);
 
     useEffect(() => {
         if (!mobileOpen) {
@@ -359,6 +321,20 @@ export function RoleNavigation({
         item: NavigationItem,
         surface: NavigationSurface
     ) => {
+        const visualKey = item.kind === 'action'
+            ? item.id
+            : item.to.split(/[?#]/, 1)[0];
+        const visual = NAVIGATION_VISUALS[visualKey];
+        const NavigationIcon = visual.icon;
+        const icon = (
+            <NavigationIcon
+                aria-hidden="true"
+                className={`shrink-0 ${visual.colorClassName}`}
+                size={surface === 'desktop-secondary' ? 15 : 17}
+                stroke={1.9}
+            />
+        );
+
         if (item.kind === 'action') {
             return (
                 <button
@@ -368,12 +344,12 @@ export function RoleNavigation({
                         if (surface === 'mobile') {
                             onCloseMobile();
                         }
-                        setMoreOpen(false);
                         onStartQuote();
                     }}
-                    className={actionClasses(surface)}
+                    className={actionClasses(isQuoteRoute, surface)}
                 >
-                    {item.label}
+                    {icon}
+                    <span>{item.label}</span>
                 </button>
             );
         }
@@ -387,13 +363,11 @@ export function RoleNavigation({
                     if (surface === 'mobile') {
                         onCloseMobile();
                     }
-                    if (surface === 'panel') {
-                        setMoreOpen(false);
-                    }
                 }}
                 className={({ isActive }) => linkClasses(isActive, surface)}
             >
-                {item.label}
+                {icon}
+                <span>{item.label}</span>
             </NavLink>
         );
     };
@@ -416,68 +390,25 @@ export function RoleNavigation({
     return (
         <>
             <nav
-                ref={desktopNavigationRef}
                 aria-label="Huvudnavigation"
-                className="relative hidden border-b border-border lg:block"
+                className="hidden border-b border-border lg:block"
             >
-                <div className="flex min-w-0 items-center gap-1 px-4 py-2 md:px-5">
-                    {primaryItems.map((item) => renderItem(item, 'desktop'))}
-                    {secondaryGroups.length > 0 && (
-                        <div className="relative shrink-0">
-                            <button
-                                ref={moreButtonRef}
-                                type="button"
-                                aria-controls={morePanelId}
-                                aria-expanded={moreOpen}
-                                aria-haspopup="true"
-                                aria-label={activeSecondaryItem
-                                    ? `Mer, aktuell sida: ${activeSecondaryItem.label}`
-                                    : 'Mer'}
-                                className={disclosureClasses(Boolean(activeSecondaryItem))}
-                                onClick={() => setMoreOpen((open) => !open)}
-                                onKeyDown={(event) => {
-                                    if (event.key !== 'ArrowDown') {
-                                        return;
-                                    }
-
-                                    event.preventDefault();
-                                    setMoreOpen(true);
-                                    window.requestAnimationFrame(() => {
-                                        morePanelRef.current?.querySelector<HTMLElement>('a[href], button:not([disabled])')?.focus();
-                                    });
-                                }}
-                            >
-                                Mer
-                            </button>
-
-                            {moreOpen && (
-                                <div
-                                    ref={morePanelRef}
-                                    id={morePanelId}
-                                    role="region"
-                                    aria-label="Fler destinationer"
-                                    className="absolute left-0 top-full z-50 mt-2 max-h-[calc(100vh-7rem)] w-[min(22rem,calc(100vw-2rem))] overflow-y-auto rounded-panel border border-panel-border bg-surface-raised p-2 shadow-panel"
-                                >
-                                    <div className="divide-y divide-border">
-                                        {secondaryGroups.map((group) => (
-                                            <section
-                                                key={group.label}
-                                                className="min-w-0 py-2 first:pt-0 last:pb-0"
-                                            >
-                                                <p className="mb-1 mt-0 px-3 pt-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-text-secondary">
-                                                    {group.label}
-                                                </p>
-                                                <div className="space-y-1">
-                                                    {group.items.map((item) => renderItem(item, 'panel'))}
-                                                </div>
-                                            </section>
-                                        ))}
-                                    </div>
-                                </div>
-                            )}
-                        </div>
-                    )}
+                <div
+                    role="group"
+                    aria-label="Primära funktioner"
+                    className="flex min-w-0 items-center gap-1 px-4 py-2 md:px-5"
+                >
+                    {primaryItems.map((item) => renderItem(item, 'desktop-primary'))}
                 </div>
+                {secondaryItems.length > 0 && (
+                    <div
+                        role="group"
+                        aria-label="Övriga funktioner"
+                        className="flex min-w-0 items-center gap-1 overflow-x-auto border-t border-border/70 bg-surface/50 px-3 py-1.5 xl:px-5"
+                    >
+                        {secondaryItems.map((item) => renderItem(item, 'desktop-secondary'))}
+                    </div>
+                )}
             </nav>
 
             {mobileOpen && (
