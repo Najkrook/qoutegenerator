@@ -14,6 +14,7 @@ const orderRequestMocks = vi.hoisted(() => ({
         quoteId: 'quote-1',
         quoteNumber: 'BRIXX - 260521-101',
         quoteVersion: 2,
+        pdfThemeId: 'brixx',
         retailerId: 'retailer-doc-1',
         retailerName: 'Nordvind',
         retailerEmail: 'retailer@example.com',
@@ -99,12 +100,10 @@ vi.mock('../src/views/historyPayload', () => ({
         quoteStatus
     })
 }));
-vi.mock('../src/store/quoteStateSchema', () => ({
-    hydrateQuoteState: (input) => input
-}));
-
 import { RetailerOrderRequests } from '../src/views/RetailerOrderRequests';
 import { AuthContext } from '../src/store/AuthContext';
+import { createInitialQuoteState } from '../src/store/quoteStateSchema';
+import { createQuotePdfBlob } from '../src/services/quotePdfService';
 
 const mountedRoots = [];
 
@@ -114,6 +113,41 @@ function formatSek(value) {
         currency: 'SEK',
         maximumFractionDigits: 0
     }).format(value);
+}
+
+function snapshotFromTotals(totals) {
+    return {
+        schemaVersion: 1,
+        presentation: { exportLanguage: 'sv', pdfThemeId: 'brixx', allowedPdfThemeIds: ['brixx'] },
+        effectiveQuoteDate: '2026-05-21',
+        productRows: totals.totals.map((row) => ({
+            model: row.model,
+            size: row.size,
+            unitPrice: row.unitPrice,
+            qty: row.qty,
+            gross: row.gross,
+            discountPct: row.discountPct,
+            discountSek: row.discountSek,
+            net: row.net,
+            isAddon: row.isAddon === true,
+            isCustom: row.isCustom === true,
+            priceUponRequest: row.priceUponRequest === true,
+            line: row.line
+        })),
+        productTotals: {
+            includesVat: true,
+            grossTotalSek: totals.grossTotalSek,
+            totalDiscountSek: totals.totalDiscountSek,
+            finalTotalSek: totals.finalTotalSek,
+            globalDiscountAmt: totals.globalDiscountAmt,
+            globalDiscountPct: 0,
+            vatBasisSek: totals.finalTotalSek,
+            vatAmountSek: totals.finalTotalSek * 0.25,
+            totalWithVatSek: totals.finalTotalSek * 1.25
+        },
+        contractingWork: null,
+        visibility: { contractingWork: 'suppressed-retailer', discountReferences: 'visible' }
+    };
 }
 
 function createAuthValue(overrides = {}) {
@@ -183,6 +217,7 @@ function createRequest(overrides = {}) {
         quoteId: 'quote-1',
         quoteNumber: 'BRIXX - 260521-101',
         quoteVersion: 2,
+        pdfThemeId: 'brixx',
         retailerId: 'retailer-doc-1',
         retailerName: 'Nordvind',
         retailerEmail: 'retailer@example.com',
@@ -213,12 +248,14 @@ beforeEach(() => {
             return null;
         }
 
+        const totals = calculationMocks.computeQuoteTotals({ state: { activeQuoteId: quoteId } });
         return {
             revisionId: `${quoteId}-revision-${version}`,
             quoteId,
             version,
             state: { quoteId, version },
             summary: {},
+            commercialSnapshot: snapshotFromTotals(totals),
             savedAtMs: 100,
             savedBy: 'admin@example.com',
             savedByUid: 'admin-1',
@@ -235,9 +272,9 @@ beforeEach(() => {
                     qty: 2,
                     net: 18400,
                     gross: 21000,
-                    unitPrice: 9200,
-                    discountPct: 12,
-                    discountSek: 5000,
+                    unitPrice: 10500,
+                    discountPct: 12.380952380952381,
+                    discountSek: 2600,
                     isAddon: false,
                     isCustom: false,
                     line: 'Solero',
@@ -250,7 +287,7 @@ beforeEach(() => {
                 }],
                 finalTotalSek: 18400,
                 grossTotalSek: 21000,
-                totalDiscountSek: 5000,
+                totalDiscountSek: 2600,
                 globalDiscountAmt: 0
             };
         }
@@ -262,7 +299,7 @@ beforeEach(() => {
                 qty: 1,
                 net: 16200,
                 gross: 20000,
-                unitPrice: 16200,
+                unitPrice: 20000,
                 discountPct: 19,
                 discountSek: 3800,
                 isAddon: false,
@@ -280,9 +317,9 @@ beforeEach(() => {
                 qty: 1,
                 net: 2200,
                 gross: 2500,
-                unitPrice: 2200,
-                discountPct: 0,
-                discountSek: 0,
+                unitPrice: 2500,
+                discountPct: 12,
+                discountSek: 300,
                 isAddon: true,
                 isCustom: false,
                 line: 'BaHaMa',
@@ -332,6 +369,136 @@ afterEach(() => {
 });
 
 describe('RetailerOrderRequests', () => {
+    it('uses frozen commercial data but the theme approved when the order was submitted', async () => {
+        quoteRepositoryMocks.getQuoteRevisionByVersion.mockResolvedValue({
+            revisionId: 'quote-1-revision-2',
+            quoteId: 'quote-1',
+            version: 2,
+            state: {
+                ...createInitialQuoteState(),
+                activeQuoteId: 'quote-1',
+                quoteNumber: 'BRIXX - 260521-101',
+                activeQuoteVersion: 2,
+                selectedLines: ['ClickitUp']
+            },
+            summary: { finalTotalSek: 11134, grossTotalSek: 11134, totalDiscountSek: 0 },
+            commercialSnapshot: {
+                schemaVersion: 1,
+                presentation: { exportLanguage: 'en', pdfThemeId: 'custom', allowedPdfThemeIds: ['brixx', 'custom'] },
+                effectiveQuoteDate: '2026-05-21',
+                productRows: [{
+                    model: 'Frozen catalog name',
+                    size: '1000',
+                    unitPrice: 11134,
+                    qty: 1,
+                    gross: 11134,
+                    discountPct: 0,
+                    discountSek: 0,
+                    net: 11134,
+                    isAddon: false,
+                    isCustom: false,
+                    priceUponRequest: false,
+                    line: 'ClickitUp'
+                }],
+                productTotals: {
+                    includesVat: true,
+                    grossTotalSek: 11134,
+                    totalDiscountSek: 0,
+                    finalTotalSek: 11134,
+                    globalDiscountAmt: 0,
+                    globalDiscountPct: 0,
+                    vatBasisSek: 11134,
+                    vatAmountSek: 2783.5,
+                    totalWithVatSek: 13917.5
+                },
+                contractingWork: null,
+                visibility: { contractingWork: 'suppressed-retailer', discountReferences: 'visible' }
+            },
+            savedAtMs: 100,
+            savedBy: 'admin@example.com',
+            savedByUid: 'admin-1',
+            changeNote: ''
+        });
+
+        const { container } = await renderRetailerOrders();
+        expect(getItemsSection(container).textContent).toContain('Frozen catalog name');
+        expect(getItemsSection(container).textContent).toContain(formatSek(11134));
+        expect(calculationMocks.computeQuoteTotals).not.toHaveBeenCalled();
+
+        await act(async () => {
+            findButton(container, 'Exportera PDF').click();
+        });
+        await flushUi();
+
+        expect(createQuotePdfBlob).toHaveBeenCalledWith(expect.objectContaining({
+            presentation: expect.objectContaining({ pdfThemeId: 'brixx' }),
+            commercial: expect.objectContaining({
+                productRows: [expect.objectContaining({ model: 'Frozen catalog name', unitPrice: 11134 })]
+            })
+        }));
+    });
+
+    it('keeps a legacy request on its original version while clearly warning about current-catalog reconstruction', async () => {
+        quoteRepositoryMocks.getQuoteRevisionByVersion.mockResolvedValue({
+            revisionId: 'quote-1-revision-2',
+            quoteId: 'quote-1',
+            version: 2,
+            state: {
+                ...createInitialQuoteState(),
+                activeQuoteId: 'quote-1',
+                quoteNumber: 'BRIXX - 260521-101',
+                activeQuoteVersion: 2,
+                selectedLines: ['BaHaMa'],
+                customerInfo: {
+                    ...createInitialQuoteState().customerInfo,
+                    date: ''
+                }
+            },
+            summary: { finalTotalSek: 20200, grossTotalSek: 24300, totalDiscountSek: 4100 },
+            commercialSnapshot: null,
+            savedAtMs: new Date('2026-05-21T08:00:00.000Z').getTime(),
+            savedBy: 'retailer@example.com',
+            savedByUid: 'retailer-1',
+            changeNote: ''
+        });
+
+        const { container } = await renderRetailerOrders();
+        const itemsSection = getItemsSection(container);
+
+        expect(itemsSection.textContent).toContain('BaHaMa Jumbrella');
+        expect(itemsSection.textContent).toContain('dagens produktkatalog');
+        expect(itemsSection.textContent).toContain('offertversion v2');
+        expect(calculationMocks.computeQuoteTotals).toHaveBeenCalledWith(expect.objectContaining({
+            catalogData: expect.any(Object),
+            state: expect.objectContaining({
+                activeQuoteId: 'quote-1',
+                activeQuoteVersion: 2
+            })
+        }));
+        expect(quoteRepositoryMocks.getQuoteRevisionByVersion).toHaveBeenCalledWith({
+            userId: 'retailer-1',
+            quoteId: 'quote-1',
+            version: 2
+        });
+
+        await act(async () => {
+            findButton(container, 'Exportera PDF').click();
+        });
+        await flushUi();
+
+        expect(notificationMocks.notifyWarn).toHaveBeenCalledWith(expect.stringContaining('dagens produktkatalog'));
+        expect(createQuotePdfBlob).toHaveBeenCalledWith(expect.objectContaining({
+            agreement: expect.objectContaining({
+                effectiveQuoteDate: '2026-05-21',
+                quoteIdentity: expect.objectContaining({
+                    quoteId: 'quote-1',
+                    quoteNumber: 'BRIXX - 260521-101',
+                    version: 2
+                })
+            })
+        }));
+    });
+
     it('renders the inbox list, request details, and compact product overview', async () => {
         const { container } = await renderRetailerOrders();
         const itemsSection = getItemsSection(container);
@@ -393,7 +560,7 @@ describe('RetailerOrderRequests', () => {
         const itemsSection = getItemsSection(container);
 
         expect(itemsSection.textContent).toContain('Den sparade offertversionen kunde inte hittas');
-        expect(itemsSection.textContent).toContain('PDF-export finns fortfarande kvar som fallback');
+        expect(itemsSection.textContent).toContain('Öppna och spara offerten på nytt');
     });
 
     it('updates the compact item list when switching between order requests', async () => {

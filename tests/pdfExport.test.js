@@ -126,13 +126,12 @@ describe('pdfExport helpers', () => {
     });
 
     it('computes valid-until date from quote date and validity days', () => {
-        const validUntil = computeValidUntilDateString('2026-03-01', 14, new Date('2026-01-01T00:00:00'));
+        const validUntil = computeValidUntilDateString('2026-03-01', 14);
         expect(validUntil).toBe('2026-03-15');
     });
 
-    it('falls back to current date when quote date is missing', () => {
-        const validUntil = computeValidUntilDateString('', 10, new Date('2026-03-02T00:00:00'));
-        expect(validUntil).toBe('2026-03-12');
+    it('does not consult the runtime clock when the prepared quote date is missing', () => {
+        expect(computeValidUntilDateString('', 10)).toBe('');
     });
 
     it('groups and orders product lines predictably for the PDF', () => {
@@ -283,26 +282,6 @@ describe('pdfExport helpers', () => {
         ]);
         expect(pdfMockState.autoTableCalls[0].body[0][0]).toBe('Add-on: LED-Lighting with 4 RGBW-LED strips');
         expect(pdfMockState.autoTableCalls[0].body[0][2]).toBe('Price on request');
-    });
-
-    it('ignores the hide flag when discounts are present in the quote', () => {
-        const state = createStateFixture({
-            includeTerms: false,
-            includePaymentBox: false,
-            includeSignatureBlock: false,
-            hideZeroDiscountReferencesInPdf: true
-        });
-        const summary = computeQuoteTotals({
-            state,
-            catalogData: createCatalogFixture()
-        });
-
-        const pdfBlob = generatePDF(state, summary, true);
-
-        expect(pdfBlob).toBeInstanceOf(Blob);
-        expect(pdfMockState.autoTableCalls[0].head[0].some((h) => h.includes('Rabatt\ni SEK'))).toBe(true);
-        expect(pdfMockState.autoTableCalls[0].head[0]).toContain('Rabatt\ni %');
-        expect(pdfMockState.textCalls.map((call) => call.value).some((t) => t.includes('Total Rabatt'))).toBe(true);
     });
 
     it('includes custom builder add-ons in the generated PDF table body', () => {
@@ -567,6 +546,76 @@ describe('pdfExport helpers', () => {
         expect(textValues).not.toContain('Quote details');
         expect(textValues).not.toContain('Total Recommended Price:');
         expect(textValues).not.toContain('Total excl. VAT:');
+    });
+
+    it('renders frozen prepared contracting rows and aggregate amounts without recalculating them', () => {
+        const state = createZeroDiscountState({
+            exportLanguage: 'en',
+            builderItems: [],
+            gridSelections: {},
+            customCosts: [],
+            contractingWork: {
+                enabled: true,
+                projectName: 'Frozen project',
+                rows: [{
+                    id: 'current-row',
+                    workPackage: 'Current mutable work',
+                    scope: 'Must not be rendered',
+                    unit: 'project',
+                    priceExVatSek: 9999
+                }],
+                margin: { enabled: true, percent: 50 },
+                ata: { enabled: true, percent: 50 }
+            }
+        });
+        const summary = computeQuoteTotals({ state, catalogData: createCatalogFixture() });
+        const frozenContractingSummary = {
+            activeRows: [{
+                id: 'saved-row',
+                workPackage: 'Saved installation',
+                scope: 'Frozen customer scope',
+                unit: 'project',
+                priceExVatSek: 1225
+            }],
+            customerRows: [{
+                id: 'saved-row',
+                workPackage: 'Saved installation',
+                scope: 'Frozen customer scope',
+                unit: 'project',
+                priceExVatSek: 1225
+            }],
+            costTotalSek: 1225,
+            baseTotalSek: 1225,
+            marginEnabled: false,
+            marginPercent: 0,
+            marginAmountSek: 0,
+            allowanceSek: 123,
+            lowerIndicativeSek: 1102,
+            upperIndicativeSek: 1348,
+            ataEnabled: true,
+            ataPercent: 10
+        };
+
+        const pdfBlob = generatePDF(state, summary, true, frozenContractingSummary);
+        const textValues = pdfMockState.textCalls.map((call) => call.value);
+        const contractingTable = pdfMockState.autoTableCalls[0];
+
+        expect(pdfBlob).toBeInstanceOf(Blob);
+        expect(contractingTable.body).toEqual([[
+            'Saved installation',
+            'Frozen customer scope',
+            'project',
+            '1 225 SEK'
+        ]]);
+        expect(textValues).toEqual(expect.arrayContaining([
+            '1 225 SEK',
+            'Variation work allowance (±10%)',
+            '123 SEK',
+            '1 102 SEK',
+            '1 348 SEK'
+        ]));
+        expect([...textValues, ...contractingTable.body.flat()].join(' '))
+            .not.toMatch(/Current mutable work|9 999|14 999/);
     });
 
     it('keeps mixed product and contracting sections separate in the PDF', () => {

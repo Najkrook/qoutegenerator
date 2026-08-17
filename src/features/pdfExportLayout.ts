@@ -10,6 +10,7 @@ import {
 } from '../services/exportLocalization';
 import { applyVat } from '../utils/vatHelper';
 import type {
+    ContractingWorkSummary,
     ContractingWorkState,
     CustomerInfo,
     ExportSummaryInput,
@@ -548,6 +549,7 @@ export function renderGroupedTables(doc, {
 
 export function renderContractingWorkSection(doc, {
     contractingWork,
+    summary: preparedSummary,
     formatSEK,
     currentY,
     pageWidth,
@@ -557,6 +559,7 @@ export function renderContractingWorkSection(doc, {
     exportLanguage = 'sv'
 }: {
     contractingWork: ContractingWorkState | null | undefined;
+    summary?: ContractingWorkSummary;
     formatSEK: (value: number) => string;
     currentY: number;
     pageWidth: number;
@@ -565,7 +568,7 @@ export function renderContractingWorkSection(doc, {
     layout?: PdfThemeLayout;
     exportLanguage?: string;
 }) {
-    const summary = calculateContractingWorkSummary(contractingWork);
+    const summary = preparedSummary ?? calculateContractingWorkSummary(contractingWork);
     if (summary.customerRows.length === 0) {
         return currentY;
     }

@@ -37,6 +37,46 @@ function revision(overrides = {}) {
     };
 }
 
+function commercialSnapshot(overrides = {}) {
+    return {
+        schemaVersion: 1,
+        presentation: {
+            exportLanguage: 'sv',
+            pdfThemeId: 'brixx',
+            allowedPdfThemeIds: ['brixx']
+        },
+        effectiveQuoteDate: '2026-05-21',
+        productRows: [{
+            model: 'BaHaMa Jumbrella',
+            size: '3x3',
+            unitPrice: 1000,
+            qty: 1,
+            gross: 1000,
+            discountPct: 0,
+            discountSek: 0,
+            net: 1000,
+            isAddon: false,
+            isCustom: false,
+            priceUponRequest: false,
+            line: 'BaHaMa'
+        }],
+        productTotals: {
+            includesVat: true,
+            grossTotalSek: 1000,
+            totalDiscountSek: 0,
+            finalTotalSek: 1000,
+            globalDiscountAmt: 0,
+            globalDiscountPct: 0,
+            vatBasisSek: 1000,
+            vatAmountSek: 250,
+            totalWithVatSek: 1250
+        },
+        contractingWork: null,
+        visibility: { contractingWork: 'absent', discountReferences: 'visible' },
+        ...overrides
+    };
+}
+
 function crmIssue(overrides = {}) {
     return {
         code: 'unavailable',
@@ -160,6 +200,65 @@ describeQuoteRules('Quote Save Firestore rules', () => {
         await assertFails(setDoc(
             doc(db, 'users', 'owner-uid', 'quotes', 'quote-1', 'revisions', 'intent_other'),
             revision({ saveIntentId: 'same-intent' })
+        ));
+    });
+
+    it('accepts the versioned commercial snapshot envelope and rejects unknown fixed nested fields', async () => {
+        const db = testEnv.authenticatedContext('owner-uid').firestore();
+        await assertSucceeds(setDoc(
+            doc(db, 'users', 'owner-uid', 'quotes', 'quote-1', 'revisions', 'intent_snapshot'),
+            revision({ commercialSnapshot: commercialSnapshot(), saveIntentId: 'snapshot' })
+        ));
+        await assertFails(setDoc(
+            doc(db, 'users', 'owner-uid', 'quotes', 'quote-1', 'revisions', 'intent_bad-snapshot'),
+            revision({
+                commercialSnapshot: commercialSnapshot({ marginAnalysis: { profit: 999999 } }),
+                saveIntentId: 'bad-snapshot'
+            })
+        ));
+        await assertFails(setDoc(
+            doc(db, 'users', 'owner-uid', 'quotes', 'quote-1', 'revisions', 'intent_bad-totals'),
+            revision({
+                commercialSnapshot: commercialSnapshot({
+                    productTotals: {
+                        ...commercialSnapshot().productTotals,
+                        marginAnalysis: { profit: 999999 }
+                    }
+                }),
+                saveIntentId: 'bad-totals'
+            })
+        ));
+        await assertFails(setDoc(
+            doc(db, 'users', 'owner-uid', 'quotes', 'quote-1', 'revisions', 'intent_bad-theme'),
+            revision({
+                commercialSnapshot: commercialSnapshot({
+                    presentation: {
+                        ...commercialSnapshot().presentation,
+                        allowedPdfThemeIds: ['brixx'],
+                        internalThemePolicy: true
+                    }
+                }),
+                saveIntentId: 'bad-theme'
+            })
+        ));
+        await assertFails(setDoc(
+            doc(db, 'users', 'owner-uid', 'quotes', 'quote-1', 'revisions', 'intent_bad-work'),
+            revision({
+                commercialSnapshot: commercialSnapshot({
+                    contractingWork: {
+                        projectName: 'Projekt',
+                        rows: [],
+                        baseTotalSek: 0,
+                        ataEnabled: false,
+                        ataPercent: 15,
+                        allowanceSek: 0,
+                        lowerIndicativeSek: 0,
+                        upperIndicativeSek: 0,
+                        internalMargins: { BaHaMa: 55 }
+                    }
+                }),
+                saveIntentId: 'bad-work'
+            })
         ));
     });
 });

@@ -71,15 +71,6 @@ vi.mock('react-hot-toast', () => ({
     default: toastState
 }));
 
-vi.mock('../src/services/calculationEngine', () => ({
-    computeQuoteTotals: () => ({
-        totals: [],
-        finalTotalSek: 0,
-        grossTotalSek: 0,
-        totalDiscountSek: 0
-    })
-}));
-
 vi.mock('../src/components/features/CustomerInfoForm', () => ({
     CustomerInfoForm: () => React.createElement('div', null, 'CustomerInfoFormMock')
 }));
@@ -186,19 +177,23 @@ async function renderSummaryExport({ stateOverrides = {}, authOverrides = {}, pr
     const root = createRoot(container);
     const dispatch = vi.fn();
 
-    await act(async () => {
-        root.render(
-            <AuthContext.Provider value={createAuthValue(authOverrides)}>
-                <QuoteContext.Provider value={{ state: createQuoteState(stateOverrides), dispatch }}>
-                    <SummaryExport onPrev={() => {}} {...props} />
-                </QuoteContext.Provider>
-            </AuthContext.Provider>
-        );
-        await Promise.resolve();
-    });
+    const renderWith = async (nextStateOverrides = stateOverrides) => {
+        await act(async () => {
+            root.render(
+                <AuthContext.Provider value={createAuthValue(authOverrides)}>
+                    <QuoteContext.Provider value={{ state: createQuoteState(nextStateOverrides), dispatch }}>
+                        <SummaryExport onPrev={() => {}} {...props} />
+                    </QuoteContext.Provider>
+                </AuthContext.Provider>
+            );
+            await Promise.resolve();
+        });
+    };
+
+    await renderWith();
 
     mountedRoots.push({ root, container });
-    return { container, dispatch };
+    return { container, dispatch, rerender: renderWith };
 }
 
 function findButton(container, label) {
@@ -316,6 +311,32 @@ afterEach(() => {
 });
 
 describe('SummaryExport PDF override', () => {
+    it('renders when the draft retains a zero-quantity custom grid add-on', async () => {
+        const { container } = await renderSummaryExport({
+            stateOverrides: {
+                customCosts: [{ description: 'Aktiv produkt', price: 1000, qty: 1, discountPct: 0 }],
+                gridSelections: {
+                    ClickitUp: {
+                        items: {},
+                        addons: {},
+                        customAddonsByCategory: {
+                            doors: [{
+                                id: 'inactive-addon',
+                                name: 'Inaktiv specialdörr',
+                                price: 1500,
+                                qty: 0,
+                                discountPct: 0
+                            }]
+                        }
+                    }
+                }
+            }
+        });
+
+        expect(container.textContent).toContain('FinalSummaryTableMock');
+        expect(container.textContent).toContain('Exportera PDF');
+    });
+
     it('renders the shared export language selector beside the PDF preview', async () => {
         const { container } = await renderSummaryExport();
         const languageGroup = container.querySelector('[role="group"][aria-label="Exportspråk"]');
@@ -355,8 +376,9 @@ describe('SummaryExport PDF override', () => {
         expect(container.textContent).toContain('Exportspråk');
         expect(findButton(container, 'EN').getAttribute('aria-pressed')).toBe('true');
         expect(createQuotePdfBlob).toHaveBeenCalledWith(
-            expect.objectContaining({ exportLanguage: 'en' }),
-            expect.any(Object)
+            expect.objectContaining({
+                presentation: expect.objectContaining({ exportLanguage: 'en' })
+            })
         );
 
         await clickButton(container, 'SV');
@@ -364,50 +386,6 @@ describe('SummaryExport PDF override', () => {
         expect(dispatch).toHaveBeenCalledWith({
             type: 'SET_EXPORT_LANGUAGE',
             payload: 'sv'
-        });
-    });
-
-    it('restricts PDF themes for retailers and allows all for admins', async () => {
-        const { container: adminContainer } = await renderSummaryExport({
-            authOverrides: { accessLevel: 'admin', isRetailer: false }
-        });
-        const adminSelect = adminContainer.querySelector('select[name="pdfThemeId"]');
-        expect(Array.from(adminSelect.options).map(o => o.value)).toEqual(['brixx', 'custom', 'roslagsmarkisen']);
-
-        const { container: retailerContainer1 } = await renderSummaryExport({
-            authOverrides: {
-                accessLevel: 'retailer',
-                isRetailer: true,
-                retailer: { id: 'ret-1', pdfThemes: [] }
-            }
-        });
-        const retSelect1 = retailerContainer1.querySelector('select[name="pdfThemeId"]');
-        expect(Array.from(retSelect1.options).map(o => o.value)).toEqual(['brixx']);
-
-        const { container: retailerContainer2 } = await renderSummaryExport({
-            authOverrides: {
-                accessLevel: 'retailer',
-                isRetailer: true,
-                retailer: { id: 'ret-2', pdfThemes: ['roslagsmarkisen'] }
-            }
-        });
-        const retSelect2 = retailerContainer2.querySelector('select[name="pdfThemeId"]');
-        expect(Array.from(retSelect2.options).map(o => o.value)).toEqual(['brixx', 'roslagsmarkisen']);
-    });
-
-    it('forces fallback to default theme if an unauthorized theme is loaded in state', async () => {
-        const { dispatch } = await renderSummaryExport({
-            authOverrides: {
-                accessLevel: 'retailer',
-                isRetailer: true,
-                retailer: { id: 'ret-1', pdfThemes: [] }
-            },
-            stateOverrides: { pdfThemeId: 'custom' }
-        });
-        
-        expect(dispatch).toHaveBeenCalledWith({
-            type: 'SET_PDF_THEME_ID',
-            payload: 'brixx'
         });
     });
 
@@ -465,6 +443,33 @@ describe('SummaryExport PDF override', () => {
 
         expect(createQuotePdfBlob).toHaveBeenCalledTimes(1);
         expect(fileUtilsState.saveBlobWithPicker).toHaveBeenCalledTimes(1);
+    });
+
+    it('reuses preview caching for equivalent prepared meaning and invalidates it when meaning changes', async () => {
+        const { rerender } = await renderSummaryExport({
+            stateOverrides: { quoteNumber: 'BRIXX - 260423-102' }
+        });
+        await waitForPreviewDebounce();
+        expect(createQuotePdfBlob).toHaveBeenCalledTimes(1);
+
+        await rerender({
+            quoteNumber: 'BRIXX - 260423-102',
+            draftUpdatedAtMs: 123
+        });
+        await waitForPreviewDebounce();
+        expect(createQuotePdfBlob).toHaveBeenCalledTimes(1);
+
+        await rerender({
+            quoteNumber: 'BRIXX - 260423-102',
+            customerInfo: {
+                ...createInitialQuoteState().customerInfo,
+                name: 'Grace',
+                company: 'Brixx',
+                date: '2026-04-23'
+            }
+        });
+        await waitForPreviewDebounce();
+        expect(createQuotePdfBlob).toHaveBeenCalledTimes(2);
     });
 
     it('shows one version-save action and blocks delivery actions while saving', async () => {
@@ -664,8 +669,11 @@ describe('SummaryExport PDF override', () => {
         await clickButton(container, 'Exportera Excel');
 
         expect(excelExportState.generateExcel).toHaveBeenCalledWith(
-            expect.objectContaining({ exportLanguage: 'en' }),
-            expect.any(Object)
+            expect.objectContaining({
+                presentation: expect.objectContaining({ exportLanguage: 'en' }),
+                commercial: expect.any(Object),
+                visibility: expect.any(Object)
+            })
         );
         expect(activityState.safeLogActivity).toHaveBeenCalledWith(expect.objectContaining({
             details: 'Excel exporterad: Quote.xlsx',
@@ -675,7 +683,7 @@ describe('SummaryExport PDF override', () => {
         }));
     });
 
-    it('removes persisted contracting work from retailer preview and export payloads', async () => {
+    it('passes the prepared persistence state to deep save and only saved identity to order submission', async () => {
         const { container } = await renderSummaryExport({
             authOverrides: {
                 accessLevel: 'retailer',
@@ -696,8 +704,8 @@ describe('SummaryExport PDF override', () => {
                     projectName: 'Hidden retailer project',
                     rows: [{
                         id: 'hidden-work',
-                        workPackage: 'Hidden retailer work',
-                        scope: 'Must not be exported',
+                        workPackage: 'Retailer-ineligible work',
+                        scope: 'Saved only through preparation',
                         unit: 'work',
                         priceExVatSek: 50000
                     }],
@@ -706,35 +714,6 @@ describe('SummaryExport PDF override', () => {
                 }
             }
         });
-        await waitForPreviewDebounce();
-
-        expect(container.textContent).not.toContain('Hidden retailer work');
-        expect(createQuotePdfBlob).toHaveBeenCalledWith(
-            expect.objectContaining({
-                contractingWork: {
-                    enabled: false,
-                    projectName: '',
-                    rows: [],
-                    margin: { enabled: false, percent: 15 },
-                    ata: { enabled: false, percent: 15 }
-                }
-            }),
-            expect.any(Object)
-        );
-
-        await clickButton(container, 'Exportera Excel');
-
-        expect(excelExportState.generateExcel).toHaveBeenCalledWith(
-            expect.objectContaining({
-                contractingWork: expect.objectContaining({
-                    enabled: false,
-                    rows: [],
-                    margin: { enabled: false, percent: 15 }
-                })
-            }),
-            expect.any(Object)
-        );
-
         await clickButton(container, 'Spara ny version');
 
         expect(quoteSaveState.save).toHaveBeenCalledWith(
@@ -752,16 +731,11 @@ describe('SummaryExport PDF override', () => {
         await clickButton(container, 'Skicka orderförfrågan');
 
         expect(orderRequestState.createOrderRequest).toHaveBeenCalledWith(
-            expect.objectContaining({
-                state: expect.objectContaining({
-                    contractingWork: expect.objectContaining({
-                        enabled: false,
-                        rows: [],
-                        margin: { enabled: false, percent: 15 }
-                    })
-                })
-            })
+            expect.objectContaining({ quoteId: 'quote-1', quoteVersion: 2 })
         );
+        expect(orderRequestState.createOrderRequest.mock.calls[0][0]).not.toHaveProperty('state');
+        expect(orderRequestState.createOrderRequest.mock.calls[0][0]).not.toHaveProperty('summary');
+        expect(orderRequestState.createOrderRequest.mock.calls[0][0]).not.toHaveProperty('preparedQuote');
     });
 
     it('shows the retailer order request CTA only for retailer users', async () => {

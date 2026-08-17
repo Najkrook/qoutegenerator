@@ -186,7 +186,8 @@ type QuoteTotalsRowModelInput = Pick<QuoteTotalsRow, 'model'> & Partial<Pick<Quo
 
 export function translateQuoteTotalsRowModel(
     row: QuoteTotalsRowModelInput,
-    language: unknown = DEFAULT_EXPORT_LANGUAGE
+    language: unknown = DEFAULT_EXPORT_LANGUAGE,
+    sourceCatalog: typeof catalogData = catalogData
 ): string {
     const raw = String(row?.model ?? '');
     if (normalizeExportLanguage(language) !== 'en') {
@@ -198,7 +199,7 @@ export function translateQuoteTotalsRowModel(
         return translateSystemLabel(raw, language);
     }
 
-    const lineData = catalogData[source.lineId];
+    const lineData = sourceCatalog[source.lineId];
     if (!lineData || lineData.type !== 'grid') {
         return translateSystemLabel(raw, language);
     }

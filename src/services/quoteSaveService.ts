@@ -1,6 +1,7 @@
-import { catalogData } from '../data/catalog';
+import { catalogData as defaultCatalogData } from '../data/catalog';
 import type {
     AccessUser,
+    CatalogData,
     CreateQuoteInput,
     CrmSynchronizationIssue,
     QuoteReference,
@@ -20,6 +21,7 @@ import { computeQuoteTotals } from './calculationEngine';
 import { hasConfiguredContractingWork } from './contractingWork';
 import { hasConfiguredGridSelection, hasConfiguredGridSelections } from './quoteContent';
 import { sanitizeQuoteRevisionState } from './quoteRepository';
+import { createQuoteCommercialSnapshot, prepareQuote } from './quotePreparation';
 
 const RETAILER_SAFE_CONTRACTING_WORK: QuoteState['contractingWork'] = {
     enabled: false,
@@ -124,6 +126,8 @@ interface QuoteSaveModuleDependencies {
     crm: CrmPort;
     logActivity: (input: UnknownRecord) => Promise<ActivityResultLike | void>;
     calculateTotals?: (draft: QuoteState) => QuoteTotalsResult;
+    catalogData?: CatalogData;
+    today?: () => string;
     createSaveIntentId?: () => string;
     now?: () => number;
     crmTimeoutMs?: number;
@@ -406,7 +410,9 @@ export function createQuoteSaveModule({
     quotePersistence,
     crm,
     logActivity,
-    calculateTotals = (draft) => computeQuoteTotals({ state: draft, catalogData }),
+    catalogData: quoteCatalogData = defaultCatalogData,
+    calculateTotals = (draft) => computeQuoteTotals({ state: draft, catalogData: quoteCatalogData }),
+    today = () => new Date().toISOString().slice(0, 10),
     createSaveIntentId: makeSaveIntentId = createSaveIntentId,
     now = () => Date.now(),
     crmTimeoutMs = DEFAULT_CRM_TIMEOUT_MS,
@@ -732,6 +738,18 @@ export function createQuoteSaveModule({
             return authorizationFailure('invalid-draft', 'The Quote draft has no configured content to save.');
         }
         const canonicalSummary = calculateTotals(canonicalDraft);
+        const preparedQuote = prepareQuote({
+            state: canonicalDraft,
+            totals: canonicalSummary,
+            catalogData: quoteCatalogData,
+            fallbackDate: today(),
+            audience: {
+                isRetailer: Boolean(input.retailer),
+                allowedPdfThemes: input.retailer?.pdfThemes || []
+            }
+        });
+        const persistenceSnapshot = preparedQuote.persistenceSnapshot;
+        const commercialSnapshot = createQuoteCommercialSnapshot(preparedQuote);
         const saveIntentId = normalizeId(input.retrySaveIntentId) || makeSaveIntentId();
         const isNewQuote = target.kind === 'new';
         const requestedDealId = normalizeId(target.crmDealId);
@@ -772,10 +790,11 @@ export function createQuoteSaveModule({
                 const createInput: CreateQuoteInput = {
                     user: input.actor as AccessUser,
                     ownerUid,
-                    state: canonicalDraft,
+                    state: persistenceSnapshot,
                     summary: canonicalSummary,
-                    customerInfo: canonicalDraft.customerInfo,
-                    status: canonicalDraft.quoteStatus,
+                    commercialSnapshot,
+                    customerInfo: persistenceSnapshot.customerInfo,
+                    status: persistenceSnapshot.quoteStatus,
                     changeNote: input.changeNote || 'Initial save',
                     retailerName: input.retailer?.name || null,
                     originType: input.retailer ? 'retailer' : 'internal',
@@ -788,10 +807,11 @@ export function createQuoteSaveModule({
                     user: input.actor as AccessUser,
                     ownerUid,
                     quoteId: target.quote.quoteId,
-                    state: canonicalDraft,
+                    state: persistenceSnapshot,
                     summary: canonicalSummary,
-                    customerInfo: canonicalDraft.customerInfo,
-                    status: canonicalDraft.quoteStatus,
+                    commercialSnapshot,
+                    customerInfo: persistenceSnapshot.customerInfo,
+                    status: persistenceSnapshot.quoteStatus,
                     changeNote: input.changeNote || '',
                     retailerName: input.retailer?.name || null,
                     crmSynchronizationIssue: pendingCrmIssue,
@@ -814,7 +834,7 @@ export function createQuoteSaveModule({
         if (!quote.quoteId) {
             throw new Error('Quote persistence returned no Quote identity.');
         }
-        const statePatch = buildSavedQuoteStatePatch(saved, canonicalDraft);
+        const statePatch = buildSavedQuoteStatePatch(saved, persistenceSnapshot);
         const version = saved.metadata.latestVersion || saved.revision.version || statePatch.activeQuoteVersion || 1;
         const persistedDealId = normalizeId(existing?.metadata.crmDealId || saved.metadata.crmDealId);
         const dealId = desiredDealId;
@@ -874,7 +894,7 @@ export function createQuoteSaveModule({
 
         await logSavedActivity({
             actor: input.actor as AccessUser,
-            draft: canonicalDraft,
+            draft: persistenceSnapshot,
             summary: canonicalSummary,
             quote,
             isNewQuote,

@@ -1,11 +1,12 @@
 import { jsPDF } from 'jspdf';
 import { notifyWarn, notifyError } from '../services/notificationService';
-import {
-    buildExportSummary,
-    shouldHideDiscountReferencesInPdf
-} from '../services/exportDataBuilders';
 import { calculateContractingWorkSummary } from '../services/contractingWork';
-import type { CustomerInfo, QuoteState, QuoteTotalsResult } from '../types/contracts';
+import type {
+    ContractingWorkSummary,
+    CustomerInfo,
+    QuoteState,
+    QuoteTotalsResult
+} from '../types/contracts';
 import {
     getPdfLayout,
     drawHeader,
@@ -27,7 +28,10 @@ type PdfExportState = Partial<QuoteState> & {
     customerInfo?: Partial<CustomerInfo>;
 };
 
-type PdfSummaryData = Partial<QuoteTotalsResult>;
+type PdfSummaryData = Partial<QuoteTotalsResult> & {
+    vatAmountSek?: number;
+    totalWithVatSek?: number;
+};
 
 type JsPdfDocument = InstanceType<typeof jsPDF>;
 
@@ -65,8 +69,7 @@ function createPdfDocument(): JsPdfDocument {
 
 export function computeValidUntilDateString(
     quoteDateValue: string | null | undefined,
-    quoteValidityDays: unknown,
-    nowDate = new Date()
+    quoteValidityDays: unknown
 ): string {
     const validityDays = normalizePositiveInt(quoteValidityDays, 14);
     let baseDate: Date | null = null;
@@ -81,9 +84,7 @@ export function computeValidUntilDateString(
         }
     }
 
-    if (!baseDate) {
-        baseDate = new Date(nowDate.getTime());
-    }
+    if (!baseDate) return '';
 
     const validUntil = new Date(baseDate.getTime());
     validUntil.setDate(validUntil.getDate() + validityDays);
@@ -93,7 +94,8 @@ export function computeValidUntilDateString(
 export function generatePDF(
     state: PdfExportState,
     summaryData: PdfSummaryData,
-    returnBlob = false
+    returnBlob = false,
+    preparedContractingSummary?: ContractingWorkSummary
 ): Blob | null {
     const doc = createPdfDocument();
 
@@ -101,19 +103,18 @@ export function generatePDF(
         const pageWidth = doc.internal.pageSize.width;
         const pageHeight = doc.internal.pageSize.height;
         const customerInfo: Partial<CustomerInfo> = state.customerInfo || {};
-        const quoteDate = customerInfo.date || new Date().toLocaleDateString('sv-SE');
-        const pdfLegalTemplatesEnabled = typeof window === 'undefined'
-            ? true
-            : window.FEATURE_PDF_LEGAL_TEMPLATES !== false;
-        const shouldRenderPaymentBox = pdfLegalTemplatesEnabled && state.includePaymentBox !== false;
-        const shouldRenderSignatureBlock = pdfLegalTemplatesEnabled && state.includeSignatureBlock !== false;
-        const hideDiscountReferences = shouldHideDiscountReferencesInPdf(state, summaryData);
+        const quoteDate = customerInfo.date || '';
+        const shouldRenderPaymentBox = state.includePaymentBox === true;
+        const shouldRenderSignatureBlock = state.includeSignatureBlock === true;
+        const hideDiscountReferences = state.hideZeroDiscountReferencesInPdf === true;
         const validUntilDate = computeValidUntilDateString(customerInfo.date, state.quoteValidityDays);
         const activeLayout = getPdfLayout(state.pdfThemeId);
         const exportLanguage = state.exportLanguage || 'sv';
         const productRows = Array.isArray(summaryData.totals) ? summaryData.totals : [];
         const hasProducts = productRows.length > 0;
-        const hasContractingWork = calculateContractingWorkSummary(state.contractingWork).activeRows.length > 0;
+        const contractingSummary = preparedContractingSummary
+            ?? calculateContractingWorkSummary(state.contractingWork);
+        const hasContractingWork = contractingSummary.activeRows.length > 0;
         const shouldRenderLegacyEmptyProductSection = !hasProducts && !hasContractingWork;
         const drawMainHeader = () => drawHeader(doc, {
             pageWidth,
@@ -153,7 +154,14 @@ export function generatePDF(
             notifyWarn('Avancerad PDF-tabell saknas. Exporterar med enkel layout.');
         }
 
-        const exportSummary = buildExportSummary(state, summaryData);
+        const finalTotalSek = summaryData.finalTotalSek || 0;
+        const exportSummary = {
+            finalTotalSek,
+            grossTotalSek: summaryData.grossTotalSek || 0,
+            totalDiscountSek: summaryData.totalDiscountSek || 0,
+            vatAmount: summaryData.vatAmountSek || 0,
+            totalWithVat: summaryData.totalWithVatSek ?? finalTotalSek
+        };
         const totalsState = {
             ...state,
             hideDiscountReferences,
@@ -181,6 +189,7 @@ export function generatePDF(
         if (hasContractingWork) {
             finalY = renderContractingWorkSection(doc, {
                 contractingWork: state.contractingWork,
+                summary: contractingSummary,
                 formatSEK: formatSek,
                 currentY: hasProducts ? finalY + 12 : finalY,
                 pageWidth,

@@ -7,7 +7,7 @@ import { ACCESS_LEVELS, resolveAccessLevelFromUser } from '../src/config/accessC
 import * as authService from '../src/services/authService';
 import * as firebase from '../src/services/firebase';
 import React from 'react';
-import { render, screen, waitFor, cleanup } from '@testing-library/react';
+import { act, render, screen, waitFor, cleanup } from '@testing-library/react';
 
 afterEach(() => {
     cleanup();
@@ -33,9 +33,10 @@ vi.mock('../src/services/firebase', () => ({
 
 // Test component to read context
 function TestConsumer() {
-    const { accessLevel, isRetailer, canViewEverything, canAccessSketch } = useAuth();
+    const { accessLevel, isRetailer, canViewEverything, canAccessSketch, loading } = useAuth();
     return (
         <div>
+            <div data-testid="loading">{String(loading)}</div>
             <div data-testid="level">{accessLevel}</div>
             <div data-testid="is-retailer">{String(isRetailer)}</div>
             <div data-testid="can-view-everything">{String(canViewEverything)}</div>
@@ -69,10 +70,10 @@ describe('AuthContext Role Precedence', () => {
         await waitFor(() => expect(authCallback).toBeDefined());
         
         // Trigger callback
-        await authCallback(user);
-        
-        // Give promises time to resolve
-        await new Promise(resolve => setTimeout(resolve, 0));
+        await act(async () => {
+            await authCallback(user);
+        });
+        await waitFor(() => expect(screen.getByTestId('loading').textContent).toBe('false'));
     };
 
     it('resolves guest when not logged in', async () => {

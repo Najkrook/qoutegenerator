@@ -12,10 +12,19 @@ import {
 } from '../src/services/orderRequestService';
 import { createFirestoreMock } from './fixtures/firestoreMock';
 import { createInitialQuoteState } from '../src/store/quoteStateSchema';
+import { computeQuoteTotals } from '../src/services/calculationEngine';
+import { createQuoteRepository } from '../src/services/quoteRepository';
+import { createQuoteCommercialSnapshot, prepareQuote } from '../src/services/quotePreparation';
 
 function buildService(initialDocs = {}) {
-    const mock = createFirestoreMock(initialDocs);
-    const service = createOrderRequestService(mock);
+    const mock = createFirestoreMock({
+        ...createSavedRevisionDocs(),
+        ...initialDocs
+    });
+    const service = createOrderRequestService({
+        ...mock,
+        quoteRepository: createQuoteRepository(mock)
+    });
     return { service, mock };
 }
 
@@ -37,6 +46,7 @@ function createSavedQuoteState(overrides = {}) {
         quoteNumber: 'BRIXX - 260521-101',
         activeQuoteVersion: 2,
         selectedLines: ['BaHaMa'],
+        customCosts: [{ description: 'Saved product', price: 12345, qty: 1, discountPct: 0 }],
         customerInfo: {
             ...createInitialQuoteState().customerInfo,
             name: 'Ada',
@@ -45,6 +55,39 @@ function createSavedQuoteState(overrides = {}) {
             customerReference: 'ER-88'
         },
         ...overrides
+    };
+}
+
+function createSavedRevisionDocs(
+    state = createSavedQuoteState(),
+    audience = { isRetailer: true }
+) {
+    const totals = computeQuoteTotals({ state, catalogData: {} });
+    const prepared = prepareQuote({
+        state,
+        totals,
+        audience,
+        fallbackDate: '2026-05-21',
+        catalogData: {}
+    });
+    return {
+        'users/retailer-1/quotes/quote_1': {
+            quoteNumber: 'BRIXX - 260521-101',
+            latestVersion: 2,
+            latestRevisionId: 'rev_2',
+            status: 'draft'
+        },
+        'users/retailer-1/quotes/quote_1/revisions/rev_2': {
+            quoteId: 'quote_1',
+            version: 2,
+            savedAtMs: 200,
+            savedBy: user.email,
+            savedByUid: user.uid,
+            state: prepared.persistenceSnapshot,
+            summary: prepared.commercial.productTotals,
+            commercialSnapshot: createQuoteCommercialSnapshot(prepared),
+            changeNote: ''
+        }
     };
 }
 
@@ -57,8 +100,8 @@ describe('orderRequestService', () => {
         const record = await service.createOrderRequest({
             user,
             retailer,
-            state: createSavedQuoteState(),
-            summary: { finalTotalSek: 12345, grossTotalSek: 15000, totalDiscountSek: 2655 }
+            quoteId: 'quote_1',
+            quoteVersion: 2
         });
 
         expect(record.id).toBe(buildOrderRequestId('quote_1', 2));
@@ -81,6 +124,27 @@ describe('orderRequestService', () => {
         vi.useRealTimers();
     });
 
+    it('persists the PDF theme approved at submission instead of the saved but revoked theme', async () => {
+        const state = createSavedQuoteState({ pdfThemeId: 'custom' });
+        const savedDocs = createSavedRevisionDocs(state, {
+            isRetailer: true,
+            allowedPdfThemes: ['custom']
+        });
+        const { service, mock } = buildService(savedDocs);
+
+        const record = await service.createOrderRequest({
+            user,
+            retailer: { ...retailer, pdfThemes: [] },
+            quoteId: 'quote_1',
+            quoteVersion: 2
+        });
+
+        expect(record.pdfThemeId).toBe('brixx');
+        expect(mock.__docs.get(`order_requests/${record.id}`)).toMatchObject({
+            pdfThemeId: 'brixx'
+        });
+    });
+
     it('returns the existing request when the same quote version is submitted again', async () => {
         vi.useFakeTimers();
         vi.setSystemTime(new Date('2026-05-21T08:00:00.000Z'));
@@ -89,15 +153,15 @@ describe('orderRequestService', () => {
         const first = await service.createOrderRequest({
             user,
             retailer,
-            state: createSavedQuoteState(),
-            summary: { finalTotalSek: 12345, grossTotalSek: 15000, totalDiscountSek: 2655 }
+            quoteId: 'quote_1',
+            quoteVersion: 2
         });
 
         const second = await service.createOrderRequest({
             user,
             retailer,
-            state: createSavedQuoteState(),
-            summary: { finalTotalSek: 12345, grossTotalSek: 15000, totalDiscountSek: 2655 }
+            quoteId: 'quote_1',
+            quoteVersion: 2
         });
 
         expect(second).toEqual(first);
@@ -106,24 +170,31 @@ describe('orderRequestService', () => {
     });
 
     it('creates a request without requiring a pre-read of the document', async () => {
-        const mock = createFirestoreMock();
-        const getDocSpy = vi.fn(async () => {
-            throw new Error('getDoc should not run before create');
+        const mock = createFirestoreMock(createSavedRevisionDocs());
+        const getDocSpy = vi.fn(async (ref) => {
+            if (String(ref?.path || '').startsWith('order_requests/')) {
+                throw new Error('order request document should not be read before create');
+            }
+            return mock.getDoc(ref);
         });
+        const repositoryDeps = { ...mock, getDoc: getDocSpy };
         const service = createOrderRequestService({
             ...mock,
-            getDoc: getDocSpy
+            getDoc: getDocSpy,
+            quoteRepository: createQuoteRepository(repositoryDeps)
         });
 
         const record = await service.createOrderRequest({
             user,
             retailer,
-            state: createSavedQuoteState(),
-            summary: { finalTotalSek: 12345, grossTotalSek: 15000, totalDiscountSek: 2655 }
+            quoteId: 'quote_1',
+            quoteVersion: 2
         });
 
         expect(record.id).toBe(buildOrderRequestId('quote_1', 2));
-        expect(getDocSpy).not.toHaveBeenCalled();
+        expect(getDocSpy).not.toHaveBeenCalledWith(expect.objectContaining({
+            path: `order_requests/${record.id}`
+        }));
     });
 
     it('lists recent order requests and updates admin status', async () => {

@@ -4,6 +4,9 @@ import { describe, expect, it, vi } from 'vitest';
 import { FinalSummaryTable } from '../src/components/features/FinalSummaryTable';
 import { QuoteContext } from '../src/store/QuoteContext';
 import { createInitialQuoteState } from '../src/store/quoteStateSchema';
+import { catalogData } from '../src/data/catalog';
+import { computeQuoteTotals } from '../src/services/calculationEngine';
+import { prepareQuote } from '../src/services/quotePreparation';
 
 function renderSummary(stateOverrides = {}) {
     const state = {
@@ -33,9 +36,16 @@ function renderSummary(stateOverrides = {}) {
         ...stateOverrides
     };
 
+    const preparedQuote = prepareQuote({
+        state,
+        totals: computeQuoteTotals({ state, catalogData }),
+        fallbackDate: '2026-08-12',
+        audience: { isRetailer: false }
+    });
+
     return renderToStaticMarkup(
         <QuoteContext.Provider value={{ state, dispatch: vi.fn() }}>
-            <FinalSummaryTable />
+            <FinalSummaryTable preparedQuote={preparedQuote} />
         </QuoteContext.Provider>
     );
 }

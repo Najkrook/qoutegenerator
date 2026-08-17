@@ -9,6 +9,7 @@ import {
     orderRequestService
 } from '../services/orderRequestService';
 import { createQuotePdfBlob } from '../services/quotePdfService';
+import { prepareQuote, restorePreparedQuote, type PreparedQuote } from '../services/quotePreparation';
 import {
     notifyError,
     notifyInfo,
@@ -23,8 +24,6 @@ import { useAuth } from '../store/AuthContext';
 import type {
     OrderRequestRecord,
     OrderRequestStatus,
-    QuoteState,
-    QuoteTotalsResult,
     RetailerOrderRequestsProps
 } from '../types/contracts';
 
@@ -45,6 +44,12 @@ interface OrderRequestItemOverviewRow {
 interface OrderRequestItemOverviewState {
     status: OrderRequestItemOverviewStatus;
     rows: OrderRequestItemOverviewRow[];
+    usesCurrentCatalog?: boolean;
+}
+
+interface SubmittedQuoteData {
+    preparedQuote: PreparedQuote;
+    usesCurrentCatalog: boolean;
 }
 
 function formatCurrencySek(value: number): string {
@@ -79,9 +84,17 @@ function buildOrderRequestItemsCacheKey(request: OrderRequestRecord): string {
     return `${request.quoteId}__v${request.quoteVersion}`;
 }
 
+function getLegacyRevisionFallbackDate(savedAtMs: unknown): string {
+    const parsed = Number(savedAtMs);
+    if (!Number.isFinite(parsed) || parsed <= 0) {
+        return '1970-01-01';
+    }
+    return new Date(parsed).toISOString().slice(0, 10);
+}
+
 async function loadSubmittedQuoteData(
     request: OrderRequestRecord
-): Promise<{ state: QuoteState; summaryData: QuoteTotalsResult } | null> {
+): Promise<SubmittedQuoteData | null> {
     const revision = await quoteRepository.getQuoteRevisionByVersion({
         userId: request.quoteOwnerUid,
         quoteId: request.quoteId,
@@ -100,13 +113,46 @@ async function loadSubmittedQuoteData(
         'draft'
     );
     const state = hydrateQuoteState(payload);
-    const summaryData = computeQuoteTotals({ state, catalogData });
+    const quoteIdentity = {
+        quoteId: request.quoteId,
+        quoteNumber: request.quoteNumber,
+        version: request.quoteVersion,
+        status: state.quoteStatus
+    };
 
-    return { state, summaryData };
+    if (revision.commercialSnapshot) {
+        return {
+            preparedQuote: restorePreparedQuote({
+                state,
+                commercialSnapshot: revision.commercialSnapshot,
+                audience: {
+                    isRetailer: true,
+                    allowedPdfThemes: request.pdfThemeId === 'brixx' ? [] : [request.pdfThemeId]
+                },
+                quoteIdentity
+            }),
+            usesCurrentCatalog: false
+        };
+    }
+
+    const totals = computeQuoteTotals({ state, catalogData });
+    return {
+        preparedQuote: prepareQuote({
+            state,
+            totals,
+            audience: {
+                isRetailer: true,
+                allowedPdfThemes: request.pdfThemeId === 'brixx' ? [] : [request.pdfThemeId]
+            },
+            fallbackDate: getLegacyRevisionFallbackDate(revision.savedAtMs),
+            catalogData
+        }),
+        usesCurrentCatalog: true
+    };
 }
 
-function buildOrderRequestItemOverviewRows(summaryData: QuoteTotalsResult): OrderRequestItemOverviewRow[] {
-    return summaryData.totals.map((row, index) => ({
+function buildOrderRequestItemOverviewRows(preparedQuote: PreparedQuote): OrderRequestItemOverviewRow[] {
+    return preparedQuote.commercial.productRows.map((row, index) => ({
         id: `${row.source.type}-${index}`,
         model: row.model || '-',
         size: row.size || '-',
@@ -171,8 +217,8 @@ export function RetailerOrderRequests({ onBack }: RetailerOrderRequestsProps) {
     );
     const selectedRequestItemsKey = selectedRequest ? buildOrderRequestItemsCacheKey(selectedRequest) : '';
     const selectedRequestItems = selectedRequestItemsKey
-        ? itemOverviewByKey[selectedRequestItemsKey] || { status: 'idle', rows: [] }
-        : { status: 'idle', rows: [] };
+        ? itemOverviewByKey[selectedRequestItemsKey] || { status: 'idle', rows: [], usesCurrentCatalog: false }
+        : { status: 'idle', rows: [], usesCurrentCatalog: false };
 
     const loadOrderRequestItems = useCallback(async (request: OrderRequestRecord): Promise<void> => {
         const cacheKey = buildOrderRequestItemsCacheKey(request);
@@ -218,7 +264,8 @@ export function RetailerOrderRequests({ onBack }: RetailerOrderRequestsProps) {
 
             const readyState: OrderRequestItemOverviewState = {
                 status: 'ready',
-                rows: buildOrderRequestItemOverviewRows(submittedQuoteData.summaryData)
+                rows: buildOrderRequestItemOverviewRows(submittedQuoteData.preparedQuote),
+                usesCurrentCatalog: submittedQuoteData.usesCurrentCatalog
             };
 
             itemOverviewCacheRef.current = {
@@ -293,7 +340,11 @@ export function RetailerOrderRequests({ onBack }: RetailerOrderRequestsProps) {
                 return;
             }
 
-            const pdfBlob = await createQuotePdfBlob(submittedQuoteData.state, submittedQuoteData.summaryData);
+            if (submittedQuoteData.usesCurrentCatalog) {
+                notifyWarn('Äldre offertversion: PDF:en återskapas med dagens produktkatalog och kan avvika från den ursprungliga offerten.');
+            }
+
+            const pdfBlob = await createQuotePdfBlob(submittedQuoteData.preparedQuote);
 
             if (!pdfBlob) {
                 notifyError('Kunde inte skapa PDF för den valda offertversionen.');
@@ -499,15 +550,25 @@ export function RetailerOrderRequests({ onBack }: RetailerOrderRequestsProps) {
                                     </span>
                                 </div>
 
+                                {selectedRequestItems.usesCurrentCatalog && (
+                                    <div
+                                        role="status"
+                                        data-testid="legacy-order-catalog-warning"
+                                        className="mt-4 rounded-lg border border-amber-400/40 bg-amber-400/10 p-4 text-sm text-text-primary"
+                                    >
+                                        Äldre offertversion: produkter och priser återskapas med dagens produktkatalog och kan avvika från den ursprungliga offerten. Orderförfrågan är fortfarande kopplad till offertversion v{selectedRequest.quoteVersion}.
+                                    </div>
+                                )}
+
                                 {selectedRequestItems.status === 'loading' || selectedRequestItems.status === 'idle' ? (
                                     <p className="mt-4 text-sm italic text-text-secondary">Laddar produkter från sparad offertversion...</p>
                                 ) : selectedRequestItems.status === 'missing' ? (
                                     <div className="mt-4 rounded-lg border border-panel-border bg-panel-bg p-4 text-sm text-text-secondary">
-                                        Den sparade offertversionen kunde inte hittas för denna orderförfrågan. PDF-export finns fortfarande kvar som fallback vid behov.
+                                        Den sparade offertversionen kunde inte hittas. Öppna och spara offerten på nytt innan ordern granskas eller exporteras.
                                     </div>
                                 ) : selectedRequestItems.status === 'error' ? (
                                     <div className="mt-4 rounded-lg border border-panel-border bg-panel-bg p-4 text-sm text-text-secondary">
-                                        Kunde inte bygga produktöversikten från den sparade offertversionen. PDF-export finns fortfarande tillgänglig.
+                                        Kunde inte läsa offertversionens frysta prisunderlag. Försök igen eller öppna och spara offerten på nytt.
                                     </div>
                                 ) : selectedRequestItems.rows.length === 0 ? (
                                     <p className="mt-4 text-sm italic text-text-secondary">Inga produkter kunde utläsas från den sparade offertversionen.</p>

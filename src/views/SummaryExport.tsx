@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useQuote } from '../store/QuoteContext';
 import { useAuth } from '../store/AuthContext';
 import { catalogData } from '../data/catalog';
-import { PDF_THEME_OPTIONS, normalizePdfThemeId, DEFAULT_PDF_THEME_ID } from '../config/pdfThemes';
+import { PDF_THEME_OPTIONS } from '../config/pdfThemes';
 import { computeQuoteTotals } from '../services/calculationEngine';
 import { CustomerInfoForm } from '../components/features/CustomerInfoForm';
 import { FinalSummaryTable } from '../components/features/FinalSummaryTable';
@@ -16,9 +16,8 @@ import { downloadBlob, saveBlobWithPicker } from '../utils/fileUtils';
 import { createQuotePdfBlob } from '../services/quotePdfService';
 import { quoteSave } from '../services/quoteSaveService';
 import { safeLogActivity } from '../services/activityLogService';
-import { hasZeroDiscountSummary } from '../services/exportDataBuilders';
-import { normalizeExportLanguage } from '../services/exportLocalization';
-import { calculateContractingWorkSummary } from '../services/contractingWork';
+import { prepareQuote } from '../services/quotePreparation';
+import type { PreparedQuote } from '../services/quotePreparation';
 import { buildQuoteRevisionLink } from '../navigation/quoteLinks';
 import {
     getOrderRequestStatusLabel,
@@ -33,8 +32,8 @@ import {
 } from '../services/notificationService';
 import { getErrorMessage } from '../utils/runtime';
 import type {
-    ExcelExportModule,
     OrderRequestRecord,
+    PdfThemeId,
     QuoteState,
     QuoteTotalsResult,
     SavedQuoteStatePatch,
@@ -55,20 +54,6 @@ interface PendingQuoteSaveRetry {
 }
 
 const QUOTE_SAVE_RETRY_STORAGE_PREFIX = 'quote-generator:pending-save-retry:';
-
-const RETAILER_SAFE_CONTRACTING_WORK: QuoteState['contractingWork'] = {
-    enabled: false,
-    projectName: '',
-    rows: [],
-    margin: {
-        enabled: false,
-        percent: 15
-    },
-    ata: {
-        enabled: false,
-        percent: 15
-    }
-};
 
 function getQuoteSaveRetryStorageKey(userUid: string | null | undefined): string | null {
     const normalizedUid = String(userUid || '').trim();
@@ -154,7 +139,7 @@ function sanitizeFileNamePart(value: string): string {
 function buildPdfFileName(customerInfo: QuoteState['customerInfo'], exportLanguage: QuoteState['exportLanguage'] = 'sv'): string {
     const rawRef = customerInfo.reference?.trim();
     const rawName = customerInfo.company?.trim() || customerInfo.name?.trim();
-    const date = customerInfo.date || new Date().toISOString().slice(0, 10);
+    const date = customerInfo.date || '';
     const base = rawRef || rawName || (exportLanguage === 'en' ? 'Quote' : 'Offert');
     const safeBase = sanitizeFileNamePart(base);
     return `${safeBase || (exportLanguage === 'en' ? 'Quote' : 'Offert')}-${date}.pdf`;
@@ -184,15 +169,15 @@ export function getPdfExportBlockReason(quoteNumber: QuoteState['quoteNumber'] |
     return 'Offerten saknar offertnummer. Spara offerten f\u00F6r att tilldela ett nummer, eller exportera \u00E4nd\u00E5 utan nummer.';
 }
 
-async function exportExcelWorkbook(state: QuoteState, summaryData: QuoteTotalsResult): Promise<void> {
-    const excelModule: ExcelExportModule = await import('../features/excelExport');
+async function exportExcelWorkbook(prepared: PreparedQuote): Promise<void> {
+    const excelModule = await import('../features/excelExport');
     const { generateExcel } = excelModule;
 
     if (typeof generateExcel !== 'function') {
         throw new Error('Excel export is unavailable.');
     }
 
-    await generateExcel(state, summaryData);
+    await generateExcel(prepared);
 }
 
 function warnIfActivityLogFailed(result: ActivityLogResultLike | null | undefined, message: string): void {
@@ -252,12 +237,12 @@ export function SummaryExport({
     const [isSubmittingOrderRequest, setIsSubmittingOrderRequest] = useState(false);
     const [hasJustSubmittedOrderRequest, setHasJustSubmittedOrderRequest] = useState(false);
     const previewUrlRef = useRef<string>('');
+    const preparationFallbackDateRef = useRef(new Date().toISOString().slice(0, 10));
     const reopenedQuoteIdRef = useRef(state.activeQuoteId);
     const attemptedReopenRepairRef = useRef<string | null>(null);
     const previewPdfRef = useRef<{
         blob: Blob;
-        state: QuoteState;
-        summary: QuoteTotalsResult;
+        equivalenceKey: string;
     } | null>(null);
     const exportBlockReason = getPdfExportBlockReason(state.quoteNumber);
     const hasQuoteNumber = Boolean(String(state.quoteNumber || '').trim());
@@ -268,36 +253,32 @@ export function SummaryExport({
     );
     const saveLabel = state.activeQuoteId ? 'Spara ny version' : 'Spara offert';
 
-    const allowedThemeOptions = useMemo(() => {
-        if (!isRetailer) {
-            return PDF_THEME_OPTIONS;
+    const preparedQuote = useMemo(() => prepareQuote({
+        state,
+        totals: summaryData,
+        fallbackDate: preparationFallbackDateRef.current,
+        catalogData,
+        audience: {
+            isRetailer,
+            allowedPdfThemes: retailer?.pdfThemes || []
         }
-        const allowedIds = new Set<string>([DEFAULT_PDF_THEME_ID, ...(retailer?.pdfThemes || [])]);
+    }), [state, summaryData, isRetailer, retailer?.pdfThemes]);
+    const preparedEquivalenceKey = preparedQuote.presentation.equivalenceKey;
+    const selectedPdfThemeId = preparedQuote.presentation.pdfThemeId;
+    const selectedExportLanguage = preparedQuote.presentation.exportLanguage;
+    const effectiveState = preparedQuote.persistenceSnapshot;
+    const allowedThemeOptions = useMemo(() => {
+        const allowedIds = new Set(preparedQuote.presentation.allowedPdfThemeIds);
         return PDF_THEME_OPTIONS.filter((theme) => allowedIds.has(theme.id));
-    }, [isRetailer, retailer?.pdfThemes]);
-
-    const selectedPdfThemeId = normalizePdfThemeId(state.pdfThemeId);
-    const selectedExportLanguage = normalizeExportLanguage(state.exportLanguage);
-    const hasProducts = summaryData.totals.length > 0;
-    const hasContractingWork = !isRetailer
-        && calculateContractingWorkSummary(state.contractingWork).activeRows.length > 0;
-
-    const effectivePdfThemeId = allowedThemeOptions.some(t => t.id === selectedPdfThemeId)
-        ? selectedPdfThemeId
-        : DEFAULT_PDF_THEME_ID;
-
-    const effectiveState = useMemo(() => ({
-        ...state,
-        pdfThemeId: effectivePdfThemeId,
-        exportLanguage: selectedExportLanguage,
-        contractingWork: isRetailer ? RETAILER_SAFE_CONTRACTING_WORK : state.contractingWork
-    }), [state, effectivePdfThemeId, selectedExportLanguage, isRetailer]);
+    }, [preparedQuote.presentation.allowedPdfThemeIds]);
+    const hasProducts = preparedQuote.commercial.productRows.length > 0;
+    const hasContractingWork = preparedQuote.visibility.contractingWork === 'visible';
 
     useEffect(() => {
-        if (selectedPdfThemeId && !allowedThemeOptions.some(t => t.id === selectedPdfThemeId)) {
-            dispatch({ type: 'SET_PDF_THEME_ID', payload: DEFAULT_PDF_THEME_ID });
+        if (state.pdfThemeId !== selectedPdfThemeId) {
+            dispatch({ type: 'SET_PDF_THEME_ID', payload: selectedPdfThemeId });
         }
-    }, [selectedPdfThemeId, allowedThemeOptions, dispatch]);
+    }, [selectedPdfThemeId, state.pdfThemeId, dispatch]);
 
     const canSubmitOrderRequest = Boolean(
         isRetailer
@@ -305,7 +286,8 @@ export function SummaryExport({
     );
 
     useEffect(() => {
-        if (hasZeroDiscountSummary(summaryData) || state.hideZeroDiscountReferencesInPdf !== true) {
+        if (preparedQuote.visibility.discountReferenceEligibility === 'eligible-zero'
+            || state.hideZeroDiscountReferencesInPdf !== true) {
             return;
         }
 
@@ -313,7 +295,7 @@ export function SummaryExport({
             type: 'SET_HIDE_ZERO_DISCOUNT_REFERENCES_IN_PDF',
             payload: false
         });
-    }, [dispatch, state.hideZeroDiscountReferencesInPdf, summaryData]);
+    }, [dispatch, preparedQuote.visibility.discountReferenceEligibility, state.hideZeroDiscountReferencesInPdf]);
 
     useEffect(() => {
         let cancelled = false;
@@ -323,7 +305,7 @@ export function SummaryExport({
         const timerId = globalThis.setTimeout(() => {
             void (async () => {
                 try {
-                    const pdfBlob = await createQuotePdfBlob(effectiveState, summaryData);
+                    const pdfBlob = await createQuotePdfBlob(preparedQuote);
                     if (cancelled) return;
 
                     if (!pdfBlob) {
@@ -334,8 +316,7 @@ export function SummaryExport({
 
                     previewPdfRef.current = {
                         blob: pdfBlob,
-                        state: effectiveState,
-                        summary: summaryData
+                        equivalenceKey: preparedEquivalenceKey
                     };
                     const nextUrl = URL.createObjectURL(pdfBlob);
                     if (previewUrlRef.current) {
@@ -359,7 +340,7 @@ export function SummaryExport({
             cancelled = true;
             globalThis.clearTimeout(timerId);
         };
-    }, [effectiveState, summaryData]);
+    }, [preparedEquivalenceKey]);
 
     useEffect(() => {
         if (!canSubmitOrderRequest || !state.activeQuoteId) {
@@ -449,7 +430,7 @@ export function SummaryExport({
     const handlePdfThemeChange = (event: React.ChangeEvent<HTMLSelectElement>): void => {
         dispatch({
             type: 'SET_PDF_THEME_ID',
-            payload: normalizePdfThemeId(event.target.value)
+            payload: event.target.value as PdfThemeId
         });
     };
 
@@ -463,22 +444,23 @@ export function SummaryExport({
             return;
         }
 
-        const fileName = buildPdfFileName(state.customerInfo, selectedExportLanguage);
+        const fileName = buildPdfFileName({
+            ...preparedQuote.agreement.customerInfo,
+            date: preparedQuote.agreement.effectiveQuoteDate
+        }, preparedQuote.presentation.exportLanguage);
         const cachedPreview = previewPdfRef.current;
-        const pdfBlob = cachedPreview?.state === effectiveState
-            && cachedPreview.summary === summaryData
+        const pdfBlob = cachedPreview?.equivalenceKey === preparedEquivalenceKey
             ? cachedPreview.blob
-            : await createQuotePdfBlob(effectiveState, summaryData);
+            : await createQuotePdfBlob(preparedQuote);
         if (!pdfBlob) {
             notifyError('Kunde inte skapa PDF.');
             return;
         }
 
-        if (cachedPreview?.state !== effectiveState || cachedPreview.summary !== summaryData) {
+        if (cachedPreview?.equivalenceKey !== preparedEquivalenceKey) {
             previewPdfRef.current = {
                 blob: pdfBlob,
-                state: effectiveState,
-                summary: summaryData
+                equivalenceKey: preparedEquivalenceKey
             };
         }
 
@@ -486,7 +468,7 @@ export function SummaryExport({
         if (pickerResult === 'saved') {
             logPdfExportActivity({
                 user,
-                state: effectiveState,
+                state: preparedQuote.persistenceSnapshot,
                 fileName,
                 missingQuoteNumber: !state.quoteNumber
             });
@@ -507,7 +489,7 @@ export function SummaryExport({
             downloadBlob(pdfBlob, fileName);
             logPdfExportActivity({
                 user,
-                state: effectiveState,
+                state: preparedQuote.persistenceSnapshot,
                 fileName,
                 missingQuoteNumber: !state.quoteNumber
             });
@@ -520,10 +502,10 @@ export function SummaryExport({
             return;
         }
 
-        const excelFileName = effectiveState.exportLanguage === 'en' ? 'Quote.xlsx' : 'Offert.xlsx';
+        const excelFileName = preparedQuote.presentation.exportLanguage === 'en' ? 'Quote.xlsx' : 'Offert.xlsx';
 
         try {
-            await exportExcelWorkbook(effectiveState, summaryData);
+            await exportExcelWorkbook(preparedQuote);
             void safeLogActivity({
                 user,
                 eventType: 'quote_export_excel',
@@ -582,7 +564,7 @@ export function SummaryExport({
                 }
                 : { kind: 'new' as const, crmDealId };
             const draftSignature = buildQuoteSaveDraftSignature({
-                state: effectiveState,
+                state: preparedQuote.persistenceSnapshot,
                 ownerUid,
                 quoteId: state.activeQuoteId || null,
                 crmDealId,
@@ -592,7 +574,7 @@ export function SummaryExport({
             const outcome = await quoteSave.save({
                 actor: user,
                 retailer,
-                state: effectiveState,
+                state: preparedQuote.persistenceSnapshot,
                 target: saveTarget,
                 canManageAllQuotes: canViewEverything,
                 retrySaveIntentId
@@ -648,8 +630,8 @@ export function SummaryExport({
             const createdRequest = await orderRequestService.createOrderRequest({
                 user,
                 retailer,
-                state: effectiveState,
-                summary: summaryData
+                quoteId: String(state.activeQuoteId),
+                quoteVersion: state.activeQuoteVersion
             });
             setOrderRequest(createdRequest);
             setHasJustSubmittedOrderRequest(true);
@@ -685,15 +667,24 @@ export function SummaryExport({
                         </section>
 
                         <section>
-                            <TermsAndPaymentPanel summaryData={summaryData} />
+                            <TermsAndPaymentPanel />
                         </section>
 
 
                         <section className="rounded-panel border border-border bg-surface-raised p-6 shadow-panel">
                             <h2 className="mb-6 text-lg font-bold text-text">Summering</h2>
-                            {hasProducts ? <FinalSummaryTable isMixedOffer={hasContractingWork} /> : null}
+                            {hasProducts ? (
+                                <FinalSummaryTable
+                                    isMixedOffer={hasContractingWork}
+                                    preparedQuote={preparedQuote}
+                                />
+                            ) : null}
                             {hasContractingWork ? (
-                                <ContractingWorkSummaryTable className={hasProducts ? 'mt-8' : ''} />
+                                <ContractingWorkSummaryTable
+                                    className={hasProducts ? 'mt-8' : ''}
+                                    contractingWork={preparedQuote.commercial.contractingWork!}
+                                    exportLanguage={preparedQuote.presentation.exportLanguage}
+                                />
                             ) : null}
                             {hasProducts ? <MarginSummaryPanel summaryData={summaryData} className="mt-6" /> : null}
                             <section className="mt-8 flex flex-col gap-6">
@@ -884,7 +875,7 @@ export function SummaryExport({
                                 Offert tema
                                 <select
                                     name="pdfThemeId"
-                                    value={effectivePdfThemeId}
+                                    value={selectedPdfThemeId}
                                     onChange={handlePdfThemeChange}
                                     className="h-10 w-full rounded-control border border-control-border bg-input px-3 text-sm font-semibold normal-case tracking-normal text-text transition-colors hover:bg-surface-hover"
                                 >

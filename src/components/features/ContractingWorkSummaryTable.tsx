@@ -1,26 +1,29 @@
 import React from 'react';
-import { useQuote } from '../../store/QuoteContext';
-import { calculateContractingWorkSummary } from '../../services/contractingWork';
-import { getExportLabels, normalizeExportLanguage } from '../../services/exportLocalization';
+import { getExportLabels } from '../../services/exportLocalization';
+import type { PreparedQuoteContractingWork } from '../../services/quotePreparation';
+import type { QuoteExportLanguage } from '../../types/contracts';
 
 interface ContractingWorkSummaryTableProps {
     className?: string;
+    contractingWork: PreparedQuoteContractingWork;
+    exportLanguage: QuoteExportLanguage;
 }
 
 function formatSek(value: number): string {
     return Math.round(value).toLocaleString('sv-SE');
 }
 
-export function ContractingWorkSummaryTable({ className = '' }: ContractingWorkSummaryTableProps) {
-    const { state } = useQuote();
-    const summary = calculateContractingWorkSummary(state.contractingWork);
-
-    if (summary.customerRows.length === 0) {
+export function ContractingWorkSummaryTable({
+    className = '',
+    contractingWork,
+    exportLanguage
+}: ContractingWorkSummaryTableProps) {
+    if (contractingWork.rows.length === 0) {
         return null;
     }
 
-    const labels = getExportLabels(normalizeExportLanguage(state.exportLanguage));
-    const projectName = state.contractingWork.projectName;
+    const labels = getExportLabels(exportLanguage);
+    const projectName = contractingWork.projectName;
     const title = projectName.trim()
         ? `${labels.contractingHeading} ${labels.contractingFor} ${projectName}`
         : labels.contractingHeading;
@@ -48,7 +51,7 @@ export function ContractingWorkSummaryTable({ className = '' }: ContractingWorkS
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-panel-border/50">
-                        {summary.customerRows.map((row) => (
+                        {contractingWork.rows.map((row) => (
                             <tr key={row.id} className="align-top">
                                 <td className="p-4 text-sm font-bold text-text-primary">{row.workPackage}</td>
                                 <td className="whitespace-pre-wrap p-4 text-sm leading-6 text-text-secondary">{row.scope}</td>
@@ -62,27 +65,27 @@ export function ContractingWorkSummaryTable({ className = '' }: ContractingWorkS
                     <tfoot>
                         <tr className="border-t-2 border-panel-border bg-black/50">
                             <td colSpan={3} className="p-4 text-sm font-bold text-white">{labels.contractingBaseValue}</td>
-                            <td className="p-4 text-right text-base font-black text-white">{formatSek(summary.baseTotalSek)} SEK</td>
+                            <td className="p-4 text-right text-base font-black text-white">{formatSek(contractingWork.baseTotalSek)} SEK</td>
                         </tr>
-                        {summary.ataEnabled ? (
+                        {contractingWork.ataEnabled ? (
                             <>
                                 <tr className="bg-black/10 text-text-secondary">
                                     <td colSpan={3} className="px-4 py-3 text-right text-sm">
-                                        {labels.contractingAtaAllowance} (±{summary.ataPercent}%)
+                                        {labels.contractingAtaAllowance} (±{contractingWork.ataPercent}%)
                                     </td>
-                                    <td className="px-4 py-3 text-right text-sm font-semibold">{formatSek(summary.allowanceSek)} SEK</td>
+                                    <td className="px-4 py-3 text-right text-sm font-semibold">{formatSek(contractingWork.allowanceSek)} SEK</td>
                                 </tr>
                                 <tr className="bg-black/10 text-text-secondary">
                                     <td colSpan={3} className="px-4 py-3 text-right text-sm">
-                                        {labels.contractingLowerIndicative} (-{summary.ataPercent}%)
+                                        {labels.contractingLowerIndicative} (-{contractingWork.ataPercent}%)
                                     </td>
-                                    <td className="px-4 py-3 text-right text-sm font-semibold">{formatSek(summary.lowerIndicativeSek)} SEK</td>
+                                    <td className="px-4 py-3 text-right text-sm font-semibold">{formatSek(contractingWork.lowerIndicativeSek)} SEK</td>
                                 </tr>
                                 <tr className="bg-white/10 text-text-primary">
                                     <td colSpan={3} className="p-4 text-right text-sm font-bold">
-                                        {labels.contractingUpperIndicative} (+{summary.ataPercent}%)
+                                        {labels.contractingUpperIndicative} (+{contractingWork.ataPercent}%)
                                     </td>
-                                    <td className="p-4 text-right text-base font-black">{formatSek(summary.upperIndicativeSek)} SEK</td>
+                                    <td className="p-4 text-right text-base font-black">{formatSek(contractingWork.upperIndicativeSek)} SEK</td>
                                 </tr>
                             </>
                         ) : null}

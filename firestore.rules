@@ -507,6 +507,7 @@ service cloud.firestore {
         && request.resource.data.quoteId is string
         && request.resource.data.quoteNumber is string
         && request.resource.data.quoteVersion is int
+        && request.resource.data.pdfThemeId in ['brixx', 'custom', 'roslagsmarkisen']
         && request.resource.data.retailerId is string
         && request.resource.data.retailerName is string
         && request.resource.data.retailerEmail is string
@@ -601,8 +602,9 @@ service cloud.firestore {
       let state = request.resource.data.get('state', {});
       return request.resource.data.keys().hasOnly([
           'quoteId', 'version', 'savedAtMs', 'savedBy', 'savedByUid',
-          'state', 'summary', 'changeNote', 'saveIntentId'
+          'state', 'summary', 'commercialSnapshot', 'changeNote', 'saveIntentId'
         ])
+        && hasValidCommercialSnapshotEnvelope()
         && hasCustomerSafeQuoteStateShape(state)
         && state.get('crmDealId', null) == null
         && state.get('crmSynchronizationIssue', null) == null
@@ -622,6 +624,75 @@ service cloud.firestore {
         && state.get('grossProfit', null) == null
         && state.get('actualMargin', null) == null
         && state.get('reviewCode', null) == null;
+    }
+
+    // ADR 0002 accepts version 1 as a proportionate client-prepared envelope for
+    // the current trusted-user deployment. Revisit before adding untrusted writers.
+    function hasValidCommercialSnapshotEnvelope() {
+      let snapshot = request.resource.data.get('commercialSnapshot', null);
+      let presentation = snapshot == null ? {} : snapshot.get('presentation', {});
+      let totals = snapshot == null ? {} : snapshot.get('productTotals', {});
+      let visibility = snapshot == null ? {} : snapshot.get('visibility', {});
+      return snapshot == null || (
+        snapshot is map
+        && snapshot.keys().hasOnly([
+          'schemaVersion', 'presentation', 'effectiveQuoteDate', 'productRows',
+          'productTotals', 'contractingWork', 'visibility'
+        ])
+        && snapshot.schemaVersion == 1
+        && snapshot.presentation is map
+        && presentation.keys().hasOnly(['exportLanguage', 'pdfThemeId', 'allowedPdfThemeIds'])
+        && presentation.exportLanguage in ['sv', 'en']
+        && presentation.pdfThemeId in ['brixx', 'custom', 'roslagsmarkisen']
+        && presentation.allowedPdfThemeIds is list
+        && presentation.allowedPdfThemeIds.size() > 0
+        && presentation.allowedPdfThemeIds.size() <= 3
+        && presentation.allowedPdfThemeIds.toSet().hasOnly(['brixx', 'custom', 'roslagsmarkisen'])
+        && 'brixx' in presentation.allowedPdfThemeIds
+        && presentation.pdfThemeId in presentation.allowedPdfThemeIds
+        && snapshot.effectiveQuoteDate is string
+        && snapshot.productRows is list
+        && snapshot.productRows.size() <= 200
+        && snapshot.productTotals is map
+        && totals.keys().hasOnly([
+          'includesVat', 'grossTotalSek', 'totalDiscountSek', 'finalTotalSek',
+          'globalDiscountAmt', 'globalDiscountPct', 'vatBasisSek', 'vatAmountSek',
+          'totalWithVatSek'
+        ])
+        && totals.includesVat is bool
+        && (totals.grossTotalSek is int || totals.grossTotalSek is float)
+        && (totals.totalDiscountSek is int || totals.totalDiscountSek is float)
+        && (totals.finalTotalSek is int || totals.finalTotalSek is float)
+        && (totals.globalDiscountAmt is int || totals.globalDiscountAmt is float)
+        && (totals.globalDiscountPct is int || totals.globalDiscountPct is float)
+        && (totals.vatBasisSek is int || totals.vatBasisSek is float)
+        && (totals.vatAmountSek is int || totals.vatAmountSek is float)
+        && (totals.totalWithVatSek is int || totals.totalWithVatSek is float)
+        && hasValidCommercialContractingWork(snapshot.contractingWork)
+        && snapshot.visibility is map
+        && visibility.keys().hasOnly(['contractingWork', 'discountReferences'])
+        && visibility.contractingWork in ['visible', 'absent', 'suppressed-retailer']
+        && visibility.discountReferences in ['visible', 'hidden-zero']
+      );
+    }
+
+    function hasValidCommercialContractingWork(work) {
+      return work == null || (
+        work is map
+        && work.keys().hasOnly([
+          'projectName', 'rows', 'baseTotalSek', 'ataEnabled', 'ataPercent',
+          'allowanceSek', 'lowerIndicativeSek', 'upperIndicativeSek'
+        ])
+        && work.projectName is string
+        && work.rows is list
+        && work.rows.size() <= 100
+        && (work.baseTotalSek is int || work.baseTotalSek is float)
+        && work.ataEnabled is bool
+        && (work.ataPercent is int || work.ataPercent is float)
+        && (work.allowanceSek is int || work.allowanceSek is float)
+        && (work.lowerIndicativeSek is int || work.lowerIndicativeSek is float)
+        && (work.upperIndicativeSek is int || work.upperIndicativeSek is float)
+      );
     }
 
     function hasValidQuoteRevisionSaveIntent(revisionId) {
