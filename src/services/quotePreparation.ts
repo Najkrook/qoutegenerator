@@ -1,26 +1,41 @@
 import { DEFAULT_PDF_THEME_ID, PDF_THEME_OPTIONS, normalizePdfThemeId } from '../config/pdfThemes';
 import type {
+    AdvancedEdge,
+    AdvancedNode,
+    AdvancedSketchDraft,
+    BahamaInventoryItem,
+    BahamaInventoryV2Item,
     BuilderAddon,
     BuilderItem,
     CatalogData,
+    ClickitupStockMap,
     ContractingWorkState,
     CustomerInfo,
     GridLineSelection,
+    InventoryBasketItem,
+    InventoryData,
     PdfThemeId,
+    PlacedFiesta,
+    PlacedParasol,
     QuoteCommercialSnapshot,
     QuoteExportLanguage,
     QuoteState,
     QuoteStatus,
     QuoteTotalsResult,
-    QuoteTotalsRow
+    QuoteTotalsRow,
+    SketchConfigState,
+    SketchDraft,
+    SketchEdgeKey,
+    SketchWorkspace
 } from '../types/contracts';
 import { catalogData as defaultCatalogData } from '../data/catalog';
 import { calculateContractingWorkSummary } from './contractingWork';
 import { normalizeExportLanguage, translateQuoteTotalsRowModel } from './exportLocalization';
-import { stripPrivateQuoteStateData } from '../utils/quoteStateSanitization';
 import { normalizeQuoteCommercialSnapshot } from './quoteCommercialSnapshot';
 
 const SEK_RECONCILIATION_TOLERANCE = 1;
+export const MAX_QUOTE_PRODUCT_ROWS = 200;
+export const MAX_QUOTE_CONTRACTING_WORK_ROWS = 100;
 
 export interface QuotePreparationAudience {
     isRetailer: boolean;
@@ -146,11 +161,270 @@ function requireReconciled(actual: number, expected: number, field: string): voi
     }
 }
 
-function cloneSafeJsonValue<T>(value: T): T {
-    if (value === undefined || value === null) {
+function isRecord(value: unknown): value is Record<string, unknown> {
+    return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function finiteNumber(value: unknown, fallback = 0): number {
+    return typeof value === 'number' && Number.isFinite(value) ? value : fallback;
+}
+
+function stringValue(value: unknown, fallback = ''): string {
+    return typeof value === 'string' ? value : fallback;
+}
+
+function cloneAllowedInventoryString(value: unknown): string | undefined {
+    if (typeof value === 'string') {
         return value;
     }
-    return JSON.parse(JSON.stringify(stripPrivateQuoteStateData(value))) as T;
+    if (typeof value === 'number' && Number.isFinite(value)) {
+        return String(value);
+    }
+    if (typeof value === 'boolean') {
+        return String(value);
+    }
+    return undefined;
+}
+
+const BAHAMA_INVENTORY_KEYS = [
+    'ID', 'TYP', 'STORLEK', 'Stativ', 'TEXTIL', 'Fot',
+    'Belysning', 'Värme', 'BESKRIVNING', 'Kommentar'
+] as const;
+
+function cloneBahamaInventoryItem(value: unknown): BahamaInventoryItem {
+    const source = isRecord(value) ? value : {};
+    const result: BahamaInventoryItem = {};
+    for (const key of BAHAMA_INVENTORY_KEYS) {
+        const cloned = cloneAllowedInventoryString(source[key]);
+        if (cloned !== undefined) {
+            result[key] = cloned;
+        }
+    }
+    return result;
+}
+
+function cloneBahamaInventoryV2Item(value: unknown): BahamaInventoryV2Item {
+    const source = isRecord(value) ? value : {};
+    const properties = isRecord(source.properties) ? source.properties : {};
+    const supportedStatuses = ['available', 'reserved', 'needs-review', 'used', 'sold'] as const;
+    const status = supportedStatuses.includes(source.status as typeof supportedStatuses[number])
+        ? source.status as typeof supportedStatuses[number]
+        : 'needs-review';
+
+    return {
+        qrId: stringValue(source.qrId),
+        id: stringValue(source.id),
+        type: stringValue(source.type),
+        size: stringValue(source.size),
+        status,
+        location: stringValue(source.location),
+        properties: {
+            stativ: stringValue(properties.stativ),
+            textil: stringValue(properties.textil),
+            fot: stringValue(properties.fot),
+            belysning: stringValue(properties.belysning),
+            varme: stringValue(properties.varme)
+        },
+        comment: stringValue(source.comment),
+        createdAt: stringValue(source.createdAt),
+        updatedAt: stringValue(source.updatedAt),
+        updatedByUid: stringValue(source.updatedByUid),
+        updatedByEmail: stringValue(source.updatedByEmail)
+    };
+}
+
+function cloneClickitupStockMap(value: unknown): ClickitupStockMap {
+    if (!isRecord(value)) {
+        return {};
+    }
+    return Object.fromEntries(Object.entries(value).map(([size, entry]) => {
+        const source = isRecord(entry) ? entry : {};
+        return [size, {
+            sektion: finiteNumber(source.sektion),
+            dorr_h: finiteNumber(source.dorr_h),
+            dorr_v: finiteNumber(source.dorr_v),
+            hane_h: finiteNumber(source.hane_h),
+            hane_v: finiteNumber(source.hane_v)
+        }];
+    }));
+}
+
+function cloneInventoryData(value: unknown): InventoryData {
+    const source = isRecord(value) ? value : {};
+    return {
+        bahama: Array.isArray(source.bahama) ? source.bahama.map(cloneBahamaInventoryItem) : [],
+        bahamaV2: Array.isArray(source.bahamaV2) ? source.bahamaV2.map(cloneBahamaInventoryV2Item) : [],
+        clickitup: cloneClickitupStockMap(source.clickitup),
+        notes: stringValue(source.notes)
+    };
+}
+
+function cloneInventoryBasket(value: unknown): InventoryBasketItem[] {
+    return Array.isArray(value) ? value.map(cloneBahamaInventoryItem) : [];
+}
+
+const SKETCH_EDGE_KEYS: SketchEdgeKey[] = ['front', 'left', 'right', 'back'];
+
+function cloneDoorSegmentsByEdge(value: unknown): SketchConfigState['doorSegmentsByEdge'] {
+    const source = isRecord(value) ? value : {};
+    return Object.fromEntries(SKETCH_EDGE_KEYS.flatMap((edge) => {
+        const rows = source[edge];
+        return Array.isArray(rows) ? [[edge, rows.map((row) => {
+            const item = isRecord(row) ? row : {};
+            return { index: finiteNumber(item.index), size: finiteNumber(item.size) };
+        })]] : [];
+    }));
+}
+
+function cloneManualSectionsByEdge(value: unknown): SketchConfigState['manualSectionsByEdge'] {
+    const source = isRecord(value) ? value : {};
+    return Object.fromEntries(SKETCH_EDGE_KEYS.flatMap((edge) => {
+        const rows = source[edge];
+        return Array.isArray(rows) ? [[edge, rows.map((row) => {
+            const item = isRecord(row) ? row : {};
+            return { index: finiteNumber(item.index), size: finiteNumber(item.size) };
+        })]] : [];
+    }));
+}
+
+function cloneSectionCountsByEdge(value: unknown): SketchConfigState['sectionCountByEdge'] {
+    const source = isRecord(value) ? value : {};
+    return Object.fromEntries(SKETCH_EDGE_KEYS.flatMap((edge) => (
+        typeof source[edge] === 'number' && Number.isFinite(source[edge])
+            ? [[edge, source[edge]]]
+            : []
+    )));
+}
+
+function clonePlacedParasol(value: unknown): PlacedParasol {
+    const source = isRecord(value) ? value : {};
+    return {
+        id: stringValue(source.id),
+        presetId: stringValue(source.presetId),
+        label: stringValue(source.label),
+        widthMm: finiteNumber(source.widthMm),
+        depthMm: finiteNumber(source.depthMm),
+        rotationDeg: source.rotationDeg === 90 ? 90 : 0,
+        xMm: finiteNumber(source.xMm),
+        yMm: finiteNumber(source.yMm),
+        exportLine: stringValue(source.exportLine),
+        exportModel: stringValue(source.exportModel),
+        exportSize: stringValue(source.exportSize)
+    };
+}
+
+function clonePlacedFiesta(value: unknown): PlacedFiesta {
+    const source = isRecord(value) ? value : {};
+    return {
+        id: stringValue(source.id),
+        diameterMm: finiteNumber(source.diameterMm),
+        xMm: finiteNumber(source.xMm),
+        yMm: finiteNumber(source.yMm),
+        zLayer: source.zLayer === 'above' ? 'above' : 'below',
+        exportLine: stringValue(source.exportLine),
+        exportModel: stringValue(source.exportModel),
+        exportSize: stringValue(source.exportSize)
+    };
+}
+
+function cloneSketchWorkspace(value: unknown): SketchWorkspace {
+    const source = isRecord(value) ? value : {};
+    const camera = isRecord(source.camera) ? source.camera : {};
+    const selection = isRecord(source.selection) ? source.selection : {};
+    return {
+        camera: {
+            zoom: finiteNumber(camera.zoom, 1),
+            panX: finiteNumber(camera.panX),
+            panY: finiteNumber(camera.panY)
+        },
+        selection: {
+            edgeKey: SKETCH_EDGE_KEYS.includes(selection.edgeKey as SketchEdgeKey)
+                ? selection.edgeKey as SketchEdgeKey
+                : 'front',
+            segmentIndex: typeof selection.segmentIndex === 'number' && Number.isFinite(selection.segmentIndex)
+                ? selection.segmentIndex
+                : null
+        },
+        uiDensity: source.uiDensity === 'touch' ? 'touch' : 'desktop'
+    };
+}
+
+function cloneSketchDraft(value: unknown): SketchDraft | null {
+    if (!isRecord(value) || !isRecord(value.config) || !isRecord(value.workspace)) {
+        return null;
+    }
+    const source = value.config;
+    const priorityModes = ['symmetrical', 'convenient', 'target'] as const;
+    const activeModes = ['clickitup', 'parasol', 'fiesta'] as const;
+    const config: SketchConfigState = {
+        width: finiteNumber(source.width),
+        depth: finiteNumber(source.depth),
+        depthLeft: finiteNumber(source.depthLeft),
+        depthRight: finiteNumber(source.depthRight),
+        equalDepth: source.equalDepth === true,
+        includeBack: source.includeBack === true,
+        prioMode: priorityModes.includes(source.prioMode as typeof priorityModes[number])
+            ? source.prioMode as typeof priorityModes[number]
+            : 'symmetrical',
+        targetLength: finiteNumber(source.targetLength),
+        doorSegmentsByEdge: cloneDoorSegmentsByEdge(source.doorSegmentsByEdge),
+        manualSectionsByEdge: cloneManualSectionsByEdge(source.manualSectionsByEdge),
+        sectionCountByEdge: cloneSectionCountsByEdge(source.sectionCountByEdge),
+        activeMode: activeModes.includes(source.activeMode as typeof activeModes[number])
+            ? source.activeMode as typeof activeModes[number]
+            : 'clickitup',
+        parasols: Array.isArray(source.parasols) ? source.parasols.map(clonePlacedParasol) : [],
+        selectedParasolId: typeof source.selectedParasolId === 'string' ? source.selectedParasolId : null,
+        selectedParasolPresetId: stringValue(source.selectedParasolPresetId),
+        fiestaItems: Array.isArray(source.fiestaItems) ? source.fiestaItems.map(clonePlacedFiesta) : [],
+        selectedFiestaId: typeof source.selectedFiestaId === 'string' ? source.selectedFiestaId : null
+    };
+    return { config, workspace: cloneSketchWorkspace(value.workspace) };
+}
+
+function cloneAdvancedNode(value: unknown): AdvancedNode {
+    const source = isRecord(value) ? value : {};
+    return { id: stringValue(source.id), x: finiteNumber(source.x), y: finiteNumber(source.y) };
+}
+
+function cloneAdvancedEdge(value: unknown): AdvancedEdge {
+    const source = isRecord(value) ? value : {};
+    return {
+        id: stringValue(source.id),
+        startNodeId: stringValue(source.startNodeId),
+        endNodeId: stringValue(source.endNodeId),
+        ...(typeof source.hasDoor === 'boolean' ? { hasDoor: source.hasDoor } : {}),
+        ...(typeof source.doorSize === 'number' && Number.isFinite(source.doorSize) ? { doorSize: source.doorSize } : {}),
+        ...(['convenient', 'symmetrical', 'target'].includes(String(source.prioMode))
+            ? { prioMode: source.prioMode as NonNullable<AdvancedEdge['prioMode']> }
+            : {}),
+        ...(typeof source.targetLength === 'number' && Number.isFinite(source.targetLength)
+            ? { targetLength: source.targetLength }
+            : {})
+    };
+}
+
+function cloneAdvancedSketchDraft(value: unknown): AdvancedSketchDraft | null {
+    if (!isRecord(value) || !isRecord(value.config) || !isRecord(value.workspace)) {
+        return null;
+    }
+    const config = value.config;
+    const workspace = value.workspace;
+    const camera = isRecord(workspace.camera) ? workspace.camera : {};
+    return {
+        config: {
+            nodes: Array.isArray(config.nodes) ? config.nodes.map(cloneAdvancedNode) : [],
+            edges: Array.isArray(config.edges) ? config.edges.map(cloneAdvancedEdge) : []
+        },
+        workspace: {
+            camera: {
+                zoom: finiteNumber(camera.zoom, 1),
+                panX: finiteNumber(camera.panX),
+                panY: finiteNumber(camera.panY)
+            },
+            uiDensity: workspace.uiDensity === 'touch' ? 'touch' : 'desktop'
+        }
+    };
 }
 
 function cloneRowSource(source: QuoteTotalsRow['source']): QuoteTotalsRow['source'] {
@@ -351,15 +625,15 @@ function createPersistenceSnapshot(
             ...cloneCustomerInfo(state.customerInfo),
             date: effectiveQuoteDate
         },
-        inventoryData: cloneSafeJsonValue(state.inventoryData),
-        cloudInventoryData: cloneSafeJsonValue(state.cloudInventoryData),
-        sketchDraft: cloneSafeJsonValue(state.sketchDraft),
-        advancedSketchDraft: cloneSafeJsonValue(state.advancedSketchDraft),
+        inventoryData: cloneInventoryData(state.inventoryData),
+        cloudInventoryData: cloneInventoryData(state.cloudInventoryData),
+        sketchDraft: cloneSketchDraft(state.sketchDraft),
+        advancedSketchDraft: cloneAdvancedSketchDraft(state.advancedSketchDraft),
         sketchMeta: {
             addedBahamaLine: state.sketchMeta?.addedBahamaLine === true,
             addedFiestaLine: state.sketchMeta?.addedFiestaLine === true
         },
-        inventoryBasket: cloneSafeJsonValue(state.inventoryBasket),
+        inventoryBasket: cloneInventoryBasket(state.inventoryBasket),
         activeQuoteId: state.activeQuoteId ? String(state.activeQuoteId) : null,
         quoteNumber: state.quoteNumber ? String(state.quoteNumber) : null,
         activeQuoteVersion: state.activeQuoteVersion,
@@ -416,7 +690,6 @@ function prepareProductRows(
     if (!Array.isArray(totals?.totals)) {
         invalidCommercial('totals', 'expected an array');
     }
-
     return totals.totals.map((row, index) => {
         const qty = requireFinite(row?.qty, `totals[${index}].qty`);
         if (qty <= 0) {
@@ -509,7 +782,6 @@ function prepareContractingWork(
     if (activeRows.length === 0) {
         return null;
     }
-
     activeRows.forEach((row, index) => {
         requireFinite(row.priceExVatSek, `contractingWork.rows[${index}].priceExVatSek`);
     });
@@ -661,6 +933,19 @@ export function prepareQuote({
 }
 
 export function createQuoteCommercialSnapshot(prepared: PreparedQuote): QuoteCommercialSnapshot {
+    if (prepared.commercial.productRows.length > MAX_QUOTE_PRODUCT_ROWS) {
+        invalidCommercial(
+            'commercialSnapshot.productRows',
+            `supports at most ${MAX_QUOTE_PRODUCT_ROWS} customer-visible product rows; reduce the quote before saving`
+        );
+    }
+    if ((prepared.commercial.contractingWork?.rows.length || 0) > MAX_QUOTE_CONTRACTING_WORK_ROWS) {
+        invalidCommercial(
+            'commercialSnapshot.contractingWork.rows',
+            `supports at most ${MAX_QUOTE_CONTRACTING_WORK_ROWS} customer-visible contracting-work rows; reduce the quote before saving`
+        );
+    }
+
     return {
         schemaVersion: 1,
         presentation: {

@@ -866,4 +866,29 @@ describe('computeQuoteTotals', () => {
 
         expect(customRow.model).toBe('Tillval: Egen rad');
     });
+
+    it('omits zero-quantity custom grid add-ons from customer-visible totals', () => {
+        const state = createStateFixture({
+            builderItems: [],
+            customCosts: [{ description: 'Aktiv produkt', price: 1000, qty: 1, discountPct: 0 }],
+            exchangeRate: 1,
+            gridSelections: {
+                ClickitUp: {
+                    items: {},
+                    addons: {},
+                    customAddonsByCategory: {
+                        doors: [
+                            { id: 'inactive-addon', name: 'Inaktiv specialdörr', price: 1500, qty: 0, discountPct: 0 }
+                        ]
+                    }
+                }
+            }
+        });
+
+        const summary = computeQuoteTotals({ state, catalogData: createCatalogFixture() });
+
+        expect(summary.totals).toHaveLength(1);
+        expect(summary.totals[0]).toMatchObject({ model: 'Övrigt: Aktiv produkt', qty: 1, gross: 1000 });
+        expect(summary.totals.some((row) => row.source.type === 'grid-custom-addon')).toBe(false);
+    });
 });

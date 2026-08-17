@@ -452,6 +452,7 @@ export function computeQuoteTotals({
             rows.forEach((row, rowIndex) => {
                 const unitPrice = getUnitSekPrice(toFloat(row?.price || 0), line, safeCatalog, exchangeRate);
                 const qty = toInt(row?.qty, 0);
+                if (qty <= 0) return;
                 const gross = unitPrice * qty;
                 const discountPct = toFloat(row?.discountPct || 0);
                 const discountSek = gross * (discountPct / 100);
@@ -494,6 +495,7 @@ export function computeQuoteTotals({
             rows.forEach((row, rowIndex) => {
                 const unitPrice = getUnitSekPrice(toFloat(row?.price || 0), line, safeCatalog, exchangeRate);
                 const qty = toInt(row?.qty, 0);
+                if (qty <= 0) return;
                 const gross = unitPrice * qty;
                 const discountPct = toFloat(row?.discountPct || 0);
                 const discountSek = gross * (discountPct / 100);

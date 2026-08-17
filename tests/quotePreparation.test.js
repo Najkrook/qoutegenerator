@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { createInitialQuoteState } from '../src/store/quoteStateSchema';
 import {
+    createQuoteCommercialSnapshot,
     prepareQuote,
     QuotePreparationError
 } from '../src/services/quotePreparation';
@@ -377,14 +378,67 @@ describe('prepareQuote', () => {
         state.marginSettings = { BaHaMa: 42 };
         state.marginAnalysis = { profit: 999999 };
         state.inventoryData = {
-            bahama: [{ id: 'inventory-1', label: 'keep-inventory', marginAnalysis: { profit: 111111 } }]
+            bahama: [{
+                ID: 'inventory-1',
+                BESKRIVNING: 'keep-inventory',
+                unknownSecret: 'nested-inventory-secret',
+                marginAnalysis: { profit: 111111 }
+            }],
+            bahamaV2: [],
+            clickitup: {
+                '1000': {
+                    sektion: 1,
+                    dorr_h: 0,
+                    dorr_v: 0,
+                    hane_h: 0,
+                    hane_v: 0,
+                    supplierPurchasePrice: 12345
+                }
+            },
+            notes: 'keep-notes',
+            profitabilityData: { profit: 777777 }
         };
-        state.inventoryBasket = [{ id: 'basket-1', label: 'keep-basket', costPrice: 222222 }];
+        state.cloudInventoryData = {
+            bahama: [],
+            bahamaV2: [],
+            clickitup: {},
+            notes: 'keep-cloud-notes',
+            unknownSecret: 'nested-cloud-secret'
+        };
+        state.inventoryBasket = [{
+            ID: 'basket-1',
+            BESKRIVNING: 'keep-basket',
+            costPrice: 222222,
+            unknownSecret: 'nested-basket-secret'
+        }];
         state.sketchDraft = {
-            items: [{ id: 'sketch-1', label: 'keep-sketch', internalMargins: { BaHaMa: 333333 } }]
+            config: {
+                width: 8000,
+                depth: 4000,
+                unknownSecret: 'nested-sketch-secret',
+                parasols: [{
+                    id: 'parasol-1',
+                    label: 'keep-sketch',
+                    unknownSecret: 'nested-parasol-secret',
+                    internalMargins: { BaHaMa: 333333 }
+                }]
+            },
+            workspace: {
+                camera: { zoom: 1, panX: 0, panY: 0, profitabilityData: { profit: 999 } },
+                unknownSecret: 'nested-workspace-secret'
+            }
         };
         state.advancedSketchDraft = {
-            scene: { label: 'keep-advanced-sketch', grossProfit: 444444 }
+            config: {
+                nodes: [{ id: 'node-1', x: 10, y: 20, unknownSecret: 'nested-node-secret' }],
+                edges: [],
+                unknownSecret: 'nested-advanced-config-secret'
+            },
+            workspace: {
+                camera: { zoom: 1, panX: 0, panY: 0 },
+                uiDensity: 'desktop',
+                grossProfit: 444444
+            }
         };
         state.builderItems = [{
             id: 'builder-1',
@@ -428,6 +482,9 @@ describe('prepareQuote', () => {
         expect(serialized).not.toContain('internalMargins');
         expect(serialized).not.toContain('grossProfit');
         expect(serialized).not.toContain('reviewCode');
+        expect(serialized).not.toContain('unknownSecret');
+        expect(serialized).not.toContain('supplierPurchasePrice');
+        expect(serialized).not.toContain('profitabilityData');
         expect(serialized).not.toContain('111111');
         expect(serialized).not.toContain('222222');
         expect(serialized).not.toContain('333333');
@@ -435,6 +492,9 @@ describe('prepareQuote', () => {
         expect(serialized).not.toContain('555555');
         expect(serialized).toContain('keep-inventory');
         expect(serialized).toContain('keep-basket');
+        expect(serialized).toContain('keep-sketch');
+        expect(serialized).toContain('keep-notes');
+        expect(serialized).toContain('keep-cloud-notes');
     });
 
     it('resolves one deterministic effective date for persistence and every downstream adapter', () => {
@@ -592,5 +652,87 @@ describe('prepareQuote', () => {
             state: { contractingWork },
             audience: { isRetailer: true }
         }).commercial.contractingWork).toBeNull();
+    });
+
+    it('accepts exactly 200 product rows and rejects one row above the persistence limit', () => {
+        const productRows = Array.from({ length: 200 }, (_, index) => createRow({
+            model: `Product ${index + 1}`,
+            qty: 1,
+            gross: 1000,
+            discountPct: 0,
+            discountSek: 0,
+            net: 1000,
+            originalIndex: index
+        }));
+        const totalsAtLimit = {
+            totals: productRows,
+            grossTotalSek: 200000,
+            totalDiscountSek: 0,
+            finalTotalSek: 200000,
+            globalDiscountAmt: 0
+        };
+
+        const preparedAtLimit = prepare({ totals: totalsAtLimit });
+        expect(createQuoteCommercialSnapshot(preparedAtLimit).productRows).toHaveLength(200);
+
+        const preparedAboveLimit = prepare({
+            totals: {
+                ...totalsAtLimit,
+                totals: [...productRows, createRow({
+                    model: 'Product 201',
+                    qty: 1,
+                    gross: 1000,
+                    discountPct: 0,
+                    discountSek: 0,
+                    net: 1000,
+                    originalIndex: 200
+                })],
+                grossTotalSek: 201000,
+                finalTotalSek: 201000
+            }
+        });
+        expect(() => createQuoteCommercialSnapshot(preparedAboveLimit)).toThrow(expect.objectContaining({
+            name: 'QuotePreparationError',
+            field: 'commercialSnapshot.productRows'
+        }));
+    });
+
+    it('accepts exactly 100 contracting-work rows and rejects one row above the persistence limit', () => {
+        const workRows = Array.from({ length: 100 }, (_, index) => ({
+            id: `work-${index + 1}`,
+            workPackage: `Work ${index + 1}`,
+            scope: 'Complete installation',
+            unit: 'project',
+            priceExVatSek: 1000
+        }));
+        const contractingWork = {
+            enabled: true,
+            projectName: 'Terrace',
+            rows: workRows,
+            margin: { enabled: false, percent: 15 },
+            ata: { enabled: false, percent: 15 }
+        };
+
+        const preparedAtLimit = prepare({ state: { contractingWork } });
+        expect(createQuoteCommercialSnapshot(preparedAtLimit).contractingWork.rows).toHaveLength(100);
+
+        const preparedAboveLimit = prepare({
+            state: {
+                contractingWork: {
+                    ...contractingWork,
+                    rows: [...workRows, {
+                        id: 'work-101',
+                        workPackage: 'Work 101',
+                        scope: 'Complete installation',
+                        unit: 'project',
+                        priceExVatSek: 1000
+                    }]
+                }
+            }
+        });
+        expect(() => createQuoteCommercialSnapshot(preparedAboveLimit)).toThrow(expect.objectContaining({
+            name: 'QuotePreparationError',
+            field: 'commercialSnapshot.contractingWork.rows'
+        }));
     });
 });

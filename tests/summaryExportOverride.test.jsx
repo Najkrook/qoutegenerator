@@ -71,16 +71,6 @@ vi.mock('react-hot-toast', () => ({
     default: toastState
 }));
 
-vi.mock('../src/services/calculationEngine', () => ({
-    computeQuoteTotals: () => ({
-        totals: [],
-        finalTotalSek: 0,
-        grossTotalSek: 0,
-        totalDiscountSek: 0,
-        globalDiscountAmt: 0
-    })
-}));
-
 vi.mock('../src/components/features/CustomerInfoForm', () => ({
     CustomerInfoForm: () => React.createElement('div', null, 'CustomerInfoFormMock')
 }));
@@ -321,6 +311,32 @@ afterEach(() => {
 });
 
 describe('SummaryExport PDF override', () => {
+    it('renders when the draft retains a zero-quantity custom grid add-on', async () => {
+        const { container } = await renderSummaryExport({
+            stateOverrides: {
+                customCosts: [{ description: 'Aktiv produkt', price: 1000, qty: 1, discountPct: 0 }],
+                gridSelections: {
+                    ClickitUp: {
+                        items: {},
+                        addons: {},
+                        customAddonsByCategory: {
+                            doors: [{
+                                id: 'inactive-addon',
+                                name: 'Inaktiv specialdörr',
+                                price: 1500,
+                                qty: 0,
+                                discountPct: 0
+                            }]
+                        }
+                    }
+                }
+            }
+        });
+
+        expect(container.textContent).toContain('FinalSummaryTableMock');
+        expect(container.textContent).toContain('Exportera PDF');
+    });
+
     it('renders the shared export language selector beside the PDF preview', async () => {
         const { container } = await renderSummaryExport();
         const languageGroup = container.querySelector('[role="group"][aria-label="Exportspråk"]');

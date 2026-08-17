@@ -204,6 +204,42 @@ describe('Quote Save module', () => {
         expect([...harness.firestore.__docs.keys()].some((path) => path.includes('/quotes/'))).toBe(false);
     });
 
+    it('rejects an oversized commercial snapshot before calling persistence', async () => {
+        const createQuote = vi.fn();
+        const productRows = Array.from({ length: 201 }, (_, index) => ({
+            ...SUMMARY.totals[0],
+            model: `Product ${index + 1}`,
+            unitPrice: 1000,
+            gross: 1000,
+            discountPct: 0,
+            discountSek: 0,
+            net: 1000,
+            originalIndex: index
+        }));
+        const harness = createHarness({
+            persistenceOverride: { createQuote },
+            moduleOptions: {
+                calculateTotals: () => ({
+                    totals: productRows,
+                    grossTotalSek: 201000,
+                    totalDiscountSek: 0,
+                    finalTotalSek: 201000,
+                    globalDiscountAmt: 0
+                })
+            }
+        });
+
+        await expect(harness.module.save({
+            actor: ACTOR,
+            state: quoteState(),
+            target: { kind: 'new' }
+        })).rejects.toMatchObject({
+            name: 'QuotePreparationError',
+            field: 'commercialSnapshot.productRows'
+        });
+        expect(createQuote).not.toHaveBeenCalled();
+    });
+
     it('saves a quote containing only custom grid items', async () => {
         const harness = createHarness();
         const state = quoteState({

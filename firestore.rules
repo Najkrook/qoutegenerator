@@ -604,7 +604,7 @@ service cloud.firestore {
           'quoteId', 'version', 'savedAtMs', 'savedBy', 'savedByUid',
           'state', 'summary', 'commercialSnapshot', 'changeNote', 'saveIntentId'
         ])
-        && hasValidCommercialSnapshot()
+        && hasValidCommercialSnapshotEnvelope()
         && hasCustomerSafeQuoteStateShape(state)
         && state.get('crmDealId', null) == null
         && state.get('crmSynchronizationIssue', null) == null
@@ -626,7 +626,9 @@ service cloud.firestore {
         && state.get('reviewCode', null) == null;
     }
 
-    function hasValidCommercialSnapshot() {
+    // ADR 0002 accepts version 1 as a proportionate client-prepared envelope for
+    // the current trusted-user deployment. Revisit before adding untrusted writers.
+    function hasValidCommercialSnapshotEnvelope() {
       let snapshot = request.resource.data.get('commercialSnapshot', null);
       let presentation = snapshot == null ? {} : snapshot.get('presentation', {});
       let totals = snapshot == null ? {} : snapshot.get('productTotals', {});
