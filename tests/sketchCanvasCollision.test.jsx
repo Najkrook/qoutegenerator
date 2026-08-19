@@ -21,6 +21,24 @@ function renderCanvas({ parasols, fiestaItems = [] }) {
 }
 
 describe('SketchCanvas parasol collision warnings', () => {
+    it('shows each parasol size in meters at the center of the canopy', () => {
+        const html = renderCanvas({
+            parasols: [{
+                id: 'parasol-1',
+                presetId: 'jumbrella_5x25_rektangel',
+                label: '5x2,5 Rektangel',
+                widthMm: 5000,
+                depthMm: 2500,
+                xMm: 2500,
+                yMm: 2500,
+                rotationDeg: 90
+            }]
+        });
+
+        expect(html).toContain('x="2500" y="2500"');
+        expect(html).toContain('>5 × 2,5 m</text>');
+    });
+
     it('allows a parasol canopy to cross a ClickitUp edge and cover a heater', () => {
         const html = renderCanvas({
             parasols: [{
@@ -42,6 +60,7 @@ describe('SketchCanvas parasol collision warnings', () => {
             }]
         });
 
+        expect(html).toContain('>5 × 5 m</text>');
         expect(html).not.toContain('>!</text>');
         expect(html).not.toContain('stroke="#ef4444"');
     });

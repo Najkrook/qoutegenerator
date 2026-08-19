@@ -147,6 +147,11 @@ function snapToGrid(value: number): number {
     return Math.round(value / STEP_MM) * STEP_MM;
 }
 
+function formatParasolSize(widthMm: number, depthMm: number): string {
+    const formatDimension = (millimeters: number) => String(Number((millimeters / 1000).toFixed(3))).replace('.', ',');
+    return `${formatDimension(widthMm)} × ${formatDimension(depthMm)} m`;
+}
+
 function normalizeCamera(camera: Partial<SketchCamera> | undefined, width: number, depth: number, padding: number): SketchCamera {
     const zoom = clamp(Number(camera?.zoom) || 1, 0.55, 3.5);
     const totalWidth = width + padding * 2;
@@ -1690,6 +1695,24 @@ export function SketchCanvas({
                             pointerEvents="none"
                         />
                     )}
+
+                    <text
+                        x={p.xMm}
+                        y={p.yMm}
+                        fill="rgba(241,245,249,0.95)"
+                        stroke="rgba(2,6,23,0.85)"
+                        strokeWidth="35"
+                        paintOrder="stroke"
+                        strokeLinejoin="round"
+                        fontSize="260"
+                        fontWeight="700"
+                        textAnchor="middle"
+                        dominantBaseline="middle"
+                        fontFamily="Inter, sans-serif"
+                        pointerEvents="none"
+                    >
+                        {formatParasolSize(p.widthMm, p.depthMm)}
+                    </text>
 
                     {/* Exclamation Warning Badge */}
                     {hasErr && (
