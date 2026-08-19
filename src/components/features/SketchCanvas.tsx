@@ -294,15 +294,6 @@ export function SketchCanvas({
         return y >= yTop && y <= yBottom;
     }, [currentWidth, currentMaxDepth, currentDepthLeft, currentDepthRight]);
 
-    const isParasolInBoundary = useCallback((px: number, py: number, w: number, d: number) => {
-        return (
-            isPointInBoundary(px - w / 2, py - d / 2) &&
-            isPointInBoundary(px + w / 2, py - d / 2) &&
-            isPointInBoundary(px - w / 2, py + d / 2) &&
-            isPointInBoundary(px + w / 2, py + d / 2)
-        );
-    }, [isPointInBoundary]);
-
     const isFiestaInBoundary = useCallback((fx: number, fy: number, r: number) => {
         return (
             isPointInBoundary(fx - r, fy) &&
@@ -317,7 +308,6 @@ export function SketchCanvas({
             const p = parasols.find(item => item.id === itemId);
             if (!p) return false;
             const dims = getEffectiveParasolDimensions(p);
-            if (!isParasolInBoundary(p.xMm, p.yMm, dims.widthMm, dims.depthMm)) return true;
             for (const other of parasols) {
                 if (other.id === itemId) continue;
                 const oDims = getEffectiveParasolDimensions(other);
@@ -340,7 +330,7 @@ export function SketchCanvas({
             }
         }
         return false;
-    }, [parasols, fiestaItems, isParasolInBoundary, isFiestaInBoundary]);
+    }, [parasols, fiestaItems, isFiestaInBoundary]);
 
     const isShowingPreview = useMemo(() => {
         if (!hoverPreviewLayout) return false;
