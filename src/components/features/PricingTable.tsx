@@ -147,16 +147,21 @@ function getRowKey(row: QuoteTotalsRow, index: number): string {
     }
 }
 
-export function clampPricingRowDiscount(value: string, isRetailer: boolean, retailerDiscountPct: number): number {
+export function clampPricingRowDiscount(
+    value: string,
+    isRetailer: boolean,
+    retailerDiscountPct: number,
+    canSetDeduction = false
+): number {
     const parsed = Number.parseFloat(value);
     const normalized = Number.isFinite(parsed) ? parsed : 0;
-    const bounded = Math.max(0, Math.min(100, normalized));
+    const bounded = Math.max(0, Math.min(canSetDeduction ? 200 : 100, normalized));
     return isRetailer ? Math.min(bounded, retailerDiscountPct) : bounded;
 }
 
 export function PricingTable() {
     const { state, dispatch } = useQuote();
-    const { isRetailer, retailer } = useAuth();
+    const { canViewEverything, isRetailer, retailer } = useAuth();
     const [displayNameDrafts, setDisplayNameDrafts] = useState<Record<string, string>>({});
     const [dragState, setDragState] = useState<PricingTableDragState | null>(null);
     const [dropTarget, setDropTarget] = useState<PricingTableDropTarget | null>(null);
@@ -433,7 +438,7 @@ export function PricingTable() {
     };
 
     const handleDiscountChange = (source: QuoteTotalsRowSource, value: string): void => {
-        const discountPct = clampPricingRowDiscount(value, isRetailer, retailerDiscountPct);
+        const discountPct = clampPricingRowDiscount(value, isRetailer, retailerDiscountPct, canViewEverything);
 
         if (source.type === 'builder') {
             const nextItems = state.builderItems.map((item) => (
@@ -542,6 +547,23 @@ export function PricingTable() {
             return;
         }
 
+        if (source.type === 'grid-custom-item') {
+            const lineSelections = state.gridSelections[source.lineId];
+            if (!lineSelections) return;
+
+            const nextSelections = {
+                ...state.gridSelections,
+                [source.lineId]: {
+                    ...lineSelections,
+                    customItems: (lineSelections.customItems || []).map((row) => (
+                        row.id === source.rowId ? { ...row, discountPct } : row
+                    ))
+                }
+            };
+            dispatch({ type: 'SET_GRID_SELECTIONS', payload: nextSelections });
+            return;
+        }
+
         if (source.type === 'custom') {
             const nextCosts = [...state.customCosts];
             nextCosts[source.index] = { ...nextCosts[source.index], discountPct };
@@ -643,15 +665,31 @@ export function PricingTable() {
                                         {isReq ? (
                                             <span className="text-text-secondary italic text-xs">-</span>
                                         ) : (
-                                            <input
-                                                type="number"
-                                                step="1"
-                                                min="0"
-                                                max={isRetailer ? retailerDiscountPct : 100}
-                                                value={row.discountPct}
-                                                onChange={(event: ChangeEvent<HTMLInputElement>) => handleDiscountChange(row.source, event.target.value)}
-                                                className={`w-16 text-center bg-black/20 border border-panel-border rounded p-1 text-sm outline-none focus:border-primary ${row.discountPct > 0 ? 'text-primary' : ''}`}
-                                            />
+                                            <div className="flex flex-col items-center gap-2">
+                                                <input
+                                                    type="number"
+                                                    step="1"
+                                                    min="0"
+                                                    max={isRetailer ? retailerDiscountPct : (canViewEverything ? 200 : 100)}
+                                                    value={row.discountPct}
+                                                    onChange={(event: ChangeEvent<HTMLInputElement>) => handleDiscountChange(row.source, event.target.value)}
+                                                    className={`w-16 text-center bg-black/20 border border-panel-border rounded p-1 text-sm outline-none focus:border-primary ${row.discountPct > 0 ? 'text-primary' : ''}`}
+                                                />
+                                                {canViewEverything ? (
+                                                    <label className="flex items-center gap-1.5 whitespace-nowrap text-[10px] font-medium normal-case text-text-secondary">
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={row.discountPct === 200}
+                                                            onChange={(event: ChangeEvent<HTMLInputElement>) => handleDiscountChange(
+                                                                row.source,
+                                                                event.target.checked ? '200' : '0'
+                                                            )}
+                                                            className="h-3.5 w-3.5 accent-primary"
+                                                        />
+                                                        Sätt som avdrag
+                                                    </label>
+                                                ) : null}
+                                            </div>
                                         )}
                                     </td>
                                     <td className={`p-4 text-sm text-right font-bold text-primary ${dropIndicatorClass}`}>

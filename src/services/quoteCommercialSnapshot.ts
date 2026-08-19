@@ -71,7 +71,7 @@ function normalizeProductRow(value: unknown): QuoteCommercialSnapshotProductRow 
     const net = finite(value.net);
     if (
         unitPrice == null || qty == null || qty <= 0 || gross == null
-        || discountPct == null || discountPct < 0 || discountPct > 100
+        || discountPct == null || discountPct < 0 || discountPct > 200
         || discountSek == null || net == null
     ) return null;
 

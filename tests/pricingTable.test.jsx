@@ -143,6 +143,63 @@ describe('PricingTable retailer discount bounds', () => {
         expect(clampPricingRowDiscount('35', false, 30)).toBe(35);
         expect(clampPricingRowDiscount('140', false, 30)).toBe(100);
     });
+
+    it('allows admins to set exactly 200 percent but no more', () => {
+        expect(clampPricingRowDiscount('200', false, 0, true)).toBe(200);
+        expect(clampPricingRowDiscount('250', false, 0, true)).toBe(200);
+    });
+});
+
+describe('PricingTable admin deduction control', () => {
+    it('renders the deduction checkbox for admins', () => {
+        const html = renderPricingTable();
+
+        expect(html).toContain('Sätt som avdrag');
+        expect(html).toContain('type="checkbox"');
+    });
+
+    it('marks a row with 200 percent discount as a deduction', () => {
+        const html = renderPricingTable({
+            builderItems: [
+                {
+                    id: 'builder_1',
+                    line: 'BaHaMa',
+                    model: 'Jumbrella',
+                    size: '3x3 Kvadrat',
+                    qty: 1,
+                    discountPct: 200,
+                    addons: []
+                }
+            ]
+        });
+
+        expect(html).toMatch(/type="checkbox"[^>]*checked=""/);
+    });
+
+    it('does not render the deduction control for non-admin quote users', () => {
+        const html = renderPricingTable({}, {
+            accessLevel: 'quote-only',
+            canViewEverything: false
+        });
+
+        expect(html).not.toContain('Sätt som avdrag');
+        expect(html).not.toContain('type="checkbox"');
+    });
+
+    it('does not render the deduction control for retailers', () => {
+        const html = renderPricingTable({}, {
+            accessLevel: 'retailer',
+            canViewEverything: false,
+            retailer: {
+                id: 'retailer_1',
+                productLines: { BaHaMa: { enabled: true, discountPct: 30 } }
+            },
+            isRetailer: true
+        });
+
+        expect(html).not.toContain('Sätt som avdrag');
+        expect(html).not.toContain('type="checkbox"');
+    });
 });
 
 describe('PricingTable priceUponRequest rendering', () => {

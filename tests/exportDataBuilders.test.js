@@ -84,4 +84,21 @@ describe('export format adapters', () => {
             'Price on request', 'Price on request', '-', '-'
         ]]);
     });
+
+    it('preserves a 200 percent discount as a negative row in PDF and Excel data', () => {
+        const prepared = createPreparedQuote({ exportLanguage: 'sv' }, {
+            model: 'Avdrag: textilduk',
+            discountPct: 200,
+            discountSek: 2000,
+            net: -1000
+        });
+        const row = prepared.commercial.productRows[0];
+
+        expect(buildPdfTableData([row], String, { exportLanguage: 'sv' })).toEqual([[
+            'Avdrag: textilduk', '3x3', '1000 SEK', '1', '-1000 SEK', '1000 SEK', '2000 SEK', '200%'
+        ]]);
+        expect(buildPreparedExcelSheetData(prepared)).toContainEqual([
+            'Avdrag: textilduk', '3x3', 1000, 1, -1000, 1000, -2000, '200%'
+        ]);
+    });
 });

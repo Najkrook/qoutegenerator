@@ -125,7 +125,8 @@ describe('Retailer workspace', () => {
     it('renders retailer product line selection with only active lines and discount preview', () => {
         const html = renderWithProviders(<ProductLineSelection onNext={() => {}} />);
 
-        expect(html).toContain('Kundinformation');
+        expect(html).toContain('Välj offertinnehåll');
+        expect(html).not.toContain('Kundinformation');
         expect(html).toContain('Avtalat sortiment');
         expect(html).toContain('BaHaMa');
         expect(html).not.toContain('ClickitUp');
@@ -166,7 +167,7 @@ describe('Retailer workspace', () => {
         expect(html).toContain('cursor-not-allowed');
     });
 
-    it('keeps the first step blocked until the customer is identified', () => {
+    it('allows the first step to continue without customer information', () => {
         const html = renderWithProviders(
             <ProductLineSelection onNext={() => {}} />,
             {
@@ -185,8 +186,8 @@ describe('Retailer workspace', () => {
             }
         );
 
-        expect(html).toContain('Ange företag eller organisation för att fortsätta.');
-        expect(html).toContain('disabled=""');
+        expect(html).not.toContain('Ange företag eller organisation för att fortsätta.');
+        expect(html).not.toContain('disabled=""');
     });
 
     it('renders retailer pricing guidance with global and row discounts capped by the retailer agreement', () => {

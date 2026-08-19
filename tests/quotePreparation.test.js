@@ -589,6 +589,29 @@ describe('prepareQuote', () => {
         expect(changed.presentation.equivalenceKey).not.toBe(baseline.presentation.equivalenceKey);
     });
 
+    it('accepts a 200 percent deduction internally but rejects it for retailers', () => {
+        const totals = {
+            totals: [createRow({
+                discountPct: 200,
+                discountSek: 4000,
+                net: -2000
+            })],
+            grossTotalSek: 2000,
+            totalDiscountSek: 4000,
+            finalTotalSek: -2000,
+            globalDiscountAmt: 0
+        };
+
+        expect(prepare({ totals }).commercial.productRows[0]).toMatchObject({
+            discountPct: 200,
+            net: -2000
+        });
+        expect(() => prepare({
+            totals,
+            audience: { isRetailer: true }
+        })).toThrow(/between 0 and 100/u);
+    });
+
     it.each([
         ['totals is not an array', { totals: null }],
         ['quantity is non-finite', { totals: [createRow({ qty: Number.NaN })] }],
@@ -597,7 +620,7 @@ describe('prepareQuote', () => {
         ['gross price is non-finite', { totals: [createRow({ gross: Number.NaN })] }],
         ['discount percentage is non-finite', { totals: [createRow({ discountPct: Number.NaN })] }],
         ['discount percentage is below zero', { totals: [createRow({ discountPct: -1 })] }],
-        ['discount percentage is above one hundred', { totals: [createRow({ discountPct: 101 })] }],
+        ['discount percentage is above two hundred', { totals: [createRow({ discountPct: 201 })] }],
         ['discount amount is non-finite', { totals: [createRow({ discountSek: Number.NaN })] }],
         ['net price is non-finite', { totals: [createRow({ net: Number.NaN })] }],
         ['gross aggregate is non-finite', { grossTotalSek: Number.NaN }],

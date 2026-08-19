@@ -3,6 +3,32 @@ import { computeQuoteTotals } from '../src/services/calculationEngine';
 import { createCatalogFixture, createStateFixture } from './fixtures/calculationFixtures';
 
 describe('computeQuoteTotals', () => {
+    it('turns a 200 percent discounted row into an equal negative deduction', () => {
+        const summary = computeQuoteTotals({
+            state: {
+                builderItems: [
+                    {
+                        id: 'deduction_item',
+                        line: 'BaHaMa',
+                        model: 'Jumbrella',
+                        size: '3x3 Kvadrat',
+                        qty: 1,
+                        discountPct: 200,
+                        addons: []
+                    }
+                ],
+                gridSelections: {},
+                customCosts: [],
+                exchangeRate: 12.2
+            },
+            catalogData: createCatalogFixture()
+        });
+
+        expect(summary.totals[0].net).toBe(-summary.totals[0].gross);
+        expect(summary.totals[0].discountPct).toBe(200);
+        expect(summary.finalTotalSek).toBe(-summary.grossTotalSek);
+    });
+
     function addClickitUpAutoScaleAddons(catalogData) {
         catalogData.ClickitUp.addonCategories.push({
             id: 'recommended',

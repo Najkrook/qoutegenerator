@@ -685,7 +685,8 @@ function normalizePresentation(state: QuoteState, audience: QuotePreparationAudi
 function prepareProductRows(
     totals: QuoteTotalsResult,
     exportLanguage: QuoteExportLanguage,
-    quoteCatalogData: CatalogData
+    quoteCatalogData: CatalogData,
+    maximumDiscountPct: number
 ): PreparedQuoteProductRow[] {
     if (!Array.isArray(totals?.totals)) {
         invalidCommercial('totals', 'expected an array');
@@ -696,8 +697,11 @@ function prepareProductRows(
             invalidCommercial(`totals[${index}].qty`, 'expected a positive quantity');
         }
         const discountPct = requireFinite(row?.discountPct, `totals[${index}].discountPct`);
-        if (discountPct < 0 || discountPct > 100) {
-            invalidCommercial(`totals[${index}].discountPct`, 'expected a percentage between 0 and 100');
+        if (discountPct < 0 || discountPct > maximumDiscountPct) {
+            invalidCommercial(
+                `totals[${index}].discountPct`,
+                `expected a percentage between 0 and ${maximumDiscountPct}`
+            );
         }
         const unitPrice = requireFinite(row?.unitPrice, `totals[${index}].unitPrice`);
         const gross = requireFinite(row?.gross, `totals[${index}].gross`);
@@ -858,7 +862,8 @@ export function prepareQuote({
     const productRows = prepareProductRows(
         totals,
         normalizedPresentation.exportLanguage,
-        catalogData
+        catalogData,
+        audience.isRetailer ? 100 : 200
     );
     const productTotals = validateAndPrepareProductTotals(state, totals, productRows);
     const contractingWork = prepareContractingWork(state, audience);

@@ -36,6 +36,23 @@ function createCatalogBackedState() {
 }
 
 describe('Quote commercial snapshot', () => {
+    it('preserves a 200 percent deduction in the saved commercial snapshot', () => {
+        const state = createCatalogBackedState();
+        state.gridSelections.ClickitUp.items['ClickitUp Sektion|1000'].discountPct = 200;
+        const totals = computeQuoteTotals({ state, catalogData });
+        const snapshot = createQuoteCommercialSnapshot(prepareQuote({
+            state,
+            totals,
+            catalogData,
+            audience: { isRetailer: false }
+        }));
+
+        expect(normalizeQuoteCommercialSnapshot(snapshot)?.productRows[0]).toMatchObject({
+            discountPct: 200,
+            net: -11134
+        });
+    });
+
     it('restores frozen catalog-backed names and prices without consulting a changed catalog', () => {
         const state = createCatalogBackedState();
         const originalCatalog = structuredClone(catalogData);

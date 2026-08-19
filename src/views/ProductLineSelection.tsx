@@ -3,7 +3,6 @@ import { useQuote } from '../store/QuoteContext';
 import { useAuth } from '../store/AuthContext';
 import { getCatalogLineIds, getCatalogLineName } from '../data/catalogLookup';
 import { createContractingWorkRow } from '../components/features/ContractingWorkEditor';
-import { CustomerInfoForm } from '../components/features/CustomerInfoForm';
 import { Button } from '../components/ui/Button';
 import { PageHeader } from '../components/ui/PageHeader';
 import { Panel } from '../components/ui/Panel';
@@ -82,8 +81,7 @@ export function ProductLineSelection({ onNext }: ProductLineSelectionProps) {
     const canSelectContractingWork = !isRetailer && (accessLevel === 'full' || accessLevel === 'quote-only');
     const contractingWorkEnabled = canSelectContractingWork && contractingWork.enabled;
     const hasSelectedQuoteContent = selectedLines.length > 0 || contractingWorkEnabled;
-    const hasCustomer = Boolean(state.customerInfo.company?.trim());
-    const canContinue = hasSelectedQuoteContent && hasCustomer;
+    const canContinue = hasSelectedQuoteContent;
 
     const toggleLine = (lineId: string): void => {
         if (isRetailer) {
@@ -167,13 +165,9 @@ export function ProductLineSelection({ onNext }: ProductLineSelectionProps) {
         <div className="mx-auto max-w-[1200px] animate-fade-in">
             <PageHeader
                 eyebrow="Steg 1 av 4"
-                title="Kund och offertinnehåll"
-                description="Lägg in kundens uppgifter och välj vad offerten ska innehålla."
+                title="Välj offertinnehåll"
+                description="Välj vad offerten ska innehålla."
             />
-
-            <div className="mt-6">
-                <CustomerInfoForm />
-            </div>
 
             {isRetailer && (
                 <Panel className="mb-6">
@@ -277,14 +271,7 @@ export function ProductLineSelection({ onNext }: ProductLineSelectionProps) {
                 </Panel>
             )}
 
-            <div className="mt-6 flex flex-col gap-3 border-t border-border pt-6 sm:flex-row sm:items-center sm:justify-between">
-                {!hasCustomer ? (
-                    <p role="status" className="m-0 text-sm text-warning-text">
-                        Ange företag eller organisation för att fortsätta.
-                    </p>
-                ) : (
-                    <span aria-hidden="true" />
-                )}
+            <div className="mt-6 flex justify-end border-t border-border pt-6">
                 <Button
                     onClick={handleNext}
                     disabled={!canContinue}
