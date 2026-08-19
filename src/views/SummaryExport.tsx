@@ -140,9 +140,10 @@ function buildPdfFileName(customerInfo: QuoteState['customerInfo'], exportLangua
     const rawRef = customerInfo.reference?.trim();
     const rawName = customerInfo.company?.trim() || customerInfo.name?.trim();
     const date = customerInfo.date || '';
-    const base = rawRef || rawName || (exportLanguage === 'en' ? 'Quote' : 'Offert');
+    const prefix = exportLanguage === 'en' ? 'Quote' : 'Offert';
+    const base = rawRef || rawName || '';
     const safeBase = sanitizeFileNamePart(base);
-    return `${safeBase || (exportLanguage === 'en' ? 'Quote' : 'Offert')}-${date}.pdf`;
+    return `${prefix}${safeBase ? `-${safeBase}` : ''}-${date}.pdf`;
 }
 
 function getActivityCustomerLabel(customerInfo: QuoteState['customerInfo']): string {

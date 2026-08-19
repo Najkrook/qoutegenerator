@@ -432,6 +432,45 @@ describe('SummaryExport PDF override', () => {
         }));
     });
 
+    it('prefixes the suggested PDF filename with the localized offer label', async () => {
+        const swedish = await renderSummaryExport({
+            stateOverrides: {
+                quoteNumber: 'BRIXX - 260423-101',
+                customerInfo: {
+                    ...createInitialQuoteState().customerInfo,
+                    company: 'Dolce Sicilia Drottningtorget',
+                    date: '2026-08-19'
+                }
+            }
+        });
+
+        await clickButton(swedish.container, 'Skapa PDF');
+
+        expect(fileUtilsState.saveBlobWithPicker).toHaveBeenLastCalledWith(
+            expect.any(Blob),
+            'Offert-Dolce-Sicilia-Drottningtorget-2026-08-19.pdf'
+        );
+
+        const english = await renderSummaryExport({
+            stateOverrides: {
+                quoteNumber: 'BRIXX - 260423-102',
+                exportLanguage: 'en',
+                customerInfo: {
+                    ...createInitialQuoteState().customerInfo,
+                    company: 'Dolce Sicilia',
+                    date: '2026-08-19'
+                }
+            }
+        });
+
+        await clickButton(english.container, 'Skapa PDF');
+
+        expect(fileUtilsState.saveBlobWithPicker).toHaveBeenLastCalledWith(
+            expect.any(Blob),
+            'Quote-Dolce-Sicilia-2026-08-19.pdf'
+        );
+    });
+
     it('reuses the completed preview blob for export when the quote has not changed', async () => {
         const { container } = await renderSummaryExport({
             stateOverrides: { quoteNumber: 'BRIXX - 260423-102' }
