@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useQuote } from '../store/QuoteContext';
 import { useAuth } from '../store/AuthContext';
 import { db, doc, getDoc, collection, writeBatch } from '../services/firebase';
@@ -6,6 +7,11 @@ import { InventoryTable } from '../components/features/InventoryTable';
 import { ClickitupStockGrid } from '../components/features/ClickitupStockGrid';
 import { InventoryItemModal } from '../components/features/InventoryItemModal';
 import { PendingChangesPanel } from '../components/features/PendingChangesPanel';
+import {
+    BahamaRackDetail,
+    BahamaStorageMap,
+    BahamaStorageSidebar
+} from '../components/features/BahamaStorageMap';
 import {
     BAHAMA_INVENTORY_STATUSES,
     cloneInventoryData,
@@ -21,6 +27,16 @@ import {
 } from '../services/notificationService';
 import { getErrorMessage } from '../utils/runtime';
 import { ensureBahamaQrIds, stageBahamaQrProjectionWrites } from '../services/bahamaQrService';
+import {
+    groupBahamaInventoryByStorageLocation,
+    type BahamaRackNumber,
+    type BahamaStorageGrouping
+} from '../services/bahamaStorageLocation';
+import {
+    getInventoryRouteSearch,
+    readInventoryRouteState,
+    type InventoryView
+} from '../navigation/inventoryLinks';
 import type {
     BahamaInventoryStatus,
     BahamaInventoryV2Item,
@@ -32,6 +48,11 @@ import type {
 type ProductLine = 'bahama' | 'clickitup';
 type InspectorMode = 'view' | 'create' | 'edit';
 
+interface InventoryViewTabsProps {
+    view: InventoryView;
+    onChange: (view: 'map' | 'list') => void;
+}
+
 const DEFAULT_INVENTORY_DATA: InventoryData = createDefaultInventoryData();
 
 const STATUS_LABELS: Record<BahamaInventoryStatus, string> = {
@@ -41,6 +62,51 @@ const STATUS_LABELS: Record<BahamaInventoryStatus, string> = {
     used: 'Begagnad',
     sold: 'Såld'
 };
+
+function InventoryViewTabs({ view, onChange }: InventoryViewTabsProps) {
+    return (
+        <div className="inline-flex overflow-hidden rounded-lg border border-white/15 bg-[#10171c]" role="tablist" aria-label="Visningsläge för BaHaMa-lagret">
+            <button
+                type="button"
+                role="tab"
+                aria-selected={view !== 'list'}
+                onClick={() => onChange('map')}
+                className={`min-w-32 px-4 py-2.5 text-sm font-semibold outline-none transition focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#f0dfc2] ${view !== 'list' ? 'bg-[#eadfce] text-[#17130f]' : 'text-slate-300 hover:bg-white/5'}`}
+            >
+                Lagerkarta
+            </button>
+            <button
+                type="button"
+                role="tab"
+                aria-selected={view === 'list'}
+                onClick={() => onChange('list')}
+                className={`min-w-28 border-l border-white/10 px-4 py-2.5 text-sm font-semibold outline-none transition focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#f0dfc2] ${view === 'list' ? 'bg-[#eadfce] text-[#17130f]' : 'text-slate-300 hover:bg-white/5'}`}
+            >
+                Lista
+            </button>
+        </div>
+    );
+}
+
+function getStoragePresentation(items: BahamaInventoryV2Item[]): {
+    grouping: BahamaStorageGrouping;
+    error: string | null;
+} {
+    try {
+        return {
+            grouping: groupBahamaInventoryByStorageLocation(items),
+            error: null
+        };
+    } catch (error) {
+        return {
+            grouping: {
+                ...groupBahamaInventoryByStorageLocation([]),
+                unplacedItems: items
+            },
+            error: getErrorMessage(error, 'Lagerplatserna kunde inte grupperas.')
+        };
+    }
+}
 
 function getSafeInventoryData(inventoryData: InventoryData | undefined): InventoryData {
     return normalizeStoredInventoryData({
@@ -101,11 +167,12 @@ function getUserUid(user: { uid?: string | null } | null): string {
 export function InventoryManager(_props: InventoryManagerProps) {
     const { state, dispatch } = useQuote();
     const { user } = useAuth();
+    const [searchParams, setSearchParams] = useSearchParams();
     const [activeLine, setActiveLine] = useState<ProductLine>('bahama');
     const [searchTerm, setSearchTerm] = useState('');
     const [statusFilter, setStatusFilter] = useState<'all' | BahamaInventoryStatus>('all');
     const [sizeFilter, setSizeFilter] = useState('all');
-    const [selectedBahamaId, setSelectedBahamaId] = useState<string | null>(null);
+    const [selectedBahamaQrId, setSelectedBahamaQrId] = useState<string | null>(null);
     const [inspectorMode, setInspectorMode] = useState<InspectorMode>('view');
     const [isSaving, setIsSaving] = useState(false);
     const [isLoading, setIsLoading] = useState(true);
@@ -116,9 +183,16 @@ export function InventoryManager(_props: InventoryManagerProps) {
     const bahamaItems = inventoryData.bahamaV2 || [];
     const sortedBahamaItems = useMemo(() => sortBahamaItems(bahamaItems), [bahamaItems]);
     const selectedItem = useMemo(
-        () => sortedBahamaItems.find((item) => item.id === selectedBahamaId) || null,
-        [selectedBahamaId, sortedBahamaItems]
+        () => sortedBahamaItems.find((item) => item.qrId === selectedBahamaQrId) || null,
+        [selectedBahamaQrId, sortedBahamaItems]
     );
+    const inventoryRoute = readInventoryRouteState(searchParams);
+    const storagePresentation = useMemo(
+        () => getStoragePresentation(sortedBahamaItems),
+        [sortedBahamaItems]
+    );
+    const selectedRack = storagePresentation.grouping.racks.find((rack) => rack.rack === inventoryRoute.rack)
+        || storagePresentation.grouping.racks[0];
 
     const sizeOptions = useMemo(() => {
         const sizes = new Set<string>();
@@ -147,6 +221,10 @@ export function InventoryManager(_props: InventoryManagerProps) {
     }, [searchTerm, sizeFilter, sortedBahamaItems, statusFilter]);
 
     const changesPending = hasInventoryChanges(inventoryData, cloudInventoryData);
+
+    const navigateInventory = (view: InventoryView, rack: BahamaRackNumber = inventoryRoute.rack) => {
+        setSearchParams(new URLSearchParams(getInventoryRouteSearch(view, rack)));
+    };
 
     const loadInventory = useCallback(async () => {
         setIsLoading(true);
@@ -188,12 +266,12 @@ export function InventoryManager(_props: InventoryManagerProps) {
         if (inspectorMode === 'create') {
             return;
         }
-        if (selectedBahamaId && sortedBahamaItems.some((item) => item.id === selectedBahamaId)) {
+        if (selectedBahamaQrId && sortedBahamaItems.some((item) => item.qrId === selectedBahamaQrId)) {
             return;
         }
-        setSelectedBahamaId(sortedBahamaItems[0]?.id || null);
+        setSelectedBahamaQrId(sortedBahamaItems[0]?.qrId || null);
         setInspectorMode(sortedBahamaItems[0] ? 'edit' : 'view');
-    }, [inspectorMode, selectedBahamaId, sortedBahamaItems]);
+    }, [inspectorMode, selectedBahamaQrId, sortedBahamaItems]);
 
     const replaceBahamaItems = (items: BahamaInventoryV2Item[]) => {
         dispatch({
@@ -206,13 +284,13 @@ export function InventoryManager(_props: InventoryManagerProps) {
     };
 
     const handleSelectItem = (item: BahamaInventoryV2Item) => {
-        setSelectedBahamaId(item.id);
+        setSelectedBahamaQrId(item.qrId);
         setInspectorMode('edit');
     };
 
     const handleCreateItem = () => {
         setActiveLine('bahama');
-        setSelectedBahamaId(null);
+        setSelectedBahamaQrId(null);
         setInspectorMode('create');
     };
 
@@ -234,7 +312,7 @@ export function InventoryManager(_props: InventoryManagerProps) {
             : [...bahamaItems, nextItem];
 
         replaceBahamaItems(nextItems);
-        setSelectedBahamaId(nextItem.id);
+        setSelectedBahamaQrId(nextItem.qrId);
         setInspectorMode('edit');
         notifySuccess(previousId ? 'BaHaMa-artikel uppdaterad' : 'BaHaMa-artikel tillagd');
     };
@@ -250,7 +328,7 @@ export function InventoryManager(_props: InventoryManagerProps) {
         if (!confirmed) return;
 
         replaceBahamaItems(bahamaItems.filter((candidate) => candidate.id !== item.id));
-        setSelectedBahamaId(null);
+        setSelectedBahamaQrId(null);
         setInspectorMode('view');
         notifySuccess('BaHaMa-artikel borttagen');
     };
@@ -402,6 +480,30 @@ export function InventoryManager(_props: InventoryManagerProps) {
         }
     };
 
+    const inventoryInspector = (
+        <InventoryItemModal
+            item={inspectorMode === 'create' ? null : selectedItem}
+            mode={inspectorMode}
+            existingIds={bahamaItems.map((item) => item.id)}
+            onSave={handleSaveBahamaItem}
+            onDelete={(item) => {
+                void handleDeleteBahamaItem(item);
+            }}
+            onCancel={() => {
+                setInspectorMode(selectedItem ? 'edit' : 'view');
+            }}
+        />
+    );
+
+    const pendingChangesPanel = (
+        <PendingChangesPanel
+            inventoryData={inventoryData}
+            cloudInventoryData={cloudInventoryData}
+            onCommit={handleCommit}
+            isSaving={isSaving}
+        />
+    );
+
     if (isLoading) {
         return (
             <div className="flex min-h-[50vh] items-center justify-center rounded-xl border border-panel-border bg-[#0d1115]">
@@ -506,80 +608,112 @@ export function InventoryManager(_props: InventoryManagerProps) {
                 )}
 
                 {activeLine === 'bahama' ? (
-                    <div className="grid min-h-0 flex-1 grid-cols-1 gap-4 p-4 xl:grid-cols-[minmax(0,1fr)_360px] md:p-6">
-                        <section className="flex min-h-0 flex-col gap-4">
-                            <div className="grid gap-3 rounded-lg border border-white/10 bg-[#10161b] p-3 md:grid-cols-[minmax(220px,1fr)_180px_180px]">
-                                <input
-                                    type="search"
-                                    value={searchTerm}
-                                    onChange={(event) => setSearchTerm(event.target.value)}
-                                    placeholder="Sök ID, typ, status, storlek, lagerplats eller egenskap"
-                                    className="rounded-md border border-white/10 bg-[#12191f] px-3 py-2 text-sm text-slate-100 outline-none placeholder:text-slate-600 focus:border-[#e8e1d4]"
-                                />
-                                <select
-                                    value={statusFilter}
-                                    onChange={(event) => setStatusFilter(event.target.value as 'all' | BahamaInventoryStatus)}
-                                    className="rounded-md border border-white/10 bg-[#12191f] px-3 py-2 text-sm text-slate-100 outline-none focus:border-[#e8e1d4]"
-                                >
-                                    <option value="all">Alla statusar</option>
-                                    {BAHAMA_INVENTORY_STATUSES.map((status) => (
-                                        <option key={status} value={status}>{STATUS_LABELS[status]}</option>
-                                    ))}
-                                </select>
-                                <select
-                                    value={sizeFilter}
-                                    onChange={(event) => setSizeFilter(event.target.value)}
-                                    className="rounded-md border border-white/10 bg-[#12191f] px-3 py-2 text-sm text-slate-100 outline-none focus:border-[#e8e1d4]"
-                                >
-                                    <option value="all">Alla storlekar</option>
-                                    {sizeOptions.map((size) => (
-                                        <option key={size} value={size}>{size}</option>
-                                    ))}
-                                </select>
-                            </div>
-
-                            <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
-                                <div className="rounded-lg border border-white/10 bg-[#10161b] p-3">
-                                    <p className="m-0 text-[11px] uppercase text-slate-500">Totalt</p>
-                                    <p className="m-0 mt-1 text-xl font-semibold">{bahamaItems.length}</p>
-                                </div>
-                                {BAHAMA_INVENTORY_STATUSES.slice(0, 4).map((status) => (
-                                    <div key={status} className="rounded-lg border border-white/10 bg-[#10161b] p-3">
-                                        <p className="m-0 text-[11px] uppercase text-slate-500">{STATUS_LABELS[status]}</p>
-                                        <p className="m-0 mt-1 text-xl font-semibold">
-                                            {bahamaItems.filter((item) => item.status === status).length}
-                                        </p>
-                                    </div>
-                                ))}
-                            </div>
-
-                            <InventoryTable
-                                items={filteredBahamaItems}
-                                selectedItemId={selectedBahamaId}
-                                onSelect={handleSelectItem}
+                    <div className="min-h-0 flex-1 overflow-auto p-4 md:p-6">
+                        <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+                            <InventoryViewTabs
+                                view={inventoryRoute.view}
+                                onChange={(view) => navigateInventory(view)}
                             />
-                        </section>
-
-                        <div className="grid min-h-0 gap-4 xl:grid-rows-[minmax(0,1fr)_auto]">
-                            <InventoryItemModal
-                                item={inspectorMode === 'create' ? null : selectedItem}
-                                mode={inspectorMode}
-                                existingIds={bahamaItems.map((item) => item.id)}
-                                onSave={handleSaveBahamaItem}
-                                onDelete={(item) => {
-                                    void handleDeleteBahamaItem(item);
-                                }}
-                                onCancel={() => {
-                                    setInspectorMode(selectedItem ? 'edit' : 'view');
-                                }}
-                            />
-                            <PendingChangesPanel
-                                inventoryData={inventoryData}
-                                cloudInventoryData={cloudInventoryData}
-                                onCommit={handleCommit}
-                                isSaving={isSaving}
-                            />
+                            <p className="m-0 text-sm text-slate-500">
+                                {inventoryRoute.view === 'list'
+                                    ? `${filteredBahamaItems.length} av ${bahamaItems.length} artiklar`
+                                    : '40 Lagerplatser · 4 Grenställ'}
+                            </p>
                         </div>
+
+                        {inventoryRoute.view === 'list' ? (
+                            <div className="grid min-h-0 grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
+                                <section className="flex min-h-0 flex-col gap-4" aria-label="BaHaMa lagerlista">
+                                    <div className="grid gap-3 rounded-lg border border-white/10 bg-[#10161b] p-3 md:grid-cols-[minmax(220px,1fr)_180px_180px]">
+                                        <input
+                                            type="search"
+                                            value={searchTerm}
+                                            onChange={(event) => setSearchTerm(event.target.value)}
+                                            placeholder="Sök ID, typ, status, storlek, lagerplats eller egenskap"
+                                            aria-label="Sök i BaHaMa-lagret"
+                                            className="rounded-md border border-white/10 bg-[#12191f] px-3 py-2 text-sm text-slate-100 outline-none placeholder:text-slate-600 focus:border-[#e8e1d4] focus-visible:ring-2 focus-visible:ring-[#f0dfc2]"
+                                        />
+                                        <select
+                                            value={statusFilter}
+                                            onChange={(event) => setStatusFilter(event.target.value as 'all' | BahamaInventoryStatus)}
+                                            aria-label="Filtrera på status"
+                                            className="rounded-md border border-white/10 bg-[#12191f] px-3 py-2 text-sm text-slate-100 outline-none focus:border-[#e8e1d4] focus-visible:ring-2 focus-visible:ring-[#f0dfc2]"
+                                        >
+                                            <option value="all">Alla statusar</option>
+                                            {BAHAMA_INVENTORY_STATUSES.map((status) => (
+                                                <option key={status} value={status}>{STATUS_LABELS[status]}</option>
+                                            ))}
+                                        </select>
+                                        <select
+                                            value={sizeFilter}
+                                            onChange={(event) => setSizeFilter(event.target.value)}
+                                            aria-label="Filtrera på storlek"
+                                            className="rounded-md border border-white/10 bg-[#12191f] px-3 py-2 text-sm text-slate-100 outline-none focus:border-[#e8e1d4] focus-visible:ring-2 focus-visible:ring-[#f0dfc2]"
+                                        >
+                                            <option value="all">Alla storlekar</option>
+                                            {sizeOptions.map((size) => (
+                                                <option key={size} value={size}>{size}</option>
+                                            ))}
+                                        </select>
+                                    </div>
+
+                                    <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
+                                        <div className="rounded-lg border border-white/10 bg-[#10161b] p-3">
+                                            <p className="m-0 text-[11px] uppercase text-slate-500">Totalt</p>
+                                            <p className="m-0 mt-1 text-xl font-semibold">{bahamaItems.length}</p>
+                                        </div>
+                                        {BAHAMA_INVENTORY_STATUSES.slice(0, 4).map((status) => (
+                                            <div key={status} className="rounded-lg border border-white/10 bg-[#10161b] p-3">
+                                                <p className="m-0 text-[11px] uppercase text-slate-500">{STATUS_LABELS[status]}</p>
+                                                <p className="m-0 mt-1 text-xl font-semibold">
+                                                    {bahamaItems.filter((item) => item.status === status).length}
+                                                </p>
+                                            </div>
+                                        ))}
+                                    </div>
+
+                                    <InventoryTable
+                                        items={filteredBahamaItems}
+                                        selectedItemId={selectedItem?.id || null}
+                                        onSelect={handleSelectItem}
+                                    />
+                                </section>
+
+                                <div className="grid min-h-0 gap-4 xl:grid-rows-[minmax(0,1fr)_auto]">
+                                    {inventoryInspector}
+                                    {pendingChangesPanel}
+                                </div>
+                            </div>
+                        ) : (
+                            <div className="grid min-h-0 grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1fr)_360px]">
+                                {inventoryRoute.view === 'rack' ? (
+                                    <BahamaRackDetail
+                                        rack={selectedRack}
+                                        selectedItemQrId={selectedBahamaQrId}
+                                        onSelectItem={handleSelectItem}
+                                        onOpenRack={(rack) => navigateInventory('rack', rack)}
+                                        onBackToMap={() => navigateInventory('map')}
+                                    />
+                                ) : (
+                                    <BahamaStorageMap
+                                        grouping={storagePresentation.grouping}
+                                        selectedRack={inventoryRoute.rack}
+                                        onOpenRack={(rack) => navigateInventory('rack', rack)}
+                                    />
+                                )}
+                                <BahamaStorageSidebar
+                                    grouping={storagePresentation.grouping}
+                                    selectedRack={inventoryRoute.rack}
+                                    selectedItemQrId={selectedBahamaQrId}
+                                    onSelectItem={handleSelectItem}
+                                    onOpenRack={(rack) => navigateInventory('rack', rack)}
+                                    showRackDetailAction={inventoryRoute.view === 'map'}
+                                    groupingError={storagePresentation.error}
+                                    inspector={inventoryInspector}
+                                    pendingChanges={pendingChangesPanel}
+                                />
+                            </div>
+                        )}
                     </div>
                 ) : (
                     <div className="min-h-0 flex-1 space-y-4 p-4 md:p-6">

@@ -3,6 +3,7 @@
 import React, { act } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createRoot } from 'react-dom/client';
+import { MemoryRouter, useLocation, useNavigate } from 'react-router-dom';
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -17,6 +18,7 @@ const firebaseMocks = vi.hoisted(() => {
             data: () => ({
                 bahama: [{ ID: 'legacy-1', BESKRIVNING: 'Legacyrad' }],
                 bahamaV2: [{
+                    qrId: '11111111-1111-4111-8111-111111111111',
                     id: 'BA-001',
                     type: 'Parasoll',
                     size: '4x4',
@@ -63,8 +65,16 @@ import { QuoteContext } from '../src/store/QuoteContext';
 import { createInitialQuoteState } from '../src/store/quoteStateSchema';
 
 const mountedRoots = [];
+let navigateForTest = null;
+
+function RouterProbe() {
+    const location = useLocation();
+    navigateForTest = useNavigate();
+    return <output data-testid="inventory-location">{`${location.pathname}${location.search}`}</output>;
+}
 
 const inventoryItem = {
+    qrId: '11111111-1111-4111-8111-111111111111',
     id: 'BA-001',
     type: 'Parasoll',
     size: '4x4',
@@ -101,27 +111,30 @@ async function renderInventoryManager(stateOverrides = {}) {
 
     await act(async () => {
         root.render(
-            <AuthContext.Provider value={{
-                user: { uid: 'admin-1', email: 'admin@example.com' },
-                loading: false,
-                accessLevel: 'full',
-                canViewEverything: true,
-                canStartQuote: true,
-                canAccessSketch: true,
-                canAccessQuoteHistory: true,
-                canExportSketchToQuote: true,
-                login: vi.fn(),
-                logout: vi.fn(),
-                retailer: null,
-                isRetailer: false
-            }}>
-                <QuoteContext.Provider value={{
-                    state: createStateOverrides(stateOverrides),
-                    dispatch
+            <MemoryRouter initialEntries={['/inventory']}>
+                <AuthContext.Provider value={{
+                    user: { uid: 'admin-1', email: 'admin@example.com' },
+                    loading: false,
+                    accessLevel: 'full',
+                    canViewEverything: true,
+                    canStartQuote: true,
+                    canAccessSketch: true,
+                    canAccessQuoteHistory: true,
+                    canExportSketchToQuote: true,
+                    login: vi.fn(),
+                    logout: vi.fn(),
+                    retailer: null,
+                    isRetailer: false
                 }}>
-                    <InventoryManager onBack={() => {}} />
-                </QuoteContext.Provider>
-            </AuthContext.Provider>
+                    <QuoteContext.Provider value={{
+                        state: createStateOverrides(stateOverrides),
+                        dispatch
+                    }}>
+                        <InventoryManager onBack={() => {}} />
+                        <RouterProbe />
+                    </QuoteContext.Provider>
+                </AuthContext.Provider>
+            </MemoryRouter>
         );
         await Promise.resolve();
         await Promise.resolve();
@@ -149,6 +162,7 @@ afterEach(() => {
 });
 
 beforeEach(() => {
+    navigateForTest = null;
     firebaseMocks.batchSet.mockReset();
     firebaseMocks.batchCommit.mockClear();
     notificationMocks.confirmAction.mockReset();
@@ -160,6 +174,45 @@ beforeEach(() => {
 });
 
 describe('InventoryManager BaHaMa V2 workflow', () => {
+    it('uses the URL for Lagerkarta, Lista and Grenställ detail so browser back restores the prior view', async () => {
+        const { container } = await renderInventoryManager();
+        const locationOutput = container.querySelector('[data-testid="inventory-location"]');
+        const listTab = Array.from(container.querySelectorAll('[role="tab"]'))
+            .find((button) => button.textContent === 'Lista');
+
+        expect(locationOutput.textContent).toBe('/inventory');
+        expect(container.textContent).toContain('Lagerkarta');
+
+        await act(async () => {
+            listTab.click();
+            await Promise.resolve();
+        });
+        expect(locationOutput.textContent).toBe('/inventory?view=list');
+        expect(container.querySelector('[aria-label="BaHaMa lagerlista"]')).toBeTruthy();
+
+        await act(async () => {
+            navigateForTest(-1);
+            await Promise.resolve();
+        });
+        expect(locationOutput.textContent).toBe('/inventory');
+
+        const rackButton = Array.from(container.querySelectorAll('button')).find((button) => (
+            button.getAttribute('aria-label') === 'Öppna Grenställ 1, 0/10 platser'
+        ));
+        await act(async () => {
+            rackButton.click();
+            await Promise.resolve();
+        });
+        expect(locationOutput.textContent).toBe('/inventory?view=rack&rack=1');
+        expect(container.textContent).toContain('Till lagerkartan');
+
+        await act(async () => {
+            navigateForTest(-1);
+            await Promise.resolve();
+        });
+        expect(locationOutput.textContent).toBe('/inventory');
+    });
+
     it('uses confirmAction before removing a BaHaMa V2 item', async () => {
         const { container } = await renderInventoryManager();
         const deleteButton = Array.from(container.querySelectorAll('button')).find((button) => (

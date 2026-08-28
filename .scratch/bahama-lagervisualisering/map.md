@@ -30,6 +30,7 @@ En färdig, administratörsbegränsad och webbläsarverifierad lagerkarta i `/in
 - [Välj en kompatibel representation för Lagerplats](issues/02-valj-kompatibel-representation-for-lagerplats.md): Behåller `location` som enda källa med ett kanoniskt 4×5×2-format, förlustfri hantering av äldre värden och explicit platskonflikt.
 - [Godkänn drag-and-drop- och Flytta-interaktionen](issues/03-godkann-flyttinteraktionen.md): Låser väntande och ångringsbara flyttar, 0,6 sekunders Grenställsbyte under drag, bekräftad atomär platsväxling, Ej placerade och det tillgängliga `Flytta`-flödet.
 - [Bygg Lagerplatsmodellen och skyddsräcken](issues/04-bygg-lagerplatsmodellen-och-skyddsracken.md): Inför en testad, ren 4×5×2-domänmodell med kanonisk serialisering, förlustfri Ej placerad-gruppering, explicit platskonflikt och stabil `qrId`-identitet.
+- [Bygg lagerkartan och Grenställsdetaljen](issues/05-bygg-lagerkartan-och-grenstallsdetaljen.md): Levererar URL-styrd Lagerkarta, fyra 5×2-Grenställ, schematisk detalj, Ej placerade/konflikter och återanvänd artikelinspektör med desktop- och mobil-QA.
 
 ## Not yet specified
 
