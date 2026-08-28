@@ -47,3 +47,25 @@ _Avoid_: Quote Save, resave
 **CRM Deal Stage**:
 The sales-lifecycle position of a CRM Deal. Its first CRM Link may advance it from lead to quote; later Quote Saves do not change it, and won or lost transitions remain explicit.
 _Avoid_: Quote status
+
+## Warehouse Language
+
+**Grenställ**:
+Ett fysiskt BaHaMa-lagerställ med fem numrerade Våningar och två Djupplatser per Våning.
+_Avoid_: Rack, hyllställ
+
+**Våning**:
+En av fem vertikala lagernivåer i ett Grenställ, numrerade nedifrån med Våning 1 längst ned.
+_Avoid_: Hylla, nivå
+
+**Djupplats**:
+Den Främre platsen eller Bakre platsen på en Våning där ett enskilt parasoll kan förvaras.
+_Avoid_: Position 1, position 2
+
+**Lagerplats**:
+En exakt fysisk placering som kombinerar Grenställ, Våning och Djupplats.
+_Avoid_: Fritextplats, location
+
+**Ej placerad BaHaMa-artikel**:
+En lagerförd BaHaMa-artikel som saknar en igenkänd Lagerplats i det aktuella fysiska lagret.
+_Avoid_: Dold artikel, borttagen artikel
