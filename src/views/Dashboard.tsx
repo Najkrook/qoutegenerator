@@ -58,6 +58,7 @@ interface DashboardLauncherCardProps {
     badgeBgClass?: string;
     description: string;
     emoji: string;
+    href?: string;
     hoverBorderClass?: string;
     icon?: TablerIcon;
     label: string;
@@ -228,25 +229,23 @@ function DashboardLauncherCard({
     badgeBgClass = 'bg-action/10 text-action border border-action/20',
     description,
     emoji,
+    href,
     hoverBorderClass = 'hover:border-action/60 hover:bg-action/5',
     icon: Icon,
     label,
     onClick
 }: DashboardLauncherCardProps) {
-    return (
-        <button
-            type="button"
-            onClick={onClick}
-            disabled={!onClick}
-            className={[
-                'group grid min-h-36 w-full grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-4',
-                'rounded-panel border border-border bg-surface-raised p-5 text-left text-text shadow-sm',
-                'transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md',
-                hoverBorderClass,
-                'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring',
-                'disabled:cursor-not-allowed disabled:opacity-60 sm:gap-5'
-            ].join(' ')}
-        >
+    const className = [
+        'group grid min-h-36 w-full grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-4',
+        'rounded-panel border border-border bg-surface-raised p-5 text-left text-text shadow-sm',
+        'transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md',
+        hoverBorderClass,
+        'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring',
+        'disabled:cursor-not-allowed disabled:opacity-60 sm:gap-5'
+    ].join(' ');
+
+    const content = (
+        <>
             <div className={`flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl text-2xl shadow-inner transition-transform duration-200 group-hover:scale-110 ${badgeBgClass}`}>
                 <span aria-hidden="true">{emoji}</span>
             </div>
@@ -264,6 +263,30 @@ function DashboardLauncherCard({
                 size={24}
                 stroke={1.8}
             />
+        </>
+    );
+
+    if (href) {
+        return (
+            <a
+                href={href}
+                target="_blank"
+                rel="noopener noreferrer"
+                className={className}
+            >
+                {content}
+            </a>
+        );
+    }
+
+    return (
+        <button
+            type="button"
+            onClick={onClick}
+            disabled={!onClick}
+            className={className}
+        >
+            {content}
         </button>
     );
 }
@@ -460,6 +483,14 @@ export function Dashboard({
                 hoverBorderClass: 'hover:border-purple-500/60 hover:bg-purple-500/5',
                 label: 'Sälj-CRM',
                 onClick: onOpenCrm
+            },
+            {
+                badgeBgClass: 'bg-cyan-500/10 text-cyan-600 dark:bg-cyan-500/20 dark:text-cyan-400 border border-cyan-500/30',
+                description: 'Öppna Masse Kladd i en ny flik.',
+                emoji: '📝',
+                href: 'https://masse-kladd.web.app',
+                hoverBorderClass: 'hover:border-cyan-500/60 hover:bg-cyan-500/5',
+                label: 'Masse Kladd'
             },
             {
                 badgeBgClass: 'bg-emerald-500/10 text-emerald-600 dark:bg-emerald-500/20 dark:text-emerald-400 border border-emerald-500/30',

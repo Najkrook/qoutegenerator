@@ -204,7 +204,7 @@ afterEach(() => {
 });
 
 describe('Dashboard admin workspace', () => {
-    it('renders exactly six launcher tools and calls the matching actions', async () => {
+    it('renders launcher tools and calls the matching actions', async () => {
         const { props } = renderDashboard();
 
         await waitForFeeds();
@@ -212,6 +212,7 @@ describe('Dashboard admin workspace', () => {
         const launchers = [
             ['Skapa ny offert', props.onStartQuote],
             ['Sälj-CRM', props.onOpenCrm],
+            ['Masse Kladd', null],
             ['Lagersaldo', props.onOpenInventory],
             ['Rita uteservering', props.onOpenSketch],
             ['Aktivitetslogg', props.onOpenActivity],
@@ -219,15 +220,23 @@ describe('Dashboard admin workspace', () => {
         ];
 
         launchers.forEach(([name, callback]) => {
-            fireEvent.click(screen.getByRole('button', { name: new RegExp(name, 'i') }));
-            expect(callback).toHaveBeenCalledTimes(1);
+            const launcher = screen.getByRole(name === 'Masse Kladd' ? 'link' : 'button', { name: new RegExp(name, 'i') });
+            if (callback) {
+                fireEvent.click(launcher);
+                expect(callback).toHaveBeenCalledTimes(1);
+            }
         });
 
         const launcherNames = launchers.map(([name]) => name);
-        const renderedLaunchers = screen.getAllByRole('button').filter((button) => (
-            launcherNames.some((name) => button.textContent.includes(name))
+        const renderedLaunchers = screen.getAllByRole('button').concat(screen.getAllByRole('link')).filter((launcher) => (
+            launcherNames.some((name) => launcher.textContent.includes(name))
         ));
-        expect(renderedLaunchers).toHaveLength(6);
+        expect(renderedLaunchers).toHaveLength(7);
+        expect(screen.getByRole('link', { name: /Masse Kladd/i })).toMatchObject({
+            href: 'https://masse-kladd.web.app/',
+            target: '_blank',
+            rel: 'noopener noreferrer'
+        });
         expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1);
         expect(screen.getByRole('heading', { level: 1 }).textContent)
             .toBe('Välkommen till Brixx portal');
