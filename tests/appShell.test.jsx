@@ -94,6 +94,10 @@ describe('AppShell navigation', () => {
         expect(within(adminPrimaryRow).getByRole('link', { name: 'CRM' })).toBeTruthy();
         expect(within(adminSecondaryRow).getByRole('link', { name: 'Lager' })).toBeTruthy();
         expect(within(adminSecondaryRow).getByRole('link', { name: 'Orderförfrågningar' })).toBeTruthy();
+        const masseKladdLink = within(adminSecondaryRow).getByRole('link', { name: 'Masse Kladd' });
+        expect(masseKladdLink.getAttribute('href')).toBe('https://masse-kladd.web.app');
+        expect(masseKladdLink.getAttribute('target')).toBe('_blank');
+        expect(masseKladdLink.getAttribute('rel')).toBe('noopener noreferrer');
         expect(screen.queryByRole('button', { name: 'Mer' })).toBeNull();
         expect(screen.queryByRole('link', { name: 'Mina ordrar' })).toBeNull();
 
@@ -129,6 +133,9 @@ describe('AppShell navigation', () => {
         expect(within(mobileNavigation).getByRole('link', { name: 'Skanna parasoll' }).getAttribute('href')).toBe('/scan');
         const qrLink = within(mobileNavigation).getByRole('link', { name: 'QR-etiketter' });
         expect(qrLink.getAttribute('href')).toBe('/inventory/qr');
+        const mobileMasseKladdLink = within(mobileNavigation).getByRole('link', { name: 'Masse Kladd' });
+        expect(mobileMasseKladdLink.getAttribute('href')).toBe('https://masse-kladd.web.app');
+        expect(mobileMasseKladdLink.getAttribute('target')).toBe('_blank');
 
         fireEvent.click(qrLink);
         expect(screen.getByTestId('location').textContent).toBe('/inventory/qr');
@@ -161,9 +168,10 @@ describe('AppShell navigation', () => {
             'Dokument',
             'Aktiviteter',
             'Lagerloggar',
-            'QR-etiketter'
+            'QR-etiketter',
+            'Masse Kladd'
         ]);
-        expect(secondaryRow.className).toContain('overflow-x-auto');
+        expect(secondaryRow.className).toContain('border-t');
         expect(screen.queryByRole('button', { name: 'Mer' })).toBeNull();
     });
 

@@ -5,6 +5,7 @@ import {
     IconBuildingStore,
     IconCalendarWeek,
     IconClipboardList,
+    IconFileText,
     IconFilePlus,
     IconFiles,
     IconFolder,
@@ -45,6 +46,11 @@ type NavigationItem =
         to: string;
     }
     | {
+        href: string;
+        kind: 'external-link';
+        label: string;
+    }
+    | {
         id: 'new-quote';
         kind: 'action';
         label: string;
@@ -77,7 +83,8 @@ const NAVIGATION_VISUALS: Record<string, NavigationVisual> = {
     [APP_PATHS[APP_ROUTE_IDS.retailerDocuments]]: { icon: IconFolder, colorClassName: 'text-blue-500' },
     [APP_PATHS[APP_ROUTE_IDS.activity]]: { icon: IconActivity, colorClassName: 'text-yellow-500' },
     [APP_PATHS[APP_ROUTE_IDS.inventoryLogs]]: { icon: IconHistory, colorClassName: 'text-slate-400' },
-    [APP_PATHS[APP_ROUTE_IDS.inventoryQr]]: { icon: IconQrcode, colorClassName: 'text-pink-500' }
+    [APP_PATHS[APP_ROUTE_IDS.inventoryQr]]: { icon: IconQrcode, colorClassName: 'text-pink-500' },
+    'masse-kladd': { icon: IconFileText, colorClassName: 'text-cyan-500' }
 };
 
 function getNavigationGroups({
@@ -210,6 +217,11 @@ function getNavigationGroups({
                     kind: 'link',
                     label: 'QR-etiketter',
                     to: APP_PATHS[APP_ROUTE_IDS.inventoryQr]
+                },
+                {
+                    href: 'https://masse-kladd.web.app',
+                    kind: 'external-link',
+                    label: 'Masse Kladd'
                 }
             ]
         });
@@ -267,6 +279,8 @@ export function RoleNavigation({
     const secondaryItems = groups.flatMap((group) => (
         group.items.filter((item) => !primaryItemLabels.has(item.label))
     ));
+    const secondaryInlineItems = secondaryItems.filter((item) => item.kind !== 'external-link');
+    const secondaryExternalItems = secondaryItems.filter((item) => item.kind === 'external-link');
     const location = useLocation();
     const isQuoteRoute = getQuoteRouteStepFromPath(location.pathname) !== null;
     const drawerRef = useRef<HTMLElement | null>(null);
@@ -323,7 +337,9 @@ export function RoleNavigation({
     ) => {
         const visualKey = item.kind === 'action'
             ? item.id
-            : item.to.split(/[?#]/, 1)[0];
+            : item.kind === 'external-link'
+                ? 'masse-kladd'
+                : item.to.split(/[?#]/, 1)[0];
         const visual = NAVIGATION_VISUALS[visualKey];
         const NavigationIcon = visual.icon;
         const icon = (
@@ -351,6 +367,26 @@ export function RoleNavigation({
                     {icon}
                     <span>{item.label}</span>
                 </button>
+            );
+        }
+
+        if (item.kind === 'external-link') {
+            return (
+                <a
+                    key={item.href}
+                    href={item.href}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={() => {
+                        if (surface === 'mobile') {
+                            onCloseMobile();
+                        }
+                    }}
+                    className={linkClasses(false, surface)}
+                >
+                    {icon}
+                    <span>{item.label}</span>
+                </a>
             );
         }
 
@@ -404,9 +440,16 @@ export function RoleNavigation({
                     <div
                         role="group"
                         aria-label="Övriga funktioner"
-                        className="flex min-w-0 items-center gap-1 overflow-x-auto border-t border-border/70 bg-surface/50 px-3 py-1.5 xl:px-5"
+                        className="flex min-w-0 items-center gap-2 border-t border-border/70 bg-surface/50 px-3 py-1.5 xl:px-5"
                     >
-                        {secondaryItems.map((item) => renderItem(item, 'desktop-secondary'))}
+                        <div className="flex min-w-0 flex-1 items-center gap-1 overflow-x-auto">
+                            {secondaryInlineItems.map((item) => renderItem(item, 'desktop-secondary'))}
+                        </div>
+                        {secondaryExternalItems.length > 0 && (
+                            <div className="flex shrink-0 items-center gap-1 border-l border-border/70 pl-2">
+                                {secondaryExternalItems.map((item) => renderItem(item, 'desktop-secondary'))}
+                            </div>
+                        )}
                     </div>
                 )}
             </nav>

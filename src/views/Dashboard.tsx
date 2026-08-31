@@ -485,14 +485,6 @@ export function Dashboard({
                 onClick: onOpenCrm
             },
             {
-                badgeBgClass: 'bg-cyan-500/10 text-cyan-600 dark:bg-cyan-500/20 dark:text-cyan-400 border border-cyan-500/30',
-                description: 'Öppna Masse Kladd i en ny flik.',
-                emoji: '📝',
-                href: 'https://masse-kladd.web.app',
-                hoverBorderClass: 'hover:border-cyan-500/60 hover:bg-cyan-500/5',
-                label: 'Masse Kladd'
-            },
-            {
                 badgeBgClass: 'bg-emerald-500/10 text-emerald-600 dark:bg-emerald-500/20 dark:text-emerald-400 border border-emerald-500/30',
                 description: 'Uppdatera lagersaldon och historik.',
                 emoji: '📦',

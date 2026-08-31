@@ -212,7 +212,6 @@ describe('Dashboard admin workspace', () => {
         const launchers = [
             ['Skapa ny offert', props.onStartQuote],
             ['Sälj-CRM', props.onOpenCrm],
-            ['Masse Kladd', null],
             ['Lagersaldo', props.onOpenInventory],
             ['Rita uteservering', props.onOpenSketch],
             ['Aktivitetslogg', props.onOpenActivity],
@@ -220,7 +219,7 @@ describe('Dashboard admin workspace', () => {
         ];
 
         launchers.forEach(([name, callback]) => {
-            const launcher = screen.getByRole(name === 'Masse Kladd' ? 'link' : 'button', { name: new RegExp(name, 'i') });
+            const launcher = screen.getByRole('button', { name: new RegExp(name, 'i') });
             if (callback) {
                 fireEvent.click(launcher);
                 expect(callback).toHaveBeenCalledTimes(1);
@@ -228,15 +227,11 @@ describe('Dashboard admin workspace', () => {
         });
 
         const launcherNames = launchers.map(([name]) => name);
-        const renderedLaunchers = screen.getAllByRole('button').concat(screen.getAllByRole('link')).filter((launcher) => (
+        const renderedLaunchers = screen.getAllByRole('button').concat(screen.queryAllByRole('link')).filter((launcher) => (
             launcherNames.some((name) => launcher.textContent.includes(name))
         ));
-        expect(renderedLaunchers).toHaveLength(7);
-        expect(screen.getByRole('link', { name: /Masse Kladd/i })).toMatchObject({
-            href: 'https://masse-kladd.web.app/',
-            target: '_blank',
-            rel: 'noopener noreferrer'
-        });
+        expect(renderedLaunchers).toHaveLength(6);
+        expect(screen.queryByRole('link', { name: /Masse Kladd/i })).toBeNull();
         expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1);
         expect(screen.getByRole('heading', { level: 1 }).textContent)
             .toBe('Välkommen till Brixx portal');
