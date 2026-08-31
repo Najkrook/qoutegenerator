@@ -31,6 +31,7 @@ En färdig, administratörsbegränsad och webbläsarverifierad lagerkarta i `/in
 - [Godkänn drag-and-drop- och Flytta-interaktionen](issues/03-godkann-flyttinteraktionen.md): Låser väntande och ångringsbara flyttar, 0,6 sekunders Grenställsbyte under drag, bekräftad atomär platsväxling, Ej placerade och det tillgängliga `Flytta`-flödet.
 - [Bygg Lagerplatsmodellen och skyddsräcken](issues/04-bygg-lagerplatsmodellen-och-skyddsracken.md): Inför en testad, ren 4×5×2-domänmodell med kanonisk serialisering, förlustfri Ej placerad-gruppering, explicit platskonflikt och stabil `qrId`-identitet.
 - [Bygg lagerkartan och Grenställsdetaljen](issues/05-bygg-lagerkartan-och-grenstallsdetaljen.md): Levererar URL-styrd Lagerkarta, fyra 5×2-Grenställ, schematisk detalj, Ej placerade/konflikter och återanvänd artikelinspektör med desktop- och mobil-QA.
+- [Bygg säker och tillgänglig flytt](issues/06-bygg-saker-och-tillganglig-flytt.md): Levererar en atomisk och ångringsbar flyttmotor, dragmål, bekräftad platsväxling, 0,6-sekunders Grenställsbyte samt en gemensam tangentbords- och mobilvänlig Flytta-dialog ovanpå befintlig arbetskopia och save-batch.
 
 ## Not yet specified
 

@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useQuote } from '../store/QuoteContext';
 import { useAuth } from '../store/AuthContext';
@@ -10,8 +10,10 @@ import { PendingChangesPanel } from '../components/features/PendingChangesPanel'
 import {
     BahamaRackDetail,
     BahamaStorageMap,
-    BahamaStorageSidebar
+    BahamaStorageSidebar,
+    type BahamaStorageFocusRequest
 } from '../components/features/BahamaStorageMap';
+import { BahamaMoveDialog } from '../components/features/BahamaMoveDialog';
 import {
     BAHAMA_INVENTORY_STATUSES,
     cloneInventoryData,
@@ -28,10 +30,17 @@ import {
 import { getErrorMessage } from '../utils/runtime';
 import { ensureBahamaQrIds, stageBahamaQrProjectionWrites } from '../services/bahamaQrService';
 import {
+    formatBahamaStorageLocation,
     groupBahamaInventoryByStorageLocation,
     type BahamaRackNumber,
-    type BahamaStorageGrouping
+    type BahamaStorageGrouping,
+    type BahamaStorageLocation
 } from '../services/bahamaStorageLocation';
+import {
+    planBahamaInventoryMove,
+    undoBahamaInventoryMove,
+    type BahamaInventoryMoveChange
+} from '../services/bahamaInventoryMove';
 import {
     getInventoryRouteSearch,
     readInventoryRouteState,
@@ -47,6 +56,12 @@ import type {
 
 type ProductLine = 'bahama' | 'clickitup';
 type InspectorMode = 'view' | 'create' | 'edit';
+
+interface BahamaMoveHistoryEntry {
+    changes: BahamaInventoryMoveChange[];
+    label: string;
+    sourceQrId: string;
+}
 
 interface InventoryViewTabsProps {
     view: InventoryView;
@@ -177,6 +192,12 @@ export function InventoryManager(_props: InventoryManagerProps) {
     const [isSaving, setIsSaving] = useState(false);
     const [isLoading, setIsLoading] = useState(true);
     const [loadError, setLoadError] = useState<string | null>(null);
+    const [draggingBahamaQrId, setDraggingBahamaQrId] = useState<string | null>(null);
+    const [moveDialogQrId, setMoveDialogQrId] = useState<string | null>(null);
+    const [moveHistory, setMoveHistory] = useState<BahamaMoveHistoryEntry[]>([]);
+    const [storageFocusRequest, setStorageFocusRequest] = useState<BahamaStorageFocusRequest | null>(null);
+    const storageFocusSequence = useRef(0);
+    const dropHandledRef = useRef(false);
 
     const inventoryData = useMemo(() => getSafeInventoryData(state.inventoryData), [state.inventoryData]);
     const cloudInventoryData = useMemo(() => getSafeInventoryData(state.cloudInventoryData), [state.cloudInventoryData]);
@@ -185,6 +206,10 @@ export function InventoryManager(_props: InventoryManagerProps) {
     const selectedItem = useMemo(
         () => sortedBahamaItems.find((item) => item.qrId === selectedBahamaQrId) || null,
         [selectedBahamaQrId, sortedBahamaItems]
+    );
+    const moveDialogItem = useMemo(
+        () => sortedBahamaItems.find((item) => item.qrId === moveDialogQrId) || null,
+        [moveDialogQrId, sortedBahamaItems]
     );
     const inventoryRoute = readInventoryRouteState(searchParams);
     const storagePresentation = useMemo(
@@ -238,6 +263,7 @@ export function InventoryManager(_props: InventoryManagerProps) {
 
             dispatch({ type: 'SET_CLOUD_INVENTORY_DATA', payload: cloneInventoryData(loadedInventory) });
             dispatch({ type: 'SET_INVENTORY_DATA', payload: cloneInventoryData(loadedInventory) });
+            setMoveHistory([]);
         } catch (err) {
             console.error('Failed to load Firestore inventory:', err);
             setLoadError(getErrorMessage(err, 'Kunde inte läsa lagersaldot.'));
@@ -248,6 +274,7 @@ export function InventoryManager(_props: InventoryManagerProps) {
                     const localData = normalizeStoredInventoryData(await res.json());
                     dispatch({ type: 'SET_INVENTORY_DATA', payload: cloneInventoryData(localData) });
                     dispatch({ type: 'SET_CLOUD_INVENTORY_DATA', payload: cloneInventoryData(localData) });
+                    setMoveHistory([]);
                     notifyWarn('Laddat lokalt lagersaldo i offline-läge.');
                 }
             } catch (localErr) {
@@ -288,6 +315,11 @@ export function InventoryManager(_props: InventoryManagerProps) {
         setInspectorMode('edit');
     };
 
+    const requestStorageFocus = (qrId: string) => {
+        storageFocusSequence.current += 1;
+        setStorageFocusRequest({ qrId, sequence: storageFocusSequence.current });
+    };
+
     const handleCreateItem = () => {
         setActiveLine('bahama');
         setSelectedBahamaQrId(null);
@@ -312,6 +344,7 @@ export function InventoryManager(_props: InventoryManagerProps) {
             : [...bahamaItems, nextItem];
 
         replaceBahamaItems(nextItems);
+        setMoveHistory([]);
         setSelectedBahamaQrId(nextItem.qrId);
         setInspectorMode('edit');
         notifySuccess(previousId ? 'BaHaMa-artikel uppdaterad' : 'BaHaMa-artikel tillagd');
@@ -328,9 +361,104 @@ export function InventoryManager(_props: InventoryManagerProps) {
         if (!confirmed) return;
 
         replaceBahamaItems(bahamaItems.filter((candidate) => candidate.id !== item.id));
+        setMoveHistory([]);
         setSelectedBahamaQrId(null);
         setInspectorMode('view');
         notifySuccess('BaHaMa-artikel borttagen');
+    };
+
+    const handleStageBahamaMove = async (
+        sourceQrId: string,
+        target: BahamaStorageLocation | null
+    ): Promise<boolean> => {
+        const plan = planBahamaInventoryMove(bahamaItems, sourceQrId, target, {
+            updatedAt: new Date().toISOString(),
+            updatedByUid: getUserUid(user),
+            updatedByEmail: getUserEmail(user)
+        });
+
+        if (plan.status === 'blocked') {
+            notifyError(plan.reason === 'target-conflict'
+                ? 'Platsen har en konflikt och kan inte användas som mål.'
+                : 'Artikeln kunde inte hittas i den lokala arbetskopian.');
+            requestStorageFocus(sourceQrId);
+            return false;
+        }
+
+        if (plan.status === 'noop') {
+            requestStorageFocus(sourceQrId);
+            return true;
+        }
+
+        if (plan.requiresConfirmation && plan.displacedItem) {
+            const targetLabel = target ? formatBahamaStorageLocation(target) : 'Ej placerade';
+            const confirmed = await confirmAction({
+                title: 'Bekräfta platsväxling',
+                message: `${targetLabel} används av ${plan.displacedItem.id}. Byt plats på ${plan.sourceItem?.id || 'artikeln'} och ${plan.displacedItem.id}?`,
+                confirmText: 'Byt plats',
+                cancelText: 'Avbryt',
+                tone: 'neutral'
+            });
+            if (!confirmed) {
+                requestStorageFocus(sourceQrId);
+                return false;
+            }
+        }
+
+        replaceBahamaItems(plan.items);
+        setMoveHistory((history) => [...history, {
+            changes: plan.changes,
+            label: `${plan.sourceItem?.id || 'Artikel'} → ${target ? formatBahamaStorageLocation(target) : 'Ej placerade'}`,
+            sourceQrId
+        }]);
+        setSelectedBahamaQrId(sourceQrId);
+        setInspectorMode('edit');
+        if (target) {
+            navigateInventory('rack', target.rack);
+        }
+        requestStorageFocus(sourceQrId);
+        notifySuccess(plan.kind === 'swap' ? 'Platsväxling lagd i väntande ändringar' : 'Flytt lagd i väntande ändringar');
+        return true;
+    };
+
+    const handleUndoBahamaMove = () => {
+        const latestMove = moveHistory.at(-1);
+        if (!latestMove) {
+            return;
+        }
+        replaceBahamaItems(undoBahamaInventoryMove(bahamaItems, latestMove.changes));
+        setMoveHistory((history) => history.slice(0, -1));
+        setSelectedBahamaQrId(latestMove.sourceQrId);
+        requestStorageFocus(latestMove.sourceQrId);
+        notifySuccess('Senaste flytten ångrades');
+    };
+
+    const handleDragStartItem = (item: BahamaInventoryV2Item, event: React.DragEvent<HTMLElement>) => {
+        dropHandledRef.current = false;
+        event.dataTransfer.effectAllowed = 'move';
+        event.dataTransfer.setData('text/plain', item.qrId);
+        setDraggingBahamaQrId(item.qrId);
+        setSelectedBahamaQrId(item.qrId);
+    };
+
+    const handleDragEndItem = (item: BahamaInventoryV2Item) => {
+        setDraggingBahamaQrId(null);
+        if (dropHandledRef.current) {
+            dropHandledRef.current = false;
+        } else {
+            requestStorageFocus(item.qrId);
+        }
+    };
+
+    const handleDropItem = (sourceQrId: string, target: BahamaStorageLocation | null) => {
+        dropHandledRef.current = true;
+        setDraggingBahamaQrId(null);
+        void handleStageBahamaMove(sourceQrId, target);
+    };
+
+    const handleOpenMoveDialog = (item: BahamaInventoryV2Item) => {
+        handleSelectItem(item);
+        setMoveDialogQrId(item.qrId);
     };
 
     const handleUpdateStock = (size: string, field: ClickitupFieldKey, delta: number) => {
@@ -471,6 +599,7 @@ export function InventoryManager(_props: InventoryManagerProps) {
             await batch.commit();
             dispatch({ type: 'SET_CLOUD_INVENTORY_DATA', payload: cloneInventoryData(inventoryToSave) });
             dispatch({ type: 'SET_INVENTORY_DATA', payload: cloneInventoryData(inventoryToSave) });
+            setMoveHistory([]);
             notifySuccess('Ändringar sparade till molnet!');
         } catch (err) {
             console.error('Failed to commit:', err);
@@ -496,12 +625,27 @@ export function InventoryManager(_props: InventoryManagerProps) {
     );
 
     const pendingChangesPanel = (
-        <PendingChangesPanel
-            inventoryData={inventoryData}
-            cloudInventoryData={cloudInventoryData}
-            onCommit={handleCommit}
-            isSaving={isSaving}
-        />
+        <div className="space-y-4">
+            {moveHistory.length > 0 ? (
+                <section aria-label="Ångra lagerflytt" className="rounded-xl border border-[#d9bd91]/30 bg-[#d9bd91]/10 p-4">
+                    <p className="m-0 text-xs font-semibold uppercase tracking-wide text-[#d9bd91]">Senaste flytt</p>
+                    <p className="m-0 mt-1 text-sm text-slate-200">{moveHistory.at(-1)?.label}</p>
+                    <button
+                        type="button"
+                        onClick={handleUndoBahamaMove}
+                        className="mt-3 rounded-md border border-[#d9bd91]/40 px-3 py-2 text-sm font-semibold text-[#f0dfc2] outline-none hover:bg-[#d9bd91]/10 focus-visible:ring-2 focus-visible:ring-[#f0dfc2]"
+                    >
+                        Ångra senaste flytten
+                    </button>
+                </section>
+            ) : null}
+            <PendingChangesPanel
+                inventoryData={inventoryData}
+                cloudInventoryData={cloudInventoryData}
+                onCommit={handleCommit}
+                isSaving={isSaving}
+            />
+        </div>
     );
 
     if (isLoading) {
@@ -693,6 +837,12 @@ export function InventoryManager(_props: InventoryManagerProps) {
                                         onSelectItem={handleSelectItem}
                                         onOpenRack={(rack) => navigateInventory('rack', rack)}
                                         onBackToMap={() => navigateInventory('map')}
+                                        draggingItemQrId={draggingBahamaQrId}
+                                        focusRequest={storageFocusRequest}
+                                        onDragStartItem={handleDragStartItem}
+                                        onDragEndItem={handleDragEndItem}
+                                        onDropItem={handleDropItem}
+                                        onOpenMoveDialog={handleOpenMoveDialog}
                                     />
                                 ) : (
                                     <BahamaStorageMap
@@ -711,6 +861,12 @@ export function InventoryManager(_props: InventoryManagerProps) {
                                     groupingError={storagePresentation.error}
                                     inspector={inventoryInspector}
                                     pendingChanges={pendingChangesPanel}
+                                    draggingItemQrId={draggingBahamaQrId}
+                                    focusRequest={storageFocusRequest}
+                                    onDragStartItem={handleDragStartItem}
+                                    onDragEndItem={handleDragEndItem}
+                                    onDropItem={handleDropItem}
+                                    onOpenMoveDialog={handleOpenMoveDialog}
                                 />
                             </div>
                         )}
@@ -750,6 +906,15 @@ export function InventoryManager(_props: InventoryManagerProps) {
                     </div>
                 )}
             </div>
+            {moveDialogItem ? (
+                <BahamaMoveDialog
+                    grouping={storagePresentation.grouping}
+                    initialRack={inventoryRoute.rack}
+                    item={moveDialogItem}
+                    onClose={() => setMoveDialogQrId(null)}
+                    onMove={(target) => handleStageBahamaMove(moveDialogItem.qrId, target)}
+                />
+            ) : null}
         </div>
     );
 }

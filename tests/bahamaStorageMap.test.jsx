@@ -185,4 +185,97 @@ describe('BaHaMa Lagerkarta', () => {
         fireEvent.click(screen.getByRole('button', { name: 'Välj ej placerad artikel BA-unplaced' }));
         expect(screen.getByTestId('article-inspector').textContent).toBe('BA-unplaced');
     });
+
+    it('exposes drag targets, the Flytta alternative and restores focus to the moved article', () => {
+        const placed = inventoryItem('placed', location(1, 2, 'back'));
+        const unplaced = inventoryItem('unplaced', 'Äldre fritextplats');
+        const grouping = groupBahamaInventoryByStorageLocation([placed, unplaced]);
+        const onDropItem = vi.fn();
+        const onOpenMoveDialog = vi.fn();
+        const onDragStartItem = vi.fn();
+        const dataTransfer = { dropEffect: 'none', effectAllowed: 'none', setData: vi.fn() };
+        const { rerender } = render(
+            <div>
+                <BahamaRackDetail
+                    rack={grouping.racks[0]}
+                    selectedItemQrId={placed.qrId}
+                    onSelectItem={() => {}}
+                    onOpenRack={() => {}}
+                    onBackToMap={() => {}}
+                    draggingItemQrId={placed.qrId}
+                    onDragStartItem={onDragStartItem}
+                    onDropItem={onDropItem}
+                    onOpenMoveDialog={onOpenMoveDialog}
+                />
+                <BahamaStorageSidebar
+                    grouping={grouping}
+                    selectedRack={1}
+                    selectedItemQrId={placed.qrId}
+                    onSelectItem={() => {}}
+                    onOpenRack={() => {}}
+                    draggingItemQrId={placed.qrId}
+                    onDragStartItem={onDragStartItem}
+                    onDropItem={onDropItem}
+                    onOpenMoveDialog={onOpenMoveDialog}
+                />
+            </div>
+        );
+
+        const placedButton = screen.getByRole('button', { name: /Välj BA-placed/ });
+        expect(placedButton.getAttribute('draggable')).toBe('true');
+        fireEvent.dragStart(placedButton, { dataTransfer });
+        expect(onDragStartItem).toHaveBeenCalledWith(placed, expect.objectContaining({ dataTransfer }));
+
+        const emptyTarget = document.querySelector('[data-storage-drop-target="Grenställ 1 våning 5 främre plats"]');
+        fireEvent.dragOver(emptyTarget, { dataTransfer });
+        fireEvent.drop(emptyTarget, { dataTransfer });
+        expect(dataTransfer.dropEffect).toBe('move');
+        expect(onDropItem).toHaveBeenCalledWith(placed.qrId, { rack: 1, floor: 5, depth: 'front' });
+
+        const unplacedTarget = document.querySelector('[data-storage-drop-target="unplaced"]');
+        fireEvent.drop(unplacedTarget, { dataTransfer });
+        expect(onDropItem).toHaveBeenCalledWith(placed.qrId, null);
+
+        fireEvent.click(screen.getByRole('button', { name: 'Flytta BA-placed' }));
+        expect(onOpenMoveDialog).toHaveBeenCalledWith(placed);
+
+        rerender(
+            <BahamaRackDetail
+                rack={grouping.racks[0]}
+                selectedItemQrId={placed.qrId}
+                onSelectItem={() => {}}
+                onOpenRack={() => {}}
+                onBackToMap={() => {}}
+                focusRequest={{ qrId: placed.qrId, sequence: 1 }}
+            />
+        );
+        expect(document.activeElement).toBe(screen.getByRole('button', { name: /Välj BA-placed/ }));
+    });
+
+    it('opens another Grenställ after a 600 ms drag hover', () => {
+        vi.useFakeTimers();
+        try {
+            const placed = inventoryItem('placed', location(1, 2, 'back'));
+            const grouping = groupBahamaInventoryByStorageLocation([placed]);
+            const onOpenRack = vi.fn();
+            render(
+                <BahamaRackDetail
+                    rack={grouping.racks[0]}
+                    selectedItemQrId={placed.qrId}
+                    onSelectItem={() => {}}
+                    onOpenRack={onOpenRack}
+                    onBackToMap={() => {}}
+                    draggingItemQrId={placed.qrId}
+                />
+            );
+
+            fireEvent.dragEnter(screen.getByRole('button', { name: 'Visa Grenställ 3' }));
+            vi.advanceTimersByTime(599);
+            expect(onOpenRack).not.toHaveBeenCalled();
+            vi.advanceTimersByTime(1);
+            expect(onOpenRack).toHaveBeenCalledWith(3);
+        } finally {
+            vi.useRealTimers();
+        }
+    });
 });

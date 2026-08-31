@@ -1,7 +1,8 @@
-import React, { useMemo } from 'react';
+import React, { useEffect, useMemo, useRef } from 'react';
 import {
     IconAlertTriangle,
     IconArrowLeft,
+    IconArrowsMove,
     IconChevronRight,
     IconPackage,
     IconStack2
@@ -9,6 +10,7 @@ import {
 import type {
     BahamaRackNumber,
     BahamaStorageGrouping,
+    BahamaStorageLocation,
     BahamaStorageRackGroup,
     BahamaStorageSlot
 } from '../../services/bahamaStorageLocation';
@@ -45,6 +47,20 @@ const RACK_POSITIONS: Record<BahamaRackNumber, string> = {
     3: 'lg:col-start-3 lg:row-start-2',
     4: 'lg:col-start-1 lg:row-start-2'
 };
+
+export interface BahamaStorageFocusRequest {
+    qrId: string;
+    sequence: number;
+}
+
+interface BahamaStorageMoveProps {
+    draggingItemQrId?: string | null;
+    focusRequest?: BahamaStorageFocusRequest | null;
+    onDragEndItem?: (item: BahamaInventoryV2Item) => void;
+    onDragStartItem?: (item: BahamaInventoryV2Item, event: React.DragEvent<HTMLElement>) => void;
+    onDropItem?: (sourceQrId: string, target: BahamaStorageLocation | null) => void;
+    onOpenMoveDialog?: (item: BahamaInventoryV2Item) => void;
+}
 
 function slotIndicatorClass(slot: BahamaStorageSlot): string {
     if (slot.status === 'conflict') {
@@ -176,13 +192,26 @@ export function BahamaStorageMap({
 function StorageSlotButton({
     slot,
     selected,
-    onSelectItem
+    onSelectItem,
+    draggingItemQrId,
+    focusRequest,
+    onDragEndItem,
+    onDragStartItem,
+    onDropItem,
+    onOpenMoveDialog
 }: {
     slot: BahamaStorageSlot;
     selected: boolean;
     onSelectItem: (item: BahamaInventoryV2Item) => void;
-}) {
+} & BahamaStorageMoveProps) {
     const depthLabel = slot.location.depth === 'front' ? 'Främre' : 'Bakre';
+    const itemButtonRef = useRef<HTMLButtonElement | null>(null);
+
+    useEffect(() => {
+        if (slot.item?.qrId === focusRequest?.qrId) {
+            itemButtonRef.current?.focus();
+        }
+    }, [focusRequest, slot.item?.qrId]);
 
     if (slot.status === 'conflict') {
         return (
@@ -202,28 +231,73 @@ function StorageSlotButton({
         return (
             <div
                 aria-label={`Tom plats, Våning ${slot.location.floor}, ${depthLabel}`}
-                className="flex min-h-20 items-center justify-center rounded-lg border border-dashed border-white/20 bg-black/10 text-sm text-slate-500"
+                data-storage-drop-target={slot.canonicalLocation}
+                onDragOver={(event) => {
+                    if (draggingItemQrId && onDropItem) {
+                        event.preventDefault();
+                        event.dataTransfer.dropEffect = 'move';
+                    }
+                }}
+                onDrop={(event) => {
+                    event.preventDefault();
+                    if (draggingItemQrId && onDropItem) {
+                        onDropItem(draggingItemQrId, slot.location);
+                    }
+                }}
+                className={`flex min-h-20 items-center justify-center rounded-lg border border-dashed bg-black/10 text-sm transition ${draggingItemQrId ? 'border-[#e8d5b5]/70 text-[#e8d5b5]' : 'border-white/20 text-slate-500'}`}
             >
-                Tom plats
+                {draggingItemQrId ? 'Släpp här' : 'Tom plats'}
             </div>
         );
     }
 
     const item = slot.item;
     return (
-        <button
-            type="button"
-            onClick={() => onSelectItem(item)}
-            aria-label={`Välj ${item.id}, ${getBahamaTubeLabel(item)}, ${STATUS_LABELS[item.status]}, Våning ${slot.location.floor}, ${depthLabel}`}
-            aria-pressed={selected}
-            className={`relative min-h-20 overflow-hidden rounded-lg border px-4 py-3 text-left text-[#19140e] outline-none transition hover:brightness-110 focus-visible:ring-2 focus-visible:ring-[#f0dfc2] focus-visible:ring-offset-2 focus-visible:ring-offset-[#0d1419] ${selected ? 'border-[#f7e4c4] ring-2 ring-[#f7e4c4]' : 'border-[#8f6b43]'} bg-[linear-gradient(180deg,#c99a62_0%,#a97842_52%,#81582f_100%)] shadow-[inset_0_1px_0_rgba(255,255,255,0.28),0_8px_20px_rgba(0,0,0,0.24)]`}
+        <div
+            onDragOver={(event) => {
+                if (draggingItemQrId && onDropItem) {
+                    event.preventDefault();
+                    event.dataTransfer.dropEffect = 'move';
+                }
+            }}
+            onDrop={(event) => {
+                event.preventDefault();
+                if (draggingItemQrId && onDropItem) {
+                    onDropItem(draggingItemQrId, slot.location);
+                }
+            }}
+            className={`relative flex min-h-20 overflow-hidden rounded-lg border text-[#19140e] transition ${selected ? 'border-[#f7e4c4] ring-2 ring-[#f7e4c4]' : 'border-[#8f6b43]'} ${draggingItemQrId === item.qrId ? 'opacity-45' : ''} bg-[linear-gradient(180deg,#c99a62_0%,#a97842_52%,#81582f_100%)] shadow-[inset_0_1px_0_rgba(255,255,255,0.28),0_8px_20px_rgba(0,0,0,0.24)]`}
         >
-            <span className="block text-sm font-bold sm:text-base">{getBahamaTubeLabel(item)}</span>
-            <span className="mt-2 flex items-center gap-2 text-xs font-medium">
-                <span className={`h-2.5 w-2.5 rounded-full ${STATUS_DOT_CLASSES[item.status]}`} aria-hidden="true" />
-                {STATUS_LABELS[item.status]}
-            </span>
-        </button>
+            <button
+                ref={itemButtonRef}
+                type="button"
+                draggable={Boolean(onDragStartItem)}
+                onDragStart={(event) => onDragStartItem?.(item, event)}
+                onDragEnd={() => onDragEndItem?.(item)}
+                data-storage-item-qr-id={item.qrId}
+                onClick={() => onSelectItem(item)}
+                aria-label={`Välj ${item.id}, ${getBahamaTubeLabel(item)}, ${STATUS_LABELS[item.status]}, Våning ${slot.location.floor}, ${depthLabel}`}
+                aria-pressed={selected}
+                className="min-w-0 flex-1 px-4 py-3 text-left outline-none transition hover:brightness-110 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#f0dfc2]"
+            >
+                <span className="block text-sm font-bold sm:text-base">{getBahamaTubeLabel(item)}</span>
+                <span className="mt-2 flex items-center gap-2 text-xs font-medium">
+                    <span className={`h-2.5 w-2.5 rounded-full ${STATUS_DOT_CLASSES[item.status]}`} aria-hidden="true" />
+                    {STATUS_LABELS[item.status]}
+                </span>
+            </button>
+            {onOpenMoveDialog ? (
+                <button
+                    type="button"
+                    onClick={() => onOpenMoveDialog(item)}
+                    aria-label={`Flytta ${item.id}`}
+                    className="flex w-14 shrink-0 flex-col items-center justify-center gap-1 border-l border-black/20 bg-black/10 px-1 text-[10px] font-bold outline-none hover:bg-white/10 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#f0dfc2]"
+                >
+                    <IconArrowsMove size={17} aria-hidden="true" />
+                    Flytta
+                </button>
+            ) : null}
+        </div>
     );
 }
 
@@ -232,14 +306,45 @@ export function BahamaRackDetail({
     selectedItemQrId,
     onSelectItem,
     onOpenRack,
-    onBackToMap
+    onBackToMap,
+    draggingItemQrId,
+    focusRequest,
+    onDragEndItem,
+    onDragStartItem,
+    onDropItem,
+    onOpenMoveDialog
 }: {
     rack: BahamaStorageRackGroup;
     selectedItemQrId: string | null;
     onSelectItem: (item: BahamaInventoryV2Item) => void;
     onOpenRack: (rack: BahamaRackNumber) => void;
     onBackToMap: () => void;
-}) {
+} & BahamaStorageMoveProps) {
+    const rackHoverTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+    useEffect(() => () => {
+        if (rackHoverTimerRef.current) {
+            clearTimeout(rackHoverTimerRef.current);
+        }
+    }, []);
+
+    const scheduleRackOpen = (rackNumber: BahamaRackNumber) => {
+        if (!draggingItemQrId || rackNumber === rack.rack) {
+            return;
+        }
+        if (rackHoverTimerRef.current) {
+            clearTimeout(rackHoverTimerRef.current);
+        }
+        rackHoverTimerRef.current = setTimeout(() => onOpenRack(rackNumber), 600);
+    };
+
+    const cancelRackOpen = () => {
+        if (rackHoverTimerRef.current) {
+            clearTimeout(rackHoverTimerRef.current);
+            rackHoverTimerRef.current = null;
+        }
+    };
+
     return (
         <section aria-labelledby="rack-detail-title" className="min-w-0">
             <button
@@ -266,6 +371,8 @@ export function BahamaRackDetail({
                             key={rackNumber}
                             type="button"
                             onClick={() => onOpenRack(rackNumber)}
+                            onDragEnter={() => scheduleRackOpen(rackNumber)}
+                            onDragLeave={cancelRackOpen}
                             aria-label={`Visa Grenställ ${rackNumber}`}
                             aria-pressed={rackNumber === rack.rack}
                             className={`h-11 w-12 border-r border-white/10 text-sm font-semibold outline-none last:border-r-0 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#f0dfc2] ${rackNumber === rack.rack ? 'bg-[#ead9bc] text-[#15120f]' : 'bg-[#11181d] text-slate-300 hover:bg-white/5'}`}
@@ -296,6 +403,12 @@ export function BahamaRackDetail({
                                         slot={slot}
                                         selected={slot.item?.qrId === selectedItemQrId}
                                         onSelectItem={onSelectItem}
+                                        draggingItemQrId={draggingItemQrId}
+                                        focusRequest={focusRequest}
+                                        onDragEndItem={onDragEndItem}
+                                        onDragStartItem={onDragStartItem}
+                                        onDropItem={onDropItem}
+                                        onOpenMoveDialog={onOpenMoveDialog}
                                     />
                                 ))}
                             </React.Fragment>
@@ -304,6 +417,72 @@ export function BahamaRackDetail({
                 </div>
             </div>
         </section>
+    );
+}
+
+function UnplacedItemRow({
+    item,
+    conflictLocation,
+    selected,
+    draggingItemQrId,
+    focusRequest,
+    onDragEndItem,
+    onDragStartItem,
+    onOpenMoveDialog,
+    onSelectItem
+}: {
+    item: BahamaInventoryV2Item;
+    conflictLocation?: string;
+    selected: boolean;
+    onSelectItem: (item: BahamaInventoryV2Item) => void;
+} & Omit<BahamaStorageMoveProps, 'onDropItem'>) {
+    const itemButtonRef = useRef<HTMLButtonElement | null>(null);
+
+    useEffect(() => {
+        if (focusRequest?.qrId === item.qrId) {
+            itemButtonRef.current?.focus();
+        }
+    }, [focusRequest, item.qrId]);
+
+    return (
+        <li
+            className={`flex list-none ${draggingItemQrId === item.qrId ? 'opacity-45' : ''}`}
+        >
+            <button
+                ref={itemButtonRef}
+                type="button"
+                draggable={Boolean(onDragStartItem)}
+                onDragStart={(event) => onDragStartItem?.(item, event)}
+                onDragEnd={() => onDragEndItem?.(item)}
+                data-storage-item-qr-id={item.qrId}
+                onClick={() => onSelectItem(item)}
+                aria-label={`Välj ej placerad artikel ${item.id}${conflictLocation ? `, Platskonflikt på ${conflictLocation}` : ''}`}
+                aria-pressed={selected}
+                className={`flex min-w-0 flex-1 items-start gap-3 px-4 py-3 text-left outline-none transition hover:bg-white/[0.04] focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#f0dfc2] ${selected ? 'bg-white/[0.07]' : ''}`}
+            >
+                <IconPackage className="mt-0.5 shrink-0 text-[#d9bd91]" size={18} aria-hidden="true" />
+                <span className="min-w-0 flex-1">
+                    <span className="block truncate text-sm font-semibold text-slate-100">{item.id}</span>
+                    <span className="mt-0.5 block truncate text-xs text-slate-400">{getBahamaTubeLabel(item)}</span>
+                    {conflictLocation ? (
+                        <span className="mt-1 block text-xs font-semibold text-rose-200">Platskonflikt · {conflictLocation}</span>
+                    ) : item.location.trim() ? (
+                        <span className="mt-1 block truncate text-xs text-amber-200">Tidigare: {item.location}</span>
+                    ) : null}
+                </span>
+            </button>
+            {onOpenMoveDialog ? (
+                <button
+                    type="button"
+                    onClick={() => onOpenMoveDialog(item)}
+                    aria-label={`Flytta ${item.id}`}
+                    className="flex w-16 shrink-0 flex-col items-center justify-center gap-1 border-l border-white/[0.07] text-[10px] font-semibold text-[#d9bd91] outline-none hover:bg-white/[0.04] focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#f0dfc2]"
+                >
+                    <IconArrowsMove size={17} aria-hidden="true" />
+                    Flytta
+                </button>
+            ) : null}
+        </li>
     );
 }
 
@@ -316,7 +495,13 @@ export function BahamaStorageSidebar({
     showRackDetailAction = false,
     groupingError,
     inspector,
-    pendingChanges
+    pendingChanges,
+    draggingItemQrId,
+    focusRequest,
+    onDragEndItem,
+    onDragStartItem,
+    onDropItem,
+    onOpenMoveDialog
 }: {
     grouping: BahamaStorageGrouping;
     selectedRack: BahamaRackNumber;
@@ -327,7 +512,7 @@ export function BahamaStorageSidebar({
     groupingError?: string | null;
     inspector?: React.ReactNode;
     pendingChanges?: React.ReactNode;
-}) {
+} & BahamaStorageMoveProps) {
     const rack = grouping.racks.find((candidate) => candidate.rack === selectedRack) || grouping.racks[0];
     const conflictLocationsByQrId = useMemo(() => {
         const result = new Map<string, string>();
@@ -378,7 +563,23 @@ export function BahamaStorageSidebar({
                 ) : null}
             </section>
 
-            <section aria-labelledby="unplaced-title" className="rounded-xl border border-white/10 bg-[#10171c]">
+            <section
+                aria-labelledby="unplaced-title"
+                data-storage-drop-target="unplaced"
+                onDragOver={(event) => {
+                    if (draggingItemQrId && onDropItem) {
+                        event.preventDefault();
+                        event.dataTransfer.dropEffect = 'move';
+                    }
+                }}
+                onDrop={(event) => {
+                    event.preventDefault();
+                    if (draggingItemQrId && onDropItem) {
+                        onDropItem(draggingItemQrId, null);
+                    }
+                }}
+                className={`rounded-xl border bg-[#10171c] transition ${draggingItemQrId ? 'border-[#e8d5b5]/70' : 'border-white/10'}`}
+            >
                 <div className="flex items-center justify-between border-b border-white/10 px-4 py-3">
                     <h3 id="unplaced-title" className="m-0 text-base font-semibold text-slate-50">Ej placerade</h3>
                     <span className="rounded-full bg-white/10 px-2 py-0.5 text-xs font-semibold text-slate-200">
@@ -399,26 +600,18 @@ export function BahamaStorageSidebar({
                         {grouping.unplacedItems.map((item) => {
                             const conflictLocation = conflictLocationsByQrId.get(item.qrId);
                             return (
-                                <li key={item.qrId || item.id} className="list-none">
-                                    <button
-                                        type="button"
-                                        onClick={() => onSelectItem(item)}
-                                        aria-label={`Välj ej placerad artikel ${item.id}${conflictLocation ? `, Platskonflikt på ${conflictLocation}` : ''}`}
-                                        aria-pressed={selectedItemQrId === item.qrId}
-                                        className={`flex w-full items-start gap-3 px-4 py-3 text-left outline-none transition hover:bg-white/[0.04] focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#f0dfc2] ${selectedItemQrId === item.qrId ? 'bg-white/[0.07]' : ''}`}
-                                    >
-                                        <IconPackage className="mt-0.5 shrink-0 text-[#d9bd91]" size={18} aria-hidden="true" />
-                                        <span className="min-w-0 flex-1">
-                                            <span className="block truncate text-sm font-semibold text-slate-100">{item.id}</span>
-                                            <span className="mt-0.5 block truncate text-xs text-slate-400">{getBahamaTubeLabel(item)}</span>
-                                            {conflictLocation ? (
-                                                <span className="mt-1 block text-xs font-semibold text-rose-200">Platskonflikt · {conflictLocation}</span>
-                                            ) : item.location.trim() ? (
-                                                <span className="mt-1 block truncate text-xs text-amber-200">Tidigare: {item.location}</span>
-                                            ) : null}
-                                        </span>
-                                    </button>
-                                </li>
+                                <UnplacedItemRow
+                                    key={item.qrId || item.id}
+                                    item={item}
+                                    conflictLocation={conflictLocation}
+                                    selected={selectedItemQrId === item.qrId}
+                                    draggingItemQrId={draggingItemQrId}
+                                    focusRequest={focusRequest}
+                                    onDragStartItem={onDragStartItem}
+                                    onDragEndItem={onDragEndItem}
+                                    onOpenMoveDialog={onOpenMoveDialog}
+                                    onSelectItem={onSelectItem}
+                                />
                             );
                         })}
                     </ul>
