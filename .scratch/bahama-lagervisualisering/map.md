@@ -32,10 +32,11 @@ En färdig, administratörsbegränsad och webbläsarverifierad lagerkarta i `/in
 - [Bygg Lagerplatsmodellen och skyddsräcken](issues/04-bygg-lagerplatsmodellen-och-skyddsracken.md): Inför en testad, ren 4×5×2-domänmodell med kanonisk serialisering, förlustfri Ej placerad-gruppering, explicit platskonflikt och stabil `qrId`-identitet.
 - [Bygg lagerkartan och Grenställsdetaljen](issues/05-bygg-lagerkartan-och-grenstallsdetaljen.md): Levererar URL-styrd Lagerkarta, fyra 5×2-Grenställ, schematisk detalj, Ej placerade/konflikter och återanvänd artikelinspektör med desktop- och mobil-QA.
 - [Bygg säker och tillgänglig flytt](issues/06-bygg-saker-och-tillganglig-flytt.md): Levererar en atomisk och ångringsbar flyttmotor, dragmål, bekräftad platsväxling, 0,6-sekunders Grenställsbyte samt en gemensam tangentbords- och mobilvänlig Flytta-dialog ovanpå befintlig arbetskopia och save-batch.
+- [Verifiera hela lagerupplevelsen](issues/07-verifiera-hela-lagerupplevelsen.md): Slutgodkänner den testade desktop- och mobilupplevelsen på befintligt verifieringsunderlag, med automatiserad HTML5-draggest noterad som accepterad kvarvarande risk.
 
 ## Not yet specified
 
-- Browser-QA kan avslöja specifika fidelity- eller interaktionsproblem som ska bli nya tickets först när de är konkreta.
+- Inget återstår att specificera inom denna karta.
 
 ## Out of scope
 
