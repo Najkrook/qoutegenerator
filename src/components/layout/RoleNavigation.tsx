@@ -11,6 +11,7 @@ import {
     IconFolder,
     IconHistory,
     IconHome2,
+    IconListSearch,
     IconPackage,
     IconPencil,
     IconQrcode,
@@ -71,6 +72,7 @@ interface NavigationVisual {
 const NAVIGATION_VISUALS: Record<string, NavigationVisual> = {
     'new-quote': { icon: IconFilePlus, colorClassName: 'text-emerald-500' },
     [APP_PATHS[APP_ROUTE_IDS.dashboard]]: { icon: IconHome2, colorClassName: 'text-sky-500' },
+    [APP_PATHS[APP_ROUTE_IDS.priceList]]: { icon: IconListSearch, colorClassName: 'text-cyan-500' },
     [APP_PATHS[APP_ROUTE_IDS.quotes]]: { icon: IconFiles, colorClassName: 'text-violet-500' },
     [APP_PATHS[APP_ROUTE_IDS.crmDashboard]]: { icon: IconBriefcase, colorClassName: 'text-amber-500' },
     [APP_PATHS[APP_ROUTE_IDS.retailerOrders]]: { icon: IconClipboardList, colorClassName: 'text-rose-500' },
@@ -114,6 +116,11 @@ function getNavigationGroups({
             id: 'new-quote',
             kind: 'action',
             label: 'Ny offert'
+        });
+        salesItems.push({
+            kind: 'link',
+            label: 'Prislista',
+            to: APP_PATHS[APP_ROUTE_IDS.priceList]
         });
     }
     if (canAccessQuoteHistory) {
@@ -231,7 +238,7 @@ function getNavigationGroups({
 }
 
 function getPrimaryItemLabels(): Set<string> {
-    return new Set(['Hem', 'Ny offert', 'Offerter', 'CRM']);
+    return new Set(['Hem', 'Ny offert', 'Prislista', 'Offerter', 'CRM']);
 }
 
 function linkClasses(isActive: boolean, surface: NavigationSurface): string {

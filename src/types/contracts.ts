@@ -1228,6 +1228,7 @@ export interface DashboardProps {
     onOpenSketch?: () => void;
     onOpenActivity?: () => void;
     onOpenRetailerOrders?: () => void;
+    onOpenPriceList?: () => void;
     quoteDraftSummary?: DashboardQuoteDraftSummary | null;
 }
 

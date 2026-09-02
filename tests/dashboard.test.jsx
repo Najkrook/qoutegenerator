@@ -139,6 +139,7 @@ function createDashboardProps(overrides = {}) {
         onOpenSketch: vi.fn(),
         onOpenActivity: vi.fn(),
         onOpenPlanner: vi.fn(),
+        onOpenPriceList: vi.fn(),
         onOpenRetailerOrders: vi.fn(),
         ...overrides
     };
@@ -204,13 +205,14 @@ afterEach(() => {
 });
 
 describe('Dashboard admin workspace', () => {
-    it('renders launcher tools and calls the matching actions', async () => {
+    it('renders exactly seven launcher tools and calls the matching actions', async () => {
         const { props } = renderDashboard();
 
         await waitForFeeds();
 
         const launchers = [
             ['Skapa ny offert', props.onStartQuote],
+            ['Prislista', props.onOpenPriceList],
             ['Sälj-CRM', props.onOpenCrm],
             ['Lagersaldo', props.onOpenInventory],
             ['Rita uteservering', props.onOpenSketch],
@@ -230,7 +232,7 @@ describe('Dashboard admin workspace', () => {
         const renderedLaunchers = screen.getAllByRole('button').concat(screen.queryAllByRole('link')).filter((launcher) => (
             launcherNames.some((name) => launcher.textContent.includes(name))
         ));
-        expect(renderedLaunchers).toHaveLength(6);
+        expect(renderedLaunchers).toHaveLength(7);
         expect(screen.queryByRole('link', { name: /Masse Kladd/i })).toBeNull();
         expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1);
         expect(screen.getByRole('heading', { level: 1 }).textContent)

@@ -58,6 +58,9 @@ export function useAppNavigation() {
         goToHistory(options?: NavigateOptions) {
             navigate(APP_PATHS[APP_ROUTE_IDS.quotes], options);
         },
+        goToPriceList(options?: NavigateOptions) {
+            navigate(APP_PATHS[APP_ROUTE_IDS.priceList], options);
+        },
         goToInventory(options?: NavigateOptions) {
             navigate(APP_PATHS[APP_ROUTE_IDS.inventory], options);
         },

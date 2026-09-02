@@ -72,6 +72,7 @@ describe('AppShell navigation', () => {
         renderHeader();
 
         expect(screen.getByRole('button', { name: 'Ny offert' })).toBeTruthy();
+        expect(screen.getByRole('link', { name: 'Prislista' }).getAttribute('href')).toBe('/price-list');
         expect(screen.getByRole('link', { name: 'Offerter' })).toBeTruthy();
         expect(screen.queryByRole('button', { name: 'Mer' })).toBeNull();
         expect(screen.queryByRole('link', { name: 'CRM' })).toBeNull();
@@ -114,6 +115,7 @@ describe('AppShell navigation', () => {
         const retailerSecondaryRow = screen.getByRole('group', { name: 'Övriga funktioner' });
         expect(within(retailerSecondaryRow).getByRole('link', { name: 'Mina ordrar' })).toBeTruthy();
         expect(within(retailerSecondaryRow).getByRole('link', { name: 'Dokument' })).toBeTruthy();
+        expect(within(retailerPrimaryRow).getByRole('link', { name: 'Prislista' })).toBeTruthy();
         expect(within(retailerPrimaryRow).queryByRole('link', { name: 'Mina ordrar' })).toBeNull();
         expect(screen.queryByRole('button', { name: 'Mer' })).toBeNull();
         expect(screen.queryByRole('link', { name: 'CRM' })).toBeNull();
@@ -155,6 +157,7 @@ describe('AppShell navigation', () => {
         expect(Array.from(primaryRow.querySelectorAll('a, button')).map((item) => item.textContent)).toEqual([
             'Hem',
             'Ny offert',
+            'Prislista',
             'Offerter',
             'CRM'
         ]);

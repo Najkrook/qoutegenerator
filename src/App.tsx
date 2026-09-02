@@ -51,6 +51,7 @@ import type {
 } from './types/contracts';
 
 const SummaryExport = lazy(() => import('./views/SummaryExport').then((module) => ({ default: module.SummaryExport })));
+const PriceList = lazy(() => import('./views/PriceList').then((module) => ({ default: module.PriceList })));
 const InventoryManager = lazy(() => import('./views/InventoryManager').then((module) => ({ default: module.InventoryManager })));
 const InventoryQrGenerator = lazy(() => import('./views/InventoryQrGenerator').then((module) => ({ default: module.InventoryQrGenerator })));
 const QrScanner = lazy(() => import('./views/QrScanner').then((module) => ({ default: module.QrScanner })));
@@ -260,6 +261,7 @@ function DashboardPage() {
             onOpenSketch={() => navigation.goToSketch('dashboard')}
             onOpenActivity={() => navigation.goToActivity()}
             onOpenRetailerOrders={() => navigation.goToRetailerOrders()}
+            onOpenPriceList={() => navigation.goToPriceList()}
             quoteDraftSummary={quoteDraftSummary}
         />
     );
@@ -569,6 +571,14 @@ export const appRoutes: RouteObject[] = [
                         <QuoteDraftBoundary routeId={APP_ROUTE_IDS.quoteSummary}>
                             <SummaryExportPage />
                         </QuoteDraftBoundary>
+                    </RouteAccessBoundary>
+                )
+            },
+            {
+                path: APP_PATHS[APP_ROUTE_IDS.priceList].slice(1),
+                element: (
+                    <RouteAccessBoundary routeId={APP_ROUTE_IDS.priceList}>
+                        <PriceList />
                     </RouteAccessBoundary>
                 )
             },

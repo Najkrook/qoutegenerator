@@ -54,6 +54,10 @@ interface QuoteDraftPanelProps {
     quoteDraftSummary?: DashboardQuoteDraftSummary | null;
 }
 
+interface PriceListPanelProps {
+    onOpenPriceList?: () => void;
+}
+
 interface DashboardLauncherCardProps {
     badgeBgClass?: string;
     description: string;
@@ -225,6 +229,21 @@ function QuoteDraftPanel({
     );
 }
 
+function PriceListPanel({ onOpenPriceList }: PriceListPanelProps) {
+    return (
+        <Panel
+            title="Prislista"
+            description="Sök snabbt bland produkter, storlekar och tillbehör utan att starta en offert."
+        >
+            <div className="p-5 sm:p-6">
+                <Button onClick={onOpenPriceList} disabled={!onOpenPriceList} size="lg">
+                    Öppna prislistan
+                </Button>
+            </div>
+        </Panel>
+    );
+}
+
 function DashboardLauncherCard({
     badgeBgClass = 'bg-action/10 text-action border border-action/20',
     description,
@@ -300,6 +319,7 @@ export function Dashboard({
     onOpenSketch,
     onOpenActivity,
     onOpenRetailerOrders,
+    onOpenPriceList,
     quoteDraftSummary
 }: DashboardProps) {
     const {
@@ -394,6 +414,8 @@ export function Dashboard({
                     quoteDraftSummary={quoteDraftSummary}
                 />
 
+                <PriceListPanel onOpenPriceList={onOpenPriceList} />
+
                 <Panel
                     title="Aktiva produktlinjer och rabatter"
                     description="Rabatten används som utgångspunkt när ni väljer produktlinje i offertflödet."
@@ -475,6 +497,14 @@ export function Dashboard({
                 hoverBorderClass: 'hover:border-indigo-500/60 hover:bg-indigo-500/5',
                 label: hasResumableDraft ? 'Fortsätt offert' : 'Skapa ny offert',
                 onClick: hasResumableDraft ? onContinueQuote : onStartQuote
+            },
+            {
+                badgeBgClass: 'bg-cyan-500/10 text-cyan-600 dark:bg-cyan-500/20 dark:text-cyan-400 border border-cyan-500/30',
+                description: 'Sök produkter, storlekar och tillbehör.',
+                emoji: '🏷️',
+                hoverBorderClass: 'hover:border-cyan-500/60 hover:bg-cyan-500/5',
+                label: 'Prislista',
+                onClick: onOpenPriceList
             },
             {
                 badgeBgClass: 'bg-purple-500/10 text-purple-600 dark:bg-purple-500/20 dark:text-purple-400 border border-purple-500/30',
@@ -749,6 +779,8 @@ export function Dashboard({
                     quoteDraftSummary={quoteDraftSummary}
                 />
             )}
+
+            {canStartQuote ? <PriceListPanel onOpenPriceList={onOpenPriceList} /> : null}
         </div>
     );
 }

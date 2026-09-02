@@ -56,7 +56,8 @@ vi.mock('../src/views/Dashboard', () => ({
         onContinueQuote,
         onOpenCrm,
         onOpenInventory,
-        onOpenPlanner
+        onOpenPlanner,
+        onOpenPriceList
     }) => (
         <div>
             <div>DashboardView</div>
@@ -67,6 +68,7 @@ vi.mock('../src/views/Dashboard', () => ({
             <button type="button" onClick={() => onOpenCrm?.()}>Öppna CRM</button>
             <button type="button" onClick={() => onOpenInventory?.()}>Öppna lager</button>
             <button type="button" onClick={() => onOpenPlanner?.()}>Öppna planering</button>
+            <button type="button" onClick={() => onOpenPriceList?.()}>Öppna prislistan</button>
         </div>
     )
 }));
@@ -89,6 +91,10 @@ vi.mock('../src/views/Login', () => ({
 
 vi.mock('../src/views/SummaryExport', () => ({
     SummaryExport: () => <div>SummaryView</div>
+}));
+
+vi.mock('../src/views/PriceList', () => ({
+    PriceList: () => <div>PriceListView</div>
 }));
 
 vi.mock('../src/views/InventoryManager', () => ({
@@ -414,6 +420,32 @@ describe('app routing', () => {
         expect(quoteOnly.container.textContent).toContain('DashboardView');
     });
 
+    it('allows quote users and retailers to open the price list without a quote draft', async () => {
+        const quoteOnly = await renderApp({
+            initialEntries: [APP_PATHS[APP_ROUTE_IDS.priceList]]
+        });
+
+        expect(quoteOnly.router.state.location.pathname).toBe(APP_PATHS[APP_ROUTE_IDS.priceList]);
+        expect(quoteOnly.container.textContent).toContain('PriceListView');
+
+        const retailer = await renderApp({
+            initialEntries: [APP_PATHS[APP_ROUTE_IDS.priceList]],
+            auth: {
+                accessLevel: 'retailer',
+                isRetailer: true,
+                retailer: {
+                    id: 'retailer-1',
+                    productLines: {
+                        BaHaMa: { enabled: true, discountPct: 20 }
+                    }
+                }
+            }
+        });
+
+        expect(retailer.router.state.location.pathname).toBe(APP_PATHS[APP_ROUTE_IDS.priceList]);
+        expect(retailer.container.textContent).toContain('PriceListView');
+    });
+
     it.each([
         [APP_PATHS[APP_ROUTE_IDS.inventoryQr], 'InventoryQrView'],
         [APP_PATHS[APP_ROUTE_IDS.qrScanner], 'QrScannerView'],
@@ -439,7 +471,8 @@ describe('app routing', () => {
     it.each([
         ['Öppna CRM', APP_PATHS[APP_ROUTE_IDS.crmDashboard], 'CrmDashboardView'],
         ['Öppna lager', APP_PATHS[APP_ROUTE_IDS.inventory], 'InventoryView'],
-        ['Öppna planering', APP_PATHS[APP_ROUTE_IDS.planner], 'PlannerView']
+        ['Öppna planering', APP_PATHS[APP_ROUTE_IDS.planner], 'PlannerView'],
+        ['Öppna prislistan', APP_PATHS[APP_ROUTE_IDS.priceList], 'PriceListView']
     ])('wires the admin dashboard action %s to its route', async (
         actionLabel,
         expectedPath,

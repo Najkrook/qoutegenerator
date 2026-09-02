@@ -48,6 +48,10 @@ describe('navigation routes', () => {
         expect(getAuthorizedRouteForAccess(APP_ROUTE_IDS.inventory, ACCESS_LEVELS.QUOTE_ONLY)).toBe(APP_PATHS[APP_ROUTE_IDS.dashboard]);
         expect(getAuthorizedRouteForAccess(APP_ROUTE_IDS.sketch, ACCESS_LEVELS.RETAILER)).toBe(APP_PATHS[APP_ROUTE_IDS.dashboard]);
         expect(getAuthorizedRouteForAccess(APP_ROUTE_IDS.quotes, ACCESS_LEVELS.QUOTE_ONLY)).toBe(APP_PATHS[APP_ROUTE_IDS.quotes]);
+        expect(getAuthorizedRouteForAccess(APP_ROUTE_IDS.priceList, ACCESS_LEVELS.FULL)).toBe(APP_PATHS[APP_ROUTE_IDS.priceList]);
+        expect(getAuthorizedRouteForAccess(APP_ROUTE_IDS.priceList, ACCESS_LEVELS.QUOTE_ONLY)).toBe(APP_PATHS[APP_ROUTE_IDS.priceList]);
+        expect(getAuthorizedRouteForAccess(APP_ROUTE_IDS.priceList, ACCESS_LEVELS.RETAILER)).toBe(APP_PATHS[APP_ROUTE_IDS.priceList]);
+        expect(getAuthorizedRouteForAccess(APP_ROUTE_IDS.priceList, ACCESS_LEVELS.SKETCH_ONLY)).toBe(APP_PATHS[APP_ROUTE_IDS.dashboard]);
         expect(getAuthorizedRouteForAccess(APP_ROUTE_IDS.retailerOrders, ACCESS_LEVELS.QUOTE_ONLY)).toBe(APP_PATHS[APP_ROUTE_IDS.dashboard]);
         expect(getAuthorizedRouteForAccess(APP_ROUTE_IDS.retailerOrderHistory, ACCESS_LEVELS.RETAILER)).toBe(APP_PATHS[APP_ROUTE_IDS.retailerOrderHistory]);
         expect(getAuthorizedRouteForAccess(APP_ROUTE_IDS.retailerOrderHistory, ACCESS_LEVELS.QUOTE_ONLY)).toBe(APP_PATHS[APP_ROUTE_IDS.dashboard]);
@@ -368,6 +372,7 @@ describe('navigation routes', () => {
 
     it('maps normalized paths back to route ids', () => {
         expect(getAppRouteIdFromPath('/quotes/')).toBe(APP_ROUTE_IDS.quotes);
+        expect(getAppRouteIdFromPath('/price-list')).toBe(APP_ROUTE_IDS.priceList);
         expect(getAppRouteIdFromPath('/inventory/logs')).toBe(APP_ROUTE_IDS.inventoryLogs);
         expect(getAppRouteIdFromPath('/retailer-orders')).toBe(APP_ROUTE_IDS.retailerOrders);
         expect(getAppRouteIdFromPath('/retailer-order-requests')).toBe(APP_ROUTE_IDS.retailerOrderHistory);
