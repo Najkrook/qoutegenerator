@@ -48,6 +48,32 @@ _Avoid_: Quote Save, resave
 The sales-lifecycle position of a CRM Deal. Its first CRM Link may advance it from lead to quote; later Quote Saves do not change it, and won or lost transitions remain explicit.
 _Avoid_: Quote status
 
+## Visualization Language
+
+**Simple Sketch**:
+The editable two-dimensional layout that is the source of truth for dimensions, ClickitUp boundaries, doors, and placed outdoor products.
+_Avoid_: 3D model, rendering
+
+**3D Visualization**:
+A read-only, dimensionally faithful interpretation of a Simple Sketch for quote presentation and spatial planning; it is not an installation or engineering document.
+_Avoid_: 3D editor, technical drawing, installation drawing
+
+**Visualization Plan**:
+A versioned, render-neutral description derived from a Simple Sketch for constructing a 3D Visualization.
+_Avoid_: Scene graph, Three.js model, 3D state
+
+**ClickitUp Run**:
+An oriented, continuous ClickitUp boundary made of an ordered sequence of sections and doors between two endpoints.
+_Avoid_: Wall, edge, mesh
+
+**Placed Product Instance**:
+One outdoor product positioned in a Simple Sketch, distinct from the product type or variant it represents.
+_Avoid_: Catalog row, asset instance
+
+**Simplified Product Model**:
+A dimensionally faithful visual substitute used when a placed outdoor product lacks a finished 3D asset; it remains visibly distinguishable from a finished product model.
+_Avoid_: Missing product, invisible product
+
 ## Warehouse Language
 
 **Grenställ**:
