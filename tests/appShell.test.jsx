@@ -99,6 +99,14 @@ describe('AppShell navigation', () => {
         expect(masseKladdLink.getAttribute('href')).toBe('https://masse-kladd.web.app');
         expect(masseKladdLink.getAttribute('target')).toBe('_blank');
         expect(masseKladdLink.getAttribute('rel')).toBe('noopener noreferrer');
+        const modelViewerLink = within(adminSecondaryRow).getByRole('link', { name: 'PURE modellvisare' });
+        expect(modelViewerLink.getAttribute('href')).toBe('https://pure-model-viewer-najk.web.app/');
+        expect(modelViewerLink.getAttribute('target')).toBe('_blank');
+        expect(modelViewerLink.getAttribute('rel')).toBe('noopener noreferrer');
+        const bahamaConfiguratorLink = within(adminSecondaryRow).getByRole('link', { name: 'BaHaMa konfigurator' });
+        expect(bahamaConfiguratorLink.getAttribute('href')).toBe('https://bahama-konfigurator-najk.web.app/');
+        expect(bahamaConfiguratorLink.getAttribute('target')).toBe('_blank');
+        expect(bahamaConfiguratorLink.getAttribute('rel')).toBe('noopener noreferrer');
         expect(screen.queryByRole('button', { name: 'Mer' })).toBeNull();
         expect(screen.queryByRole('link', { name: 'Mina ordrar' })).toBeNull();
 
@@ -138,6 +146,12 @@ describe('AppShell navigation', () => {
         const mobileMasseKladdLink = within(mobileNavigation).getByRole('link', { name: 'Masse Kladd' });
         expect(mobileMasseKladdLink.getAttribute('href')).toBe('https://masse-kladd.web.app');
         expect(mobileMasseKladdLink.getAttribute('target')).toBe('_blank');
+        const mobileModelViewerLink = within(mobileNavigation).getByRole('link', { name: 'PURE modellvisare' });
+        expect(mobileModelViewerLink.getAttribute('href')).toBe('https://pure-model-viewer-najk.web.app/');
+        expect(mobileModelViewerLink.getAttribute('target')).toBe('_blank');
+        const mobileBahamaConfiguratorLink = within(mobileNavigation).getByRole('link', { name: 'BaHaMa konfigurator' });
+        expect(mobileBahamaConfiguratorLink.getAttribute('href')).toBe('https://bahama-konfigurator-najk.web.app/');
+        expect(mobileBahamaConfiguratorLink.getAttribute('target')).toBe('_blank');
 
         fireEvent.click(qrLink);
         expect(screen.getByTestId('location').textContent).toBe('/inventory/qr');
@@ -172,7 +186,9 @@ describe('AppShell navigation', () => {
             'Aktiviteter',
             'Lagerloggar',
             'QR-etiketter',
-            'Masse Kladd'
+            'Masse Kladd',
+            'PURE modellvisare',
+            'BaHaMa konfigurator'
         ]);
         expect(secondaryRow.className).toContain('border-t');
         expect(screen.queryByRole('button', { name: 'Mer' })).toBeNull();

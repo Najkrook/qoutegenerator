@@ -5,6 +5,7 @@ import {
     IconBuildingStore,
     IconCalendarWeek,
     IconClipboardList,
+    IconCube,
     IconFileText,
     IconFilePlus,
     IconFiles,
@@ -17,6 +18,7 @@ import {
     IconQrcode,
     IconScan,
     IconShoppingCart,
+    IconUmbrella,
     type TablerIcon
 } from '@tabler/icons-react';
 import { NavLink, useLocation } from 'react-router-dom';
@@ -48,6 +50,7 @@ type NavigationItem =
     }
     | {
         href: string;
+        id: 'bahama-configurator' | 'masse-kladd' | 'pure-model-viewer';
         kind: 'external-link';
         label: string;
     }
@@ -86,7 +89,9 @@ const NAVIGATION_VISUALS: Record<string, NavigationVisual> = {
     [APP_PATHS[APP_ROUTE_IDS.activity]]: { icon: IconActivity, colorClassName: 'text-yellow-500' },
     [APP_PATHS[APP_ROUTE_IDS.inventoryLogs]]: { icon: IconHistory, colorClassName: 'text-slate-400' },
     [APP_PATHS[APP_ROUTE_IDS.inventoryQr]]: { icon: IconQrcode, colorClassName: 'text-pink-500' },
-    'masse-kladd': { icon: IconFileText, colorClassName: 'text-cyan-500' }
+    'bahama-configurator': { icon: IconUmbrella, colorClassName: 'text-amber-500' },
+    'masse-kladd': { icon: IconFileText, colorClassName: 'text-cyan-500' },
+    'pure-model-viewer': { icon: IconCube, colorClassName: 'text-violet-500' }
 };
 
 function getNavigationGroups({
@@ -227,8 +232,21 @@ function getNavigationGroups({
                 },
                 {
                     href: 'https://masse-kladd.web.app',
+                    id: 'masse-kladd',
                     kind: 'external-link',
                     label: 'Masse Kladd'
+                },
+                {
+                    href: 'https://pure-model-viewer-najk.web.app/',
+                    id: 'pure-model-viewer',
+                    kind: 'external-link',
+                    label: 'PURE modellvisare'
+                },
+                {
+                    href: 'https://bahama-konfigurator-najk.web.app/',
+                    id: 'bahama-configurator',
+                    kind: 'external-link',
+                    label: 'BaHaMa konfigurator'
                 }
             ]
         });
@@ -345,7 +363,7 @@ export function RoleNavigation({
         const visualKey = item.kind === 'action'
             ? item.id
             : item.kind === 'external-link'
-                ? 'masse-kladd'
+                ? item.id
                 : item.to.split(/[?#]/, 1)[0];
         const visual = NAVIGATION_VISUALS[visualKey];
         const NavigationIcon = visual.icon;
