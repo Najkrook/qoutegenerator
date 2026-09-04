@@ -1,7 +1,7 @@
 # Godkänn ClickitUp-sektionens visuella byggsätt
 
 Type: prototype
-Status: claimed
+Status: resolved
 Parent: ../map.md
 Blocked by: 01, 02
 
@@ -36,3 +36,41 @@ Prototypen visar att:
 - den procedurgenererade modellen är måttriktig och billig men visuellt för förenklad som primär kundmodell.
 
 Browser-QA verifierade variantväxling, URL-state, desktop och mobil, laddad scen, synliga måttfall och runtime-statistik. Den enda konsolvarningen är den förväntade `ColladaLoader`-varningen om Z-up-källan; prototypen normaliserar geometrin till Y-up efter import. Encodingvakten och UI-textsmoketestet passerade, 21 tester totalt.
+
+### Användarens godkännande
+
+Användaren godkände det rekommenderade byggsättet: semantiskt uppdelad GLB som primär modell, delade stolp- och kopplingsinstanser vid skarvar och hörn, separat verifierad dörrasset, kontrollmått som produktionsgrind samt en tydligt avvikande procedurgenererad Simplified Product Model som fallback.
+
+## Answer
+
+ClickitUp ska primärt byggas som en semantiskt uppdelad, meterbaserad och Y-up-normaliserad GLB härledd från den oförändrade DAE-källan. En komplett 1500 mm-sektion får inte skalas eller klonas som ett odelbart objekt för varje medlem. I stället ska 3D-assemblern skapa varje ClickitUp Run av separata längdspan och delade ClickitUp Junctions.
+
+Den godkända minsta assetstrukturen är:
+
+```text
+clickitup
+├── junctions
+│   ├── straight-shared
+│   ├── corner-90
+│   └── free-terminal
+├── section
+│   ├── lower-glass-span
+│   ├── upper-glass-span
+│   └── top-rail-span
+└── door
+    └── verified-door-assembly
+```
+
+De tre verifierade span-delarna från 1500 mm-källan längdanpassas endast längs sin lokala X-axel. Stolpar, beslag, djup och höjd behåller sina mått. Ett Run skapar exakt en delad junction vid varje intern medlemsgräns; angränsande sektioner får alltså inte bidra med var sitt överlappande ändparti. Run-terminalen väljer hörn- eller fri-ände-komponent från Visualiseringsplanens explicita terminaltyp. En `unresolved` terminal får ingen påhittad koppling och hanteras genom den senare fel- och fallbackpolicyn.
+
+Denna modell stödjer samtliga sektionsbredder som Simple Sketch producerar från en gemensam geometriuppsättning. Den fasta 1500 mm-modellen avvisas som generell strategi eftersom den ger överlapp vid smalare sektioner och tomrum vid bredare. Separata GLB-assets per standardbredd avvisas som standardstrategi eftersom ingen sådan verifierad assetfamilj finns och den skulle multiplicera export-, cache- och QA-arbetet. Separata exporter får endast återkomma som en riktad reservåtgärd om kontrollmått visar att en viss komponent inte kan längdanpassas utan geometriskt fel.
+
+DAE-källan innehåller ingen verifierad dörrassembly. Produktionsleveransen behöver därför en separat, måttriktig dörrasset med samma ankare, axlar, höjd- och materialkontrakt som en vanlig medlem. Tills den finns ska en dörr visas med en tydligt avvikande Simplified Product Model och ett problem; prototypens gula dörr är endast bevis på kontraktet, inte en godkänd produktmodell.
+
+Den procedurgenererade modellen godkänns enbart som fallback. Den ska bära rätt yttre bredd och footprint samt visa stolpar, glasfält och toppskena, men vara synligt enklare än den färdiga GLB-modellen. Den får inte användas som om den vore en material- eller detaljexakt ClickitUp-visualisering.
+
+Prototypen mätte den råa DAE-baserade testscenen till 210 draw calls, 60 693 renderade trianglar och 156 geometrier, jämfört med 70 draw calls, 3 048 trianglar och 33 geometrier för den procedurgenererade fallbacken. Värdena inkluderar prototypens scenhjälpmedel och skuggpass och är inte produktionsbudgetar, men visar att råa DAE-primitiver inte får bli leveransstruktur. Den slutliga GLB:n ska slå ihop opak geometri per material inom varje semantisk del, behålla glas separat och återanvända geometri/material; exakta budgetar och instancingkrav låses i **Lås runtime- och assetleveransen** efter sammansatt scenmätning.
+
+Visuell prototypkontroll räcker inte för att fastställa glasspel, skenornas infästningsöverlapp eller dörrens exakta geometri. Dessa kontrollmått och en verifierad dörrkälla är uttryckliga produktionsgrindar. En ny full SketchUp-export per vanlig sektionsbredd krävs däremot inte så länge kontrollmåtten bekräftar den semantiska splitten.
+
+Prototypen är bevarad som primärkälla på branch `codex/prototype-clickitup-section-build`, commit `159b21866ed083fad7ba83389236870a4f06f205`. Produktionsimplementation ingår inte i denna ticket.

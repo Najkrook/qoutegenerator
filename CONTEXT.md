@@ -66,6 +66,10 @@ _Avoid_: Scene graph, Three.js model, 3D state
 An oriented, continuous ClickitUp boundary made of an ordered sequence of sections and doors between two endpoints.
 _Avoid_: Wall, edge, mesh
 
+**ClickitUp Junction**:
+The single shared physical connection at a boundary between adjacent ClickitUp members or Runs.
+_Avoid_: Duplicate end, overlapping posts
+
 **Placed Product Instance**:
 One outdoor product positioned in a Simple Sketch, distinct from the product type or variant it represents.
 _Avoid_: Catalog row, asset instance
