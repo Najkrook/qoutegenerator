@@ -15,7 +15,7 @@ Bygg en billig körbar prototyp från en representativ Simple Sketch med olika C
 
 ### Körbar sammansatt scenprototyp
 
-Prototypen finns på branch `codex/prototype-composite-3d-scene` och startas från repo-roten med:
+Prototypen finns på branch `codex/prototype-composite-3d-scene`, commit `dc22b13`, och startas från repo-roten med:
 
 ```powershell
 node src/prototypes/composite-3d-scene-prototype/server.mjs
