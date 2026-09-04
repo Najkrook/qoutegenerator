@@ -30,6 +30,7 @@ En godkänd, implementationklar specifikation för en integrerad och skrivskydda
 - [Fastställ ClickitUp-assetens webbförutsättningar](issues/01-faststall-clickitup-assetens-webbforutsattningar.md): DAE-källan räcker för första prototypen och ska bli en semantiskt uppdelad Y-up/meter-GLB där fasta ändpartier bevaras och endast tre identifierade span-delar längdanpassas.
 - [Välj Visualiseringsplanens kontrakt](issues/02-valj-visualiseringsplanens-kontrakt.md): 3D-modulen får en transient, versionerad och renderingsneutral millimeterplan med explicita löp, produkter och problem i stället för `QuoteState`, lösarinterna eller scengrafdetaljer.
 - [Godkänn ClickitUp-sektionens visuella byggsätt](issues/03-godkann-clickitup-sektionens-byggsatt.md): En semantiskt uppdelad GLB med längdanpassade span och delade skarv-, hörn- och ändkomponenter blir primärmodell; en tydligt förenklad procedurmodell blir fallback.
+- [Välj produktmodellstrategi för BaHaMa och Fiesta](issues/04-valj-produktmodellstrategi-for-bahama-och-fiesta.md): Jumbrella använder den befintliga måttdrivna procedurgeometrin som primärmodell, Fiesta börjar som verifieringskrävande Simplified Product Model och framtida GLB-assets kan ersätta exakta visuella variantnycklar utan katalog- eller priskoppling.
 
 ## Not yet specified
 

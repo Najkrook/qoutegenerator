@@ -1,7 +1,7 @@
 # Välj produktmodellstrategi för BaHaMa och Fiesta
 
 Type: prototype
-Status: claimed
+Status: resolved
 Parent: ../map.md
 Blocked by: 02
 
@@ -65,4 +65,24 @@ Fasta standardmaterial föreslås vara varm off-white, matt duk och antracitgrå
 
 För en känd Jumbrella-nyckel används procedurmodellen. För en saknad eller felande färdig modell används en tydligt blå Simplified Product Model som bevarar footprint, centrum och rotation samt ger ett produktmodellproblem. En okänd variant väljer aldrig närmaste storlek. Objekt med oanvändbara planmått utelämnas i stället för att ges gissade dimensioner; exakt problemkod, användartext och exportpåverkan lämnas till ticket 05.
 
-Ticketen förblir `claimed` tills användaren har granskat prototypen och uttryckligen godkänt eller ändrat det visuella byggsättet, Fiesta-tolkningen och materialstandarden.
+Ticketen hölls `claimed` tills användaren hade granskat prototypen och uttryckligen godkänt det visuella byggsättet, Fiesta-tolkningen och materialstandarden.
+
+### Användarens visuella godkännande
+
+Användaren godkände det föreslagna upplägget och bekräftade att riktiga BaHaMa-modeller eventuellt kan tas fram senare. Den befintliga Jumbrella-modellen i Bahama-visualizer godkändes som tillräckligt visuellt underlag för första versionen.
+
+## Answer
+
+Första versionen återanvänder Jumbrella-geometrin från `C:\Users\Najk\Documents\ChatGPT\Bahama-visualizer` som procedurgenererad primärmodell. Källprojektet innehåller inga färdiga GLB-, glTF- eller CAD-assets; det som återanvänds är modellfabrikerna för mast, duk, ekrar, stag och nav.
+
+Produktionsimplementationen får inte importera kod eller resurser från den externa lokala sökvägen vid körning. De relevanta geometriidéerna ska i stället flyttas och skrivas om som rena, testbara Three.js-fabriker inne i QuoteGenerator. Fabrikerna ska konsumera `VisualizationPlanV1` och ett separat `VisualProductRegistryV1`, inte QuoteContext, katalogobjekt eller prisdata.
+
+De stabila visuella nycklarna är `bahama.jumbrella` med en lokaliseringsneutral dimensionsvariant som `square-3000x3000` eller `rectangular-4000x3000`, samt `fiesta.f1-f` med `standard` som preliminär variant. Simple Sketch-adaptern mappar dagens exportmetadata till nycklarna och skickar footprint, centrum och rotation i planen. Renderern använder aldrig kommersiella exportnycklar som asset-ID:n.
+
+Planens footprint och rotation är placeringsauktoritativa. Ett versionerat visuellt register bär endast sekundära produktmått som öppnad höjd, passagehöjd, antal ekrar, totalhöjd och största synliga bredd. Jumbrella-registret seedas från Bahamas verifierade tekniska data. Fiesta använder tills vidare 2 260 mm totalhöjd och 860 mm största synliga bredd från F1.F-underlaget, samtidigt som skissens befintliga 700 mm footprint bevaras och avvikelsen diagnostiseras. F1.F-matchningen är en produktionsgrind tills BRIXX har bekräftat den exakta handelsmodellen.
+
+Fasta visualiseringsmaterial är varm off-white matt duk och antracitgrå metall för Jumbrella samt svart och rostfritt med diskret orange emitter för Fiesta. De representerar inte valda offertmaterial eller färger.
+
+Kända Jumbrella-varianter använder procedurmodellen. Fiesta förblir en namngiven Simplified Product Model tills dess exakta modellidentitet eller en verifierad asset har bekräftats. En saknad eller felande färdig modell ersätts av en tydligt blå Simplified Product Model med bibehållen footprint, centrum och rotation samt ett problem. En okänd variant får aldrig använda närmaste storlek eller helskala en annan färdig produktmodell.
+
+Framtida GLB-assets kan registreras som exakta per-nyckel-ersättare utan att Visualiseringsplanen ändras. De måste vara meterbaserade, Y-up, markcentrerade, transformnormaliserade, namnstabila och bounds-verifierade. Produktionsimplementation ingår inte i denna ticket.
