@@ -32,6 +32,7 @@ En godkänd, implementationklar specifikation för en integrerad och skrivskydda
 - [Godkänn ClickitUp-sektionens visuella byggsätt](issues/03-godkann-clickitup-sektionens-byggsatt.md): En semantiskt uppdelad GLB med längdanpassade span och delade skarv-, hörn- och ändkomponenter blir primärmodell; en tydligt förenklad procedurmodell blir fallback.
 - [Välj produktmodellstrategi för BaHaMa och Fiesta](issues/04-valj-produktmodellstrategi-for-bahama-och-fiesta.md): Jumbrella använder den befintliga måttdrivna procedurgeometrin som primärmodell, Fiesta börjar som verifieringskrävande Simplified Product Model och framtida GLB-assets kan ersätta exakta visuella variantnycklar utan katalog- eller priskoppling.
 - [Lås fel- och fallbacktolkningen](issues/05-las-fel-och-fallbacktolkningen.md): Tillförlitlig best-effort-rendering med tydliga problem och Simplified Product Models är exportbar med disclosure, medan utelämnade entiteter, otolkbara planer och terminala renderingsfel blockerar PNG.
+- [Godkänn den sammansatta 3D-scenen](issues/06-godkann-den-sammansatta-3d-scenen.md): En återhållen dagsljusmiljö med högt trekvartsperspektiv blir standard, kompletterad av tekniskt granskningsläge, ovanifrånkamera och fokuserbara beständiga problem på desktop och mobil.
 
 ## Not yet specified
 

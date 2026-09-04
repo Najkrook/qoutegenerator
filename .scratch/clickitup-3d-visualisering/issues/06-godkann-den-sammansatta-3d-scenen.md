@@ -1,7 +1,7 @@
 # Godkänn den sammansatta 3D-scenen
 
 Type: prototype
-Status: claimed
+Status: resolved
 Parent: ../map.md
 Blocked by: 03, 04, 05
 
@@ -40,4 +40,22 @@ Ljussättningen ska vara en stabil hemisfärisk grund, en varm huvudriktning och
 
 Beständiga problem visas i en högersida på desktop och en scrollbar bottendel på mobil. Färg kompletteras alltid med ikon, entitetsnamn och text. Ett problemval flyttar kameran till entiteten men ändrar aldrig skissen. `degraded` scen är exportbar med disclosure enligt **Lås fel- och fallbacktolkningen**.
 
-Ticketen förblir `claimed`. Inget `## Answer` läggs till och kartan ändras inte innan användaren uttryckligen har godkänt den sammansatta scenen visuellt.
+### Användarens visuella godkännande
+
+Användaren granskade den körbara miljösatta prototypen och godkände den sammansatta scenen utan begärda ändringar.
+
+## Answer
+
+3D Visualization ska som standard använda den godkända, återhållna dagsljusmiljön: en stenlagd yta som följer Simple Sketchs exakta footprint, diskret gräs och lågmäld vegetation utanför ytan samt fast, trovärdig belysning. Miljön ska ge skala, glasläsbarhet och kontaktskuggor utan att antyda en verklig kundmiljö eller fotorealistisk materialåtergivning. En tekniskt neutral vy med mörk bakgrund, metergrid och tydlig ytgräns ska finnas som granskningsalternativ.
+
+Standardkameran är ett högt trekvartsperspektiv med orbit, begränsad zoom och spärr mot vy under markplanet. En explicit ovanifrånkamera kompletterar standardvyn för kontroll av footprint, rotationer, sektionsföljd och objektplaceringar. Kamera och scenuttryck är transient UI-state och skrivs inte till Quote eller Quote Revision.
+
+Scenen använder en stabil hemisfärisk grundbelysning, en varm huvudriktning och en svag kall fyllning. Mjuka kontaktskuggor krävs. ClickitUp-glas återges med fast ljus cyan ton, låg opacitet och separata mörka profiler så att glaset förblir läsbart i båda scenuttrycken. ClickitUp-metall är neutral aluminium och antracit, Jumbrella har varm off-white duk och mörk stomme, och Fiesta samt övriga Simplified Product Models använder den beslutade blå fallbackfärgen. Materialen är fasta visualiseringsmaterial och representerar inga offertval.
+
+Den sammansatta scenen ska visa olika ClickitUp-bredder, dörrar, hörn och fria ändar tillsammans med samtliga placerade produkter från Visualiseringsplanen. Känd Jumbrella använder den beslutade måttdrivna procedurgeometrin. Saknad eller ännu overifierad dörr- och Fiesta-modell visas som måttbevarande Simplified Product Model enligt **Lås fel- och fallbacktolkningen**; scenen får aldrig flytta eller korrigera källplaceringar.
+
+Beständiga problem presenteras i en högersida på desktop och en scrollbar bottendel på mobil. Varje problem använder ikon, entitetsnamn och text utöver färg och kan fokusera entiteten genom att flytta kameran, utan att ändra skissen. En komplett `degraded` scen är exportbar med disclosure, medan `omitted` och terminala fel blockerar PNG enligt den redan beslutade felpolicyn.
+
+Prototypmätningen visade att den tekniska testscenen och den miljösatta testscenen låg nära varandra i runtimekostnad: 185 respektive 193 draw calls och 9 184 respektive 9 828 renderade trianglar i 1 440 × 900-perspektivet. Dessa värden är jämförelsetal från procedur- och proxygeometri, inte produktionsbudgetar. Den optimerade GLB-leveransens slutliga budget, instancing och assetkrav beslutas i **Lås runtime- och assetleveransen**.
+
+Den godkända prototypen är bevarad som primärkälla på branch `codex/prototype-composite-3d-scene`, commit `dc22b13`. Produktionsimplementation ingår inte i denna ticket.
