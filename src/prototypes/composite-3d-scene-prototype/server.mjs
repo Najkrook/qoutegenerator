@@ -1,4 +1,4 @@
-import { createReadStream, existsSync } from 'node:fs';
+import { createReadStream, existsSync, readFileSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { extname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url';
 const host = '127.0.0.1';
 const port = Number(process.env.COMPOSITE_SCENE_PROTOTYPE_PORT || 4186);
 const prototypeRoot = fileURLToPath(new URL('.', import.meta.url));
-const threeRoot = 'C:\\Users\\Najk\\Documents\\ChatGPT\\Bahama-visualizer\\node_modules\\three';
+const threeRoot = fileURLToPath(new URL('../../../node_modules/three/', import.meta.url));
 
 const routes = new Map([
     ['/', join(prototypeRoot, 'index.html')],
@@ -33,6 +33,11 @@ const server = createServer((request, response) => {
         'Cache-Control': 'no-store',
         'Content-Type': contentTypes[extname(filePath)] || 'application/octet-stream'
     });
+    if (extname(filePath) === '.html') {
+        const importMap = '<script type="importmap">{ "imports": { "three": "/three.module.js", "three/examples/jsm/controls/OrbitControls.js": "/OrbitControls.js" } }</script>';
+        response.end(readFileSync(filePath, 'utf8').replace('</head>', `${importMap}\n</head>`));
+        return;
+    }
     createReadStream(filePath).pipe(response);
 });
 

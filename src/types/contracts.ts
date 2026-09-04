@@ -1821,6 +1821,7 @@ export interface ComputedLayoutResult {
 export interface SketchToolProps {
     onBack: () => void;
     onExportToQuoteComplete?: () => void;
+    onOpen3dPrototype?: () => void;
     modeToggleNode?: React.ReactNode;
 }
 

@@ -249,10 +249,20 @@ vi.mock('../src/views/History', () => ({
 }));
 
 vi.mock('../src/views/SketchTool', () => ({
-    SketchTool: ({ onBack, onExportToQuoteComplete }) => (
+    SketchTool: ({ onBack, onExportToQuoteComplete, onOpen3dPrototype }) => (
         <div>
             <button type="button" onClick={onBack}>Back From Sketch</button>
             <button type="button" onClick={onExportToQuoteComplete}>Export From Sketch</button>
+            <button type="button" onClick={onOpen3dPrototype}>Open 3D Prototype</button>
+        </div>
+    )
+}));
+
+vi.mock('../src/views/Sketch3dPrototype', () => ({
+    Sketch3dPrototype: ({ onBack }) => (
+        <div>
+            <div>Sketch3dPrototypeView</div>
+            <button type="button" onClick={onBack}>Back From 3D Prototype</button>
         </div>
     )
 }));
@@ -340,7 +350,29 @@ afterEach(() => {
 });
 
 describe('app routing', () => {
-    it('uses the focus shell without global navigation only on the sketch route', async () => {
+    it('opens the protected 3D prototype route from sketch in a new tab', async () => {
+        const open = vi.spyOn(window, 'open').mockImplementation(() => null);
+        const sketch = await renderApp({
+            initialEntries: [APP_PATHS[APP_ROUTE_IDS.sketch]],
+            auth: {
+                accessLevel: 'full',
+                canViewEverything: true,
+                canAccessSketch: true,
+                canExportSketchToQuote: true
+            }
+        });
+
+        await clickButton(sketch.container, 'Open 3D Prototype');
+
+        expect(open).toHaveBeenCalledWith(
+            APP_PATHS[APP_ROUTE_IDS.sketch3dPrototype],
+            '_blank',
+            'noopener,noreferrer'
+        );
+        open.mockRestore();
+    });
+
+    it('uses the focus shell without global navigation on sketch routes', async () => {
         const sketch = await renderApp({
             initialEntries: [APP_PATHS[APP_ROUTE_IDS.sketch]],
             auth: {
@@ -359,6 +391,16 @@ describe('app routing', () => {
         expect(focusShell.firstElementChild.classList.contains('max-w-[1920px]')).toBe(true);
         expect(focusShell.querySelector('header')).toBeNull();
         expect(focusShell.querySelector('#main-content').classList.contains('overflow-hidden')).toBe(true);
+
+        const prototype = await renderApp({
+            initialEntries: [APP_PATHS[APP_ROUTE_IDS.sketch3dPrototype]],
+            auth: {
+                accessLevel: 'sketch-only',
+                canAccessSketch: true
+            }
+        });
+        expect(prototype.container.textContent).toContain('Sketch3dPrototypeView');
+        expect(prototype.container.querySelector('[data-app-shell="focus"]')).toBeTruthy();
 
         const dashboard = await renderApp({
             auth: {

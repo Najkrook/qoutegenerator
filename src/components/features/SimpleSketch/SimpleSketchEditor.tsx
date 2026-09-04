@@ -1,6 +1,7 @@
 import { useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import {
     IconDownload,
+    IconCube,
     IconRefresh,
     IconRulerMeasure,
     IconStack2
@@ -438,7 +439,12 @@ function buildMaterialRows(layout: ComputedLayoutResult, parasols: PlacedParasol
     return rows;
 }
 
-export function SimpleSketchEditor({ onBack, onExportToQuoteComplete, modeToggleNode }: SketchToolProps) {
+export function SimpleSketchEditor({
+    onBack,
+    onExportToQuoteComplete,
+    onOpen3dPrototype,
+    modeToggleNode
+}: SketchToolProps) {
     const { state, dispatch } = useQuote();
     const { user, canExportSketchToQuote } = useAuth();
 
@@ -1364,6 +1370,11 @@ export function SimpleSketchEditor({ onBack, onExportToQuoteComplete, modeToggle
         onBack?.();
     }, [flushAutosave, onBack]);
 
+    const handleOpen3dPrototype = useCallback(() => {
+        flushAutosave();
+        onOpen3dPrototype?.();
+    }, [flushAutosave, onOpen3dPrototype]);
+
     const materialIssueCount = criticalWarnings.length
         + invalidEdges.length
         + warningWarnings.length
@@ -1399,6 +1410,12 @@ export function SimpleSketchEditor({ onBack, onExportToQuoteComplete, modeToggle
                     tone: readinessTone,
                     onClick: openMaterialPanel
                 }}
+                prototypeAction={onOpen3dPrototype
+                    ? {
+                        label: 'Visa 3D-prototyp',
+                        onClick: handleOpen3dPrototype
+                    }
+                    : undefined}
                 primaryAction={canExportSketchToQuote
                     ? {
                         label: 'Överför till offert',
@@ -1422,6 +1439,11 @@ export function SimpleSketchEditor({ onBack, onExportToQuoteComplete, modeToggle
                     }
                     : undefined}
                 overflowActions={[
+                    ...(onOpen3dPrototype ? [{
+                        label: 'Visa 3D-prototyp',
+                        icon: <IconCube aria-hidden="true" size={17} stroke={1.8} />,
+                        onClick: handleOpen3dPrototype
+                    }] : []),
                     {
                         label: 'Ladda ner bild',
                         icon: <IconDownload aria-hidden="true" size={17} stroke={1.8} />,

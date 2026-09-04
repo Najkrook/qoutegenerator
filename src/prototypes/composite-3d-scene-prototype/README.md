@@ -4,13 +4,17 @@
 
 This prototype answers which composed scene should become the visual production specification for QuoteGenerator's read-only 3D Visualization.
 
-Run from the repository root:
+Run QuoteGenerator from the repository root:
 
 ```powershell
-node src/prototypes/composite-3d-scene-prototype/server.mjs
+npm run dev
 ```
 
-Open `http://127.0.0.1:4186/?variant=environment`.
+Open Simple Sketch and choose **Visa 3D-prototyp**, or open
+`http://127.0.0.1:5173/sketch/3d-prototype` while signed in with sketch access.
+
+The prototype is bundled as a separate Vite HTML entry so its Three.js runtime
+does not become part of the main QuoteGenerator bundle.
 
 The same representative, renderer-facing Simple Sketch is shown in two URL-controlled variants:
 

@@ -4,6 +4,7 @@ import {
     IconCheck,
     IconChevronDown,
     IconCloudCheck,
+    IconCube,
     IconDownload,
     IconDots,
     IconFileExport,
@@ -45,6 +46,7 @@ interface SketchWorkspaceHeaderProps {
     primaryAction: SketchHeaderAction;
     readiness: SketchReadiness;
     saveStatus: SketchSaveStatus;
+    prototypeAction?: SketchHeaderAction;
     secondaryAction?: SketchHeaderAction;
 }
 
@@ -61,6 +63,7 @@ export function SketchWorkspaceHeader({
     primaryAction,
     readiness,
     saveStatus,
+    prototypeAction,
     secondaryAction
 }: SketchWorkspaceHeaderProps) {
     return (
@@ -114,6 +117,18 @@ export function SketchWorkspaceHeader({
                 </div>
 
                 <div className="flex shrink-0 items-center gap-2">
+                    {prototypeAction ? (
+                        <button
+                            type="button"
+                            onClick={prototypeAction.onClick}
+                            disabled={prototypeAction.disabled}
+                            className="hidden min-h-10 items-center gap-2 rounded-control border border-control-border bg-surface-raised px-3 text-sm font-semibold text-text transition-colors hover:bg-surface-hover disabled:cursor-not-allowed disabled:opacity-50 lg:inline-flex"
+                        >
+                            <IconCube aria-hidden="true" size={18} stroke={1.8} />
+                            {prototypeAction.label}
+                        </button>
+                    ) : null}
+
                     <button
                         type="button"
                         onClick={readiness.onClick}

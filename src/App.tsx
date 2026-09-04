@@ -57,6 +57,7 @@ const InventoryQrGenerator = lazy(() => import('./views/InventoryQrGenerator').t
 const QrScanner = lazy(() => import('./views/QrScanner').then((module) => ({ default: module.QrScanner })));
 const QrParasolDetail = lazy(() => import('./views/QrParasolDetail').then((module) => ({ default: module.QrParasolDetail })));
 const SketchTool = lazy(() => import('./views/SketchTool').then((module) => ({ default: module.SketchTool })));
+const Sketch3dPrototype = lazy(() => import('./views/Sketch3dPrototype').then((module) => ({ default: module.Sketch3dPrototype })));
 const Planner = lazy(() => import('./views/Planner').then((module) => ({ default: module.Planner })));
 const History = lazy(() => import('./views/History').then((module) => ({ default: module.History })));
 const CrmDashboardPage = lazy(() => import('./views/crm/CrmDashboard').then((module) => ({ default: module.CrmDashboardPage })));
@@ -92,6 +93,7 @@ function RouteShell() {
     const location = useLocation();
     const routeId = getAppRouteIdFromPath(location.pathname);
     const isFocusRoute = routeId === APP_ROUTE_IDS.sketch
+        || routeId === APP_ROUTE_IDS.sketch3dPrototype
         || routeId === APP_ROUTE_IDS.qrScanner
         || routeId === APP_ROUTE_IDS.qrParasolDetail;
     const isWideRoute = routeId === APP_ROUTE_IDS.quoteSummary
@@ -432,8 +434,16 @@ function SketchPage() {
         <SketchTool
             onBack={() => navigation.goToSketchReturnTarget(returnTarget)}
             onExportToQuoteComplete={() => navigation.goToQuoteStep(exportTarget)}
+            onOpen3dPrototype={() => {
+                window.open(APP_PATHS[APP_ROUTE_IDS.sketch3dPrototype], '_blank', 'noopener,noreferrer');
+            }}
         />
     );
+}
+
+function Sketch3dPrototypePage() {
+    const navigation = useAppNavigation();
+    return <Sketch3dPrototype onBack={() => navigation.goToSketch()} />;
 }
 
 function PlannerPage() {
@@ -595,6 +605,14 @@ export const appRoutes: RouteObject[] = [
                 element: (
                     <RouteAccessBoundary routeId={APP_ROUTE_IDS.sketch}>
                         <SketchPage />
+                    </RouteAccessBoundary>
+                )
+            },
+            {
+                path: APP_PATHS[APP_ROUTE_IDS.sketch3dPrototype].slice(1),
+                element: (
+                    <RouteAccessBoundary routeId={APP_ROUTE_IDS.sketch3dPrototype}>
+                        <Sketch3dPrototypePage />
                     </RouteAccessBoundary>
                 )
             },
