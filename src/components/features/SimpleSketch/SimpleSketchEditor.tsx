@@ -1372,8 +1372,10 @@ export function SimpleSketchEditor({
 
     const handleOpen3dPrototype = useCallback(() => {
         flushAutosave();
+        // The untouched initial sketch has no pending autosave, but needs a snapshot too.
+        commitAutosaveSnapshot(autosaveSnapshot);
         onOpen3dPrototype?.();
-    }, [flushAutosave, onOpen3dPrototype]);
+    }, [flushAutosave, commitAutosaveSnapshot, autosaveSnapshot, onOpen3dPrototype]);
 
     const materialIssueCount = criticalWarnings.length
         + invalidEdges.length

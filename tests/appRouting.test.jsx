@@ -350,10 +350,9 @@ afterEach(() => {
 });
 
 describe('app routing', () => {
-    it('opens the protected 3D prototype route from sketch in a new tab', async () => {
-        const open = vi.spyOn(window, 'open').mockImplementation(() => null);
+    it('opens 3D in the same tab and returns with the original sketch context', async () => {
         const sketch = await renderApp({
-            initialEntries: [APP_PATHS[APP_ROUTE_IDS.sketch]],
+            initialEntries: ['/sketch?return=quote-summary&crmDealId=deal-1'],
             auth: {
                 accessLevel: 'full',
                 canViewEverything: true,
@@ -364,12 +363,11 @@ describe('app routing', () => {
 
         await clickButton(sketch.container, 'Open 3D Prototype');
 
-        expect(open).toHaveBeenCalledWith(
-            APP_PATHS[APP_ROUTE_IDS.sketch3dPrototype],
-            '_blank',
-            'noopener,noreferrer'
-        );
-        open.mockRestore();
+        expect(sketch.router.state.location.pathname).toBe(APP_PATHS[APP_ROUTE_IDS.sketch3dPrototype]);
+        expect(sketch.router.state.location.search).toBe('?return=quote-summary&crmDealId=deal-1');
+        await clickButton(sketch.container, 'Back From 3D Prototype');
+        expect(sketch.router.state.location.pathname).toBe(APP_PATHS[APP_ROUTE_IDS.sketch]);
+        expect(sketch.router.state.location.search).toBe('?return=quote-summary&crmDealId=deal-1');
     });
 
     it('uses the focus shell without global navigation on sketch routes', async () => {

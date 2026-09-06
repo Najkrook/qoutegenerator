@@ -434,16 +434,14 @@ function SketchPage() {
         <SketchTool
             onBack={() => navigation.goToSketchReturnTarget(returnTarget)}
             onExportToQuoteComplete={() => navigation.goToQuoteStep(exportTarget)}
-            onOpen3dPrototype={() => {
-                window.open(APP_PATHS[APP_ROUTE_IDS.sketch3dPrototype], '_blank', 'noopener,noreferrer');
-            }}
+            onOpen3dPrototype={() => navigation.goToSketch3dPrototype()}
         />
     );
 }
 
 function Sketch3dPrototypePage() {
     const navigation = useAppNavigation();
-    return <Sketch3dPrototype onBack={() => navigation.goToSketch()} />;
+    return <Sketch3dPrototype onBack={() => navigation.returnFromSketch3dPrototype()} />;
 }
 
 function PlannerPage() {
