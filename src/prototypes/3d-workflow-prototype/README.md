@@ -1,6 +1,6 @@
 # 3D workflow prototype — ticket 07
 
-Throwaway UI experiment on `codex/prototype-3d-workflow`, pending explicit user approval.
+Throwaway UI experiment on `codex/prototype-3d-workflow`. Workflow approved by the user on 2026-09-07; not a production-readiness approval.
 Question: how should users review their current Simple Sketch in read-only 3D, understand problems, export PNG and return?
 
 Run `npm run dev`. In the authenticated application: Simple Sketch → Visa 3D-prototyp.
@@ -28,4 +28,4 @@ No deployment, Firestore write, pricing change or production-readiness claim is 
 - Browser fixture: desktop and 390 × 844 mobile, PNG creation with decoded 2560 × 1440 dimensions, omitted-entity export blocking and fatal-state retry checked.
 - Authenticated end-to-end operation with a real user account and production assets has not been verified. Routing round-trip is covered by the application routing test.
 
-Verdict remains pending: choose A or B and approve/change the workflow before resolving ticket 07.
+Verdict recorded in [Godkänn 3D-arbetsflödet och bildexporten](../../../.scratch/clickitup-3d-visualisering/issues/07-godkann-3d-arbetsflodet-och-bildexporten.md). A remains the recommended/default layout; no separate variant choice was stated. Runtime and asset delivery remain to be decided.

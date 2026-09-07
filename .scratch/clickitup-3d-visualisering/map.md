@@ -34,6 +34,8 @@ En godkänd, implementationklar specifikation för en integrerad och skrivskydda
 - [Lås fel- och fallbacktolkningen](issues/05-las-fel-och-fallbacktolkningen.md): Tillförlitlig best-effort-rendering med tydliga problem och Simplified Product Models är exportbar med disclosure, medan utelämnade entiteter, otolkbara planer och terminala renderingsfel blockerar PNG.
 - [Godkänn den sammansatta 3D-scenen](issues/06-godkann-den-sammansatta-3d-scenen.md): En återhållen dagsljusmiljö med högt trekvartsperspektiv blir standard, kompletterad av tekniskt granskningsläge, ovanifrånkamera och fokuserbara beständiga problem på desktop och mobil.
 
+- [Godkänn 3D-arbetsflödet och bildexporten](issues/07-godkann-3d-arbetsflodet-och-bildexporten.md): Godkänt skrivskyddat flöde från aktuell skiss i samma flik, med kamerakontroller, tydlig problemstatus och högupplöst PNG; Granska behålls som standard.
+
 ## Not yet specified
 
 - Exakta visuella och prestandamässiga acceptansnivåer för stora skisser; dessa kan preciseras först när optimerad ClickitUp-geometri och flera produktinstanser har mätts tillsammans.
