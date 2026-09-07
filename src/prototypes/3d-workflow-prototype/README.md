@@ -19,7 +19,7 @@ Standalone fixture, with no authentication, persistence or backend data:
 
 `plan.ts` is a temporary adapter around the current section solver, **not** the final VisualizationPlanV1 implementation. It does not mutate the supplied sketch. Models are procedural proxies, not the approved production GLB. Product heights remain proxy assumptions. Nonrectangular/unknown parasols use footprints. Collision and boundary diagnostics are partial and not a construction validation.
 
-No deployment, Firestore write, pricing change or production-readiness claim is included. Persisted camera state is intentionally absent. Production asset/performance validation remains ticket 08.
+No deployment, Firestore write, pricing change or production-readiness claim is included. Persisted camera state is intentionally absent. Production asset decisions remain separate. On 2026-09-07 the user explicitly waived the separate performance-measurement step; no benchmark or numerical capacity guarantee is required or claimed. Ordinary functional checks remain in scope.
 
 ## Verification (2026-09-06)
 

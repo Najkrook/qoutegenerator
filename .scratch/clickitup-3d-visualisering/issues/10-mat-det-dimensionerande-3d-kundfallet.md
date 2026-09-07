@@ -1,11 +1,13 @@
 # Mät det dimensionerande 3D-kundfallet
 
 Type: task
-Status: unclaimed
+Status: closed
 Parent: ../map.md
 Blocked by: 03, 04, 06, 07
 
 ## Question
+
+**Avförd ur scope 2026-09-07 på användarens begäran. Arbetet nedan är historik och ska inte genomföras som del av denna karta.**
 
 Ta fram det mätunderlag som krävs för att besluta runtime- och assetbudgetar för cirka 30 ClickitUp-sektioner, 4 parasoller och 2 Fiesta-värmare på dator och fysisk mobil.
 
@@ -16,6 +18,8 @@ Jämför det föreslagna enkla leveransläget med riktade alternativ endast när
 Fysisk mobil kräver tillgång till verkliga testapparater eller hjälp från användaren. En smal desktop-viewport eller CPU-throttling får inte rapporteras som iPhone-/Android-mätning. Brist på källasset eller apparat ska dokumenteras konkret, inte fyllas med uppskattade mätvärden.
 
 ## Comments
+
+2026-09-07: Användaren beslutade ”vi skippar mätningen helt faktiskt, det verkar fungera bra som det är”. Ticketen stängs därför som avförd, inte som genomförd. Ingen benchmark eller assetkonvertering för mätning har gjorts och inga prestandagränser har verifierats. Den blockerar inte längre **Lås runtime- och assetleveransen**. Återuppta inte detta mätarbete utan en ny uttrycklig begäran.
 
 2026-09-07: Skapad när användaren fastställde kundprofilen 30/4/2. Resultatet avblockerar **Lås runtime- och assetleveransen**. Ingen mätning eller assetkonvertering har ännu genomförts i denna ticket. Gränsvärden och leveranslöften beslutas i den överordnade runtime-ticketen efter mätningen.
 

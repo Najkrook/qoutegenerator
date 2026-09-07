@@ -38,9 +38,11 @@ En godkänd, implementationklar specifikation för en integrerad och skrivskydda
 
 ## Not yet specified
 
-- Ingen ytterligare ospecificerad fråga är identifierad just nu; återstående mätbehov och beslut täcks av befintliga tickets.
+- Ingen ytterligare ospecificerad fråga är identifierad just nu; återstående beslut täcks av befintliga tickets.
 
 ## Out of scope
+
+- [Mät det dimensionerande 3D-kundfallet](issues/10-mat-det-dimensionerande-3d-kundfallet.md): Separat benchmark, fysisk mobilprestandamätning och numeriska kapacitetsbudgetar har uttryckligen valts bort av användaren 2026-09-07. Prototypens upplevda funktion räcker för fortsatt planering; vanlig funktionskontroll kvarstår. Ticketen är avförd, inte genomförd.
 
 - Advanced Sketch och överföring från godtyckliga nod-/kantnät.
 - Redigering i 3D eller återföring av ändringar från 3D till 2D.
