@@ -82,6 +82,10 @@ _Avoid_: Missing product, invisible product, guessed product model
 A stable, user-meaningful diagnosis that part of a 3D Visualization is degraded or omitted while its source Simple Sketch remains unchanged.
 _Avoid_: Exception, console error, UI message
 
+**Visualization Quality Level**:
+The degree of visual polish in a 3D Visualization, independent of the represented products, trustworthy dimensions, placements and Visualization Problems. A lower level is not itself a Simplified Product Model or an omitted product.
+_Avoid_: Product accuracy, simplified sketch, missing geometry
+
 ## Warehouse Language
 
 **Grenställ**:

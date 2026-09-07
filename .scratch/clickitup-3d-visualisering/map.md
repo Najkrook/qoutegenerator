@@ -38,7 +38,7 @@ En godkänd, implementationklar specifikation för en integrerad och skrivskydda
 
 ## Not yet specified
 
-- Exakta visuella och prestandamässiga acceptansnivåer för stora skisser; dessa kan preciseras först när optimerad ClickitUp-geometri och flera produktinstanser har mätts tillsammans.
+- Ingen ytterligare ospecificerad fråga är identifierad just nu; återstående mätbehov och beslut täcks av befintliga tickets.
 
 ## Out of scope
 
