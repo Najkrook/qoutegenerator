@@ -2,6 +2,8 @@
 
 Label: wayfinder:map
 
+Status: destination nådd — underlaget slutligt godkänt 2026-09-07.
+
 ## Destination
 
 En godkänd, implementationklar specifikation för en integrerad och skrivskyddad 3D Visualization i QuoteGenerator som härleder en måttriktig offert- och planeringsvy från den aktuella Simple Sketch, visar ClickitUp, placerade BaHaMa-parasoller och Fiesta-värmare samt kan exportera en högupplöst PNG.
@@ -36,9 +38,13 @@ En godkänd, implementationklar specifikation för en integrerad och skrivskydda
 
 - [Godkänn 3D-arbetsflödet och bildexporten](issues/07-godkann-3d-arbetsflodet-och-bildexporten.md): Godkänt skrivskyddat flöde från aktuell skiss i samma flik, med kamerakontroller, tydlig problemstatus och högupplöst PNG; Granska behålls som standard.
 
+- [Lås runtime- och assetleveransen](issues/08-las-runtime-och-assetleveransen.md): Godkänd Three.js-leverans med lazy loading, semantisk GLB, delade resurser, scenägd livscykel och samma funktioner på mobil; inga separata prestandamätningar.
+- [Fastställ implementationsspecifikationen](issues/09-faststall-implementationsspecifikationen.md): Den [sammanhållna specifikationen](implementation-spec.md) och dess sex implementationssteg godkändes av användaren med ”go ahead” 2026-09-07. Planeringsdestinationen är nådd; produktionsimplementation och driftsättning ingår inte.
+
 ## Not yet specified
 
-- Ingen ytterligare ospecificerad fråga är identifierad just nu; återstående beslut täcks av befintliga tickets.
+- Inga öppna specifikationsbeslut återstår i denna karta. Måttkontroller, verifierad dörrkälla och Fiesta-identitet kvarstår som produktionsförutsättningar enligt specifikationen, inte som genomförda kontroller.
+- Referensfallet är 30 ClickitUp-sektioner, 4 parasoller och 2 Fiesta med samma funktioner på mobil. Inga ytterligare prototyprundor eller separata prestandamätningar ingår. Historiska hänvisningar till mätstyrda budgetar i tickets 01/03/06 är ersatta av scopebeslutet i ticket 08 och specifikationen.
 
 ## Out of scope
 

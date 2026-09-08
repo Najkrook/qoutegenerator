@@ -1,10 +1,16 @@
 # Lås runtime- och assetleveransen
 
 Type: grilling
-Status: claimed
+Status: resolved
 Assignee: Codex
 Parent: ../map.md
 Blocked by: 03, 04, 06
+
+## Godkänt underlag
+
+2026-09-07: Runtime- och assetleveransen är sammanställd i [implementationsspecifikationen](../implementation-spec.md), tillsammans med ticket 09. Dokumentet är aktuellt beslutsunderlag och ersätter det preliminära förslaget nedan där det preciserar leveransen. Det omfattar paketering, GLB/texturer, komponent- och resursdelning, scenägd livscykel, lazy loading, kamera, mobilkvalitet och vanlig funktionskontroll.
+
+Inga separata prestandamätningar eller nya prototyprundor återstår. Referensfallet är 30 ClickitUp-sektioner, 4 parasoller och 2 Fiesta, med samma funktioner på mobil och bibehållen PNG-storlek. Kontrollmått och produktidentitet är kvarvarande produktionsgrindar, inte genomförda kontroller. Användaren godkände det sammanhållna underlaget med ”go ahead” som svar på frågan om slutlig specifikation för tickets 08 och 09. Ticketen är därmed resolved; godkännandet innebär ingen driftsättning.
 
 ## Question
 

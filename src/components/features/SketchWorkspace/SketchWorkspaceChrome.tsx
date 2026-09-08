@@ -46,7 +46,7 @@ interface SketchWorkspaceHeaderProps {
     primaryAction: SketchHeaderAction;
     readiness: SketchReadiness;
     saveStatus: SketchSaveStatus;
-    prototypeAction?: SketchHeaderAction;
+    visualizationAction?: SketchHeaderAction;
     secondaryAction?: SketchHeaderAction;
 }
 
@@ -63,7 +63,7 @@ export function SketchWorkspaceHeader({
     primaryAction,
     readiness,
     saveStatus,
-    prototypeAction,
+    visualizationAction,
     secondaryAction
 }: SketchWorkspaceHeaderProps) {
     return (
@@ -117,15 +117,15 @@ export function SketchWorkspaceHeader({
                 </div>
 
                 <div className="flex shrink-0 items-center gap-2">
-                    {prototypeAction ? (
+                    {visualizationAction ? (
                         <button
                             type="button"
-                            onClick={prototypeAction.onClick}
-                            disabled={prototypeAction.disabled}
+                            onClick={visualizationAction.onClick}
+                            disabled={visualizationAction.disabled}
                             className="hidden min-h-10 items-center gap-2 rounded-control border border-control-border bg-surface-raised px-3 text-sm font-semibold text-text transition-colors hover:bg-surface-hover disabled:cursor-not-allowed disabled:opacity-50 lg:inline-flex"
                         >
                             <IconCube aria-hidden="true" size={18} stroke={1.8} />
-                            {prototypeAction.label}
+                            {visualizationAction.label}
                         </button>
                     ) : null}
 

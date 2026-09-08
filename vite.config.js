@@ -18,12 +18,7 @@ export default defineConfig({
         sourcemap: true,
         rollupOptions: {
             input: {
-                main: resolve(__dirname, 'index.html'),
-                workflowPrototype: resolve(__dirname, 'src/prototypes/3d-workflow-prototype/index.html'),
-                composite3dPrototype: resolve(
-                    __dirname,
-                    'src/prototypes/composite-3d-scene-prototype/index.html'
-                )
+                main: resolve(__dirname, 'index.html')
             },
             output: {
                 manualChunks(id) {

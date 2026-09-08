@@ -124,10 +124,10 @@ export function useAppNavigation() {
                 options
             );
         },
-        goToSketch3dPrototype() {
-            navigate(`${APP_PATHS[APP_ROUTE_IDS.sketch3dPrototype]}${location.search}`, { state: { fromSketch: true } });
+        goToSketchVisualization() {
+            navigate(`${APP_PATHS[APP_ROUTE_IDS.sketchVisualization]}${location.search}`, { state: { fromSketch: true } });
         },
-        returnFromSketch3dPrototype() {
+        returnFromSketchVisualization() {
             if (location.state?.fromSketch) navigate(-1);
             else navigate(`${APP_PATHS[APP_ROUTE_IDS.sketch]}${location.search}`, { replace: true });
         },

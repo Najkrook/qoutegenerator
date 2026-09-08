@@ -158,13 +158,13 @@ afterEach(() => {
 
 describe('SimpleSketchEditor workspace', () => {
     it('opens the 3D prototype from Simple Sketch after flushing autosave', () => {
-        const onOpen3dPrototype = vi.fn();
-        renderEditor({ onOpen3dPrototype });
+        const onOpenVisualization = vi.fn();
+        renderEditor({ onOpenVisualization });
 
-        fireEvent.click(screen.getByRole('button', { name: 'Visa 3D-prototyp' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Visa 3D' }));
 
         expect(autosaveState.flush).toHaveBeenCalledTimes(1);
-        expect(onOpen3dPrototype).toHaveBeenCalledTimes(1);
+        expect(onOpenVisualization).toHaveBeenCalledTimes(1);
     });
 
     it('uses quote transfer as the primary action and image download as the secondary action for full access', () => {

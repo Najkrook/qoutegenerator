@@ -3,6 +3,12 @@ import type { QuoteExportLanguage, QuoteTotalsRow } from '../types/contracts';
 
 export const DEFAULT_EXPORT_LANGUAGE: QuoteExportLanguage = 'sv';
 
+export function getVisualizationExportLabels(language: unknown) {
+    return normalizeExportLanguage(language) === 'en'
+        ? { fallbackLabel: 'Current sketch', disclosure: 'The visualization contains simplified models or marked deviations.' }
+        : { fallbackLabel: 'Aktuell skiss', disclosure: 'Visualiseringen innehåller förenklade modeller eller markerade avvikelser.' };
+}
+
 const EXPORT_LABELS = {
     sv: {
         sheetName: 'Offert',

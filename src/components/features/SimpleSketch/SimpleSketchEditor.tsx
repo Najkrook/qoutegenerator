@@ -442,7 +442,7 @@ function buildMaterialRows(layout: ComputedLayoutResult, parasols: PlacedParasol
 export function SimpleSketchEditor({
     onBack,
     onExportToQuoteComplete,
-    onOpen3dPrototype,
+    onOpenVisualization,
     modeToggleNode
 }: SketchToolProps) {
     const { state, dispatch } = useQuote();
@@ -1370,12 +1370,12 @@ export function SimpleSketchEditor({
         onBack?.();
     }, [flushAutosave, onBack]);
 
-    const handleOpen3dPrototype = useCallback(() => {
+    const handleOpenVisualization = useCallback(() => {
         flushAutosave();
         // The untouched initial sketch has no pending autosave, but needs a snapshot too.
         commitAutosaveSnapshot(autosaveSnapshot);
-        onOpen3dPrototype?.();
-    }, [flushAutosave, commitAutosaveSnapshot, autosaveSnapshot, onOpen3dPrototype]);
+        onOpenVisualization?.();
+    }, [flushAutosave, commitAutosaveSnapshot, autosaveSnapshot, onOpenVisualization]);
 
     const materialIssueCount = criticalWarnings.length
         + invalidEdges.length
@@ -1412,10 +1412,10 @@ export function SimpleSketchEditor({
                     tone: readinessTone,
                     onClick: openMaterialPanel
                 }}
-                prototypeAction={onOpen3dPrototype
+                visualizationAction={onOpenVisualization
                     ? {
-                        label: 'Visa 3D-prototyp',
-                        onClick: handleOpen3dPrototype
+                        label: 'Visa 3D',
+                        onClick: handleOpenVisualization
                     }
                     : undefined}
                 primaryAction={canExportSketchToQuote
@@ -1441,10 +1441,10 @@ export function SimpleSketchEditor({
                     }
                     : undefined}
                 overflowActions={[
-                    ...(onOpen3dPrototype ? [{
-                        label: 'Visa 3D-prototyp',
+                    ...(onOpenVisualization ? [{
+                        label: 'Visa 3D',
                         icon: <IconCube aria-hidden="true" size={17} stroke={1.8} />,
-                        onClick: handleOpen3dPrototype
+                        onClick: handleOpenVisualization
                     }] : []),
                     {
                         label: 'Ladda ner bild',

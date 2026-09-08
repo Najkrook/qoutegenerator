@@ -1821,7 +1821,7 @@ export interface ComputedLayoutResult {
 export interface SketchToolProps {
     onBack: () => void;
     onExportToQuoteComplete?: () => void;
-    onOpen3dPrototype?: () => void;
+    onOpenVisualization?: () => void;
     modeToggleNode?: React.ReactNode;
 }
 
@@ -1997,3 +1997,6 @@ export interface SketchExportStateResult {
     builderItems: BuilderItem[];
     sketchMeta: SketchMeta;
 }
+
+// Transient rendering-neutral contracts; never persisted in QuoteState.
+export type { VisualizationPlanV1, VisualizationProblemV1, ClickitUpRunV1, PlacedProductV1, RunTerminalV1, PlanPoint } from '../features/visualization/types';
