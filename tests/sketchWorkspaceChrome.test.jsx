@@ -38,6 +38,10 @@ function createHeaderProps(overrides = {}) {
             label: 'Överför till offert',
             onClick: vi.fn()
         },
+        visualizationAction: {
+            label: 'Visa 3D',
+            onClick: vi.fn()
+        },
         readiness: {
             label: 'Redo att överföra',
             tone: 'success',
@@ -93,11 +97,13 @@ describe('SketchWorkspaceHeader', () => {
 
         fireEvent.click(screen.getByRole('button', { name: 'Tillbaka' }));
         fireEvent.click(screen.getByRole('button', { name: 'Redo att överföra' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Visa 3D' }));
         fireEvent.click(screen.getByText('Ladda ner bild').closest('button'));
         fireEvent.click(screen.getByText('Överför till offert').closest('button'));
 
         expect(props.onBack).toHaveBeenCalledTimes(1);
         expect(props.readiness.onClick).toHaveBeenCalledTimes(1);
+        expect(props.visualizationAction.onClick).toHaveBeenCalledTimes(1);
         expect(props.secondaryAction.onClick).toHaveBeenCalledTimes(1);
         expect(props.primaryAction.onClick).toHaveBeenCalledTimes(1);
 

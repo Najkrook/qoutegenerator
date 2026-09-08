@@ -1,0 +1,235 @@
+.visualization {
+    height: 100%;
+    min-height: 0;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    background: #101b24;
+    color: #eef4f6;
+    font-family: Inter, system-ui, sans-serif;
+}
+.visualization * {
+    box-sizing: border-box;
+}
+.visualization button,
+.visualization select {
+    font: inherit;
+    color: inherit;
+    border: 1px solid #496071;
+    background: #20313e;
+    border-radius: 9px;
+    padding: 10px 12px;
+    cursor: pointer;
+    min-height: 44px;
+}
+.visualization button:hover {
+    background: #304956;
+}
+.visualization button:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+}
+.visualization :focus-visible {
+    outline: 2px solid #7dd3fc;
+    outline-offset: 2px;
+}
+.visualization p {
+    font-size: 13px;
+    color: #bbcbd5;
+    line-height: 1.5;
+    margin: 8px 0;
+}
+.visualization-header {
+    display: flex;
+    gap: 18px;
+    align-items: center;
+    padding: 12px 18px;
+    border-bottom: 1px solid #30424f;
+}
+.visualization-header h1 {
+    font-size: 18px;
+    margin: 0;
+}
+.visualization-header p {
+    margin: 2px 0 0;
+}
+.visualization-header .visualization-export {
+    margin-left: auto;
+    background: #d8eaf0;
+    color: #142631;
+    font-weight: 650;
+}
+.visualization-body {
+    display: flex;
+    flex: 1;
+    min-height: 0;
+}
+.visualization-canvas {
+    position: relative;
+    flex: 1;
+    min-height: 0;
+    min-width: 0;
+}
+.visualization-renderer {
+    position: absolute;
+    inset: 0;
+}
+.visualization-renderer canvas {
+    display: block;
+    width: 100%;
+    height: 100%;
+    touch-action: none;
+}
+.visualization-camera {
+    position: absolute;
+    top: 14px;
+    left: 14px;
+    right: 14px;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: start;
+    gap: 6px;
+}
+.visualization-camera button,
+.visualization-camera details {
+    background: #101b24ed;
+    font-size: 12px;
+}
+.visualization-camera details {
+    border: 1px solid #496071;
+    border-radius: 9px;
+    padding: 0 10px;
+}
+.visualization-camera details div {
+    display: grid;
+    gap: 4px;
+    padding-bottom: 8px;
+}
+.visualization summary {
+    cursor: pointer;
+    font-size: 13px;
+    padding: 12px 0;
+    min-height: 44px;
+}
+.visualization-hint {
+    position: absolute;
+    left: 12px;
+    bottom: 8px;
+    background: #101b24e8;
+    padding: 5px 9px;
+    border-radius: 6px;
+    pointer-events: none;
+}
+.visualization-panel {
+    width: 320px;
+    overflow: auto;
+    padding: 20px;
+    border-left: 1px solid #30424f;
+    flex-shrink: 0;
+}
+.visualization-panel h2 {
+    margin: 0 0 8px;
+    font-size: 20px;
+}
+.visualization-panel h3 {
+    font-size: 14px;
+    margin: 12px 0 0;
+}
+.visualization-problems {
+    display: grid;
+    gap: 8px;
+}
+.visualization-problem {
+    padding: 10px;
+    border: 1px solid #6f6144;
+    border-radius: 8px;
+    font-size: 12px;
+}
+.visualization-problem strong {
+    color: #fde68a;
+    overflow-wrap: anywhere;
+}
+.visualization-problem-error {
+    border-color: #915351;
+}
+.visualization-problem-error strong {
+    color: #fca5a5;
+}
+.visualization-problem button {
+    font-size: 12px;
+    width: 100%;
+    text-align: left;
+}
+.visualization-quality {
+    display: grid;
+    gap: 8px;
+    margin: 16px 0;
+    font-size: 13px;
+}
+.visualization-panel img {
+    width: 100%;
+    display: block;
+    border: 1px solid #496071;
+    border-radius: 6px;
+}
+.visualization-overlay {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    background: #101b24;
+    text-align: center;
+}
+.visualization-empty {
+    justify-content: center;
+    align-items: center;
+    padding: 24px;
+}
+@media (max-width: 700px) {
+    .visualization-header {
+        padding: 8px;
+        gap: 8px;
+        flex-wrap: wrap;
+    }
+    .visualization-header h1 {
+        font-size: 15px;
+    }
+    .visualization-header p {
+        font-size: 11px;
+    }
+    .visualization-header button {
+        font-size: 12px;
+        padding: 8px;
+    }
+    .visualization-body {
+        flex-direction: column;
+    }
+    .visualization-panel {
+        width: 100%;
+        max-height: 36%;
+        padding: 12px;
+        border-left: 0;
+        border-top: 1px solid #30424f;
+    }
+    .visualization-panel h2 {
+        font-size: 16px;
+    }
+    .visualization-hint {
+        font-size: 10px !important;
+        right: 12px;
+    }
+    .visualization-camera {
+        top: 8px;
+        left: 8px;
+        right: 8px;
+        gap: 4px;
+    }
+    .visualization-camera button {
+        font-size: 11px;
+        padding: 6px 8px;
+    }
+}

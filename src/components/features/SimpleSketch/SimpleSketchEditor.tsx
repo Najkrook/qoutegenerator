@@ -1,6 +1,7 @@
 import { useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import {
     IconDownload,
+    IconCube,
     IconRefresh,
     IconRulerMeasure,
     IconStack2
@@ -438,7 +439,12 @@ function buildMaterialRows(layout: ComputedLayoutResult, parasols: PlacedParasol
     return rows;
 }
 
-export function SimpleSketchEditor({ onBack, onExportToQuoteComplete, modeToggleNode }: SketchToolProps) {
+export function SimpleSketchEditor({
+    onBack,
+    onExportToQuoteComplete,
+    onOpenVisualization,
+    modeToggleNode
+}: SketchToolProps) {
     const { state, dispatch } = useQuote();
     const { user, canExportSketchToQuote } = useAuth();
 
@@ -1364,6 +1370,13 @@ export function SimpleSketchEditor({ onBack, onExportToQuoteComplete, modeToggle
         onBack?.();
     }, [flushAutosave, onBack]);
 
+    const handleOpenVisualization = useCallback(() => {
+        flushAutosave();
+        // The untouched initial sketch has no pending autosave, but needs a snapshot too.
+        commitAutosaveSnapshot(autosaveSnapshot);
+        onOpenVisualization?.();
+    }, [flushAutosave, commitAutosaveSnapshot, autosaveSnapshot, onOpenVisualization]);
+
     const materialIssueCount = criticalWarnings.length
         + invalidEdges.length
         + warningWarnings.length
@@ -1399,6 +1412,12 @@ export function SimpleSketchEditor({ onBack, onExportToQuoteComplete, modeToggle
                     tone: readinessTone,
                     onClick: openMaterialPanel
                 }}
+                visualizationAction={onOpenVisualization
+                    ? {
+                        label: 'Visa 3D',
+                        onClick: handleOpenVisualization
+                    }
+                    : undefined}
                 primaryAction={canExportSketchToQuote
                     ? {
                         label: 'Överför till offert',
@@ -1422,6 +1441,11 @@ export function SimpleSketchEditor({ onBack, onExportToQuoteComplete, modeToggle
                     }
                     : undefined}
                 overflowActions={[
+                    ...(onOpenVisualization ? [{
+                        label: 'Visa 3D',
+                        icon: <IconCube aria-hidden="true" size={17} stroke={1.8} />,
+                        onClick: handleOpenVisualization
+                    }] : []),
                     {
                         label: 'Ladda ner bild',
                         icon: <IconDownload aria-hidden="true" size={17} stroke={1.8} />,

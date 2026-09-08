@@ -75,8 +75,16 @@ One outdoor product positioned in a Simple Sketch, distinct from the product typ
 _Avoid_: Catalog row, asset instance
 
 **Simplified Product Model**:
-A dimensionally faithful visual substitute used when a placed outdoor product lacks a finished 3D asset; it remains visibly distinguishable from a finished product model.
-_Avoid_: Missing product, invisible product
+A visibly distinct substitute that preserves trustworthy placement dimensions and known identity when a final visual representation is unavailable or unverified. It must not imply unknown dimensions, variants, materials, or detail.
+_Avoid_: Missing product, invisible product, guessed product model
+
+**Visualization Problem**:
+A stable, user-meaningful diagnosis that part of a 3D Visualization is degraded or omitted while its source Simple Sketch remains unchanged.
+_Avoid_: Exception, console error, UI message
+
+**Visualization Quality Level**:
+The degree of visual polish in a 3D Visualization, independent of the represented products, trustworthy dimensions, placements and Visualization Problems. A lower level is not itself a Simplified Product Model or an omitted product.
+_Avoid_: Product accuracy, simplified sketch, missing geometry
 
 ## Warehouse Language
 

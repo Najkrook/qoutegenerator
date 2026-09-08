@@ -124,6 +124,13 @@ export function useAppNavigation() {
                 options
             );
         },
+        goToSketchVisualization() {
+            navigate(`${APP_PATHS[APP_ROUTE_IDS.sketchVisualization]}${location.search}`, { state: { fromSketch: true } });
+        },
+        returnFromSketchVisualization() {
+            if (location.state?.fromSketch) navigate(-1);
+            else navigate(`${APP_PATHS[APP_ROUTE_IDS.sketch]}${location.search}`, { replace: true });
+        },
         goToLogin(next?: string | { pathname: string; search?: string; hash?: string }, options?: NavigateOptions) {
             if (!next) {
                 navigate(APP_PATHS[APP_ROUTE_IDS.login], options);

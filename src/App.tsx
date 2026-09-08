@@ -57,6 +57,7 @@ const InventoryQrGenerator = lazy(() => import('./views/InventoryQrGenerator').t
 const QrScanner = lazy(() => import('./views/QrScanner').then((module) => ({ default: module.QrScanner })));
 const QrParasolDetail = lazy(() => import('./views/QrParasolDetail').then((module) => ({ default: module.QrParasolDetail })));
 const SketchTool = lazy(() => import('./views/SketchTool').then((module) => ({ default: module.SketchTool })));
+const SketchVisualization = lazy(() => import('./views/SketchVisualization').then((module) => ({ default: module.SketchVisualization })));
 const Planner = lazy(() => import('./views/Planner').then((module) => ({ default: module.Planner })));
 const History = lazy(() => import('./views/History').then((module) => ({ default: module.History })));
 const CrmDashboardPage = lazy(() => import('./views/crm/CrmDashboard').then((module) => ({ default: module.CrmDashboardPage })));
@@ -92,6 +93,7 @@ function RouteShell() {
     const location = useLocation();
     const routeId = getAppRouteIdFromPath(location.pathname);
     const isFocusRoute = routeId === APP_ROUTE_IDS.sketch
+        || routeId === APP_ROUTE_IDS.sketchVisualization
         || routeId === APP_ROUTE_IDS.qrScanner
         || routeId === APP_ROUTE_IDS.qrParasolDetail;
     const isWideRoute = routeId === APP_ROUTE_IDS.quoteSummary
@@ -432,8 +434,19 @@ function SketchPage() {
         <SketchTool
             onBack={() => navigation.goToSketchReturnTarget(returnTarget)}
             onExportToQuoteComplete={() => navigation.goToQuoteStep(exportTarget)}
+            onOpenVisualization={() => navigation.goToSketchVisualization()}
         />
     );
+}
+
+function LegacySketchVisualizationRedirect() {
+    const location = useLocation();
+    return <Navigate to={`${APP_PATHS[APP_ROUTE_IDS.sketchVisualization]}${location.search}`} state={location.state} replace />;
+}
+
+function SketchVisualizationPage() {
+    const navigation = useAppNavigation();
+    return <SketchVisualization onBack={() => navigation.returnFromSketchVisualization()} />;
 }
 
 function PlannerPage() {
@@ -595,6 +608,18 @@ export const appRoutes: RouteObject[] = [
                 element: (
                     <RouteAccessBoundary routeId={APP_ROUTE_IDS.sketch}>
                         <SketchPage />
+                    </RouteAccessBoundary>
+                )
+            },
+            {
+                path: APP_PATHS[APP_ROUTE_IDS.sketch3dPrototype].slice(1),
+                element: <RouteAccessBoundary routeId={APP_ROUTE_IDS.sketch3dPrototype}><LegacySketchVisualizationRedirect /></RouteAccessBoundary>
+            },
+            {
+                path: APP_PATHS[APP_ROUTE_IDS.sketchVisualization].slice(1),
+                element: (
+                    <RouteAccessBoundary routeId={APP_ROUTE_IDS.sketchVisualization}>
+                        <SketchVisualizationPage />
                     </RouteAccessBoundary>
                 )
             },
