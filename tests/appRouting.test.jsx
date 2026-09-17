@@ -996,6 +996,7 @@ describe('app routing', () => {
 
         expect(notificationMocks.confirmChoiceAction).toHaveBeenCalledWith(expect.objectContaining({
             title: 'Starta ny offert?',
+            message: expect.stringContaining('Osparade ändringar går förlorade'),
             confirmText: 'Starta ny offert',
             cancelText: 'Avbryt',
             secondaryText: 'Fortsätt utkast'

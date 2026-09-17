@@ -239,7 +239,7 @@ describe('Dashboard admin workspace', () => {
             .toBe('Välkommen till Brixx portal');
     });
 
-    it('turns the quote launcher into a continue action when a draft exists', async () => {
+    it('offers both new and continue actions in the quote card when a draft exists', async () => {
         const { props } = renderDashboard({
             props: {
                 quoteDraftSummary: {
@@ -255,14 +255,21 @@ describe('Dashboard admin workspace', () => {
         await waitForFeeds();
 
         expect(screen.queryByRole('button', { name: /Skapa ny offert/i })).toBeNull();
-        const continueButton = screen.getByRole('button', { name: /Fortsätt offert/i });
-        expect(continueButton.textContent).toContain('Testbolaget AB');
-        expect(continueButton.textContent).toContain('Steg 3 av 4 · Prissättning');
+        const quoteCard = screen.getByRole('group', { name: 'Offerter' });
+        const continueButton = within(quoteCard).getByRole('button', { name: 'Fortsätt senaste' });
+        const newButton = within(quoteCard).getByRole('button', { name: 'Ny offert' });
+        expect(quoteCard.textContent).toContain('Testbolaget AB');
+        expect(quoteCard.textContent).toContain('Steg 3 av 4 · Prissättning');
 
         fireEvent.click(continueButton);
 
         expect(props.onContinueQuote).toHaveBeenCalledTimes(1);
         expect(props.onStartQuote).not.toHaveBeenCalled();
+
+        fireEvent.click(newButton);
+
+        expect(props.onStartQuote).toHaveBeenCalledTimes(1);
+        expect(props.onContinueQuote).toHaveBeenCalledTimes(1);
     });
 
     it('requests and renders three static rows in each recent feed', async () => {

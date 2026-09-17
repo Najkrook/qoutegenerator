@@ -41,7 +41,7 @@ export function useQuoteDraftActions() {
         if (hasQuoteDraft) {
             const choice = await confirmChoiceAction({
                 title: 'Starta ny offert?',
-                message: `Det finns ett pågående utkast för ${customerLabel}. Om du startar en ny offert rensas utkastet och du börjar om från början.`,
+                message: `Det finns ett pågående utkast för ${customerLabel}. Osparade ändringar går förlorade om du startar en ny offert. Sparade offerter finns kvar i Offerter.`,
                 confirmText: 'Starta ny offert',
                 cancelText: 'Avbryt',
                 secondaryText: 'Fortsätt utkast',

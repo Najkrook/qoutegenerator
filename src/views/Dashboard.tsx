@@ -310,6 +310,47 @@ function DashboardLauncherCard({
     );
 }
 
+function QuoteLauncherCard({ onStartQuote, onContinueQuote, quoteDraftSummary }: QuoteDraftPanelProps) {
+    if (!quoteDraftSummary || !onContinueQuote) {
+        return (
+            <DashboardLauncherCard
+                badgeBgClass="bg-indigo-500/10 text-indigo-600 dark:bg-indigo-500/20 dark:text-indigo-400 border border-indigo-500/30"
+                description="Starta ett nytt offertflöde."
+                emoji="➕"
+                hoverBorderClass="hover:border-indigo-500/60 hover:bg-indigo-500/5"
+                label="Skapa ny offert"
+                onClick={onStartQuote}
+            />
+        );
+    }
+
+    return (
+        <div
+            role="group"
+            aria-label="Offerter"
+            className="grid min-h-36 grid-cols-[auto_minmax(0,1fr)] items-center gap-4 rounded-panel border border-indigo-500/40 bg-surface-raised p-5 shadow-sm sm:gap-5"
+        >
+            <div className="flex h-14 w-14 items-center justify-center rounded-2xl border border-indigo-500/30 bg-indigo-500/10 text-2xl shadow-inner dark:bg-indigo-500/20">
+                <span aria-hidden="true">📄</span>
+            </div>
+            <div className="min-w-0">
+                <div className="grid grid-cols-2 gap-2">
+                    <Button onClick={onStartQuote} disabled={!onStartQuote} size="sm" variant="primary">
+                        Ny offert
+                    </Button>
+                    <Button onClick={onContinueQuote} size="sm">
+                        Fortsätt senaste
+                    </Button>
+                </div>
+                <p className="mb-0 mt-2 break-words text-sm leading-6 text-text-muted">
+                    <span className="block font-medium text-text">{quoteDraftSummary.customerLabel}</span>
+                    {quoteDraftSummary.stepLabel}
+                </p>
+            </div>
+        </div>
+    );
+}
+
 export function Dashboard({
     onStartQuote,
     onContinueQuote,
@@ -486,18 +527,7 @@ export function Dashboard({
     }
 
     if (canViewEverything) {
-        const hasResumableDraft = Boolean(quoteDraftSummary && onContinueQuote);
         const launcherItems: DashboardLauncherCardProps[] = [
-            {
-                badgeBgClass: 'bg-indigo-500/10 text-indigo-600 dark:bg-indigo-500/20 dark:text-indigo-400 border border-indigo-500/30',
-                description: hasResumableDraft && quoteDraftSummary
-                    ? `${quoteDraftSummary.customerLabel} · ${quoteDraftSummary.stepLabel}`
-                    : 'Starta ett nytt offertflöde.',
-                emoji: hasResumableDraft ? '📄' : '➕',
-                hoverBorderClass: 'hover:border-indigo-500/60 hover:bg-indigo-500/5',
-                label: hasResumableDraft ? 'Fortsätt offert' : 'Skapa ny offert',
-                onClick: hasResumableDraft ? onContinueQuote : onStartQuote
-            },
             {
                 badgeBgClass: 'bg-cyan-500/10 text-cyan-600 dark:bg-cyan-500/20 dark:text-cyan-400 border border-cyan-500/30',
                 description: 'Sök produkter, storlekar och tillbehör.',
@@ -563,6 +593,11 @@ export function Dashboard({
                     aria-label="Administrationsverktyg"
                     className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3"
                 >
+                    <QuoteLauncherCard
+                        onStartQuote={onStartQuote}
+                        onContinueQuote={onContinueQuote}
+                        quoteDraftSummary={quoteDraftSummary}
+                    />
                     {launcherItems.map((item) => (
                         <DashboardLauncherCard key={item.label} {...item} />
                     ))}
