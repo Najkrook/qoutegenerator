@@ -2,6 +2,8 @@
 
 Label: wayfinder:map
 
+Status: destination nådd — underlaget slutligt godkänt 2026-09-07.
+
 ## Destination
 
 En godkänd, implementationklar specifikation för en integrerad och skrivskyddad 3D Visualization i QuoteGenerator som härleder en måttriktig offert- och planeringsvy från den aktuella Simple Sketch, visar ClickitUp, placerade BaHaMa-parasoller och Fiesta-värmare samt kan exportera en högupplöst PNG.
@@ -32,12 +34,21 @@ En godkänd, implementationklar specifikation för en integrerad och skrivskydda
 - [Godkänn ClickitUp-sektionens visuella byggsätt](issues/03-godkann-clickitup-sektionens-byggsatt.md): En semantiskt uppdelad GLB med längdanpassade span och delade skarv-, hörn- och ändkomponenter blir primärmodell; en tydligt förenklad procedurmodell blir fallback.
 - [Välj produktmodellstrategi för BaHaMa och Fiesta](issues/04-valj-produktmodellstrategi-for-bahama-och-fiesta.md): Jumbrella använder den befintliga måttdrivna procedurgeometrin som primärmodell, Fiesta börjar som verifieringskrävande Simplified Product Model och framtida GLB-assets kan ersätta exakta visuella variantnycklar utan katalog- eller priskoppling.
 - [Lås fel- och fallbacktolkningen](issues/05-las-fel-och-fallbacktolkningen.md): Tillförlitlig best-effort-rendering med tydliga problem och Simplified Product Models är exportbar med disclosure, medan utelämnade entiteter, otolkbara planer och terminala renderingsfel blockerar PNG.
+- [Godkänn den sammansatta 3D-scenen](issues/06-godkann-den-sammansatta-3d-scenen.md): En återhållen dagsljusmiljö med högt trekvartsperspektiv blir standard, kompletterad av tekniskt granskningsläge, ovanifrånkamera och fokuserbara beständiga problem på desktop och mobil.
+
+- [Godkänn 3D-arbetsflödet och bildexporten](issues/07-godkann-3d-arbetsflodet-och-bildexporten.md): Godkänt skrivskyddat flöde från aktuell skiss i samma flik, med kamerakontroller, tydlig problemstatus och högupplöst PNG; Granska behålls som standard.
+
+- [Lås runtime- och assetleveransen](issues/08-las-runtime-och-assetleveransen.md): Godkänd Three.js-leverans med lazy loading, semantisk GLB, delade resurser, scenägd livscykel och samma funktioner på mobil; inga separata prestandamätningar.
+- [Fastställ implementationsspecifikationen](issues/09-faststall-implementationsspecifikationen.md): Den [sammanhållna specifikationen](implementation-spec.md) och dess sex implementationssteg godkändes av användaren med ”go ahead” 2026-09-07. Planeringsdestinationen är nådd; produktionsimplementation och driftsättning ingår inte.
 
 ## Not yet specified
 
-- Exakta visuella och prestandamässiga acceptansnivåer för stora skisser; dessa kan preciseras först när optimerad ClickitUp-geometri och flera produktinstanser har mätts tillsammans.
+- Inga öppna specifikationsbeslut återstår i denna karta. Måttkontroller, verifierad dörrkälla och Fiesta-identitet kvarstår som produktionsförutsättningar enligt specifikationen, inte som genomförda kontroller.
+- Referensfallet är 30 ClickitUp-sektioner, 4 parasoller och 2 Fiesta med samma funktioner på mobil. Inga ytterligare prototyprundor eller separata prestandamätningar ingår. Historiska hänvisningar till mätstyrda budgetar i tickets 01/03/06 är ersatta av scopebeslutet i ticket 08 och specifikationen.
 
 ## Out of scope
+
+- [Mät det dimensionerande 3D-kundfallet](issues/10-mat-det-dimensionerande-3d-kundfallet.md): Separat benchmark, fysisk mobilprestandamätning och numeriska kapacitetsbudgetar har uttryckligen valts bort av användaren 2026-09-07. Prototypens upplevda funktion räcker för fortsatt planering; vanlig funktionskontroll kvarstår. Ticketen är avförd, inte genomförd.
 
 - Advanced Sketch och överföring från godtyckliga nod-/kantnät.
 - Redigering i 3D eller återföring av ändringar från 3D till 2D.

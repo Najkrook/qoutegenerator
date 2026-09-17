@@ -115,11 +115,12 @@ vi.mock('../src/utils/fileUtils', () => ({
 
 import { SimpleSketchEditor } from '../src/components/features/SimpleSketch/SimpleSketchEditor';
 
-function renderEditor() {
+function renderEditor(props = {}) {
     return render(
         <SimpleSketchEditor
             modeToggleNode={<button type="button">Enkel</button>}
             onBack={() => {}}
+            {...props}
         />
     );
 }
@@ -156,6 +157,16 @@ afterEach(() => {
 });
 
 describe('SimpleSketchEditor workspace', () => {
+    it('opens the 3D prototype from Simple Sketch after flushing autosave', () => {
+        const onOpenVisualization = vi.fn();
+        renderEditor({ onOpenVisualization });
+
+        fireEvent.click(screen.getByRole('button', { name: 'Visa 3D' }));
+
+        expect(autosaveState.flush).toHaveBeenCalledTimes(1);
+        expect(onOpenVisualization).toHaveBeenCalledTimes(1);
+    });
+
     it('uses quote transfer as the primary action and image download as the secondary action for full access', () => {
         renderEditor();
 

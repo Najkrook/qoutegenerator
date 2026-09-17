@@ -1,0 +1,54 @@
+.workflow-preview { height:100%; min-height:0; flex:1; display:flex; flex-direction:column; overflow:hidden; background:#101b24; color:#eef4f6; font-family:Inter,system-ui,sans-serif; }
+.workflow-preview * { box-sizing:border-box; }
+.workflow-preview button, .workflow-preview select { font:inherit; color:inherit; border:1px solid #496071; background:#20313e; border-radius:9px; padding:10px 12px; cursor:pointer; min-height:42px; }
+.workflow-preview button:hover { background:#304956; }
+.workflow-preview button:disabled { opacity:.45; cursor:not-allowed; }
+.workflow-preview button:focus-visible,.workflow-preview select:focus-visible { outline:2px solid #7dd3fc; outline-offset:2px; }
+.workflow-preview p { font-size:13px; color:#bbcbd5; line-height:1.5; margin:8px 0; }
+.workflow-header { display:flex; gap:18px; align-items:center; padding:12px 18px; border-bottom:1px solid #30424f; }
+.workflow-header h1 { font-size:18px; margin:0; }
+.workflow-header p { margin:2px 0 0; }
+.workflow-header small { color:#e8c89b; font-size:11px; padding-left:8px; }
+.workflow-header .workflow-export { margin-left:auto; background:#d8eaf0; color:#142631; font-weight:650; }
+.workflow-body { display:flex; flex:1; min-height:0; }
+.workflow-canvas { position:relative; flex:1; min-height:0; min-width:0; }
+.workflow-renderer { position:absolute; inset:0; }
+.workflow-renderer canvas { display:block; width:100%; height:100%; touch-action:none; }
+.workflow-camera { position:absolute; top:14px; left:14px; right:14px; display:flex; flex-wrap:wrap; gap:6px; }
+.workflow-camera button { background:#101b24e8; font-size:12px; }
+.workflow-hint { position:absolute; left:12px; bottom:8px; background:#101b24e8; padding:5px 9px; border-radius:6px; pointer-events:none; }
+.workflow-panel { width:320px; overflow:auto; padding:20px; border-left:1px solid #30424f; flex-shrink:0; }
+.workflow-panel h2 { margin:0 0 8px; font-size:20px; }
+.workflow-panel summary { cursor:pointer; font-size:14px; padding:12px 0; }
+.workflow-problems { display:grid; gap:8px; }
+.workflow-problems button { text-align:left; font-size:12px; line-height:1.45; border-color:#6f6144; }
+.workflow-problems span,.workflow-problems small { display:block; }
+.workflow-problems span { color:#fde68a; margin-bottom:4px; font-weight:650; }
+.workflow-problems small { margin-top:6px; color:#9dcadd; }
+.workflow-review { border-top:1px solid #30424f; margin-top:18px; }
+.workflow-review label { font-size:12px; display:grid; gap:8px; }
+.workflow-review select { width:100%; min-width:0; }
+.workflow-export-note { padding:12px 0; }
+.workflow-export-preview img { width:100%; display:block; border:1px solid #496071; border-radius:6px; }
+.workflow-switcher { display:flex; gap:8px; justify-content:center; padding:8px; background:#09131b; flex-shrink:0; }
+.workflow-switcher button { font-size:12px; min-height:34px; padding:5px 14px; }
+.workflow-switcher button[aria-pressed=true] { border-color:#7dd3fc; background:#264454; }
+.workflow-overlay { position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:24px; background:#101b24; text-align:center; }
+.workflow-empty { justify-content:center; align-items:center; padding:24px; }
+.workflow-presentation .workflow-body { flex-direction:column; }
+.workflow-presentation .workflow-panel { width:100%; max-height:28%; border-left:0; border-top:1px solid #30424f; padding:10px 20px; }
+.workflow-presentation .workflow-panel>h2 { display:inline; font-size:16px; }
+.workflow-presentation .workflow-panel>p { display:inline; margin-left:12px; }
+.workflow-presentation .workflow-problems { grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); }
+@media(max-width:700px) {
+    .workflow-header { padding:8px; gap:8px; flex-wrap:wrap; }
+    .workflow-header h1 { font-size:15px; }
+    .workflow-header p { font-size:10px; }
+    .workflow-header button { font-size:12px; padding:8px; }
+    .workflow-body { flex-direction:column; }
+    .workflow-panel { width:100%; max-height:32%; padding:12px; border-left:0; border-top:1px solid #30424f; }
+    .workflow-panel h2 { font-size:16px; }
+    .workflow-hint { font-size:10px!important; right:12px; }
+    .workflow-camera { top:8px; left:8px; gap:4px; }
+    .workflow-camera button { font-size:10px; padding:6px 8px; }
+}

@@ -47,6 +47,9 @@ describe('navigation routes', () => {
     it('maps access-controlled routes back to dashboard when access is missing', () => {
         expect(getAuthorizedRouteForAccess(APP_ROUTE_IDS.inventory, ACCESS_LEVELS.QUOTE_ONLY)).toBe(APP_PATHS[APP_ROUTE_IDS.dashboard]);
         expect(getAuthorizedRouteForAccess(APP_ROUTE_IDS.sketch, ACCESS_LEVELS.RETAILER)).toBe(APP_PATHS[APP_ROUTE_IDS.dashboard]);
+        expect(getAuthorizedRouteForAccess(APP_ROUTE_IDS.sketchVisualization, ACCESS_LEVELS.FULL)).toBe(APP_PATHS[APP_ROUTE_IDS.sketchVisualization]);
+        expect(getAuthorizedRouteForAccess(APP_ROUTE_IDS.sketchVisualization, ACCESS_LEVELS.SKETCH_ONLY)).toBe(APP_PATHS[APP_ROUTE_IDS.sketchVisualization]);
+        expect(getAuthorizedRouteForAccess(APP_ROUTE_IDS.sketchVisualization, ACCESS_LEVELS.RETAILER)).toBe(APP_PATHS[APP_ROUTE_IDS.dashboard]);
         expect(getAuthorizedRouteForAccess(APP_ROUTE_IDS.quotes, ACCESS_LEVELS.QUOTE_ONLY)).toBe(APP_PATHS[APP_ROUTE_IDS.quotes]);
         expect(getAuthorizedRouteForAccess(APP_ROUTE_IDS.priceList, ACCESS_LEVELS.FULL)).toBe(APP_PATHS[APP_ROUTE_IDS.priceList]);
         expect(getAuthorizedRouteForAccess(APP_ROUTE_IDS.priceList, ACCESS_LEVELS.QUOTE_ONLY)).toBe(APP_PATHS[APP_ROUTE_IDS.priceList]);
@@ -76,6 +79,16 @@ describe('navigation routes', () => {
         expect(getAppRouteIdFromPath('/scan')).toBe(APP_ROUTE_IDS.qrScanner);
         expect(getAppRouteIdFromPath('/p/1234')).toBe(APP_ROUTE_IDS.qrParasolDetail);
         expect(resolveLoginRedirectTarget('/p/1234')).toBe('/p/1234');
+    });
+
+    it('recognizes the protected production and legacy 3D routes', () => {
+        expect(getAppRouteIdFromPath('/sketch/3d')).toBe(APP_ROUTE_IDS.sketchVisualization);
+        expect(getAppRouteIdFromPath('/sketch/3d-prototype')).toBe(APP_ROUTE_IDS.sketch3dPrototype);
+        for (const route of [APP_ROUTE_IDS.sketchVisualization, APP_ROUTE_IDS.sketch3dPrototype]) {
+            for (const role of [ACCESS_LEVELS.GUEST, ACCESS_LEVELS.QUOTE_ONLY, ACCESS_LEVELS.RETAILER]) {
+                expect(getAuthorizedRouteForAccess(route, role)).toBe(APP_PATHS[APP_ROUTE_IDS.dashboard]);
+            }
+        }
     });
 
     it('encodes login next targets and resolves them safely', () => {

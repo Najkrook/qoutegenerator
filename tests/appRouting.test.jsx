@@ -249,10 +249,20 @@ vi.mock('../src/views/History', () => ({
 }));
 
 vi.mock('../src/views/SketchTool', () => ({
-    SketchTool: ({ onBack, onExportToQuoteComplete }) => (
+    SketchTool: ({ onBack, onExportToQuoteComplete, onOpenVisualization }) => (
         <div>
             <button type="button" onClick={onBack}>Back From Sketch</button>
             <button type="button" onClick={onExportToQuoteComplete}>Export From Sketch</button>
+            <button type="button" onClick={onOpenVisualization}>Open 3D Visualization</button>
+        </div>
+    )
+}));
+
+vi.mock('../src/views/SketchVisualization', () => ({
+    SketchVisualization: ({ onBack }) => (
+        <div>
+            <div>SketchVisualizationView</div>
+            <button type="button" onClick={onBack}>Back From 3D Prototype</button>
         </div>
     )
 }));
@@ -340,7 +350,54 @@ afterEach(() => {
 });
 
 describe('app routing', () => {
-    it('uses the focus shell without global navigation only on the sketch route', async () => {
+    it.each(['quote-only', 'retailer'])('denies both 3D URLs to %s', async (accessLevel) => {
+        for (const path of ['/sketch/3d', '/sketch/3d-prototype']) {
+            const view = await renderApp({ initialEntries: [path], auth: { accessLevel } });
+            expect(view.router.state.location.pathname).toBe('/');
+            expect(view.container.textContent).not.toContain('SketchVisualizationView');
+        }
+    });
+
+    it('requires login before opening the 3D route and preserves the return target', async () => {
+        const view = await renderApp({
+            initialEntries: ['/sketch/3d?return=quote-summary'],
+            auth: { user: null, accessLevel: 'guest' }
+        });
+        expect(view.router.state.location.pathname).toBe('/login');
+        expect(new URLSearchParams(view.router.state.location.search).get('next')).toBe('/sketch/3d?return=quote-summary');
+    });
+    it('redirects the old 3D URL while preserving query context and direct-entry return', async () => {
+        const view = await renderApp({
+            initialEntries: ['/sketch/3d-prototype?return=quote-summary&crmDealId=deal-1'],
+            auth: { accessLevel: 'sketch-only', canAccessSketch: true }
+        });
+        expect(view.router.state.location.pathname).toBe('/sketch/3d');
+        expect(view.router.state.location.search).toBe('?return=quote-summary&crmDealId=deal-1');
+        await clickButton(view.container, 'Back From 3D Prototype');
+        expect(view.router.state.location.pathname).toBe('/sketch');
+        expect(view.router.state.location.search).toBe('?return=quote-summary&crmDealId=deal-1');
+    });
+    it('opens 3D in the same tab and returns with the original sketch context', async () => {
+        const sketch = await renderApp({
+            initialEntries: ['/sketch?return=quote-summary&crmDealId=deal-1'],
+            auth: {
+                accessLevel: 'full',
+                canViewEverything: true,
+                canAccessSketch: true,
+                canExportSketchToQuote: true
+            }
+        });
+
+        await clickButton(sketch.container, 'Open 3D Visualization');
+
+        expect(sketch.router.state.location.pathname).toBe(APP_PATHS[APP_ROUTE_IDS.sketchVisualization]);
+        expect(sketch.router.state.location.search).toBe('?return=quote-summary&crmDealId=deal-1');
+        await clickButton(sketch.container, 'Back From 3D Prototype');
+        expect(sketch.router.state.location.pathname).toBe(APP_PATHS[APP_ROUTE_IDS.sketch]);
+        expect(sketch.router.state.location.search).toBe('?return=quote-summary&crmDealId=deal-1');
+    });
+
+    it('uses the focus shell without global navigation on sketch routes', async () => {
         const sketch = await renderApp({
             initialEntries: [APP_PATHS[APP_ROUTE_IDS.sketch]],
             auth: {
@@ -359,6 +416,16 @@ describe('app routing', () => {
         expect(focusShell.firstElementChild.classList.contains('max-w-[1920px]')).toBe(true);
         expect(focusShell.querySelector('header')).toBeNull();
         expect(focusShell.querySelector('#main-content').classList.contains('overflow-hidden')).toBe(true);
+
+        const prototype = await renderApp({
+            initialEntries: [APP_PATHS[APP_ROUTE_IDS.sketchVisualization]],
+            auth: {
+                accessLevel: 'sketch-only',
+                canAccessSketch: true
+            }
+        });
+        expect(prototype.container.textContent).toContain('SketchVisualizationView');
+        expect(prototype.container.querySelector('[data-app-shell="focus"]')).toBeTruthy();
 
         const dashboard = await renderApp({
             auth: {
