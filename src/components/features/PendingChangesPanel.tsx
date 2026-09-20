@@ -1,20 +1,5 @@
 import React from 'react';
-import type {
-    BahamaInventoryV2Item,
-    ClickitupFieldKey,
-    ClickitupStockMap,
-    PendingChangesPanelProps
-} from '../../types/contracts';
-
-interface DiffChange {
-    key: string;
-    title: string;
-    desc: string;
-    icon: string;
-    color: string;
-}
-
-const CLICKITUP_FIELDS: ClickitupFieldKey[] = ['sektion', 'dorr_h', 'dorr_v', 'hane_h', 'hane_v'];
+import type { PendingChangesPanelProps } from '../../types/contracts';
 
 function DiffTag({ title, description, icon, color }: { title: string; description: string; icon: string; color: string }) {
     return (
@@ -28,100 +13,7 @@ function DiffTag({ title, description, icon, color }: { title: string; descripti
     );
 }
 
-function buildBahamaMap(items: BahamaInventoryV2Item[]): Record<string, BahamaInventoryV2Item> {
-    return items.reduce<Record<string, BahamaInventoryV2Item>>((acc, item) => {
-        if (item.id) {
-            acc[item.id] = item;
-        }
-        return acc;
-    }, {});
-}
-
-function formatBahamaDescription(item: BahamaInventoryV2Item): string {
-    return [item.id, item.type, item.size].filter(Boolean).join(' - ');
-}
-
-function formatClickitupField(field: ClickitupFieldKey): string {
-    return field
-        .replace('_h', ' Höger')
-        .replace('_v', ' Vänster')
-        .replace('dorr', 'Dörr')
-        .replace('hane', 'Hane')
-        .replace('sektion', 'Sektion');
-}
-
-export function PendingChangesPanel({ inventoryData, cloudInventoryData, onCommit, isSaving }: PendingChangesPanelProps) {
-    const changes: DiffChange[] = [];
-
-    const bahamaLocal = inventoryData.bahamaV2 || [];
-    const bahamaCloud = cloudInventoryData.bahamaV2 || [];
-    const cloudMap = buildBahamaMap(bahamaCloud);
-    const localMap = buildBahamaMap(bahamaLocal);
-
-    bahamaLocal.forEach((item) => {
-        if (!cloudMap[item.id]) {
-            changes.push({
-                key: `add-${item.id}`,
-                title: 'BaHaMa: Lades till',
-                desc: formatBahamaDescription(item),
-                icon: '+',
-                color: 'var(--success)'
-            });
-        } else if (JSON.stringify(item) !== JSON.stringify(cloudMap[item.id])) {
-            changes.push({
-                key: `upd-${item.id}`,
-                title: 'BaHaMa: Ändrades',
-                desc: formatBahamaDescription(item),
-                icon: 'upd',
-                color: 'var(--primary)'
-            });
-        }
-    });
-
-    bahamaCloud.forEach((item) => {
-        if (item.id && !localMap[item.id]) {
-            changes.push({
-                key: `del-${item.id}`,
-                title: 'BaHaMa: Togs bort',
-                desc: formatBahamaDescription(item),
-                icon: '-',
-                color: 'var(--danger)'
-            });
-        }
-    });
-
-    const clickitupLocal: ClickitupStockMap = inventoryData.clickitup || {};
-    const clickitupCloud: ClickitupStockMap = cloudInventoryData.clickitup || {};
-
-    Object.keys(clickitupLocal).forEach((size) => {
-        CLICKITUP_FIELDS.forEach((field) => {
-            const localValue = clickitupLocal[size]?.[field] || 0;
-            const cloudValue = clickitupCloud[size]?.[field] || 0;
-            const delta = localValue - cloudValue;
-            if (delta !== 0) {
-                const sign = delta > 0 ? '+' : '';
-                const color = delta > 0 ? 'var(--success)' : 'var(--danger)';
-                changes.push({
-                    key: `cu-${size}-${field}`,
-                    title: `ClickitUp ${size}`,
-                    desc: formatClickitupField(field),
-                    icon: `${sign}${delta}`,
-                    color
-                });
-            }
-        });
-    });
-
-    if (inventoryData.notes !== cloudInventoryData.notes) {
-        changes.push({
-            key: 'inventory-notes',
-            title: 'Huvudnoteringar',
-            desc: 'Noteringar har ändrats',
-            icon: 'txt',
-            color: 'var(--primary)'
-        });
-    }
-
+export function PendingChangesPanel({ changes, onCommit, isSaving }: PendingChangesPanelProps) {
     const hasChanges = changes.length > 0;
 
     return (

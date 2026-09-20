@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom';
 import { useQuote } from '../store/QuoteContext';
 import { useAuth } from '../store/AuthContext';
-import { db, doc, getDoc, collection, writeBatch } from '../services/firebase';
+import { db, doc, getDoc } from '../services/firebase';
 import { InventoryTable } from '../components/features/InventoryTable';
 import { ClickitupStockGrid } from '../components/features/ClickitupStockGrid';
 import { InventoryItemModal } from '../components/features/InventoryItemModal';
@@ -28,7 +28,7 @@ import {
     notifyWarn
 } from '../services/notificationService';
 import { getErrorMessage } from '../utils/runtime';
-import { ensureBahamaQrIds, stageBahamaQrProjectionWrites } from '../services/bahamaQrService';
+import { useInventoryWorkflow } from '../services/useInventoryWorkflow';
 import {
     formatBahamaStorageLocation,
     groupBahamaInventoryByStorageLocation,
@@ -38,8 +38,7 @@ import {
 } from '../services/bahamaStorageLocation';
 import {
     planBahamaInventoryMove,
-    undoBahamaInventoryMove,
-    type BahamaInventoryMoveChange
+    undoBahamaInventoryMove
 } from '../services/bahamaInventoryMove';
 import {
     getInventoryRouteSearch,
@@ -56,12 +55,6 @@ import type {
 
 type ProductLine = 'bahama' | 'clickitup';
 type InspectorMode = 'view' | 'create' | 'edit';
-
-interface BahamaMoveHistoryEntry {
-    changes: BahamaInventoryMoveChange[];
-    label: string;
-    sourceQrId: string;
-}
 
 interface InventoryViewTabsProps {
     view: InventoryView;
@@ -151,26 +144,6 @@ function getSearchBlob(item: BahamaInventoryV2Item): string {
     ].join(' ').toLowerCase();
 }
 
-function formatBahamaDetails(item: BahamaInventoryV2Item): string {
-    const properties = [
-        item.properties.stativ,
-        item.properties.textil,
-        item.properties.fot,
-        item.properties.belysning,
-        item.properties.varme
-    ].filter(Boolean).join(' / ');
-
-    return [
-        item.type,
-        item.size,
-        properties
-    ].filter(Boolean).join(' - ') || item.id;
-}
-
-function hasInventoryChanges(local: InventoryData, cloud: InventoryData): boolean {
-    return JSON.stringify(local) !== JSON.stringify(cloud);
-}
-
 function getUserEmail(user: { email?: string | null } | null): string {
     return user?.email || 'unknown';
 }
@@ -189,18 +162,22 @@ export function InventoryManager(_props: InventoryManagerProps) {
     const [sizeFilter, setSizeFilter] = useState('all');
     const [selectedBahamaQrId, setSelectedBahamaQrId] = useState<string | null>(null);
     const [inspectorMode, setInspectorMode] = useState<InspectorMode>('view');
-    const [isSaving, setIsSaving] = useState(false);
     const [isLoading, setIsLoading] = useState(true);
     const [loadError, setLoadError] = useState<string | null>(null);
     const [draggingBahamaQrId, setDraggingBahamaQrId] = useState<string | null>(null);
     const [moveDialogQrId, setMoveDialogQrId] = useState<string | null>(null);
-    const [moveHistory, setMoveHistory] = useState<BahamaMoveHistoryEntry[]>([]);
     const [storageFocusRequest, setStorageFocusRequest] = useState<BahamaStorageFocusRequest | null>(null);
     const storageFocusSequence = useRef(0);
     const dropHandledRef = useRef(false);
 
     const inventoryData = useMemo(() => getSafeInventoryData(state.inventoryData), [state.inventoryData]);
     const cloudInventoryData = useMemo(() => getSafeInventoryData(state.cloudInventoryData), [state.cloudInventoryData]);
+    const { changes, isSaving, save, moveHistory, setMoveHistory } = useInventoryWorkflow({
+        inventory: inventoryData,
+        baseline: cloudInventoryData,
+        updateDraft: (payload) => dispatch({ type: 'SET_INVENTORY_DATA', payload }),
+        updateBaseline: (payload) => dispatch({ type: 'SET_CLOUD_INVENTORY_DATA', payload })
+    });
     const bahamaItems = inventoryData.bahamaV2 || [];
     const sortedBahamaItems = useMemo(() => sortBahamaItems(bahamaItems), [bahamaItems]);
     const selectedItem = useMemo(
@@ -245,7 +222,7 @@ export function InventoryManager(_props: InventoryManagerProps) {
         });
     }, [searchTerm, sizeFilter, sortedBahamaItems, statusFilter]);
 
-    const changesPending = hasInventoryChanges(inventoryData, cloudInventoryData);
+    const changesPending = changes.length > 0;
 
     const navigateInventory = (view: InventoryView, rack: BahamaRackNumber = inventoryRoute.rack) => {
         setSearchParams(new URLSearchParams(getInventoryRouteSearch(view, rack)));
@@ -479,133 +456,11 @@ export function InventoryManager(_props: InventoryManagerProps) {
             return;
         }
 
-        setIsSaving(true);
         try {
-            const batch = writeBatch(db);
-            const inventoryToSave = cloneInventoryData(inventoryData);
-            inventoryToSave.bahamaV2 = ensureBahamaQrIds(inventoryToSave.bahamaV2 || []);
-            const invRef = doc(db, 'stock', 'main_inventory');
-            batch.set(invRef, inventoryToSave);
-
-            const logsRef = collection(db, 'inventory_logs');
-            const userEmail = getUserEmail(user);
-            const userUid = getUserUid(user);
-            const now = new Date().toISOString();
-            const nowMs = Date.now();
-
-            const bahamaLocal = inventoryToSave.bahamaV2 || [];
-            const bahamaCloud = cloudInventoryData.bahamaV2 || [];
-            stageBahamaQrProjectionWrites(batch, bahamaLocal, bahamaCloud, now);
-            const cloudMap = bahamaCloud.reduce<Record<string, BahamaInventoryV2Item>>((acc, item) => {
-                acc[item.id] = item;
-                return acc;
-            }, {});
-            const localMap = bahamaLocal.reduce<Record<string, BahamaInventoryV2Item>>((acc, item) => {
-                acc[item.id] = item;
-                return acc;
-            }, {});
-
-            bahamaLocal.forEach((item) => {
-                const cloudItem = cloudMap[item.id];
-                if (!cloudItem) {
-                    const logRef = doc(logsRef);
-                    batch.set(logRef, {
-                        timestamp: now,
-                        createdAt: nowMs,
-                        action: 'Lades Till',
-                        system: 'BaHaMa',
-                        category: 'bahama',
-                        targetType: 'item',
-                        targetId: item.id,
-                        element: item.id,
-                        details: formatBahamaDetails(item),
-                        user: userEmail,
-                        userUid,
-                        delta: null
-                    });
-                } else if (JSON.stringify(item) !== JSON.stringify(cloudItem)) {
-                    const logRef = doc(logsRef);
-                    batch.set(logRef, {
-                        timestamp: now,
-                        createdAt: nowMs,
-                        action: 'Ändrades',
-                        system: 'BaHaMa',
-                        category: 'bahama',
-                        targetType: 'item',
-                        targetId: item.id,
-                        element: item.id,
-                        details: formatBahamaDetails(item),
-                        user: userEmail,
-                        userUid,
-                        delta: null
-                    });
-                }
-            });
-
-            bahamaCloud.forEach((item) => {
-                if (!localMap[item.id]) {
-                    const logRef = doc(logsRef);
-                    batch.set(logRef, {
-                        timestamp: now,
-                        createdAt: nowMs,
-                        action: 'Togs Bort',
-                        system: 'BaHaMa',
-                        category: 'bahama',
-                        targetType: 'item',
-                        targetId: item.id,
-                        element: item.id,
-                        details: formatBahamaDetails(item),
-                        user: userEmail,
-                        userUid,
-                        delta: null
-                    });
-                }
-            });
-
-            const clickitupLocal = inventoryToSave.clickitup || {};
-            const clickitupCloud = cloudInventoryData.clickitup || {};
-            Object.keys(clickitupLocal).forEach((size) => {
-                (['sektion', 'dorr_h', 'dorr_v', 'hane_h', 'hane_v'] as ClickitupFieldKey[]).forEach((field) => {
-                    const localValue = clickitupLocal[size]?.[field] || 0;
-                    const cloudValue = clickitupCloud[size]?.[field] || 0;
-                    const delta = localValue - cloudValue;
-                    if (delta !== 0) {
-                        const fieldName = field
-                            .replace('_h', ' Höger')
-                            .replace('_v', ' Vänster')
-                            .replace('dorr', 'Dörr')
-                            .replace('hane', 'Hane')
-                            .replace('sektion', 'Sektion');
-                        const sign = delta > 0 ? '+' : '';
-                        const logRef = doc(logsRef);
-                        batch.set(logRef, {
-                            timestamp: now,
-                            createdAt: nowMs,
-                            action: 'Justering',
-                            system: 'ClickitUp',
-                            category: 'clickitup',
-                            targetType: 'size',
-                            targetId: String(size),
-                            element: size,
-                            details: `${fieldName} (${sign}${delta})`,
-                            user: userEmail,
-                            userUid,
-                            delta
-                        });
-                    }
-                });
-            });
-
-            await batch.commit();
-            dispatch({ type: 'SET_CLOUD_INVENTORY_DATA', payload: cloneInventoryData(inventoryToSave) });
-            dispatch({ type: 'SET_INVENTORY_DATA', payload: cloneInventoryData(inventoryToSave) });
-            setMoveHistory([]);
-            notifySuccess('Ändringar sparade till molnet!');
+            if (await save(user)) notifySuccess('Ändringar sparade till molnet!');
         } catch (err) {
             console.error('Failed to commit:', err);
             notifyError(getErrorMessage(err, 'Nätverksfel. Kontrollera din internetuppkoppling.'));
-        } finally {
-            setIsSaving(false);
         }
     };
 
@@ -640,8 +495,7 @@ export function InventoryManager(_props: InventoryManagerProps) {
                 </section>
             ) : null}
             <PendingChangesPanel
-                inventoryData={inventoryData}
-                cloudInventoryData={cloudInventoryData}
+                changes={changes}
                 onCommit={handleCommit}
                 isSaving={isSaving}
             />
@@ -897,8 +751,7 @@ export function InventoryManager(_props: InventoryManagerProps) {
                                 </label>
                             </section>
                             <PendingChangesPanel
-                                inventoryData={inventoryData}
-                                cloudInventoryData={cloudInventoryData}
+                                changes={changes}
                                 onCommit={handleCommit}
                                 isSaving={isSaving}
                             />

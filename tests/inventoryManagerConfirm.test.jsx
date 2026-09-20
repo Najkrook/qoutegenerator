@@ -289,22 +289,33 @@ describe('InventoryManager BaHaMa V2 workflow', () => {
 
     it('writes BaHaMa V2 inventory logs on save', async () => {
         const localItem = { ...inventoryItem, comment: 'Uppdaterad' };
-        const { container } = await renderInventoryManager({
+        const { container, dispatch } = await renderInventoryManager({
             inventoryData: { bahama: [], bahamaV2: [localItem], clickitup: {}, notes: '' },
             cloudInventoryData: { bahama: [], bahamaV2: [], clickitup: {}, notes: '' }
         });
         const saveButton = Array.from(container.querySelectorAll('button')).find((button) => button.textContent === 'Spara ändringar');
+        dispatch.mockClear();
+        firebaseMocks.writeBatch.mockClear();
 
         await act(async () => {
             saveButton.click();
             await Promise.resolve();
         });
 
-        expect(firebaseMocks.batchCommit).toHaveBeenCalled();
+        expect(firebaseMocks.writeBatch).toHaveBeenCalledTimes(1);
+        expect(firebaseMocks.batchCommit).toHaveBeenCalledTimes(1);
+        expect(firebaseMocks.batchSet).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
+            bahamaV2: [expect.objectContaining({ qrId: inventoryItem.qrId })]
+        }));
+        expect(firebaseMocks.batchSet).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
+            schemaVersion: 1, qrId: inventoryItem.qrId, active: true
+        }));
         expect(firebaseMocks.batchSet).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
             category: 'bahama',
             targetId: 'BA-001',
             details: expect.stringContaining('Parasoll')
         }));
+        expect(dispatch).toHaveBeenCalledWith(expect.objectContaining({ type: 'SET_CLOUD_INVENTORY_DATA' }));
+        expect(dispatch).not.toHaveBeenCalledWith(expect.objectContaining({ type: 'SET_INVENTORY_DATA' }));
     });
 });

@@ -1358,8 +1358,7 @@ export interface InventoryItemModalProps {
 }
 
 export interface PendingChangesPanelProps {
-    inventoryData: InventoryData;
-    cloudInventoryData: InventoryData;
+    changes: import('../services/inventoryChanges').InventoryChange[];
     onCommit: () => void | Promise<void>;
     isSaving: boolean;
 }
