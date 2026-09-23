@@ -5,16 +5,24 @@ import { StockQuantityControl } from './StockQuantityControl';
 
 const fieldColor: Record<ClickitupFieldKey, string> = {
     sektion: 'bg-emerald-400/[0.07]',
-    dorr_h: 'bg-orange-400/[0.07]',
-    dorr_v: 'bg-orange-400/[0.07]',
-    hane_h: 'bg-blue-400/[0.07]',
-    hane_v: 'bg-blue-400/[0.07]'
+    dorr_h: 'bg-rose-300/[0.10]',
+    dorr_v: 'bg-rose-300/[0.10]',
+    hane_h: 'bg-sky-300/[0.10]',
+    hane_v: 'bg-sky-300/[0.10]'
+};
+
+const tableColumnColor: Record<ClickitupFieldKey, string> = {
+    sektion: '',
+    dorr_h: 'bg-rose-300/[0.10]',
+    dorr_v: 'bg-rose-300/[0.10]',
+    hane_h: 'bg-sky-300/[0.10]',
+    hane_v: 'bg-sky-300/[0.10]'
 };
 
 const fieldAccent: Record<ClickitupFieldKey, string> = {
     sektion: 'bg-emerald-400',
-    dorr_h: 'bg-amber-400',
-    dorr_v: 'bg-amber-400',
+    dorr_h: 'bg-rose-300',
+    dorr_v: 'bg-rose-300',
     hane_h: 'bg-sky-400',
     hane_v: 'bg-sky-400'
 };
@@ -106,7 +114,7 @@ export function ClickitupStockGrid({ inventoryData, cloudInventoryData, onSetSto
                     <thead>
                         <tr className="border-b border-white/15 bg-white/[0.025] text-[11px] font-semibold uppercase tracking-wide text-slate-400">
                             <th className="px-3 py-3">Storlek</th>
-                            {CLICKITUP_FIELDS.map((field) => <th key={field.key} className="px-2 py-3"><span className="inline-flex items-center gap-2"><span aria-hidden="true" className={`h-1.5 w-1.5 rounded-full ${fieldAccent[field.key]}`} />{field.label}</span></th>)}
+                            {CLICKITUP_FIELDS.map((field) => <th key={field.key} className={`border-l border-white/[0.04] px-2 py-3 ${tableColumnColor[field.key]}`}><span className="inline-flex items-center gap-2"><span aria-hidden="true" className={`h-1.5 w-1.5 rounded-full ${fieldAccent[field.key]}`} />{field.label}</span></th>)}
                             <th className="px-2 py-3">Räknad</th>
                         </tr>
                     </thead>
@@ -116,7 +124,7 @@ export function ClickitupStockGrid({ inventoryData, cloudInventoryData, onSetSto
                             return (
                                 <tr key={size} className="border-b border-white/[0.08] transition-colors hover:bg-white/[0.035]">
                                     <th scope="row" className={`border-l-2 px-3 py-2 text-sm font-semibold tabular-nums text-slate-100 ${counted ? 'border-emerald-400' : 'border-transparent'}`}>{size}</th>
-                                    {CLICKITUP_FIELDS.map((field) => <td key={field.key} className="px-2 py-2">{fieldControl(size, field, true)}</td>)}
+                                    {CLICKITUP_FIELDS.map((field) => <td key={field.key} className={`border-l border-white/[0.04] px-2 py-2 ${tableColumnColor[field.key]}`}>{fieldControl(size, field, true)}</td>)}
                                     <td className="px-2 py-2"><CountedButton compact counted={counted} label={`Storlek ${size}`} onClick={() => onToggleCounted('size', size)} /></td>
                                 </tr>
                             );
