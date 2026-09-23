@@ -13,7 +13,8 @@
     "test:run": "vitest run --reporter=basic",
     "test:firestore-qr": "npx --yes firebase-tools@9.23.3 emulators:exec --only firestore \"vitest run --reporter=basic tests/firestoreQrRules.test.js\"",
     "test:firestore-quote": "npx --yes firebase-tools@9.23.3 emulators:exec --only firestore \"vitest run --reporter=basic tests/firestoreQuoteRules.test.js\"",
-    "test:firestore": "npx --yes firebase-tools@9.23.3 emulators:exec --only firestore \"vitest run --reporter=basic tests/firestoreQuoteRules.test.js tests/firestoreQrRules.test.js\"",
+    "test:firestore-inventory": "npx --yes firebase-tools@9.23.3 emulators:exec --only firestore \"vitest run --reporter=basic tests/firestoreInventoryRules.test.js\"",
+    "test:firestore": "npx --yes firebase-tools@9.23.3 emulators:exec --only firestore \"vitest run --reporter=basic tests/firestoreQuoteRules.test.js tests/firestoreQrRules.test.js tests/firestoreInventoryRules.test.js\"",
     "crm:backfill": "node scripts/backfill-crm-from-quotes.mjs",
     "inventory:qr-backfill": "node scripts/backfill-bahama-qr.mjs",
     "typecheck": "tsc --noEmit"

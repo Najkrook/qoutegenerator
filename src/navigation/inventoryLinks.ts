@@ -7,6 +7,20 @@ export interface InventoryRouteState {
     rack: BahamaRackNumber;
 }
 
+export type ClickitupInventoryTab = 'sections' | 'accessories';
+
+export function readClickitupInventoryRoute(search: string | URLSearchParams): { line: 'bahama' | 'clickitup'; tab: ClickitupInventoryTab } {
+    const params = typeof search === 'string' ? new URLSearchParams(search) : search;
+    return {
+        line: params.get('line') === 'clickitup' ? 'clickitup' : 'bahama',
+        tab: params.get('tab') === 'accessories' ? 'accessories' : 'sections'
+    };
+}
+
+export function getClickitupInventoryRouteSearch(tab: ClickitupInventoryTab = 'sections'): string {
+    return `?line=clickitup&tab=${tab}`;
+}
+
 function parseRackNumber(value: string | null): BahamaRackNumber {
     const rack = Number(value);
     return [1, 2, 3, 4].includes(rack) ? rack as BahamaRackNumber : 1;

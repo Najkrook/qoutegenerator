@@ -139,6 +139,7 @@ export function Pricing({ onNext, onPrev }: PricingProps) {
 
             const nextLineSelection = applyGlobalDiscountToGridCustomItems(
                 applyGlobalDiscountToGridCustomAddons(
+                    gridLineData || undefined,
                     {
                         ...lineSelection,
                         items: nextItems,

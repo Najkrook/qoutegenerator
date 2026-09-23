@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest';
 import {
     isPricingTableDropAllowed,
     reorderBuilderAddonsByDrop,
-    reorderBuilderItemsByDrop
+    reorderBuilderItemsByDrop,
+    reorderGridRowsByDrop
 } from '../src/components/features/PricingTable';
 
 describe('PricingTable drag-and-drop helpers', () => {
@@ -54,5 +55,21 @@ describe('PricingTable drag-and-drop helpers', () => {
             { type: 'builder', itemId: 'builder_a' },
             { type: 'builder-addon', itemId: 'builder_a', addonId: 'heater' }
         )).toBe(false);
+    });
+
+    it('allows ClickitUp products and add-ons to move within one product line', () => {
+        const product = { type: 'grid', lineId: 'ClickitUp', key: 'ClickitUp Sektion|1000' };
+        const freight = { type: 'grid-addon', lineId: 'ClickitUp', addonId: 'frakt_glas' };
+        const customAddon = { type: 'grid-custom-addon', lineId: 'ClickitUp', categoryId: 'extra', rowId: 'toplock' };
+
+        expect(isPricingTableDropAllowed(freight, product)).toBe(true);
+        expect(isPricingTableDropAllowed(customAddon, freight)).toBe(true);
+        expect(isPricingTableDropAllowed(freight, { ...freight, lineId: 'ClickitUpFixed' })).toBe(false);
+        expect(isPricingTableDropAllowed(freight, freight)).toBe(false);
+        expect(isPricingTableDropAllowed(freight, { type: 'custom', index: 0 })).toBe(false);
+
+        const keys = ['grid:ClickitUp:ClickitUp Sektion|1000', 'grid-addon:ClickitUp:frakt_glas', 'grid-custom-addon:ClickitUp:extra:toplock'];
+        expect(reorderGridRowsByDrop(keys, keys[2], keys[0], 'before')).toEqual([keys[2], keys[0], keys[1]]);
+        expect(reorderGridRowsByDrop(keys, keys[0], keys[1], 'after')).toEqual([keys[1], keys[0], keys[2]]);
     });
 });

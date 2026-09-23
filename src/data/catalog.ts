@@ -1038,6 +1038,7 @@ const rawCatalogData: CatalogData = {
             {
                 id: "freight",
                 name: "Fraktkostnad",
+                excludeFromGlobalDiscountByDefault: true,
                 items: [
                     { id: "frakt_glas", name: "Glasfrakt Specialpall", exportNameEn: "Glass freight – special pallet", price: 2120, autoScale: true, autoScaleDivisor: 6 }
                 ]
@@ -1139,6 +1140,7 @@ const rawCatalogData: CatalogData = {
             {
                 id: "freight",
                 name: "Fraktkostnad",
+                excludeFromGlobalDiscountByDefault: true,
                 items: [
                     { id: "frakt_glas", name: "Glasfrakt Specialpall", exportNameEn: "Glass freight – special pallet", price: 2120, autoScale: true, autoScaleDivisor: 6 }
                 ]

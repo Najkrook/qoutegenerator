@@ -24,9 +24,11 @@ import { DEFAULT_TEMPLATE_ID, getTemplateById, isBuiltinTemplateId } from '../co
 import { DEFAULT_PDF_THEME_ID, normalizePdfThemeId } from '../config/pdfThemes';
 import { DEFAULT_EXPORT_LANGUAGE, normalizeExportLanguage } from '../services/exportLocalization';
 import { stripPrivateQuoteStateData } from '../utils/quoteStateSanitization';
+import { getGridItemsQtyTotal } from '../utils/gridAutoScale';
+import { normalizeClickitupAccessories, normalizeClickitupCounted, normalizeStockQuantity } from '../services/clickitupInventory';
 
 export const QUOTE_STATE_STORAGE_KEY = 'offertverktyg_state';
-export const CURRENT_STATE_VERSION = 6;
+export const CURRENT_STATE_VERSION = 8;
 
 const VALID_QUOTE_STATUSES: QuoteStatus[] = ['draft', 'sent', 'won', 'lost', 'archived'];
 const VALID_BAHAMA_STATUSES: BahamaInventoryStatus[] = ['available', 'reserved', 'needs-review', 'used', 'sold'];
@@ -57,11 +59,11 @@ function cloneValueOr<T>(value: unknown, fallback: T): T {
 function normalizeClickitupStockEntry(value: unknown): ClickitupStockEntry {
     const record = toRecord<RawClickitupStockEntry>(value);
     return {
-        sektion: toNumber(record.sektion, 0) || 0,
-        dorr_h: toNumber(record.dorr_h, 0) || 0,
-        dorr_v: toNumber(record.dorr_v, 0) || 0,
-        hane_h: toNumber(record.hane_h, 0) || 0,
-        hane_v: toNumber(record.hane_v, 0) || 0
+        sektion: normalizeStockQuantity(record.sektion),
+        dorr_h: normalizeStockQuantity(record.dorr_h),
+        dorr_v: normalizeStockQuantity(record.dorr_v),
+        hane_h: normalizeStockQuantity(record.hane_h),
+        hane_v: normalizeStockQuantity(record.hane_v)
     };
 }
 
@@ -268,6 +270,8 @@ function normalizeInventoryData(value: RawPersistedInventoryData | unknown): Quo
         bahama: cloneArray(record.bahama),
         bahamaV2: normalizeBahamaV2Items(record.bahamaV2),
         clickitup: normalizeClickitupStockMap(record.clickitup),
+        clickitupAccessories: normalizeClickitupAccessories(record.clickitupAccessories),
+        clickitupCounted: normalizeClickitupCounted(record.clickitupCounted),
         notes: typeof record.notes === 'string' ? record.notes : ''
     };
 }
@@ -327,7 +331,10 @@ function normalizeGridSelections(value: unknown): QuoteState['gridSelections'] {
             items: normalizeGridItemSelectionMap(safeLineSelection.items),
             addons: normalizeGridAddonStateMap(safeLineSelection.addons),
             customAddonsByCategory: normalizeGridCustomAddonsByCategory(safeLineSelection.customAddonsByCategory),
-            customItems: normalizeGridCustomItems(safeLineSelection.customItems)
+            customItems: normalizeGridCustomItems(safeLineSelection.customItems),
+            rowOrder: Array.isArray(safeLineSelection.rowOrder)
+                ? [...new Set(safeLineSelection.rowOrder.filter((key): key is string => typeof key === 'string' && key.length > 0))]
+                : []
         };
         return acc;
     }, {});
@@ -422,8 +429,8 @@ function createBaseInitialState(): QuoteState {
             validity: '30 dagar',
             extraNotes: ''
         },
-        inventoryData: { bahama: [], bahamaV2: [], clickitup: {}, notes: '' },
-        cloudInventoryData: { bahama: [], bahamaV2: [], clickitup: {}, notes: '' },
+        inventoryData: { bahama: [], bahamaV2: [], clickitup: {}, clickitupAccessories: {}, clickitupCounted: {}, notes: '' },
+        cloudInventoryData: { bahama: [], bahamaV2: [], clickitup: {}, clickitupAccessories: {}, clickitupCounted: {}, notes: '' },
         sketchDraft: null,
         advancedSketchDraft: null,
         sketchMeta: { addedBahamaLine: false, addedFiestaLine: false },
@@ -563,6 +570,43 @@ function migrateV5ToV6(rawState: UnknownRecord = {}): UnknownRecord {
     };
 }
 
+function migrateV6ToV7(rawState: UnknownRecord = {}): UnknownRecord {
+    const next = toRecord(rawState);
+    const gridSelections = normalizeGridSelections(next.gridSelections);
+    const previousGlobalDiscount = normalizePercentage(next.globalDiscountPct, 0);
+
+    for (const lineId of ['ClickitUp', 'ClickitUpFixed']) {
+        const lineSelection = gridSelections[lineId];
+        if (!lineSelection) continue;
+
+        const freight = lineSelection.addons.frakt_glas;
+        if (freight?.discountSyncMode !== 'global' && freight) continue;
+        if (!freight && (previousGlobalDiscount === 0 || getGridItemsQtyTotal(lineSelection) === 0)) continue;
+
+        lineSelection.addons.frakt_glas = {
+            ...(freight || { qty: 0 }),
+            discountPct: previousGlobalDiscount,
+            syncMode: freight?.syncMode ?? 'auto',
+            discountSyncMode: 'manual'
+        };
+    }
+
+    return {
+        ...next,
+        stateVersion: 7,
+        gridSelections
+    };
+}
+
+function migrateV7ToV8(rawState: UnknownRecord = {}): UnknownRecord {
+    const next = toRecord(rawState);
+    return {
+        ...next,
+        stateVersion: 8,
+        gridSelections: normalizeGridSelections(next.gridSelections)
+    };
+}
+
 export function migrateQuoteState(fromVersion: unknown, rawState: unknown): UnknownRecord {
     let version = Number.isFinite(Number(fromVersion)) ? Number(fromVersion) : 0;
     let nextState: UnknownRecord = isObject(rawState) ? clone(rawState) : {};
@@ -601,6 +645,18 @@ export function migrateQuoteState(fromVersion: unknown, rawState: unknown): Unkn
         if (version === 5) {
             nextState = migrateV5ToV6(nextState);
             version = 6;
+            continue;
+        }
+
+        if (version === 6) {
+            nextState = migrateV6ToV7(nextState);
+            version = 7;
+            continue;
+        }
+
+        if (version === 7) {
+            nextState = migrateV7ToV8(nextState);
+            version = 8;
             continue;
         }
 

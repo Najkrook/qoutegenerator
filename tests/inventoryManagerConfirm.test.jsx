@@ -50,6 +50,7 @@ const firebaseMocks = vi.hoisted(() => {
 
 const notificationMocks = vi.hoisted(() => ({
     confirmAction: vi.fn(async () => false),
+    confirmChoiceAction: vi.fn(async () => 'cancel'),
     notifyError: vi.fn(),
     notifyInfo: vi.fn(),
     notifySuccess: vi.fn(),
@@ -63,6 +64,8 @@ import { InventoryManager } from '../src/views/InventoryManager';
 import { AuthContext } from '../src/store/AuthContext';
 import { QuoteContext } from '../src/store/QuoteContext';
 import { createInitialQuoteState } from '../src/store/quoteStateSchema';
+import { writeClickitupInventoryDraft, createClickitupDraftSnapshot } from '../src/services/clickitupInventoryDraft';
+import { createDefaultInventoryData } from '../src/views/inventoryData';
 
 const mountedRoots = [];
 let navigateForTest = null;
@@ -162,11 +165,15 @@ afterEach(() => {
 });
 
 beforeEach(() => {
+    window.localStorage.clear();
     navigateForTest = null;
     firebaseMocks.batchSet.mockReset();
     firebaseMocks.batchCommit.mockClear();
+    firebaseMocks.getDoc.mockClear();
     notificationMocks.confirmAction.mockReset();
     notificationMocks.confirmAction.mockResolvedValue(false);
+    notificationMocks.confirmChoiceAction.mockReset();
+    notificationMocks.confirmChoiceAction.mockResolvedValue('cancel');
     notificationMocks.notifyError.mockReset();
     notificationMocks.notifyInfo.mockReset();
     notificationMocks.notifySuccess.mockReset();
@@ -274,7 +281,7 @@ describe('InventoryManager BaHaMa V2 workflow', () => {
     });
 
     it('switches between BaHaMa and ClickitUp without changing ClickitUp grid flow', async () => {
-        const { container } = await renderInventoryManager();
+        const { container, dispatch } = await renderInventoryManager();
         const clickitupButton = Array.from(container.querySelectorAll('button')).find((button) => button.textContent === 'ClickitUp');
 
         await act(async () => {
@@ -285,6 +292,67 @@ describe('InventoryManager BaHaMa V2 workflow', () => {
         expect(container.textContent).toContain('ClickitUp lagersaldo');
         expect(container.textContent).toContain('Sektion');
         expect(container.textContent).toContain('Dörr H');
+        expect(container.textContent).toContain('0 av 32 rader räknade');
+        const openingAction = dispatch.mock.calls.map(([action]) => action).find((action) => action.type === 'SET_INVENTORY_DATA');
+        expect(Object.values(openingAction.payload.clickitupAccessories).reduce((sum, value) => sum + value, 0)).toBe(843);
+
+        const accessoriesTab = Array.from(container.querySelectorAll('[role="tab"]')).find((button) => button.textContent === 'Tillbehör');
+        await act(async () => {
+            accessoriesTab.click();
+            await Promise.resolve();
+        });
+        expect(container.querySelector('[data-testid="inventory-location"]').textContent).toBe('/inventory?line=clickitup&tab=accessories');
+        expect(container.textContent).toContain('Stickfötter');
+        expect(container.textContent).toContain('Stolpe och smådelar');
+    });
+
+    it('offers local draft recovery after fetching cloud stock', async () => {
+        const baseline = createDefaultInventoryData();
+        const local = { ...baseline, clickitupAccessories: { stolpe: 30 } };
+        writeClickitupInventoryDraft('admin-1', createClickitupDraftSnapshot(baseline), createClickitupDraftSnapshot(local));
+        notificationMocks.confirmChoiceAction.mockResolvedValue('confirm');
+        const { dispatch } = await renderInventoryManager();
+        expect(firebaseMocks.getDoc).toHaveBeenCalled();
+        expect(notificationMocks.confirmChoiceAction).toHaveBeenCalledWith(expect.objectContaining({ title: 'Återuppta inventering?' }));
+        const draftAction = dispatch.mock.calls.map(([action]) => action).find((action) => action.type === 'SET_INVENTORY_DATA');
+        expect(draftAction.payload.clickitupAccessories.stolpe).toBe(30);
+    });
+
+    it('saves accessory quantities with a delta log and counted markers in the inventory document', async () => {
+        const base = createDefaultInventoryData();
+        const cloud = { ...base, clickitupAccessories: { stolpe: 26 } };
+        const local = { ...cloud, clickitupAccessories: { stolpe: 27 }, clickitupCounted: { 'accessory:stolpe': true } };
+        const { container } = await renderInventoryManager({ inventoryData: local, cloudInventoryData: cloud });
+        const saveButton = Array.from(container.querySelectorAll('button')).find((button) => button.textContent === 'Spara ändringar');
+        await act(async () => {
+            saveButton.click();
+            await Promise.resolve();
+        });
+        expect(firebaseMocks.batchCommit).toHaveBeenCalledTimes(1);
+        expect(firebaseMocks.batchSet).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
+            clickitupAccessories: { stolpe: 27 },
+            clickitupCounted: { 'accessory:stolpe': true }
+        }));
+        expect(firebaseMocks.batchSet).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
+            category: 'clickitup', targetType: 'accessory', targetId: 'stolpe', delta: 1
+        }));
+    });
+
+    it('resets counted markers after confirmation while retaining balances', async () => {
+        notificationMocks.confirmAction.mockResolvedValue(true);
+        const base = createDefaultInventoryData();
+        const local = { ...base, clickitupAccessories: { stolpe: 26 }, clickitupCounted: { 'accessory:stolpe': true } };
+        const { container, dispatch } = await renderInventoryManager({ inventoryData: local, cloudInventoryData: local });
+        const clickitupButton = Array.from(container.querySelectorAll('button')).find((button) => button.textContent === 'ClickitUp');
+        await act(async () => { clickitupButton.click(); await Promise.resolve(); });
+        const resetButton = Array.from(container.querySelectorAll('button')).find((button) => button.textContent === 'Ny inventeringsrunda');
+        dispatch.mockClear();
+        await act(async () => { resetButton.click(); await Promise.resolve(); });
+        expect(notificationMocks.confirmAction).toHaveBeenCalledWith(expect.objectContaining({ title: 'Starta ny inventeringsrunda' }));
+        expect(dispatch).toHaveBeenCalledWith(expect.objectContaining({
+            type: 'SET_INVENTORY_DATA',
+            payload: expect.objectContaining({ clickitupAccessories: { stolpe: 26 }, clickitupCounted: {} })
+        }));
     });
 
     it('writes BaHaMa V2 inventory logs on save', async () => {

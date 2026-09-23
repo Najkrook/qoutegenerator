@@ -6,6 +6,7 @@ import { computeQuoteTotals } from '../../services/calculationEngine';
 import { translateQuoteTotalsRowModel } from '../../services/exportLocalization';
 import { DEFAULT_UNKNOWN_ADDON_NAME, formatAddonLabel } from '../../utils/addonLabels';
 import { buildEffectiveGridSelections } from '../../utils/gridAutoScale';
+import { getGridRowOrderKey, isGridRowSource, type GridRowSource } from '../../utils/gridRowOrder';
 import type {
     BuilderAddon,
     BuilderItem,
@@ -35,7 +36,7 @@ type PricingTableBuilderRowSource = Extract<
 
 interface PricingTableDragState {
     rowKey: string;
-    source: PricingTableBuilderRowSource;
+    source: PricingTableBuilderRowSource | GridRowSource;
 }
 
 interface PricingTableDropTarget {
@@ -44,9 +45,14 @@ interface PricingTableDropTarget {
 }
 
 export function isPricingTableDropAllowed(
-    draggedSource: PricingTableBuilderRowSource,
+    draggedSource: PricingTableBuilderRowSource | GridRowSource,
     targetSource: QuoteTotalsRowSource
 ): boolean {
+    if (isGridRowSource(draggedSource)) {
+        return isGridRowSource(targetSource) && targetSource.lineId === draggedSource.lineId
+            && getGridRowOrderKey(targetSource) !== getGridRowOrderKey(draggedSource);
+    }
+
     if (draggedSource.type === 'builder') {
         return targetSource.type === 'builder' && targetSource.itemId !== draggedSource.itemId;
     }
@@ -107,6 +113,20 @@ export function reorderBuilderAddonsByDrop<T extends BuilderAddon>(
     return moveArrayItem(addons, sourceIndex, nextIndex);
 }
 
+export function reorderGridRowsByDrop(
+    rowKeys: string[],
+    sourceKey: string,
+    targetKey: string,
+    position: PricingTableDropPosition
+): string[] {
+    const sourceIndex = rowKeys.indexOf(sourceKey);
+    const targetIndex = rowKeys.indexOf(targetKey);
+    if (sourceIndex === -1 || targetIndex === -1 || sourceIndex === targetIndex) return rowKeys;
+
+    const insertIndex = targetIndex + (position === 'after' ? 1 : 0) - (sourceIndex < targetIndex ? 1 : 0);
+    return moveArrayItem(rowKeys, sourceIndex, insertIndex);
+}
+
 function findBuilderAddonDefinition(modelData: any, addonId: string) {
     if (!modelData || !addonId) return null;
 
@@ -133,13 +153,10 @@ function getRowKey(row: QuoteTotalsRow, index: number): string {
         case 'builder-custom-addon':
             return `builder-custom-addon:${row.source.itemId}:${row.source.rowId}`;
         case 'grid':
-            return `grid:${row.source.lineId}:${row.source.key}`;
         case 'grid-addon':
-            return `grid-addon:${row.source.lineId}:${row.source.addonId}`;
         case 'grid-custom-addon':
-            return `grid-custom-addon:${row.source.lineId}:${row.source.categoryId}:${row.source.rowId}`;
         case 'grid-custom-item':
-            return `grid-custom-item:${row.source.lineId}:${row.source.rowId}`;
+            return getGridRowOrderKey(row.source);
         case 'custom':
             return `custom:${row.source.index}`;
         default:
@@ -349,7 +366,7 @@ export function PricingTable() {
         return event.clientY < rect.top + rect.height / 2 ? 'before' : 'after';
     };
 
-    const handleDragStart = (rowKey: string, source: PricingTableBuilderRowSource) => (event: DragEvent<HTMLElement>) => {
+    const handleDragStart = (rowKey: string, source: PricingTableBuilderRowSource | GridRowSource) => (event: DragEvent<HTMLElement>) => {
         if (isRetailer) {
             event.preventDefault();
             return;
@@ -388,6 +405,32 @@ export function PricingTable() {
 
         event.preventDefault();
         const position = getDropPosition(event);
+
+        if (isGridRowSource(dragState.source) && isGridRowSource(source)) {
+            const rowKeys = totals
+                .filter((row) => isGridRowSource(row.source) && row.source.lineId === source.lineId)
+                .map((row) => getGridRowOrderKey(row.source as GridRowSource));
+            const nextOrder = reorderGridRowsByDrop(
+                rowKeys,
+                getGridRowOrderKey(dragState.source),
+                getGridRowOrderKey(source),
+                position
+            );
+
+            if (nextOrder !== rowKeys) {
+                const lineSelection = state.gridSelections[source.lineId];
+                dispatch({
+                    type: 'SET_GRID_SELECTIONS',
+                    payload: {
+                        ...state.gridSelections,
+                        [source.lineId]: { ...lineSelection, rowOrder: nextOrder }
+                    }
+                });
+            }
+
+            clearDragState();
+            return;
+        }
 
         if (dragState.source.type === 'builder' && source.type === 'builder') {
             const nextItems = reorderBuilderItemsByDrop(
@@ -593,11 +636,13 @@ export function PricingTable() {
                     <tbody className="divide-y divide-panel-border/50">
                         {totals.map((row, index) => {
                             const editable = isEditableBuilderRow(row.source);
-                            const builderSource = editable ? row.source as PricingTableBuilderRowSource : null;
+                            const draggableSource = editable || isGridRowSource(row.source)
+                                ? row.source as PricingTableBuilderRowSource | GridRowSource
+                                : null;
                             const rowKey = getRowKey(row, index);
                             const displayNameValue = editable ? getDisplayNameInputValue(row, rowKey) : '';
                             const dropIndicatorPosition = dropTarget?.rowKey === rowKey ? dropTarget.position : null;
-                            const dragHandleLabel = row.source.type === 'builder'
+                            const dragHandleLabel = !row.isAddon
                                 ? 'Dra och flytta produkt'
                                 : 'Dra och flytta tillval';
                             const dragHandleClass = isRetailer
@@ -614,19 +659,19 @@ export function PricingTable() {
                             return (
                                 <tr
                                     key={rowKey}
-                                    onDragOver={editable ? handleDragOver(rowKey, row.source) : undefined}
-                                    onDragLeave={editable ? handleDragLeave(rowKey) : undefined}
-                                    onDrop={editable ? handleDrop(row.source) : undefined}
+                                    onDragOver={draggableSource ? handleDragOver(rowKey, row.source) : undefined}
+                                    onDragLeave={draggableSource ? handleDragLeave(rowKey) : undefined}
+                                    onDrop={draggableSource ? handleDrop(row.source) : undefined}
                                     className={`hover:bg-white/[0.02] transition-colors ${row.isAddon ? 'bg-black/5' : ''} ${row.isCustom ? 'bg-secondary/5' : ''} ${isDraggedRow ? 'opacity-60' : ''}`}
                                 >
                                     <td className={`p-4 text-sm ${dropIndicatorClass} ${row.isAddon ? 'pl-8 text-text-secondary italic' : 'font-medium'}`}>
-                                        {editable ? (
+                                        {draggableSource ? (
                                             <div className="flex items-center gap-3">
                                                 <button
                                                     type="button"
                                                     draggable={!isRetailer}
                                                     disabled={isRetailer}
-                                                    onDragStart={builderSource ? handleDragStart(rowKey, builderSource) : undefined}
+                                                    onDragStart={handleDragStart(rowKey, draggableSource)}
                                                     onDragEnd={clearDragState}
                                                     className={`flex h-9 w-9 shrink-0 items-center justify-center rounded border border-panel-border text-text-secondary transition-colors ${dragHandleClass}`}
                                                     aria-label={dragHandleLabel}
@@ -637,17 +682,19 @@ export function PricingTable() {
                                                         ))}
                                                     </span>
                                                 </button>
-                                                <input
-                                                    type="text"
-                                                    value={displayNameValue}
-                                                    disabled={isRetailer}
-                                                    onBlur={() => clearDisplayNameDraft(rowKey)}
-                                                    onChange={(event: ChangeEvent<HTMLInputElement>) => handleDisplayNameChange(row, rowKey, event.target.value)}
-                                                    className={`w-full bg-black/20 border border-panel-border rounded p-2 text-sm outline-none focus:border-primary placeholder:text-text-secondary ${
-                                                        row.isAddon ? 'text-text-secondary italic' : 'text-text-primary font-medium'
-                                                    } ${isRetailer ? 'opacity-50 cursor-not-allowed' : ''}`}
-                                                    aria-label="Redigera radnamn"
-                                                />
+                                                {editable ? (
+                                                    <input
+                                                        type="text"
+                                                        value={displayNameValue}
+                                                        disabled={isRetailer}
+                                                        onBlur={() => clearDisplayNameDraft(rowKey)}
+                                                        onChange={(event: ChangeEvent<HTMLInputElement>) => handleDisplayNameChange(row, rowKey, event.target.value)}
+                                                        className={`w-full bg-black/20 border border-panel-border rounded p-2 text-sm outline-none focus:border-primary placeholder:text-text-secondary ${
+                                                            row.isAddon ? 'text-text-secondary italic' : 'text-text-primary font-medium'
+                                                        } ${isRetailer ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                                        aria-label="Redigera radnamn"
+                                                    />
+                                                ) : <span>{translateQuoteTotalsRowModel(row, state.exportLanguage)}</span>}
                                             </div>
                                         ) : (
                                             translateQuoteTotalsRowModel(row, state.exportLanguage)

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { computeQuoteTotals } from '../src/services/calculationEngine';
+import { catalogData } from '../src/data/catalog';
 import { createCatalogFixture, createStateFixture } from './fixtures/calculationFixtures';
 
 describe('computeQuoteTotals', () => {
@@ -774,6 +775,76 @@ describe('computeQuoteTotals', () => {
 
         expect(freight.qty).toBe(3);
         expect(freight.gross).toBe(6360);
+    });
+
+    it('uses saved ClickitUp row order in review and export totals without changing prices', () => {
+        const selection = {
+            items: { 'ClickitUp Section|1000': { qty: 1, discountPct: 0 } },
+            addons: { 'door-right': { qty: 1, discountPct: 0 } },
+            customAddonsByCategory: {
+                doors: [{ id: 'special', name: 'Specialbeslag', price: 300, qty: 1, discountPct: 0 }]
+            }
+        };
+        const state = createStateFixture({ builderItems: [], customCosts: [], gridSelections: { ClickitUp: selection } });
+        const catalogData = createCatalogFixture();
+        const original = computeQuoteTotals({ state, catalogData });
+        const ordered = computeQuoteTotals({
+            state: {
+                ...state,
+                gridSelections: {
+                    ClickitUp: {
+                        ...selection,
+                        rowOrder: [
+                            'grid-custom-addon:ClickitUp:doors:special',
+                            'grid:ClickitUp:ClickitUp Section|1000',
+                            'grid-addon:ClickitUp:door-right'
+                        ]
+                    }
+                }
+            },
+            catalogData
+        });
+
+        expect(ordered.totals.map((row) => row.source.type)).toEqual(['grid-custom-addon', 'grid', 'grid-addon']);
+        expect(ordered.grossTotalSek).toBe(original.grossTotalSek);
+        expect(ordered.totalDiscountSek).toBe(original.totalDiscountSek);
+        expect(ordered.finalTotalSek).toBe(original.finalTotalSek);
+    });
+
+    it.each(['ClickitUp', 'ClickitUpFixed'])('excludes %s freight from global discount in quote totals', (lineId) => {
+        const state = createStateFixture({
+            builderItems: [],
+            customCosts: [],
+            exchangeRate: 1,
+            globalDiscountPct: 12,
+            gridSelections: {
+                [lineId]: {
+                    items: { 'ClickitUp Sektion|1000': { qty: 8, discountPct: 12 } },
+                    addons: {},
+                    customAddonsByCategory: {
+                        freight: [{ id: 'extra-freight', name: 'Extra frakt', price: 500, qty: 1, discountPct: 0 }]
+                    }
+                }
+            }
+        });
+
+        const totals = computeQuoteTotals({ state, catalogData }).totals;
+        const freight = totals.find((row) => row.source.type === 'grid-addon' && row.source.addonId === 'frakt_glas');
+        const extraFreight = totals.find((row) => row.source.type === 'grid-custom-addon' && row.source.rowId === 'extra-freight');
+
+        expect(freight).toMatchObject({ qty: 2, gross: 4240, discountPct: 0, net: 4240 });
+        expect(extraFreight).toMatchObject({ gross: 500, discountPct: 0, net: 500 });
+
+        state.gridSelections[lineId].addons.frakt_glas = {
+            qty: 2, discountPct: 5, syncMode: 'auto', discountSyncMode: 'manual'
+        };
+        state.gridSelections[lineId].customAddonsByCategory.freight[0].discountPct = 7;
+
+        const manualTotals = computeQuoteTotals({ state, catalogData }).totals;
+        expect(manualTotals.find((row) => row.source.type === 'grid-addon' && row.source.addonId === 'frakt_glas'))
+            .toMatchObject({ discountPct: 5, discountSek: 212, net: 4028 });
+        expect(manualTotals.find((row) => row.source.type === 'grid-custom-addon' && row.source.rowId === 'extra-freight'))
+            .toMatchObject({ discountPct: 7, discountSek: 35, net: 465 });
     });
 
     it('uses global discount when an auto-scale row is explicitly marked as global', () => {

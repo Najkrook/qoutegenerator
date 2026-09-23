@@ -1,5 +1,6 @@
 import { buildEffectiveGridSelections } from '../utils/gridAutoScale';
 import { DEFAULT_UNKNOWN_ADDON_NAME, formatAddonLabel } from '../utils/addonLabels';
+import { getGridRowOrderKey, isGridRowSource, type GridRowSource } from '../utils/gridRowOrder';
 import type { CatalogData, GridAddonState, QuoteState, QuoteTotalsResult, QuoteTotalsRow } from '../types/contracts';
 
 const ADDONS_ONLY_SIZE = '__addons_only__';
@@ -177,6 +178,40 @@ function sortQuoteTotalsRows(rows) {
     });
 
     return [...builderRows, ...sortedMainRows, ...addonRows, ...customRows];
+}
+
+function applyGridRowOrder(rows: QuoteTotalsRow[], gridSelections: QuoteState['gridSelections']): QuoteTotalsRow[] {
+    const orderedRows = [...rows];
+
+    for (const [lineId, selection] of Object.entries(gridSelections || {})) {
+        const rowOrder = selection?.rowOrder;
+        if (!Array.isArray(rowOrder) || rowOrder.length === 0) continue;
+
+        const ranks = new Map(rowOrder.map((key, index) => [key, index]));
+        const positions: number[] = [];
+        const lineRows: QuoteTotalsRow[] = [];
+
+        orderedRows.forEach((row, index) => {
+            if (isGridRowSource(row.source) && row.source.lineId === lineId) {
+                positions.push(index);
+                lineRows.push(row);
+            }
+        });
+
+        lineRows.sort((left, right) => {
+            const leftRank = ranks.get(getGridRowOrderKey(left.source as GridRowSource));
+            const rightRank = ranks.get(getGridRowOrderKey(right.source as GridRowSource));
+            if (leftRank === undefined && rightRank === undefined) return 0;
+            if (leftRank === undefined) return 1;
+            if (rightRank === undefined) return -1;
+            return leftRank - rightRank;
+        });
+        positions.forEach((position, index) => {
+            orderedRows[position] = lineRows[index];
+        });
+    }
+
+    return orderedRows;
 }
 
 /**
@@ -568,7 +603,7 @@ export function computeQuoteTotals({
     // Global discount is an editing helper and must not be applied a second time.
     const globalDiscountAmt = 0;
     const finalTotalSek = grossTotalSek - totalDiscountSek;
-    const sortedTotals = sortQuoteTotalsRows(totals);
+    const sortedTotals = applyGridRowOrder(sortQuoteTotalsRows(totals), gridSelections);
 
     return {
         totals: sortedTotals,

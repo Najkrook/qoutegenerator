@@ -136,7 +136,7 @@ function ProtectedAppLayout() {
     const inventoryBootstrappedRef = useRef(false);
 
     useEffect(() => {
-        if (!user || !canViewEverything || inventoryBootstrappedRef.current) {
+        if (!user || !canViewEverything || inventoryBootstrappedRef.current || location.pathname === APP_PATHS[APP_ROUTE_IDS.inventory]) {
             return;
         }
 
@@ -144,10 +144,14 @@ function ProtectedAppLayout() {
             (state.inventoryData?.bahama?.length || 0) > 0 ||
             (state.inventoryData?.bahamaV2?.length || 0) > 0 ||
             Object.keys(state.inventoryData?.clickitup || {}).length > 0 ||
+            Object.keys(state.inventoryData?.clickitupAccessories || {}).length > 0 ||
+            Object.keys(state.inventoryData?.clickitupCounted || {}).length > 0 ||
             Boolean(state.inventoryData?.notes) ||
             (state.cloudInventoryData?.bahama?.length || 0) > 0 ||
             (state.cloudInventoryData?.bahamaV2?.length || 0) > 0 ||
             Object.keys(state.cloudInventoryData?.clickitup || {}).length > 0 ||
+            Object.keys(state.cloudInventoryData?.clickitupAccessories || {}).length > 0 ||
+            Object.keys(state.cloudInventoryData?.clickitupCounted || {}).length > 0 ||
             Boolean(state.cloudInventoryData?.notes);
 
         if (hasLoadedInventory) {
@@ -191,7 +195,7 @@ function ProtectedAppLayout() {
         return () => {
             cancelled = true;
         };
-    }, [canViewEverything, dispatch, state.cloudInventoryData, state.inventoryData, user]);
+    }, [canViewEverything, dispatch, location.pathname, state.cloudInventoryData, state.inventoryData, user]);
 
     if (loading) {
         return <FullScreenLoader />;

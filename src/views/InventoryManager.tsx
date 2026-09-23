@@ -5,6 +5,7 @@ import { useAuth } from '../store/AuthContext';
 import { db, doc, getDoc } from '../services/firebase';
 import { InventoryTable } from '../components/features/InventoryTable';
 import { ClickitupStockGrid } from '../components/features/ClickitupStockGrid';
+import { ClickitupAccessoryStock } from '../components/features/ClickitupAccessoryStock';
 import { InventoryItemModal } from '../components/features/InventoryItemModal';
 import { PendingChangesPanel } from '../components/features/PendingChangesPanel';
 import {
@@ -18,17 +19,24 @@ import {
     BAHAMA_INVENTORY_STATUSES,
     cloneInventoryData,
     createDefaultInventoryData,
-    DEFAULT_CLICKITUP_ENTRY,
     normalizeStoredInventoryData
 } from './inventoryData';
 import {
     confirmAction,
+    confirmChoiceAction,
     notifyError,
-    notifySuccess,
-    notifyWarn
+    notifySuccess
 } from '../services/notificationService';
 import { getErrorMessage } from '../utils/runtime';
 import { useInventoryWorkflow } from '../services/useInventoryWorkflow';
+import { getAccessoryLabel, getClickitupCountProgress, seedMissingClickitupAccessories, setClickitupAccessoryQuantity, setClickitupSizeQuantity, toggleClickitupCounted } from '../services/clickitupInventory';
+import {
+    clearClickitupInventoryDraft,
+    createClickitupDraftSnapshot,
+    readClickitupInventoryDraft,
+    restoreClickitupInventoryDraft,
+    writeClickitupInventoryDraft
+} from '../services/clickitupInventoryDraft';
 import {
     formatBahamaStorageLocation,
     groupBahamaInventoryByStorageLocation,
@@ -42,6 +50,8 @@ import {
 } from '../services/bahamaInventoryMove';
 import {
     getInventoryRouteSearch,
+    getClickitupInventoryRouteSearch,
+    readClickitupInventoryRoute,
     readInventoryRouteState,
     type InventoryView
 } from '../navigation/inventoryLinks';
@@ -53,7 +63,6 @@ import type {
     InventoryManagerProps
 } from '../types/contracts';
 
-type ProductLine = 'bahama' | 'clickitup';
 type InspectorMode = 'view' | 'create' | 'edit';
 
 interface InventoryViewTabsProps {
@@ -156,7 +165,6 @@ export function InventoryManager(_props: InventoryManagerProps) {
     const { state, dispatch } = useQuote();
     const { user } = useAuth();
     const [searchParams, setSearchParams] = useSearchParams();
-    const [activeLine, setActiveLine] = useState<ProductLine>('bahama');
     const [searchTerm, setSearchTerm] = useState('');
     const [statusFilter, setStatusFilter] = useState<'all' | BahamaInventoryStatus>('all');
     const [sizeFilter, setSizeFilter] = useState('all');
@@ -189,6 +197,9 @@ export function InventoryManager(_props: InventoryManagerProps) {
         [moveDialogQrId, sortedBahamaItems]
     );
     const inventoryRoute = readInventoryRouteState(searchParams);
+    const clickitupRoute = readClickitupInventoryRoute(searchParams);
+    const activeLine = clickitupRoute.line;
+    const countProgress = getClickitupCountProgress(inventoryData.clickitupCounted);
     const storagePresentation = useMemo(
         () => getStoragePresentation(sortedBahamaItems),
         [sortedBahamaItems]
@@ -228,43 +239,65 @@ export function InventoryManager(_props: InventoryManagerProps) {
         setSearchParams(new URLSearchParams(getInventoryRouteSearch(view, rack)));
     };
 
+    const navigateClickitup = (tab: 'sections' | 'accessories' = 'sections') => {
+        setSearchParams(new URLSearchParams(getClickitupInventoryRouteSearch(tab)));
+    };
+
     const loadInventory = useCallback(async () => {
         setIsLoading(true);
         setLoadError(null);
         try {
             const docRef = doc(db, 'stock', 'main_inventory');
             const docSnap = await getDoc(docRef);
-            const loadedInventory = docSnap.exists()
-                ? normalizeStoredInventoryData(docSnap.data())
+            const rawInventory = docSnap.exists() ? docSnap.data() : null;
+            const loadedInventory = rawInventory
+                ? normalizeStoredInventoryData(rawInventory)
                 : createDefaultInventoryData();
+            let workingInventory = seedMissingClickitupAccessories(cloneInventoryData(loadedInventory), rawInventory);
+            const localDraft = readClickitupInventoryDraft(user?.uid);
+            if (localDraft) {
+                const recovery = restoreClickitupInventoryDraft(loadedInventory, localDraft);
+                const resumedInventory = restoreClickitupInventoryDraft(workingInventory, localDraft).inventory;
+                const hasConflict = recovery.conflicts.length > 0;
+                const conflictLabels = recovery.conflicts.slice(0, 3).map((item) => item.startsWith('accessory:')
+                    ? getAccessoryLabel(item.slice('accessory:'.length))
+                    : item.startsWith('size:') ? `Storlek ${item.slice('size:'.length)}` : getAccessoryLabel(item));
+                const choice = await confirmChoiceAction({
+                    title: hasConflict ? 'Molnlagret har ändrats' : 'Återuppta inventering?',
+                    message: hasConflict
+                        ? `${recovery.conflicts.length} av dina ändrade rader har också ändrats i molnet (${conflictLabels.join(', ')}${recovery.conflicts.length > 3 ? ' med flera' : ''}). Om du återupptar används dina lokala värden för dessa rader; övriga molnändringar behålls.`
+                        : 'Det finns osparade ClickitUp-ändringar på den här enheten. Vill du fortsätta där du slutade?',
+                    confirmText: 'Återuppta lokalt',
+                    cancelText: 'Använd molnlagret',
+                    tone: hasConflict ? 'danger' : 'neutral'
+                });
+                if (choice === 'confirm') workingInventory = resumedInventory;
+                else clearClickitupInventoryDraft(user?.uid);
+            }
 
             dispatch({ type: 'SET_CLOUD_INVENTORY_DATA', payload: cloneInventoryData(loadedInventory) });
-            dispatch({ type: 'SET_INVENTORY_DATA', payload: cloneInventoryData(loadedInventory) });
+            dispatch({ type: 'SET_INVENTORY_DATA', payload: cloneInventoryData(workingInventory) });
             setMoveHistory([]);
         } catch (err) {
             console.error('Failed to load Firestore inventory:', err);
             setLoadError(getErrorMessage(err, 'Kunde inte läsa lagersaldot.'));
-
-            try {
-                const res = await fetch('/inventory_db.json');
-                if (res.ok) {
-                    const localData = normalizeStoredInventoryData(await res.json());
-                    dispatch({ type: 'SET_INVENTORY_DATA', payload: cloneInventoryData(localData) });
-                    dispatch({ type: 'SET_CLOUD_INVENTORY_DATA', payload: cloneInventoryData(localData) });
-                    setMoveHistory([]);
-                    notifyWarn('Laddat lokalt lagersaldo i offline-läge.');
-                }
-            } catch (localErr) {
-                console.error('Failed to load local inventory fallback:', localErr);
-            }
         } finally {
             setIsLoading(false);
         }
-    }, [dispatch]);
+    }, [dispatch, user?.uid]);
 
     useEffect(() => {
         void loadInventory();
     }, [loadInventory]);
+
+    useEffect(() => {
+        if (isLoading || loadError) return;
+        writeClickitupInventoryDraft(
+            user?.uid,
+            createClickitupDraftSnapshot(cloudInventoryData),
+            createClickitupDraftSnapshot(inventoryData)
+        );
+    }, [cloudInventoryData, inventoryData, isLoading, loadError, user?.uid]);
 
     useEffect(() => {
         if (inspectorMode === 'create') {
@@ -298,7 +331,7 @@ export function InventoryManager(_props: InventoryManagerProps) {
     };
 
     const handleCreateItem = () => {
-        setActiveLine('bahama');
+        navigateInventory('list');
         setSelectedBahamaQrId(null);
         setInspectorMode('create');
     };
@@ -438,16 +471,32 @@ export function InventoryManager(_props: InventoryManagerProps) {
         setMoveDialogQrId(item.qrId);
     };
 
-    const handleUpdateStock = (size: string, field: ClickitupFieldKey, delta: number) => {
-        const clickitup = cloneInventoryData(inventoryData).clickitup;
-        if (!clickitup[size]) {
-            clickitup[size] = { ...DEFAULT_CLICKITUP_ENTRY };
-        }
+    const handleSetStock = (size: string, field: ClickitupFieldKey, value: number) => {
+        const next = setClickitupSizeQuantity(inventoryData, size, field, value);
+        if (next !== inventoryData) dispatch({ type: 'SET_INVENTORY_DATA', payload: next });
+    };
 
-        const currentVal = clickitup[size][field] || 0;
-        if (currentVal + delta < 0) return;
-        clickitup[size][field] = currentVal + delta;
-        dispatch({ type: 'SET_INVENTORY_DATA', payload: { ...inventoryData, clickitup } });
+    const handleSetAccessoryStock = (id: string, value: number) => {
+        const next = setClickitupAccessoryQuantity(inventoryData, id, value);
+        if (next !== inventoryData) dispatch({ type: 'SET_INVENTORY_DATA', payload: next });
+    };
+
+    const handleToggleCounted = (type: 'size' | 'accessory', id: string) => {
+        const next = toggleClickitupCounted(inventoryData, type, id);
+        if (next !== inventoryData) dispatch({ type: 'SET_INVENTORY_DATA', payload: next });
+    };
+
+    const handleNewCountRound = async () => {
+        if (Object.keys(inventoryData.clickitupCounted).length === 0) return;
+        const confirmed = await confirmAction({
+            title: 'Starta ny inventeringsrunda',
+            message: 'Rensa alla ClickitUp-avprickningar? Lagersaldona behålls.',
+            confirmText: 'Rensa avprickningar',
+            cancelText: 'Avbryt',
+            tone: 'danger'
+        });
+        if (!confirmed) return;
+        dispatch({ type: 'SET_INVENTORY_DATA', payload: { ...inventoryData, clickitupCounted: {} } });
     };
 
     const handleCommit = async () => {
@@ -513,6 +562,18 @@ export function InventoryManager(_props: InventoryManagerProps) {
         );
     }
 
+    if (loadError) {
+        return (
+            <div className="rounded-xl border border-amber-400/30 bg-[#11191d] p-6 text-slate-100">
+                <h2 className="m-0 text-xl font-semibold">Kunde inte öppna lagret</h2>
+                <p className="mt-2 text-sm text-amber-100">{loadError} Försök igen för att hämta molnlagret och återuppta ett eventuellt lokalt utkast.</p>
+                <button type="button" onClick={() => { void loadInventory(); }} className="min-h-11 rounded-lg bg-[#e8e1d4] px-4 py-2 font-semibold text-[#10161b]">
+                    Försök igen
+                </button>
+            </div>
+        );
+    }
+
     return (
         <div className="flex h-full min-h-[40rem] overflow-hidden rounded-xl border border-panel-border bg-[#0d1115] text-slate-100">
             <aside className="hidden w-[248px] shrink-0 border-r border-white/10 bg-[#10161b] p-5 lg:flex lg:flex-col">
@@ -526,7 +587,7 @@ export function InventoryManager(_props: InventoryManagerProps) {
                         <p className="mb-2 text-[11px] font-semibold uppercase text-slate-600">Produktlinjer</p>
                         <button
                             type="button"
-                            onClick={() => setActiveLine('bahama')}
+                            onClick={() => navigateInventory(inventoryRoute.view, inventoryRoute.rack)}
                             className={`mb-1 flex w-full items-center justify-between rounded-md px-3 py-2 text-left font-semibold transition-colors ${
                                 activeLine === 'bahama' ? 'bg-[#e8e1d4] text-[#10161b]' : 'text-slate-300 hover:bg-white/5'
                             }`}
@@ -536,13 +597,13 @@ export function InventoryManager(_props: InventoryManagerProps) {
                         </button>
                         <button
                             type="button"
-                            onClick={() => setActiveLine('clickitup')}
+                            onClick={() => navigateClickitup(clickitupRoute.tab)}
                             className={`flex w-full items-center justify-between rounded-md px-3 py-2 text-left font-semibold transition-colors ${
                                 activeLine === 'clickitup' ? 'bg-[#e8e1d4] text-[#10161b]' : 'text-slate-300 hover:bg-white/5'
                             }`}
                         >
                             ClickitUp
-                            <span>{Object.keys(inventoryData.clickitup || {}).length}</span>
+                            <span>{countProgress.done}/{countProgress.total}</span>
                         </button>
                     </div>
 
@@ -572,14 +633,14 @@ export function InventoryManager(_props: InventoryManagerProps) {
                             <div className="flex rounded-lg border border-white/10 bg-[#12191f] p-1 lg:hidden">
                                 <button
                                     type="button"
-                                    onClick={() => setActiveLine('bahama')}
+                                    onClick={() => navigateInventory(inventoryRoute.view, inventoryRoute.rack)}
                                     className={`rounded-md px-3 py-2 text-sm font-semibold transition-colors ${activeLine === 'bahama' ? 'bg-[#e8e1d4] text-[#10161b]' : 'text-slate-400 hover:text-slate-100'}`}
                                 >
                                     BaHaMa
                                 </button>
                                 <button
                                     type="button"
-                                    onClick={() => setActiveLine('clickitup')}
+                                    onClick={() => navigateClickitup(clickitupRoute.tab)}
                                     className={`rounded-md px-3 py-2 text-sm font-semibold transition-colors ${activeLine === 'clickitup' ? 'bg-[#e8e1d4] text-[#10161b]' : 'text-slate-400 hover:text-slate-100'}`}
                                 >
                                     ClickitUp
@@ -598,12 +659,6 @@ export function InventoryManager(_props: InventoryManagerProps) {
                         </div>
                     </div>
                 </header>
-
-                {loadError && (
-                    <div className="mx-4 mt-4 rounded-lg border border-amber-400/30 bg-amber-400/10 px-4 py-3 text-sm text-amber-100 md:mx-6">
-                        Firebase kunde inte nås: {loadError}. Visar lokalt lagersaldo.
-                    </div>
-                )}
 
                 {activeLine === 'bahama' ? (
                     <div className="min-h-0 flex-1 overflow-auto p-4 md:p-6">
@@ -726,13 +781,58 @@ export function InventoryManager(_props: InventoryManagerProps) {
                         )}
                     </div>
                 ) : (
-                    <div className="min-h-0 flex-1 space-y-4 p-4 md:p-6">
-                        <section className="rounded-lg border border-white/10 bg-[#10161b] p-4">
-                            <ClickitupStockGrid
-                                inventoryData={inventoryData}
-                                cloudInventoryData={cloudInventoryData}
-                                onUpdateStock={handleUpdateStock}
-                            />
+                    <div className="min-h-0 flex-1 space-y-4 p-3 pb-24 sm:p-4 md:p-6 md:pb-6">
+                        <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-white/10 bg-[#10161b] p-3 sm:p-4">
+                            <div>
+                                <p className="m-0 text-sm font-semibold text-slate-100">{countProgress.done} av {countProgress.total} rader räknade</p>
+                                <p className="m-0 mt-1 text-xs text-slate-400">Saldot sparas först när du väljer Spara ändringar.</p>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => { void handleNewCountRound(); }}
+                                disabled={countProgress.done === 0}
+                                className="min-h-11 rounded-lg border border-white/15 px-3 py-2 text-sm font-semibold text-slate-200 hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-40"
+                            >
+                                Ny inventeringsrunda
+                            </button>
+                        </div>
+                        {Object.keys(cloudInventoryData.clickitupAccessories).length === 0 && Object.keys(inventoryData.clickitupAccessories).length > 0 ? (
+                            <p className="m-0 rounded-lg border border-amber-400/30 bg-amber-400/10 p-3 text-sm text-amber-100">
+                                Excel-antalen är förifyllda som startsaldo. Spara ändringarna för att lägga in dem i molnlagret.
+                            </p>
+                        ) : null}
+                        <div role="tablist" aria-label="ClickitUp lagerdelar" className="inline-flex w-full rounded-xl border border-white/10 bg-[#10161b] p-1 sm:w-auto">
+                            <button
+                                type="button"
+                                role="tab"
+                                aria-selected={clickitupRoute.tab === 'sections'}
+                                onClick={() => navigateClickitup('sections')}
+                                className={`min-h-11 flex-1 rounded-lg px-4 py-2 text-sm font-semibold sm:flex-none ${clickitupRoute.tab === 'sections' ? 'bg-[#e8e1d4] text-[#10161b]' : 'text-slate-300 hover:bg-white/10'}`}
+                            >Sektioner</button>
+                            <button
+                                type="button"
+                                role="tab"
+                                aria-selected={clickitupRoute.tab === 'accessories'}
+                                onClick={() => navigateClickitup('accessories')}
+                                className={`min-h-11 flex-1 rounded-lg px-4 py-2 text-sm font-semibold sm:flex-none ${clickitupRoute.tab === 'accessories' ? 'bg-[#e8e1d4] text-[#10161b]' : 'text-slate-300 hover:bg-white/10'}`}
+                            >Tillbehör</button>
+                        </div>
+                        <section className="rounded-xl border border-white/10 bg-[#10161b] p-3 sm:p-4">
+                            {clickitupRoute.tab === 'sections' ? (
+                                <ClickitupStockGrid
+                                    inventoryData={inventoryData}
+                                    cloudInventoryData={cloudInventoryData}
+                                    onSetStock={handleSetStock}
+                                    onToggleCounted={handleToggleCounted}
+                                />
+                            ) : (
+                                <ClickitupAccessoryStock
+                                    inventoryData={inventoryData}
+                                    cloudInventoryData={cloudInventoryData}
+                                    onSetStock={handleSetAccessoryStock}
+                                    onToggleCounted={(id) => handleToggleCounted('accessory', id)}
+                                />
+                            )}
                         </section>
                         <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_360px]">
                             <section className="rounded-lg border border-white/10 bg-[#10161b] p-5">
@@ -755,6 +855,16 @@ export function InventoryManager(_props: InventoryManagerProps) {
                                 onCommit={handleCommit}
                                 isSaving={isSaving}
                             />
+                        </div>
+                        <div className="sticky bottom-0 z-10 -mx-3 border-t border-white/15 bg-[#0f1418]/95 p-3 backdrop-blur sm:-mx-4 md:hidden">
+                            <button
+                                type="button"
+                                onClick={() => { void handleCommit(); }}
+                                disabled={!changesPending || isSaving}
+                                className="min-h-12 w-full rounded-lg bg-emerald-500 px-4 py-3 text-sm font-bold text-[#08150f] disabled:cursor-not-allowed disabled:opacity-45"
+                            >
+                                {isSaving ? 'Sparar...' : `Spara ändringar${changesPending ? ` (${changes.length})` : ''}`}
+                            </button>
                         </div>
                     </div>
                 )}

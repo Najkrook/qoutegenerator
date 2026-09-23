@@ -1,4 +1,5 @@
 import type { BahamaInventoryV2Item, ClickitupFieldKey, ClickitupStockMap, InventoryData } from '../types/contracts';
+import { CLICKITUP_ACCESSORIES, CLICKITUP_SIZES, getAccessoryLabel, getClickitupCountKey } from './clickitupInventory';
 
 export interface InventoryChange {
     key: string;
@@ -128,6 +129,52 @@ export function getInventoryChanges(inventoryData: InventoryData, cloudInventory
                     color
                 });
             }
+        });
+    });
+
+    if (Object.keys(inventoryData.clickitupAccessories || {}).length > 0 && Object.keys(cloudInventoryData.clickitupAccessories || {}).length === 0) {
+        changes.push({
+            key: 'cu-accessories-initialized',
+            title: 'ClickitUp tillbehör',
+            desc: 'Excel-startsaldo förifyllt',
+            icon: 'nytt',
+            color: 'var(--primary)'
+        });
+    }
+
+    CLICKITUP_ACCESSORIES.forEach(({ id }) => {
+        const localValue = inventoryData.clickitupAccessories?.[id] || 0;
+        const cloudValue = cloudInventoryData.clickitupAccessories?.[id] || 0;
+        const delta = localValue - cloudValue;
+        if (delta === 0) return;
+        const sign = delta > 0 ? '+' : '';
+        changes.push({
+            key: `cu-accessory-${id}`,
+            title: 'ClickitUp tillbehör',
+            desc: getAccessoryLabel(id),
+            icon: `${sign}${delta}`,
+            color: delta > 0 ? 'var(--success)' : 'var(--danger)',
+            log: {
+                action: 'Justering', system: 'ClickitUp', category: 'clickitup', targetType: 'accessory',
+                targetId: id, element: getAccessoryLabel(id), details: `${getAccessoryLabel(id)} (${sign}${delta})`, delta
+            }
+        });
+    });
+
+    const countRows = [
+        ...CLICKITUP_SIZES.map((size) => ({ key: getClickitupCountKey('size', size), label: `${size} mm` })),
+        ...CLICKITUP_ACCESSORIES.map(({ id }) => ({ key: getClickitupCountKey('accessory', id), label: getAccessoryLabel(id) }))
+    ];
+    countRows.forEach(({ key, label }) => {
+        const localCounted = inventoryData.clickitupCounted?.[key] === true;
+        const cloudCounted = cloudInventoryData.clickitupCounted?.[key] === true;
+        if (localCounted === cloudCounted) return;
+        changes.push({
+            key: `cu-counted-${key}`,
+            title: 'ClickitUp inventering',
+            desc: label,
+            icon: localCounted ? '✓' : '↺',
+            color: 'var(--primary)'
         });
     });
 

@@ -14,6 +14,7 @@ import type {
 interface GridAddonResolutionInput {
     addonDef?: GridCatalogAddonOption | null;
     addonState?: Partial<GridAddonState> | null;
+    excludeFromGlobalDiscountByDefault?: boolean;
 }
 
 interface GridAddonQtyInput extends GridAddonResolutionInput {
@@ -45,11 +46,14 @@ function nearlyEqual(a: number, b: number): boolean {
     return Math.abs(a - b) < 0.0001;
 }
 
-function getCatalogAddonMap(lineData?: Partial<GridCatalogLineData> | null): Record<string, GridCatalogAddonOption> {
-    const addonMap: Record<string, GridCatalogAddonOption> = {};
+function getCatalogAddonMap(lineData?: Partial<GridCatalogLineData> | null): Record<string, GridAddonResolutionInput> {
+    const addonMap: Record<string, GridAddonResolutionInput> = {};
     (lineData?.addonCategories || []).forEach((category) => {
         (category.items || []).forEach((addon) => {
-            addonMap[addon.id] = addon;
+            addonMap[addon.id] = {
+                addonDef: addon,
+                excludeFromGlobalDiscountByDefault: category.excludeFromGlobalDiscountByDefault === true
+            };
         });
     });
     return addonMap;
@@ -85,9 +89,13 @@ export function getGridAddonSyncMode({
 
 export function getGridAddonDiscountSyncMode({
     addonDef,
-    addonState
+    addonState,
+    excludeFromGlobalDiscountByDefault
 }: GridAddonResolutionInput): GridAddonDiscountSyncMode {
     if (!addonDef?.autoScale) {
+        return 'manual';
+    }
+    if (excludeFromGlobalDiscountByDefault) {
         return 'manual';
     }
     if (addonState?.discountSyncMode === 'global' || addonState?.discountSyncMode === 'manual') {
@@ -114,9 +122,14 @@ export function getEffectiveGridAddonQty({
 export function getEffectiveGridAddonDiscountPct({
     addonDef,
     addonState,
+    excludeFromGlobalDiscountByDefault,
     globalDiscountPct = 0
 }: GridAddonResolutionInput & { globalDiscountPct?: number }): number {
-    const discountSyncMode = getGridAddonDiscountSyncMode({ addonDef, addonState });
+    const discountSyncMode = getGridAddonDiscountSyncMode({
+        addonDef,
+        addonState,
+        excludeFromGlobalDiscountByDefault
+    });
     if (addonDef?.autoScale && discountSyncMode === 'global') {
         return normalizeDiscountPct(globalDiscountPct);
     }
@@ -135,17 +148,18 @@ export function buildEffectiveGridSelections(
     const addons: Record<string, EffectiveGridAddonState> = {};
     const globalDiscountPct = normalizeDiscountPct(options.globalDiscountPct);
 
-    Object.entries(catalogAddonMap).forEach(([addonId, addonDef]) => {
+    Object.entries(catalogAddonMap).forEach(([addonId, addonResolution]) => {
+        const addonDef = addonResolution.addonDef;
         const addonState = persistedAddons[addonId];
         const syncMode = getGridAddonSyncMode({ addonDef, addonState });
-        const discountSyncMode = getGridAddonDiscountSyncMode({ addonDef, addonState });
+        const discountSyncMode = getGridAddonDiscountSyncMode({ ...addonResolution, addonState });
         addons[addonId] = {
             ...(addonState || { qty: 0, discountPct: 0 }),
             qty: getEffectiveGridAddonQty({ addonDef, addonState, itemsQtyTotal }),
-            discountPct: getEffectiveGridAddonDiscountPct({ addonDef, addonState, globalDiscountPct }),
+            discountPct: getEffectiveGridAddonDiscountPct({ ...addonResolution, addonState, globalDiscountPct }),
             syncMode,
             discountSyncMode,
-            isAutoScaled: addonDef.autoScale === true
+            isAutoScaled: addonDef?.autoScale === true
         };
     });
 
@@ -182,6 +196,9 @@ export function applyGlobalDiscountToLineSelection(
     });
 
     (lineData.addonCategories || []).forEach((category) => {
+        if (category.excludeFromGlobalDiscountByDefault) {
+            return;
+        }
         (category.items || []).forEach((addonDef) => {
             if (!addonDef?.autoScale) {
                 return;
@@ -210,6 +227,7 @@ export function applyGlobalDiscountToLineSelection(
 }
 
 export function applyGlobalDiscountToGridCustomAddons(
+    lineData: Partial<GridCatalogLineData> = {},
     lineSelection: Partial<GridLineSelection> = {},
     previousGlobalDiscount = 0,
     nextGlobalDiscount = 0
@@ -217,11 +235,18 @@ export function applyGlobalDiscountToGridCustomAddons(
     const previousDiscount = normalizeDiscountPct(previousGlobalDiscount);
     const nextDiscount = normalizeDiscountPct(nextGlobalDiscount);
     const customAddonsByCategory = lineSelection.customAddonsByCategory || {};
+    const excludedCategoryIds = new Set((lineData.addonCategories || [])
+        .flatMap((category, index) => category.excludeFromGlobalDiscountByDefault
+            ? [String(category.id || category.categoryId || `category_${index}`)]
+            : []));
 
     const nextCustomAddonsByCategory = Object.entries(customAddonsByCategory).reduce<Record<string, GridCustomAddonRow[]>>(
         (acc, [categoryId, rows]) => {
             acc[categoryId] = Array.isArray(rows)
                 ? rows.map((row) => {
+                    if (excludedCategoryIds.has(categoryId)) {
+                        return row;
+                    }
                     const currentDiscount = normalizeDiscountPct(row?.discountPct);
                     return nearlyEqual(currentDiscount, previousDiscount)
                         ? { ...row, discountPct: nextDiscount }

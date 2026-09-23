@@ -1,10 +1,17 @@
 import { describe, expect, it } from 'vitest';
 import {
+    getClickitupInventoryRouteSearch,
     getInventoryRouteSearch,
+    readClickitupInventoryRoute,
     readInventoryRouteState
 } from '../src/navigation/inventoryLinks';
 
 describe('inventory URL state', () => {
+    it('routes ClickitUp sections and accessories without changing BaHaMa defaults', () => {
+        expect(readClickitupInventoryRoute('')).toEqual({ line: 'bahama', tab: 'sections' });
+        expect(readClickitupInventoryRoute(getClickitupInventoryRouteSearch('accessories'))).toEqual({ line: 'clickitup', tab: 'accessories' });
+        expect(readClickitupInventoryRoute('?line=clickitup&tab=bad')).toEqual({ line: 'clickitup', tab: 'sections' });
+    });
     it('uses the Lagerkarta as the stable default and keeps Lista compact', () => {
         expect(readInventoryRouteState('')).toEqual({ view: 'map', rack: 1 });
         expect(readInventoryRouteState('?view=list')).toEqual({ view: 'list', rack: 1 });

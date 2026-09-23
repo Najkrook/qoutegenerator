@@ -226,6 +226,8 @@ export interface InventoryData {
     bahama: BahamaInventoryItem[];
     bahamaV2: BahamaInventoryV2Item[];
     clickitup: ClickitupStockMap;
+    clickitupAccessories: Record<string, number>;
+    clickitupCounted: Record<string, true>;
     notes?: string;
 }
 
@@ -233,6 +235,8 @@ export interface RawPersistedInventoryData extends UnknownRecord {
     bahama?: unknown;
     bahamaV2?: unknown;
     clickitup?: unknown;
+    clickitupAccessories?: unknown;
+    clickitupCounted?: unknown;
     notes?: unknown;
 }
 
@@ -282,6 +286,7 @@ export interface GridLineSelection {
     addons: Record<string, GridAddonState>;
     customAddonsByCategory: Record<string, GridCustomAddonRow[]>;
     customItems?: GridCustomItemRow[];
+    rowOrder?: string[];
     [key: string]: unknown;
 }
 
@@ -369,6 +374,7 @@ export interface GridCatalogAddonCategory {
     id?: string;
     categoryId?: string;
     name: string;
+    excludeFromGlobalDiscountByDefault?: boolean;
     items: GridCatalogAddonOption[];
 }
 
@@ -475,6 +481,7 @@ export interface RawPersistedGridLineSelection extends UnknownRecord {
     addons?: unknown;
     customAddonsByCategory?: unknown;
     customItems?: unknown;
+    rowOrder?: unknown;
 }
 
 export type HydratedQuoteStatePayload = Partial<QuoteState> | UnknownRecord | null | undefined;
@@ -1366,7 +1373,8 @@ export interface PendingChangesPanelProps {
 export interface ClickitupStockGridProps {
     inventoryData: InventoryData;
     cloudInventoryData: InventoryData;
-    onUpdateStock: (size: string, field: ClickitupFieldKey, delta: number) => void;
+    onSetStock: (size: string, field: ClickitupFieldKey, value: number) => void;
+    onToggleCounted: (type: 'size' | 'accessory', id: string) => void;
 }
 
 export interface RetailerManagerProps {}

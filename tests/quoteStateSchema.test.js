@@ -60,12 +60,13 @@ describe('quoteStateSchema', () => {
         expect(hydrated.builderItems).toHaveLength(1);
         expect(hydrated.gridSelections.ClickitUp.items['ClickitUp Section|1500'].qty).toBe(3);
         expect(hydrated.gridSelections.ClickitUp.customAddonsByCategory).toEqual({});
+        expect(hydrated.gridSelections.ClickitUp.rowOrder).toEqual([]);
         expect(hydrated.customCosts).toHaveLength(1);
         expect(hydrated.customerInfo.name).toBe('Ada');
         expect(hydrated.customerInfo.customerReference).toBe('ER-14');
         expect(hydrated.quoteValidityDays).toBe(14);
         expect(hydrated.customerInfo.validity).toBe('14 dagar');
-        expect(hydrated.inventoryData).toEqual({ bahama: [], bahamaV2: [], clickitup: {}, notes: '' });
+        expect(hydrated.inventoryData).toEqual({ bahama: [], bahamaV2: [], clickitup: {}, clickitupAccessories: {}, clickitupCounted: {}, notes: '' });
         expect(hydrated.hideZeroDiscountReferencesInPdf).toBe(false);
         expect(hydrated.pdfThemeId).toBe('brixx');
         expect(hydrated.exportLanguage).toBe('sv');
@@ -362,7 +363,7 @@ describe('quoteStateSchema', () => {
 
         expect(hydrated.customerInfo).toEqual(createInitialQuoteState().customerInfo);
         expect(hydrated.gridSelections).toEqual({});
-        expect(hydrated.inventoryData).toEqual({ bahama: [], bahamaV2: [], clickitup: {}, notes: '' });
+        expect(hydrated.inventoryData).toEqual({ bahama: [], bahamaV2: [], clickitup: {}, clickitupAccessories: {}, clickitupCounted: {}, notes: '' });
         expect(hydrated.contractingWork).toEqual(createInitialQuoteState().contractingWork);
     });
 
@@ -436,6 +437,8 @@ describe('quoteStateSchema', () => {
                 '3m': { sektion: 2, dorr_h: 3, dorr_v: 0, hane_h: 0, hane_v: 4 },
                 broken: { sektion: 0, dorr_h: 0, dorr_v: 0, hane_h: 0, hane_v: 0 }
             },
+            clickitupAccessories: {},
+            clickitupCounted: {},
             notes: 'Lagernotis'
         });
         expect(hydrated.gridSelections.ClickitUp.items).toEqual({
@@ -582,6 +585,85 @@ describe('quoteStateSchema', () => {
 
         expect(hydrated.stateVersion).toBe(CURRENT_STATE_VERSION);
         expect(hydrated.draftUpdatedAtMs).toBe(1720000000123);
+    });
+
+    it.each(['ClickitUp', 'ClickitUpFixed'])('preserves implicit legacy %s freight discount', (lineId) => {
+        const hydrated = hydrateQuoteState({
+            stateVersion: 6,
+            selectedLines: [lineId],
+            globalDiscountPct: 12,
+            gridSelections: {
+                [lineId]: {
+                    items: { 'ClickitUp Sektion|1000': { qty: 7, discountPct: 12 } },
+                    addons: {}
+                }
+            }
+        });
+
+        expect(hydrated.gridSelections[lineId].addons.frakt_glas).toMatchObject({
+            qty: 0,
+            discountPct: 12,
+            syncMode: 'auto',
+            discountSyncMode: 'manual'
+        });
+    });
+
+    it('freezes an old globally synced freight discount and preserves manual freight discounts', () => {
+        const hydrated = hydrateQuoteState({
+            stateVersion: 6,
+            globalDiscountPct: 18,
+            gridSelections: {
+                ClickitUp: {
+                    items: { 'ClickitUp Sektion|1000': { qty: 2, discountPct: 18 } },
+                    addons: { frakt_glas: { qty: 1, discountPct: 4, discountSyncMode: 'global' } },
+                    customAddonsByCategory: {
+                        freight: [{ id: 'f1', name: 'Egen frakt', price: 300, qty: 1, discountPct: 7 }]
+                    }
+                },
+                ClickitUpFixed: {
+                    items: { 'ClickitUp Sektion|1000': { qty: 1, discountPct: 18 } },
+                    addons: { frakt_glas: { qty: 1, discountPct: 6, discountSyncMode: 'manual' } }
+                }
+            }
+        });
+
+        expect(hydrated.gridSelections.ClickitUp.addons.frakt_glas).toMatchObject({
+            discountPct: 18,
+            discountSyncMode: 'manual'
+        });
+        expect(hydrated.gridSelections.ClickitUpFixed.addons.frakt_glas).toMatchObject({
+            discountPct: 6,
+            discountSyncMode: 'manual'
+        });
+        expect(hydrated.gridSelections.ClickitUp.customAddonsByCategory.freight[0].discountPct).toBe(7);
+    });
+
+    it('leaves unselected legacy freight at the new zero-percent default', () => {
+        const hydrated = hydrateQuoteState({
+            stateVersion: 6,
+            globalDiscountPct: 12,
+            gridSelections: { ClickitUp: { items: {}, addons: {} } }
+        });
+
+        expect(hydrated.gridSelections.ClickitUp.addons.frakt_glas).toBeUndefined();
+    });
+
+    it('migrates version 7 grid selections and keeps only valid unique row-order keys', () => {
+        const hydrated = hydrateQuoteState({
+            stateVersion: 7,
+            gridSelections: {
+                ClickitUp: {
+                    items: { 'ClickitUp Sektion|1000': { qty: 1, discountPct: 0 } },
+                    addons: {},
+                    rowOrder: ['grid-addon:ClickitUp:frakt_glas', '', 4, 'grid-addon:ClickitUp:frakt_glas']
+                },
+                ClickitUpFixed: { items: {}, addons: {}, rowOrder: 'invalid' }
+            }
+        });
+
+        expect(hydrated.stateVersion).toBe(CURRENT_STATE_VERSION);
+        expect(hydrated.gridSelections.ClickitUp.rowOrder).toEqual(['grid-addon:ClickitUp:frakt_glas']);
+        expect(hydrated.gridSelections.ClickitUpFixed.rowOrder).toEqual([]);
     });
 
     it('reset path returns the initial schema shape', () => {

@@ -32,6 +32,8 @@ describe('inventoryData helpers', () => {
                 '3m': { sektion: 2, dorr_h: 1, dorr_v: 0, hane_h: 0, hane_v: 4 },
                 bad: DEFAULT_CLICKITUP_ENTRY
             },
+            clickitupAccessories: {},
+            clickitupCounted: {},
             notes: 'Intern anteckning'
         });
     });
@@ -66,6 +68,8 @@ describe('inventoryData helpers', () => {
             clickitup: {
                 '4m': { sektion: 1, dorr_h: 2, dorr_v: 3, hane_h: 4, hane_v: 5 }
             },
+            clickitupAccessories: {},
+            clickitupCounted: {},
             notes: 'Intern notering'
         });
 
@@ -100,6 +104,8 @@ describe('inventoryData helpers', () => {
             clickitup: {
                 '4m': { sektion: 1, dorr_h: 2, dorr_v: 3, hane_h: 4, hane_v: 5 }
             },
+            clickitupAccessories: {},
+            clickitupCounted: {},
             notes: 'Intern notering'
         });
     });

@@ -32,6 +32,7 @@ import { catalogData as defaultCatalogData } from '../data/catalog';
 import { calculateContractingWorkSummary } from './contractingWork';
 import { normalizeExportLanguage, translateQuoteTotalsRowModel } from './exportLocalization';
 import { normalizeQuoteCommercialSnapshot } from './quoteCommercialSnapshot';
+import { normalizeClickitupAccessories, normalizeClickitupCounted } from './clickitupInventory';
 
 const SEK_RECONCILIATION_TOLERANCE = 1;
 export const MAX_QUOTE_PRODUCT_ROWS = 200;
@@ -255,6 +256,8 @@ function cloneInventoryData(value: unknown): InventoryData {
         bahama: Array.isArray(source.bahama) ? source.bahama.map(cloneBahamaInventoryItem) : [],
         bahamaV2: Array.isArray(source.bahamaV2) ? source.bahamaV2.map(cloneBahamaInventoryV2Item) : [],
         clickitup: cloneClickitupStockMap(source.clickitup),
+        clickitupAccessories: normalizeClickitupAccessories(source.clickitupAccessories),
+        clickitupCounted: normalizeClickitupCounted(source.clickitupCounted),
         notes: stringValue(source.notes)
     };
 }

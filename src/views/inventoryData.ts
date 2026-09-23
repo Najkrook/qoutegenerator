@@ -12,6 +12,7 @@ import type {
     UnknownRecord
 } from '../types/contracts';
 import { createBahamaQrId } from '../services/bahamaQrService';
+import { normalizeClickitupAccessories, normalizeClickitupCounted, normalizeStockQuantity } from '../services/clickitupInventory';
 
 export type InventorySheetCell = string | number | boolean | null | undefined;
 export type InventorySheetRow = InventorySheetCell[];
@@ -42,6 +43,8 @@ export function createDefaultInventoryData(): InventoryData {
         bahama: [],
         bahamaV2: [],
         clickitup: {},
+        clickitupAccessories: {},
+        clickitupCounted: {},
         notes: ''
     };
 }
@@ -242,11 +245,11 @@ export function hasBahamaInventoryHeader(row: InventorySheetRow): boolean {
 export function normalizeClickitupEntry(value: unknown): ClickitupStockEntry {
     const raw: RawClickitupStockEntry = isUnknownRecord(value) ? value : {};
     return {
-        sektion: Number(raw.sektion) || 0,
-        dorr_h: Number(raw.dorr_h) || 0,
-        dorr_v: Number(raw.dorr_v) || 0,
-        hane_h: Number(raw.hane_h) || 0,
-        hane_v: Number(raw.hane_v) || 0
+        sektion: normalizeStockQuantity(raw.sektion),
+        dorr_h: normalizeStockQuantity(raw.dorr_h),
+        dorr_v: normalizeStockQuantity(raw.dorr_v),
+        hane_h: normalizeStockQuantity(raw.hane_h),
+        hane_v: normalizeStockQuantity(raw.hane_v)
     };
 }
 
@@ -265,7 +268,12 @@ export function normalizeStoredInventoryData(value: unknown): InventoryData {
         : {};
 
     const notes = typeof value.notes === 'string' ? value.notes : '';
-    return { bahama, bahamaV2, clickitup, notes };
+    return {
+        bahama, bahamaV2, clickitup,
+        clickitupAccessories: normalizeClickitupAccessories(value.clickitupAccessories),
+        clickitupCounted: normalizeClickitupCounted(value.clickitupCounted),
+        notes
+    };
 }
 
 export function cloneInventoryData(inventory: InventoryData): InventoryData {

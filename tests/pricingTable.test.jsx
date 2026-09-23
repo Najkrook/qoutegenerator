@@ -1,6 +1,8 @@
+// @vitest-environment jsdom
 import React from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { PricingTable, clampPricingRowDiscount } from '../src/components/features/PricingTable';
 import { QuoteContext } from '../src/store/QuoteContext';
 import { AuthContext } from '../src/store/AuthContext';
@@ -234,6 +236,24 @@ describe('PricingTable priceUponRequest rendering', () => {
 });
 
 describe('PricingTable ClickitUp export language rendering', () => {
+    it.each(['ClickitUp', 'ClickitUpFixed'])('shows %s freight at zero discount by default', (lineId) => {
+        const html = renderPricingTable({
+            builderItems: [],
+            selectedLines: [lineId],
+            globalDiscountPct: 12,
+            gridSelections: {
+                [lineId]: {
+                    items: { 'ClickitUp Sektion|1000': { qty: 7, discountPct: 12 } },
+                    addons: {},
+                    customAddonsByCategory: {}
+                }
+            }
+        });
+
+        const freightRow = html.split('<tr').find((row) => row.includes('Glasfrakt Specialpall'));
+        expect(freightRow).toContain('value="0"');
+    });
+
     it('translates only ClickitUp article content while keeping pricing controls Swedish', () => {
         const html = renderPricingTable({
             builderItems: [],
@@ -258,5 +278,59 @@ describe('PricingTable ClickitUp export language rendering', () => {
         expect(html).toContain('Rabatt %');
         expect(html).toContain('Summa brutto');
         expect(html).not.toContain('Model/Description');
+    });
+});
+
+describe('PricingTable ClickitUp row dragging', () => {
+    it('saves a dragged custom add-on after a catalog add-on', () => {
+        const dispatch = vi.fn();
+        const state = {
+            builderItems: [],
+            gridSelections: {
+                ClickitUp: {
+                    items: { 'ClickitUp Sektion|1000': { qty: 1, discountPct: 0 } },
+                    addons: { frakt_glas: { qty: 1, discountPct: 0, syncMode: 'manual' } },
+                    customAddonsByCategory: {
+                        extra: [{ id: 'toplock', name: 'Toplock - Hörna vinkel', price: 720, qty: 1, discountPct: 0 }]
+                    }
+                }
+            },
+            customCosts: [],
+            selectedLines: ['ClickitUp'],
+            exchangeRate: 1,
+            globalDiscountPct: 0,
+            includesVat: false
+        };
+        const auth = {
+            accessLevel: 'full',
+            canViewEverything: true,
+            isRetailer: false,
+            retailer: null
+        };
+        const view = render(
+            <AuthContext.Provider value={auth}>
+                <QuoteContext.Provider value={{ state, dispatch }}>
+                    <PricingTable />
+                </QuoteContext.Provider>
+            </AuthContext.Provider>
+        );
+
+        const toplockRow = screen.getByText('Tillval: Toplock - Hörna vinkel').closest('tr');
+        const freightRow = screen.getByText('Tillval: Glasfrakt Specialpall').closest('tr');
+        const dataTransfer = { effectAllowed: '', dropEffect: '', setData: vi.fn() };
+        freightRow.getBoundingClientRect = () => ({ top: 0, height: 100 });
+
+        fireEvent.dragStart(toplockRow.querySelector('[draggable="true"]'), { dataTransfer });
+        fireEvent.dragOver(freightRow, { dataTransfer, clientY: 1 });
+        fireEvent.drop(freightRow, { dataTransfer, clientY: 1 });
+
+        const action = dispatch.mock.calls[0][0];
+        expect(action.type).toBe('SET_GRID_SELECTIONS');
+        const order = action.payload.ClickitUp.rowOrder;
+        expect(order[0]).toBe('grid:ClickitUp:ClickitUp Sektion|1000');
+        expect(order.indexOf('grid-custom-addon:ClickitUp:extra:toplock'))
+            .toBe(order.indexOf('grid-addon:ClickitUp:frakt_glas') + 1);
+        expect(order).toContain('grid-addon:ClickitUp:svartanodiserade');
+        view.unmount();
     });
 });

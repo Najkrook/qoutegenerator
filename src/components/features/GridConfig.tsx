@@ -47,6 +47,19 @@ function getCategoryId(category: GridCatalogAddonCategory, index: number): strin
     return String(category.id || category.categoryId || `category_${index}`);
 }
 
+function isDiscountExcludedCategory(lineData: GridCatalogLineData | null, categoryId: string): boolean {
+    return lineData?.addonCategories.some((category, index) => (
+        getCategoryId(category, index) === categoryId && category.excludeFromGlobalDiscountByDefault === true
+    )) || false;
+}
+
+function isDiscountExcludedAddon(lineData: GridCatalogLineData | null, addonId: string): boolean {
+    return lineData?.addonCategories.some((category) => (
+        category.excludeFromGlobalDiscountByDefault === true
+        && category.items.some((addon) => addon.id === addonId)
+    )) || false;
+}
+
 function getGridLine(lineId: string): GridCatalogLineData | null {
     return getGridCatalogLine(lineId);
 }
@@ -312,10 +325,11 @@ export function GridConfig({ lineId }: GridConfigProps) {
 
     const addCustomAddon = (categoryId: string) => {
         const existingRows = selections.customAddonsByCategory?.[categoryId] || [];
+        const defaultDiscountPct = isDiscountExcludedCategory(lineData, categoryId) ? 0 : globalDiscountPct;
         updateGrid({
             customAddonsByCategory: {
                 ...(selections.customAddonsByCategory || {}),
-                [categoryId]: [...existingRows, createCustomAddonRow(globalDiscountPct)]
+                [categoryId]: [...existingRows, createCustomAddonRow(defaultDiscountPct)]
             }
         });
     };
@@ -366,6 +380,7 @@ export function GridConfig({ lineId }: GridConfigProps) {
     const setAddonQtyManual = (addonId: string, qty: number, addon?: GridCatalogAddonOption) => {
         const newAddons: Record<string, GridAddonState> = { ...selections.addons };
         const normalizedQty = Math.max(0, qty);
+        const excludeFromGlobalDiscount = isDiscountExcludedAddon(lineData, addonId);
         if (normalizedQty > 0 || addon?.autoScale) {
             const existing = newAddons[addonId];
             newAddons[addonId] = existing
@@ -373,13 +388,13 @@ export function GridConfig({ lineId }: GridConfigProps) {
                     ...existing,
                     qty: normalizedQty,
                     syncMode: 'manual',
-                    discountSyncMode: existing.discountSyncMode || 'manual'
+                    discountSyncMode: excludeFromGlobalDiscount ? 'manual' : existing.discountSyncMode || 'manual'
                 }
                 : {
                     qty: normalizedQty,
-                    discountPct: globalDiscountPct,
+                    discountPct: excludeFromGlobalDiscount ? 0 : globalDiscountPct,
                     syncMode: 'manual',
-                    discountSyncMode: 'global'
+                    discountSyncMode: excludeFromGlobalDiscount ? 'manual' : 'global'
                 };
         } else {
             delete newAddons[addonId];
@@ -391,12 +406,16 @@ export function GridConfig({ lineId }: GridConfigProps) {
         const newAddons: Record<string, GridAddonState> = { ...selections.addons };
         const existing = newAddons[addonId];
         const effectiveQty = effectiveSelections.addons[addonId]?.qty || 0;
-        const effectiveDiscountSyncMode = existing?.discountSyncMode ?? (existing ? 'manual' : 'global');
+        const excludeFromGlobalDiscount = isDiscountExcludedAddon(lineData, addonId);
+        const defaultDiscountPct = excludeFromGlobalDiscount ? 0 : globalDiscountPct;
+        const effectiveDiscountSyncMode = excludeFromGlobalDiscount
+            ? 'manual'
+            : existing?.discountSyncMode ?? (existing ? 'manual' : 'global');
 
         newAddons[addonId] = {
-            ...(existing || { qty: 0, discountPct: globalDiscountPct }),
+            ...(existing || { qty: 0, discountPct: defaultDiscountPct }),
             qty: existing?.qty ?? effectiveQty,
-            discountPct: existing?.discountPct ?? globalDiscountPct,
+            discountPct: existing?.discountPct ?? defaultDiscountPct,
             syncMode,
             discountSyncMode: effectiveDiscountSyncMode as GridAddonDiscountSyncMode
         };
