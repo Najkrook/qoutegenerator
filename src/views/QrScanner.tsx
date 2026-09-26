@@ -107,7 +107,7 @@ export function QrScanner() {
                         : 'Starta kameran när du är redo att skanna.';
 
     return (
-        <div className="mx-auto max-w-2xl overflow-hidden rounded-2xl border border-white/10 bg-[#0c111b] text-slate-100 shadow-2xl">
+        <div className="mx-auto min-h-0 w-full max-w-2xl overflow-y-auto overscroll-contain rounded-2xl border border-white/10 bg-[#0c111b] text-slate-100 shadow-2xl">
             <header className="flex items-center justify-between border-b border-white/10 px-4 py-4 sm:px-6">
                 <div>
                     <p className="m-0 text-[11px] font-bold uppercase tracking-[0.18em] text-[#d4c8b4]">BaHaMa lager</p>
@@ -119,7 +119,7 @@ export function QrScanner() {
             </header>
 
             <main className="p-4 sm:p-6">
-                <section className="relative aspect-[4/5] max-h-[560px] overflow-hidden rounded-2xl border border-white/10 bg-[#080b11] sm:aspect-[4/3]">
+                <section className="relative aspect-[4/5] max-h-[50dvh] overflow-hidden rounded-2xl border border-white/10 bg-[#080b11] sm:aspect-[4/3] sm:max-h-[560px]">
                     <video ref={videoRef} muted playsInline className={`h-full w-full object-cover ${state === 'active' ? 'opacity-100' : 'opacity-20'}`} />
                     <div className="pointer-events-none absolute inset-0 grid place-items-center bg-gradient-to-b from-transparent via-transparent to-black/35">
                         <IconScan size={148} stroke={1.1} className="text-[#e8e1d4] drop-shadow-xl" aria-hidden="true" />
@@ -152,7 +152,7 @@ export function QrScanner() {
                     <label className="relative">
                         <span className="sr-only">BRIXX-länk eller QR-ID</span>
                         <IconKeyboard className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" size={18} aria-hidden="true" />
-                        <input value={manualInput} onChange={(event) => { setManualInput(event.target.value); setMessage(null); }} placeholder="Klistra in länk eller QR-ID" autoComplete="off" className="w-full rounded-lg border border-white/10 bg-[#111722] py-3 pl-10 pr-3 text-sm text-white outline-none placeholder:text-slate-600 focus:border-[#e8e1d4]" />
+                        <input value={manualInput} onChange={(event) => { setManualInput(event.target.value); setMessage(null); }} placeholder="Klistra in länk eller QR-ID" autoComplete="off" className="w-full rounded-lg border border-white/10 bg-[#111722] py-3 pl-10 pr-3 text-base text-white outline-none placeholder:text-slate-400 focus:border-[#e8e1d4]" />
                     </label>
                     <button type="submit" className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-white/15 bg-white/[0.05] px-5 text-sm font-semibold text-white hover:bg-white/[0.09]">
                         Öppna <IconArrowRight size={18} aria-hidden="true" />

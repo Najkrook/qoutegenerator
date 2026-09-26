@@ -26,16 +26,16 @@ const STATUS_LABELS: Record<BahamaInventoryStatus, string> = {
 };
 
 function Value({ value }: { value: string }) {
-    return <span className={value ? 'text-slate-100' : 'text-slate-600'}>{value || 'Ej angivet'}</span>;
+    return <span className={value ? 'text-slate-100' : 'text-slate-400'}>{value || 'Ej angivet'}</span>;
 }
 
 function DetailRow({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
     return (
-        <div className="grid grid-cols-[34px_minmax(0,1fr)] gap-3 border-b border-white/[0.07] py-4 last:border-b-0">
+        <div className="grid grid-cols-[20px_minmax(0,1fr)] gap-3 border-b border-white/[0.07] py-3 last:border-b-0 sm:py-4">
             <div className="mt-0.5 text-[#d4c8b4]" aria-hidden="true">{icon}</div>
-            <div>
-                <p className="m-0 text-[11px] font-bold uppercase tracking-wider text-slate-600">{label}</p>
-                <p className="mb-0 mt-1 text-sm font-medium"><Value value={value} /></p>
+            <div className="min-w-0">
+                <p className="m-0 text-[11px] font-bold uppercase tracking-wider text-slate-400">{label}</p>
+                <p className="mb-0 mt-1 whitespace-pre-wrap text-sm font-medium [overflow-wrap:anywhere]"><Value value={value} /></p>
             </div>
         </div>
     );
@@ -44,21 +44,21 @@ function DetailRow({ icon, label, value }: { icon: React.ReactNode; label: strin
 function ActiveDetail({ record }: { record: BahamaQrActiveRecord }) {
     return (
         <>
-            <div className="border-b border-white/10 bg-gradient-to-br from-[#151d2a] to-[#0d131d] px-5 py-6 sm:px-7">
-                <div className="flex flex-wrap items-start justify-between gap-4">
-                    <div>
+            <div className="border-b border-white/10 bg-gradient-to-br from-[#151d2a] to-[#0d131d] px-4 py-4 sm:px-7 sm:py-6">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div className="min-w-0 [overflow-wrap:anywhere]">
                         <p className="m-0 text-[11px] font-bold uppercase tracking-[0.18em] text-[#d4c8b4]">Lager-ID</p>
                         <h1 className="m-0 mt-1 text-3xl font-semibold tracking-tight text-white">{record.inventoryId}</h1>
-                        <p className="mb-0 mt-2 text-sm text-slate-400">{record.type || 'Modell ej angiven'} · {record.size || 'Storlek ej angiven'}</p>
                     </div>
                     <span className="inline-flex items-center gap-2 rounded-full border border-emerald-300/20 bg-emerald-300/10 px-3 py-1.5 text-xs font-bold text-emerald-200">
                         <IconShieldCheck size={16} aria-hidden="true" /> {STATUS_LABELS[record.status]}
                     </span>
                 </div>
+                <p className="mb-0 mt-2 text-sm text-slate-300 [overflow-wrap:anywhere]">{record.type || 'Modell ej angiven'} · {record.size || 'Storlek ej angiven'}</p>
             </div>
 
-            <div className="grid gap-5 p-5 sm:p-7 lg:grid-cols-2">
-                <section className="rounded-xl border border-white/10 bg-white/[0.025] px-4" aria-labelledby="basic-heading">
+            <div className="grid gap-3 p-3 sm:gap-5 sm:p-7 lg:grid-cols-2">
+                <section className="min-w-0 rounded-xl border border-white/10 bg-white/[0.025] px-3 sm:px-4" aria-labelledby="basic-heading">
                     <h2 id="basic-heading" className="mb-0 mt-4 text-sm font-semibold text-white">Parasollet</h2>
                     <DetailRow icon={<IconRulerMeasure size={20} />} label="Modell och storlek" value={[record.type, record.size].filter(Boolean).join(' · ')} />
                     <DetailRow icon={<IconMapPin size={20} />} label="Lagerplats" value={record.location} />
@@ -66,7 +66,7 @@ function ActiveDetail({ record }: { record: BahamaQrActiveRecord }) {
                     <DetailRow icon={<IconPalette size={20} />} label="Duk / textil" value={record.properties.textil} />
                 </section>
 
-                <section className="rounded-xl border border-white/10 bg-white/[0.025] px-4" aria-labelledby="equipment-heading">
+                <section className="min-w-0 rounded-xl border border-white/10 bg-white/[0.025] px-3 sm:px-4" aria-labelledby="equipment-heading">
                     <h2 id="equipment-heading" className="mb-0 mt-4 text-sm font-semibold text-white">Utrustning</h2>
                     <DetailRow icon={<IconTool size={20} />} label="Fot" value={record.properties.fot} />
                     <DetailRow icon={<IconBulb size={20} />} label="Belysning" value={record.properties.belysning} />
@@ -75,7 +75,7 @@ function ActiveDetail({ record }: { record: BahamaQrActiveRecord }) {
                 </section>
             </div>
 
-            <div className="border-t border-white/10 px-5 py-4 text-xs text-slate-600 sm:px-7">
+            <div className="border-t border-white/10 px-4 py-4 text-xs text-slate-400 sm:px-7">
                 Senast uppdaterad {new Date(record.updatedAt).toLocaleString('sv-SE')}
             </div>
         </>
@@ -105,9 +105,9 @@ export function QrParasolDetail({ initialRecord }: { initialRecord?: BahamaQrRec
     }, [initialRecord, qrId]);
 
     return (
-        <div className="mx-auto max-w-4xl overflow-hidden rounded-2xl border border-white/10 bg-[#0c111b] text-slate-100 shadow-2xl">
-            <header className="flex items-center justify-between border-b border-white/10 px-4 py-3 sm:px-6">
-                <Link to={APP_PATHS[APP_ROUTE_IDS.qrScanner]} className="inline-flex items-center gap-2 text-sm font-semibold text-slate-400 no-underline hover:text-white">
+        <div className="mx-auto min-h-0 w-full max-w-4xl overflow-y-auto overscroll-contain rounded-2xl border border-white/10 bg-[#0c111b] text-slate-100 shadow-2xl">
+            <header className="sticky top-0 z-10 flex items-center justify-between gap-3 border-b border-white/10 bg-[#0c111b] px-4 py-1 sm:px-6">
+                <Link to={APP_PATHS[APP_ROUTE_IDS.qrScanner]} className="inline-flex min-h-11 items-center gap-2 rounded text-sm font-semibold text-slate-300 no-underline hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white">
                     <IconArrowLeft size={18} aria-hidden="true" /> Skanna igen
                 </Link>
                 <div className="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-[0.16em] text-[#d4c8b4]">

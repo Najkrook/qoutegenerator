@@ -5,10 +5,16 @@ import type { BahamaInventoryV2Item, QrLabelLayout } from '../types/contracts';
 import { getBahamaQrUrl } from './bahamaQrService';
 
 export const DEFAULT_QR_LABEL_LAYOUT: QrLabelLayout = {
-    widthMm: 70,
-    heightMm: 50,
+    widthMm: 190,
+    heightMm: 277,
     marginMm: 10,
-    gapMm: 3
+    gapMm: 0
+};
+
+export const QR_LABEL_PRESETS: Record<string, QrLabelLayout> = {
+    a4: DEFAULT_QR_LABEL_LAYOUT,
+    '70x50': { widthMm: 70, heightMm: 50, marginMm: 10, gapMm: 3 },
+    '90x50': { widthMm: 90, heightMm: 50, marginMm: 10, gapMm: 3 }
 };
 
 export const MIN_QR_LABEL_WIDTH_MM = 60;
@@ -84,6 +90,40 @@ export async function renderBahamaLabelDataUrl(
     context.fillStyle = '#ffffff';
     context.fillRect(0, 0, canvas.width, canvas.height);
     context.fillStyle = '#121827';
+
+    // Portrait sheets need a stacked layout so the QR code and text keep their proportions.
+    if (layout.heightMm > layout.widthMm) {
+        const inset = Math.round(canvas.width * 0.06);
+        const contentWidth = canvas.width - inset * 2;
+        context.textAlign = 'center';
+        drawFittedLine(context, 'BRIXX', canvas.width / 2, canvas.height * 0.075, contentWidth, canvas.width * 0.06, 800);
+        drawFittedLine(context, item.id, canvas.width / 2, canvas.height * 0.155, contentWidth, canvas.width * 0.12, 800);
+        drawFittedLine(context, `${displayValue(item.type)} · ${displayValue(item.size)}`, canvas.width / 2, canvas.height * 0.205, contentWidth, canvas.width * 0.04, 700);
+
+        const qrSize = Math.round(Math.min(canvas.width * 0.70, canvas.height * 0.46));
+        const qrCanvas = document.createElement('canvas');
+        await QRCode.toCanvas(qrCanvas, getBahamaQrUrl(item.qrId, origin), {
+            errorCorrectionLevel: 'Q', margin: 4, width: qrSize,
+            color: { dark: '#10131a', light: '#ffffff' }
+        });
+        context.drawImage(qrCanvas, Math.round((canvas.width - qrSize) / 2), Math.round(canvas.height * 0.24), qrSize, qrSize);
+
+        context.textAlign = 'left';
+        const rows = [
+            ['Stativ', item.properties.stativ], ['Textil', item.properties.textil],
+            ['Belysning', item.properties.belysning], ['Värme', item.properties.varme]
+        ];
+        const columnWidth = contentWidth / 2;
+        rows.forEach(([label, value], index) => {
+            const x = inset + (index % 2) * columnWidth;
+            const y = canvas.height * (0.77 + Math.floor(index / 2) * 0.11);
+            context.fillStyle = '#667085';
+            drawFittedLine(context, label.toUpperCase(), x, y, columnWidth - inset, canvas.width * 0.025, 600);
+            context.fillStyle = '#1f2937';
+            drawFittedLine(context, displayValue(value), x, y + canvas.height * 0.035, columnWidth - inset, canvas.width * 0.04, 650);
+        });
+        return canvas.toDataURL('image/png');
+    }
 
     const padding = Math.round(canvas.width * 0.045);
     const qrSize = Math.min(
