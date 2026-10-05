@@ -4,6 +4,21 @@ import { catalogData } from '../src/data/catalog';
 import { createCatalogFixture, createStateFixture } from './fixtures/calculationFixtures';
 
 describe('computeQuoteTotals', () => {
+    it('subtracts a negative custom freight price multiplied by its quantity', () => {
+        const state = createStateFixture({
+            builderItems: [], customCosts: [], exchangeRate: 1,
+            gridSelections: { ClickitUp: {
+                items: {}, addons: {},
+                customAddonsByCategory: {
+                    freight: [{ id: 'return', name: 'Pallet return', price: -680, qty: 3, discountPct: 0 }]
+                }
+            } }
+        });
+        const summary = computeQuoteTotals({ state, catalogData });
+        expect(summary.totals.find((row) => row.source.rowId === 'return')).toMatchObject({ unitPrice: -680, qty: 3, gross: -2040, net: -2040 });
+        expect(summary.finalTotalSek).toBe(-2040);
+    });
+
     it('turns a 200 percent discounted row into an equal negative deduction', () => {
         const summary = computeQuoteTotals({
             state: {

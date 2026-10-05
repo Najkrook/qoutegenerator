@@ -1,4 +1,4 @@
-import type { ChangeEvent } from 'react';
+import { useState, type ChangeEvent } from 'react';
 import { useQuote } from '../../store/QuoteContext';
 import { getGridCatalogLine } from '../../data/catalogLookup';
 import { buildEffectiveGridSelections } from '../../utils/gridAutoScale';
@@ -17,6 +17,27 @@ import type {
     GridItemSelectionState,
     GridLineSelection
 } from '../../types/contracts';
+
+function CustomPriceInput({ value, onChange }: { value: number; onChange: (price: number) => void }) {
+    const [draft, setDraft] = useState<string | null>(null);
+
+    return (
+        <input
+            type="text"
+            inputMode="decimal"
+            value={draft ?? String(value)}
+            onChange={(event) => {
+                const text = event.target.value;
+                if (!/^-?\d*([.,]\d*)?$/.test(text)) return;
+                setDraft(text);
+                const parsed = Number(text.replace(',', '.'));
+                if (Number.isFinite(parsed)) onChange(parsed);
+            }}
+            onBlur={() => setDraft(null)}
+            className="w-full bg-black/20 border border-panel-border text-text-primary rounded p-2 text-sm text-right outline-none focus:border-primary"
+        />
+    );
+}
 
 function createGridRowId(prefix: string): string {
     return `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
@@ -225,12 +246,9 @@ function GridAddonCategoryRows({
                             </div>
                         </td>
                         <td className="p-3">
-                            <input
-                                type="number"
-                                min="0"
+                            <CustomPriceInput
                                 value={price}
-                                onChange={(event) => updateCustomAddon(categoryId, row.id, { price: Number.parseFloat(event.target.value) || 0 })}
-                                className="w-full bg-black/20 border border-panel-border text-text-primary rounded p-2 text-sm text-right outline-none focus:border-primary"
+                                onChange={(price) => updateCustomAddon(categoryId, row.id, { price })}
                             />
                         </td>
                         <td className="p-3">
@@ -249,7 +267,7 @@ function GridAddonCategoryRows({
                             </div>
                         </td>
                         <td className="p-3 text-sm text-right font-semibold">
-                            {total > 0 ? `${total.toLocaleString('sv-SE')} SEK` : ''}
+                            {total !== 0 ? `${total.toLocaleString('sv-SE')} SEK` : ''}
                         </td>
                     </tr>
                 );
@@ -543,12 +561,9 @@ export function GridConfig({ lineId }: GridConfigProps) {
                                         />
                                     </td>
                                     <td className="p-3">
-                                        <input
-                                            type="number"
-                                            min="0"
+                                        <CustomPriceInput
                                             value={price}
-                                            onChange={(event) => updateCustomItem(row.id, { price: Number.parseFloat(event.target.value) || 0 })}
-                                            className="w-full bg-black/20 border border-panel-border text-text-primary rounded p-2 text-sm text-right outline-none focus:border-primary"
+                                            onChange={(price) => updateCustomItem(row.id, { price })}
                                         />
                                     </td>
                                     <td className="p-3">
@@ -567,7 +582,7 @@ export function GridConfig({ lineId }: GridConfigProps) {
                                         </div>
                                     </td>
                                     <td className="p-3 text-sm text-right font-semibold">
-                                        {total > 0 ? `${total.toLocaleString('sv-SE')} SEK` : ''}
+                                        {total !== 0 ? `${total.toLocaleString('sv-SE')} SEK` : ''}
                                     </td>
                                 </tr>
                             );
@@ -592,7 +607,7 @@ export function GridConfig({ lineId }: GridConfigProps) {
                                 {itemsQtyTotal > 0 ? `${itemsQtyTotal} st` : ''}
                             </td>
                             <td className="px-4 py-4 text-sm text-right font-bold text-text-primary">
-                                {itemsSubtotal > 0 ? `${itemsSubtotal.toLocaleString('sv-SE')} SEK` : ''}
+                                {itemsSubtotal !== 0 ? `${itemsSubtotal.toLocaleString('sv-SE')} SEK` : ''}
                             </td>
                         </tr>
                         <tr aria-hidden="true">

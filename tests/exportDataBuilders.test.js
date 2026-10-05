@@ -48,6 +48,17 @@ function createPreparedQuote(stateOverrides = {}, rowOverrides = {}) {
 }
 
 describe('export format adapters', () => {
+    it('preserves negative unit prices and totals in PDF and Excel data', () => {
+        const prepared = createPreparedQuote({ exportLanguage: 'en' }, {
+            model: 'Pallet return', size: '-', unitPrice: -680, qty: 3,
+            gross: -2040, net: -2040
+        });
+        expect(buildPdfTableData(prepared.commercial.productRows, String, { exportLanguage: 'en' })[0])
+            .toEqual(['Pallet return', '-', '-680 SEK', '3', '-2040 SEK', '-2040 SEK', '0 SEK', '0%']);
+        expect(buildPreparedExcelSheetData(prepared))
+            .toContainEqual(['Pallet return', '-', -680, 3, -2040, -2040, 0, '0%']);
+    });
+
     it('maps prepared customer and product meaning into worksheet rows', () => {
         const rows = buildPreparedExcelSheetData(createPreparedQuote({ exportLanguage: 'en' }));
 
