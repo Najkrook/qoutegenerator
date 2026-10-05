@@ -5,7 +5,8 @@ const generatePDF = vi.hoisted(() => vi.fn(() => new Blob(['pdf'])));
 vi.mock('../src/features/pdfExport', () => ({ generatePDF }));
 
 import { createQuotePdfBlob } from '../src/services/quotePdfService';
-import { prepareQuote } from '../src/services/quotePreparation';
+import { prepareSavedQuoteForPdf } from '../src/services/savedQuotePdfPreparation';
+import { prepareQuote, createQuoteCommercialSnapshot } from '../src/services/quotePreparation';
 import {
     buildPdfTableData,
     buildPreparedExcelSheetData
@@ -67,6 +68,71 @@ function createPreparedQuote() {
         audience: { isRetailer: false, allowedPdfThemes: [] }
     });
 }
+
+describe('prepareSavedQuoteForPdf', () => {
+    const metadata = { quoteId: 'saved-quote', quoteNumber: 'BRIXX-123', status: 'sent', originType: 'internal' };
+    const revision = {
+        version: 2,
+        savedAtMs: Date.parse('2026-08-12T12:00:00Z'),
+        state: { customerInfo: { company: 'Sparad kund' } },
+        commercialSnapshot: null
+    };
+
+    it('restores saved commercial values even when the state would calculate different prices', () => {
+        const prepared = createPreparedQuote();
+        const saved = {
+            ...revision,
+            state: { ...prepared.persistenceSnapshot, customCosts: [{ description: 'Changed price', price: 99999, qty: 1 }], builderItems: [] },
+            commercialSnapshot: createQuoteCommercialSnapshot(prepared)
+        };
+        const before = JSON.stringify(saved);
+        const result = prepareSavedQuoteForPdf({ revision: saved, metadata });
+
+        expect(result.usesCurrentCatalog).toBe(false);
+        expect(result.preparedQuote.commercial.productTotals).toEqual(prepared.commercial.productTotals);
+        expect(result.preparedQuote.commercial.contractingWork).toEqual(prepared.commercial.contractingWork);
+        expect(result.preparedQuote.commercial.productRows).toMatchObject(saved.commercialSnapshot.productRows);
+        expect(result.preparedQuote.presentation).toMatchObject({ exportLanguage: 'en', pdfThemeId: 'roslagsmarkisen' });
+        expect(result.preparedQuote.agreement.quoteIdentity).toEqual({ quoteId: 'saved-quote', quoteNumber: 'BRIXX-123', version: 2, status: 'sent' });
+        expect(JSON.stringify(saved)).toBe(before);
+    });
+
+    it('hydrates partial legacy state and uses revision date only when the quote date is absent', () => {
+        const result = prepareSavedQuoteForPdf({ revision, metadata });
+        expect(result.usesCurrentCatalog).toBe(true);
+        expect(result.preparedQuote.agreement.effectiveQuoteDate).toBe('2026-08-12');
+        expect(result.preparedQuote.commercial.productTotals.finalTotalSek).toBe(0);
+        const dated = prepareSavedQuoteForPdf({
+            revision: { ...revision, state: { customerInfo: { date: '2025-01-02' } } }, metadata
+        });
+        expect(dated.preparedQuote.agreement.effectiveQuoteDate).toBe('2025-01-02');
+    });
+
+    it('preserves historical retailer theme and suppresses internal contracting work for legacy revisions', () => {
+        const result = prepareSavedQuoteForPdf({
+            revision: { ...revision, state: createPreparedQuote().persistenceSnapshot },
+            metadata: { ...metadata, originType: 'retailer' }
+        });
+        expect(result.preparedQuote.presentation.pdfThemeId).toBe('roslagsmarkisen');
+        expect(result.preparedQuote.visibility.contractingWork).toBe('suppressed-retailer');
+        expect(result.preparedQuote.commercial.contractingWork).toBeNull();
+    });
+
+    it('normalizes retailer themes against supplied permissions', () => {
+        const prepared = createPreparedQuote();
+        const result = prepareSavedQuoteForPdf({
+            revision: { ...revision, state: prepared.persistenceSnapshot, commercialSnapshot: createQuoteCommercialSnapshot(prepared) },
+            metadata,
+            audience: { isRetailer: true, allowedPdfThemes: [] }
+        });
+        expect(result.preparedQuote.presentation.pdfThemeId).toBe('brixx');
+    });
+
+    it('rejects absent state and invalid snapshots instead of silently recalculating them', () => {
+        expect(() => prepareSavedQuoteForPdf({ revision: { ...revision, state: null }, metadata })).toThrow('Revisionen saknar sparat tillstånd.');
+        expect(() => prepareSavedQuoteForPdf({ revision: { ...revision, commercialSnapshot: {} }, metadata })).toThrow();
+    });
+});
 
 describe('createQuotePdfBlob', () => {
     beforeEach(() => {

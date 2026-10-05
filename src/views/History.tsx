@@ -8,6 +8,8 @@ import { db, collection, getDocs } from '../services/firebase';
 import { getErrorMessage } from '../utils/runtime';
 import { buildQuoteRevisionLink, parseQuoteRevisionLinkParams } from '../navigation/quoteLinks';
 import { buildHistoryOpenQuotePayload } from './historyPayload';
+import { QuotePdfPreview } from '../components/features/QuotePdfPreview';
+import type { QuotePreparationAudience } from '../services/quotePreparation';
 import type {
     HistoryOwnerOption,
     HistoryProps,
@@ -27,7 +29,13 @@ const STATUS_LABELS: Record<QuoteStatus, string> = {
 };
 
 export function History({ onBack, onOpenQuote }: HistoryProps) {
-    const { user, canAccessQuoteHistory, canViewEverything } = useAuth();
+    const { user, canAccessQuoteHistory, canViewEverything, isRetailer, retailer } = useAuth();
+    const [pdfPreview, setPdfPreview] = useState<{
+        quote: HistoryQuoteRow;
+        ownerUid: string;
+        version?: number;
+        audience?: QuotePreparationAudience;
+    } | null>(null);
     const [searchParams, setSearchParams] = useSearchParams();
     const [quotes, setQuotes] = useState<HistoryQuoteRow[]>([]);
     const [loading, setLoading] = useState(true);
@@ -312,6 +320,20 @@ export function History({ onBack, onOpenQuote }: HistoryProps) {
     const getQuoteLinkOwnerUid = (quote: HistoryQuoteRow): string | null => (
         isAdminBrowsing ? (getQuoteOwnerUid(quote) || null) : null
     );
+
+    const previewQuote = (quote: HistoryQuoteRow, version?: number): void => {
+        if (!user?.uid || !canAccessQuoteHistory) return;
+        const ownerUid = getQuoteOwnerUid(quote);
+        if (ownerUid !== user.uid && !canViewEverything) return;
+        setPdfPreview({
+            quote,
+            ownerUid,
+            version,
+            audience: isRetailer && ownerUid === user.uid
+                ? { isRetailer: true, allowedPdfThemes: retailer?.pdfThemes || [] }
+                : undefined
+        });
+    };
 
     const handleCrmRepair = async (quote: HistoryQuoteRow): Promise<void> => {
         if (!canViewEverything || !user?.uid || !quote.crmSynchronizationIssue) return;
@@ -674,7 +696,7 @@ export function History({ onBack, onOpenQuote }: HistoryProps) {
                         const showOwnerBadge = canViewEverything && selectedOwnerUid !== '__mine__' && quote.ownerUid;
 
                         return (
-                            <article key={`${quote.ownerUid || ''}_${quote.quoteId}`} className="bg-panel-bg border border-panel-border rounded-lg p-6 mb-4 flex flex-col md:flex-row justify-between items-start md:items-center transition-all hover:bg-gray-800 hover:border-white/30 gap-4">
+                            <article key={`${quote.ownerUid || ''}_${quote.quoteId}`} className="bg-panel-bg border border-panel-border rounded-lg p-6 mb-4 flex flex-col md:flex-row flex-wrap justify-between items-start md:items-center transition-all hover:bg-gray-800 hover:border-white/30 gap-4">
                                 <div>
                                     <div className="flex items-center gap-3 mb-1">
                                         <h3 className="m-0 text-xl font-semibold">{quote.company || quote.customerName || 'Okänd kund'}</h3>
@@ -725,6 +747,13 @@ export function History({ onBack, onOpenQuote }: HistoryProps) {
                                         }}
                                     >
                                         {quoteLifecycleEnabled ? 'Öppna senaste' : 'Öppna offert'}
+                                    </button>
+                                    <button
+                                        type="button"
+                                        className="px-4 py-2 text-sm border border-panel-border bg-transparent text-text-primary hover:bg-white/5 rounded w-full transition-colors"
+                                        onClick={() => previewQuote(quote)}
+                                    >
+                                        Förhandsgranska PDF
                                     </button>
                                     <button
                                         type="button"
@@ -782,7 +811,7 @@ export function History({ onBack, onOpenQuote }: HistoryProps) {
                                 </div>
 
                                 {isRevisionsVisible && (
-                                    <div className="mt-4 w-full" style={{ gridColumn: '1 / -1' }}>
+                                    <div className="mt-4 w-full md:basis-full">
                                         {!revisions ? (
                                             <p className="text-text-secondary text-sm m-0">Laddar revisioner...</p>
                                         ) : revisions.length === 0 ? (
@@ -792,7 +821,7 @@ export function History({ onBack, onOpenQuote }: HistoryProps) {
                                                 {revisions.map((revision) => (
                                                     <div
                                                         key={revision.revisionId}
-                                                        className="w-full border border-panel-border bg-white/5 hover:bg-white/10 rounded-md text-text-primary text-xs px-3 py-2 flex items-center justify-between gap-3 transition-colors"
+                                                        className="w-full border border-panel-border bg-white/5 hover:bg-white/10 rounded-md text-text-primary text-xs px-3 py-2 flex flex-wrap items-center justify-between gap-3 transition-colors"
                                                     >
                                                         <button
                                                             type="button"
@@ -803,6 +832,13 @@ export function History({ onBack, onOpenQuote }: HistoryProps) {
                                                         >
                                                             <span>v{revision.version} - {formatDateTime(revision.savedAtMs)}</span>
                                                             <span>{revision.changeNote || ''}</span>
+                                                        </button>
+                                                        <button
+                                                            type="button"
+                                                            className="shrink-0 rounded border border-panel-border px-2 py-1 text-[11px] text-text-primary hover:bg-white/10"
+                                                            onClick={() => previewQuote(quote, revision.version)}
+                                                        >
+                                                            Förhandsgranska PDF
                                                         </button>
                                                         <button
                                                             type="button"
@@ -828,6 +864,13 @@ export function History({ onBack, onOpenQuote }: HistoryProps) {
                     })
                 )}
             </div>
+            {pdfPreview && canAccessQuoteHistory && user?.uid && (canViewEverything || pdfPreview.ownerUid === user.uid) && (
+                <QuotePdfPreview
+                    key={`${pdfPreview.ownerUid}/${pdfPreview.quote.quoteId}/${pdfPreview.version ?? 'latest'}`}
+                    {...pdfPreview}
+                    onClose={() => setPdfPreview(null)}
+                />
+            )}
             {onBack && (
                 <div className="mt-6 text-center">
                     <button type="button" onClick={onBack} className="px-4 py-2 bg-panel-bg border border-panel-border hover:bg-white/5 rounded text-text-primary transition-colors">
