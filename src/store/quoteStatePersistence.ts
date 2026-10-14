@@ -14,34 +14,54 @@ export function loadPersistedQuoteState(
     ownerUid: string | null | undefined,
     storage: Storage | undefined = globalThis.localStorage
 ): QuoteState {
+    return loadPersistedQuoteWorkspace(ownerUid, storage).state;
+}
+
+export function loadPersistedQuoteWorkspace(
+    ownerUid: string | null | undefined,
+    storage: Storage | undefined = globalThis.localStorage
+): { state: QuoteState; savedSignature: string | null } {
+    const empty = () => ({ state: createInitialQuoteState(), savedSignature: null });
     const storageKey = getQuoteStateStorageKey(ownerUid);
     if (!storage || !storageKey) {
-        return createInitialQuoteState();
+        return empty();
     }
 
     try {
         const saved = storage.getItem(storageKey);
         if (!saved) {
-            return createInitialQuoteState();
+            return empty();
         }
 
-        return hydrateQuoteState(JSON.parse(saved));
+        const parsed = JSON.parse(saved);
+        if (parsed?.workspaceVersion === 1) {
+            return {
+                state: hydrateQuoteState(parsed.state),
+                savedSignature: typeof parsed.savedSignature === 'string' ? parsed.savedSignature : null
+            };
+        }
+        return { state: hydrateQuoteState(parsed), savedSignature: null };
     } catch (error) {
         console.error('Failed to load state from localStorage', error);
-        return createInitialQuoteState();
+        return empty();
     }
 }
 
 export function persistQuoteState(
     state: QuoteState | HydratedQuoteStatePayload,
     ownerUid: string | null | undefined,
-    storage: Storage | undefined = globalThis.localStorage
+    storage: Storage | undefined = globalThis.localStorage,
+    savedSignature: string | null = null
 ) {
     const storageKey = getQuoteStateStorageKey(ownerUid);
     if (!storage || !storageKey) return;
 
     try {
-        storage.setItem(storageKey, JSON.stringify(hydrateQuoteState(state)));
+        storage.setItem(storageKey, JSON.stringify({
+            workspaceVersion: 1,
+            state: hydrateQuoteState(state),
+            savedSignature
+        }));
     } catch (error) {
         console.error('Failed to save state to localStorage', error);
     }

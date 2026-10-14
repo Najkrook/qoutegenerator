@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useQuote } from '../store/QuoteContext';
+import { quoteContentSignature } from '../store/quoteChangeTracking';
 import { useAuth } from '../store/AuthContext';
 import { catalogData } from '../data/catalog';
 import { PDF_THEME_OPTIONS } from '../config/pdfThemes';
@@ -223,7 +224,7 @@ export function SummaryExport({
     crmDealId = null,
     quoteOwnerUid = null
 }: SummaryExportProps) {
-    const { state, dispatch } = useQuote();
+    const { state, dispatch, hasUnsavedChanges, workspaceGeneration } = useQuote();
     const { user, retailer, isRetailer, canViewEverything } = useAuth();
     const summaryData = useMemo(
         () => computeQuoteTotals({ state, catalogData }),
@@ -551,6 +552,9 @@ export function SummaryExport({
     const handleSaveQuote = async (): Promise<void> => {
         if (isSavingQuote) return;
 
+        // Capture the editable source of this request before awaiting persistence.
+        // Later edits must remain dirty, including edits made on another route.
+        const savedSignature = quoteContentSignature(state);
         setIsSavingQuote(true);
         try {
             const ownerUid = quoteOwnerUid || user?.uid || '';
@@ -599,8 +603,12 @@ export function SummaryExport({
             const saveStatePatch: SavedQuoteStatePatch = statePatch;
 
             dispatch({
-                type: 'UPDATE_STATE',
-                payload: saveStatePatch
+                type: 'QUOTE_SAVED',
+                payload: {
+                    generation: workspaceGeneration,
+                    savedSignature,
+                    statePatch: saveStatePatch
+                }
             });
 
             if (isNewQuote) {
@@ -723,6 +731,9 @@ export function SummaryExport({
                                     </Button>
 
                                     <div className="flex w-full flex-col items-stretch gap-3 xl:w-auto xl:items-end">
+                                        {hasUnsavedChanges && (
+                                            <p role="status" className="m-0 text-sm font-semibold text-text">Osparade ändringar</p>
+                                        )}
                                         {!hasQuoteNumber && (
                                             <Button
                                                 onClick={() => {
@@ -731,7 +742,7 @@ export function SummaryExport({
                                                 disabled={isSavingQuote}
                                                 className="w-full sm:w-auto"
                                                 size="lg"
-                                                variant="primary"
+                                                variant={hasUnsavedChanges ? 'warning' : 'primary'}
                                             >
                                                 {isSavingQuote ? 'Sparar...' : saveLabel}
                                             </Button>
@@ -757,6 +768,7 @@ export function SummaryExport({
                                                             void handleSaveQuote();
                                                         }}
                                                         disabled={isSavingQuote}
+                                                        variant={hasUnsavedChanges ? 'warning' : 'secondary'}
                                                     >
                                                         {isSavingQuote ? 'Sparar...' : saveLabel}
                                                     </Button>

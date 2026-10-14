@@ -179,6 +179,9 @@ function QuoteDraftPanel({
             <div className="p-5 sm:p-6">
                 {quoteDraftSummary && (
                     <div className="mb-5 rounded-panel border border-indigo-500/30 bg-indigo-500/10 p-4 shadow-sm">
+                        {quoteDraftSummary.hasUnsavedChanges && (
+                            <p role="status" className="text-sm font-semibold text-text">Osparade ändringar</p>
+                        )}
                         <div className="flex flex-wrap items-start justify-between gap-3">
                             <div>
                                 <p className="m-0 text-base font-semibold text-text">
@@ -345,6 +348,9 @@ function QuoteLauncherCard({ onStartQuote, onContinueQuote, quoteDraftSummary }:
                 <p className="mb-0 mt-2 break-words text-sm leading-6 text-text-muted">
                     <span className="block font-medium text-text">{quoteDraftSummary.customerLabel}</span>
                     {quoteDraftSummary.stepLabel}
+                    {quoteDraftSummary.hasUnsavedChanges && (
+                        <span role="status" className="block font-semibold text-text">Osparade ändringar</span>
+                    )}
                 </p>
             </div>
         </div>

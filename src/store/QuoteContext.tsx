@@ -5,7 +5,8 @@ import {
     createInitialQuoteState,
     hydrateQuoteState
 } from './quoteStateSchema';
-import { loadPersistedQuoteState, persistQuoteState } from './quoteStatePersistence';
+import { loadPersistedQuoteWorkspace, persistQuoteState } from './quoteStatePersistence';
+import { hasUnsavedQuoteChanges, quoteContentSignature } from './quoteChangeTracking';
 import {
     getDefaultTemplateIdForLanguage,
     getTemplateById,
@@ -179,31 +180,71 @@ interface UserQuoteStateProviderProps extends PropsWithChildren {
     ownerUid: string | null;
 }
 
+export interface QuoteWorkspace {
+    state: QuoteState;
+    savedSignature: string | null;
+    generation: number;
+}
+
+export function quoteWorkspaceReducer(workspace: QuoteWorkspace, action: QuoteReducerAction): QuoteWorkspace {
+    if (action.type === 'QUOTE_SAVED') {
+        const { generation, savedSignature, statePatch } = action.payload;
+        if (generation !== workspace.generation || statePatch.activeQuoteVersion < workspace.state.activeQuoteVersion) {
+            return workspace;
+        }
+        return { ...workspace, savedSignature, state: { ...workspace.state, ...statePatch } };
+    }
+    const state = quoteReducer(workspace.state, action);
+    if (action.type === 'HYDRATE_STATE' || action.type === 'RESET_STATE' || action.type === 'RESET_QUOTE_DRAFT') {
+        return {
+            state,
+            generation: workspace.generation + 1,
+            savedSignature: action.type === 'HYDRATE_STATE' && !state.activeQuoteId
+                ? null : quoteContentSignature(state)
+        };
+    }
+    return { ...workspace, state };
+}
+
 function UserQuoteStateProvider({ children, ownerUid }: UserQuoteStateProviderProps) {
-    const [state, dispatch] = useReducer(
-        quoteReducer,
+    const [workspace, dispatch] = useReducer(
+        quoteWorkspaceReducer,
         ownerUid,
-        (initialOwnerUid) => loadPersistedQuoteState(initialOwnerUid)
+        (initialOwnerUid) => ({ ...loadPersistedQuoteWorkspace(initialOwnerUid), generation: 0 })
     );
-    const latestStateRef = useRef(state);
-    latestStateRef.current = state;
+    const { state, savedSignature, generation } = workspace;
+    const latestStateRef = useRef(workspace);
+    latestStateRef.current = workspace;
 
     useEffect(() => {
         const timeoutId = globalThis.setTimeout(() => {
-            persistQuoteState(state, ownerUid);
+            persistQuoteState(state, ownerUid, undefined, savedSignature);
         }, 250);
 
         return () => {
             globalThis.clearTimeout(timeoutId);
         };
-    }, [ownerUid, state]);
+    }, [ownerUid, state, savedSignature]);
 
-    useEffect(() => () => {
-        persistQuoteState(latestStateRef.current, ownerUid);
+    useEffect(() => {
+        const persistLatest = () => {
+            const latest = latestStateRef.current;
+            persistQuoteState(latest.state, ownerUid, undefined, latest.savedSignature);
+        };
+        window.addEventListener('pagehide', persistLatest);
+        return () => {
+            window.removeEventListener('pagehide', persistLatest);
+            persistLatest();
+        };
     }, [ownerUid]);
 
     return (
-        <QuoteContext.Provider value={{ state, dispatch }}>
+        <QuoteContext.Provider value={{
+            state,
+            dispatch,
+            hasUnsavedChanges: hasUnsavedQuoteChanges(state, savedSignature),
+            workspaceGeneration: generation
+        }}>
             {children}
         </QuoteContext.Provider>
     );

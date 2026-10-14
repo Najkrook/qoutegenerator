@@ -1179,6 +1179,7 @@ export interface QuoteRepositoryDeps {
 }
 
 export type QuoteReducerAction =
+    | { type: 'QUOTE_SAVED'; payload: { generation: number; savedSignature: string; statePatch: SavedQuoteStatePatch } }
     | { type: 'SET_STEP'; payload: StepInput }
     | { type: 'HYDRATE_STATE'; payload: HydratedQuoteStatePayload }
     | { type: 'UPDATE_STATE'; payload: QuoteStatePatch }
@@ -1211,6 +1212,8 @@ export type QuoteReducerAction =
 
 export interface QuoteContextValue {
     state: QuoteState;
+    hasUnsavedChanges: boolean;
+    workspaceGeneration: number;
     dispatch: (action: QuoteReducerAction) => void;
 }
 
@@ -1219,6 +1222,7 @@ export interface HeaderProps {
 }
 
 export interface DashboardQuoteDraftSummary {
+    hasUnsavedChanges?: boolean;
     customerLabel: string;
     reference?: string;
     quoteNumber?: string;

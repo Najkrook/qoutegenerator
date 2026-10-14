@@ -171,7 +171,7 @@ function createQuoteState(overrides = {}) {
     };
 }
 
-async function renderSummaryExport({ stateOverrides = {}, authOverrides = {}, props = {} } = {}) {
+async function renderSummaryExport({ stateOverrides = {}, authOverrides = {}, props = {}, hasUnsavedChanges = true } = {}) {
     const container = document.createElement('div');
     document.body.appendChild(container);
     const root = createRoot(container);
@@ -181,7 +181,7 @@ async function renderSummaryExport({ stateOverrides = {}, authOverrides = {}, pr
         await act(async () => {
             root.render(
                 <AuthContext.Provider value={createAuthValue(authOverrides)}>
-                    <QuoteContext.Provider value={{ state: createQuoteState(nextStateOverrides), dispatch }}>
+                    <QuoteContext.Provider value={{ state: createQuoteState(nextStateOverrides), dispatch, hasUnsavedChanges, workspaceGeneration: 0 }}>
                         <SummaryExport onPrev={() => {}} {...props} />
                     </QuoteContext.Provider>
                 </AuthContext.Provider>
@@ -511,6 +511,15 @@ describe('SummaryExport PDF override', () => {
         expect(createQuotePdfBlob).toHaveBeenCalledTimes(2);
     });
 
+    it.each([false, true])('shows the yellow save action only when dirty=%s', async (hasUnsavedChanges) => {
+        const { container } = await renderSummaryExport({
+            hasUnsavedChanges,
+            stateOverrides: { activeQuoteId: 'quote-1', quoteNumber: 'BRIXX-1' }
+        });
+        expect(findButton(container, 'Spara ny version').className.includes('bg-yellow-400')).toBe(hasUnsavedChanges);
+        expect(container.textContent.includes('Osparade ändringar')).toBe(hasUnsavedChanges);
+    });
+
     it('shows one version-save action and blocks delivery actions while saving', async () => {
         let resolveSave;
         quoteSaveState.save.mockReturnValueOnce(new Promise((resolve) => {
@@ -595,8 +604,8 @@ describe('SummaryExport PDF override', () => {
             }
         }));
         expect(dispatch).toHaveBeenCalledWith({
-            type: 'UPDATE_STATE',
-            payload: expect.objectContaining({ activeQuoteVersion: 3 })
+            type: 'QUOTE_SAVED',
+            payload: expect.objectContaining({ statePatch: expect.objectContaining({ activeQuoteVersion: 3 }) })
         });
         expect(toastState.success).toHaveBeenCalled();
         expect(toastState).toHaveBeenCalledWith(
@@ -638,7 +647,7 @@ describe('SummaryExport PDF override', () => {
         });
 
         await clickButton(container, 'Spara ny version');
-        expect(dispatch).not.toHaveBeenCalledWith(expect.objectContaining({ type: 'UPDATE_STATE' }));
+        expect(dispatch).not.toHaveBeenCalledWith(expect.objectContaining({ type: 'QUOTE_SAVED' }));
 
         const refreshed = await renderSummaryExport({
             stateOverrides
@@ -647,7 +656,7 @@ describe('SummaryExport PDF override', () => {
 
         expect(quoteSaveState.save.mock.calls[0][0].retrySaveIntentId).toBeNull();
         expect(quoteSaveState.save.mock.calls[1][0].retrySaveIntentId).toBe('save-retry-1');
-        expect(refreshed.dispatch).toHaveBeenCalledWith(expect.objectContaining({ type: 'UPDATE_STATE' }));
+        expect(refreshed.dispatch).toHaveBeenCalledWith(expect.objectContaining({ type: 'QUOTE_SAVED' }));
     });
 
     it('does not reuse an ambiguous Save Intent after the draft changes', async () => {
@@ -694,7 +703,7 @@ describe('SummaryExport PDF override', () => {
 
         expect(quoteSaveState.save.mock.calls[0][0].retrySaveIntentId).toBeNull();
         expect(quoteSaveState.save.mock.calls[1][0].retrySaveIntentId).toBeNull();
-        expect(edited.dispatch).toHaveBeenCalledWith(expect.objectContaining({ type: 'UPDATE_STATE' }));
+        expect(edited.dispatch).toHaveBeenCalledWith(expect.objectContaining({ type: 'QUOTE_SAVED' }));
     });
 
     it('logs the English Excel filename when exporting in English', async () => {

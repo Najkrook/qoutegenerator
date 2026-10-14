@@ -12,10 +12,10 @@ import type { DashboardQuoteDraftSummary } from '../types/contracts';
 
 export function useQuoteDraftActions() {
     const navigation = useAppNavigation();
-    const { state, dispatch } = useQuote();
+    const { state, dispatch, hasUnsavedChanges } = useQuote();
     const { isRetailer } = useAuth();
     const quoteDraftOptions = { isRetailer };
-    const hasQuoteDraft = hasQuoteStartDraftData(state, quoteDraftOptions);
+    const hasQuoteDraft = hasQuoteStartDraftData(state, quoteDraftOptions) || hasUnsavedChanges;
     const resumeQuoteStep = getQuoteResumeStep(state, quoteDraftOptions);
     const customerLabel = String(state.customerInfo?.company || '').trim()
         || String(state.customerInfo?.name || '').trim()
@@ -25,6 +25,7 @@ export function useQuoteDraftActions() {
         || undefined;
     const quoteDraftSummary: DashboardQuoteDraftSummary | null = hasQuoteDraft
         ? {
+            hasUnsavedChanges,
             customerLabel,
             reference,
             quoteNumber: state.quoteNumber || undefined,
@@ -38,7 +39,7 @@ export function useQuoteDraftActions() {
     };
 
     const startQuote = async (): Promise<void> => {
-        if (hasQuoteDraft) {
+        if (hasUnsavedChanges) {
             const choice = await confirmChoiceAction({
                 title: 'Starta ny offert?',
                 message: `Det finns ett pågående utkast för ${customerLabel}. Osparade ändringar går förlorade om du startar en ny offert. Sparade offerter finns kvar i Offerter.`,

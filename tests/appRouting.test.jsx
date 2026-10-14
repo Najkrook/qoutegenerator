@@ -271,6 +271,7 @@ import { appRoutes } from '../src/App';
 import { APP_PATHS, APP_ROUTE_IDS } from '../src/navigation/routes';
 import { AuthContext } from '../src/store/AuthContext';
 import { QuoteContext } from '../src/store/QuoteContext';
+import { hasUnsavedQuoteChanges } from '../src/store/quoteChangeTracking';
 import { createInitialQuoteState } from '../src/store/quoteStateSchema';
 
 const mountedRoots = [];
@@ -297,6 +298,7 @@ async function renderApp({
     initialEntries = ['/'],
     auth = {},
     quoteState = createInitialQuoteState(),
+    hasUnsavedChanges = hasUnsavedQuoteChanges(quoteState, null),
     dispatch = vi.fn()
 } = {}) {
     const container = document.createElement('div');
@@ -308,7 +310,7 @@ async function renderApp({
     await act(async () => {
         root.render(
             <AuthContext.Provider value={authValue}>
-                <QuoteContext.Provider value={{ state: quoteState, dispatch }}>
+                <QuoteContext.Provider value={{ state: quoteState, dispatch, hasUnsavedChanges, workspaceGeneration: 0 }}>
                     <RouterProvider router={router} />
                 </QuoteContext.Provider>
             </AuthContext.Provider>
@@ -1145,6 +1147,20 @@ describe('app routing', () => {
         expect(notificationMocks.confirmChoiceAction).toHaveBeenCalledTimes(1);
         expect(dispatch).not.toHaveBeenCalledWith({ type: 'RESET_QUOTE_DRAFT' });
         expect(router.state.location.pathname).toBe(APP_PATHS[APP_ROUTE_IDS.quoteSummary]);
+    });
+
+    it.each(['quote-only', 'retailer'])('starts a new quote without warning for a saved unchanged %s draft', async (accessLevel) => {
+        const dispatch = vi.fn();
+        const { container } = await renderApp({
+            auth: { accessLevel, isRetailer: accessLevel === 'retailer' },
+            quoteState: { ...createInitialQuoteState(), selectedLines: ['BaHaMa'], activeQuoteId: 'saved-quote' },
+            hasUnsavedChanges: false,
+            dispatch
+        });
+        expect(container.textContent).not.toContain('Osparade ändringar');
+        await clickButton(container, 'Starta Ny Offert');
+        expect(notificationMocks.confirmChoiceAction).not.toHaveBeenCalled();
+        expect(dispatch).toHaveBeenCalledWith({ type: 'RESET_QUOTE_DRAFT' });
     });
 
     it('asks non-retailers to confirm before replacing an existing draft', async () => {
