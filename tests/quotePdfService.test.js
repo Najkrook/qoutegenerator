@@ -128,8 +128,30 @@ describe('prepareSavedQuoteForPdf', () => {
         expect(result.preparedQuote.presentation.pdfThemeId).toBe('brixx');
     });
 
-    it('rejects absent state and invalid snapshots instead of silently recalculating them', () => {
-        expect(() => prepareSavedQuoteForPdf({ revision: { ...revision, state: null }, metadata })).toThrow('Revisionen saknar sparat tillstånd.');
+    it.each([undefined, null, [], 'invalid'])('rejects unusable state %j even with a commercial snapshot', (state) => {
+        for (const commercialSnapshot of [null, createQuoteCommercialSnapshot(createPreparedQuote())]) {
+            expect(() => prepareSavedQuoteForPdf({
+                revision: { ...revision, state, commercialSnapshot }, metadata
+            })).toThrow('Revisionen saknar sparat tillstånd.');
+        }
+    });
+
+    it.each([undefined, NaN, Infinity, -Infinity, 0, -1, 1e20])('uses a stable legacy fallback for invalid saved date %s', (savedAtMs) => {
+        const result = prepareSavedQuoteForPdf({ revision: { ...revision, savedAtMs }, metadata });
+        expect(result.usesCurrentCatalog).toBe(true);
+        expect(result.preparedQuote.agreement.effectiveQuoteDate).toBe('1970-01-01');
+    });
+
+    it('keeps the frozen date when revision timestamp is invalid', () => {
+        const prepared = createPreparedQuote();
+        const result = prepareSavedQuoteForPdf({
+            revision: { ...revision, savedAtMs: 1e20, commercialSnapshot: createQuoteCommercialSnapshot(prepared) }, metadata
+        });
+        expect(result.usesCurrentCatalog).toBe(false);
+        expect(result.preparedQuote.agreement.effectiveQuoteDate).toBe('2026-08-12');
+    });
+
+    it('rejects invalid snapshots instead of silently recalculating them', () => {
         expect(() => prepareSavedQuoteForPdf({ revision: { ...revision, commercialSnapshot: {} }, metadata })).toThrow();
     });
 });

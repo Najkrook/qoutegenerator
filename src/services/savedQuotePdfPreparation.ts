@@ -4,6 +4,9 @@ import { hydrateQuoteState } from '../store/quoteStateSchema';
 import { catalogData } from '../data/catalog';
 import { computeQuoteTotals } from './calculationEngine';
 
+// Shared by history previews and submitted-order inspection/export. Callers supply
+// current theme permissions for history, or the permission recorded on an order.
+// Revision state is required even with a snapshot: it supplies agreement details.
 export function prepareSavedQuoteForPdf({
     revision,
     metadata,

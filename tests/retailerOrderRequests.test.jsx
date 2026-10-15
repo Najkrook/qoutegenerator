@@ -91,15 +91,6 @@ vi.mock('../src/utils/fileUtils', () => ({
     downloadBlob: vi.fn(),
     saveBlobWithPicker: vi.fn(async () => 'saved')
 }));
-vi.mock('../src/views/historyPayload', () => ({
-    buildHistoryOpenQuotePayload: (state, quoteId, quoteNumber, quoteVersion, quoteStatus) => ({
-        ...state,
-        activeQuoteId: quoteId,
-        quoteNumber,
-        activeQuoteVersion: quoteVersion,
-        quoteStatus
-    })
-}));
 import { RetailerOrderRequests } from '../src/views/RetailerOrderRequests';
 import { AuthContext } from '../src/store/AuthContext';
 import { createInitialQuoteState } from '../src/store/quoteStateSchema';
@@ -369,7 +360,8 @@ afterEach(() => {
 });
 
 describe('RetailerOrderRequests', () => {
-    it('uses frozen commercial data but the theme approved when the order was submitted', async () => {
+    it.each(['brixx', 'roslagsmarkisen'])('uses frozen commercial data with the submitted theme %s', async (pdfThemeId) => {
+        orderRequestMocks.listOrderRequests.mockResolvedValue([createRequest({ pdfThemeId })]);
         quoteRepositoryMocks.getQuoteRevisionByVersion.mockResolvedValue({
             revisionId: 'quote-1-revision-2',
             quoteId: 'quote-1',
@@ -384,7 +376,7 @@ describe('RetailerOrderRequests', () => {
             summary: { finalTotalSek: 11134, grossTotalSek: 11134, totalDiscountSek: 0 },
             commercialSnapshot: {
                 schemaVersion: 1,
-                presentation: { exportLanguage: 'en', pdfThemeId: 'custom', allowedPdfThemeIds: ['brixx', 'custom'] },
+                presentation: { exportLanguage: 'en', pdfThemeId: 'roslagsmarkisen', allowedPdfThemeIds: ['brixx', 'roslagsmarkisen'] },
                 effectiveQuoteDate: '2026-05-21',
                 productRows: [{
                     model: 'Frozen catalog name',
@@ -431,11 +423,15 @@ describe('RetailerOrderRequests', () => {
         await flushUi();
 
         expect(createQuotePdfBlob).toHaveBeenCalledWith(expect.objectContaining({
-            presentation: expect.objectContaining({ pdfThemeId: 'brixx' }),
+            presentation: expect.objectContaining({ pdfThemeId }),
+            agreement: expect.objectContaining({
+                quoteIdentity: { quoteId: 'quote-1', quoteNumber: 'BRIXX - 260521-101', version: 2, status: 'draft' }
+            }),
             commercial: expect.objectContaining({
                 productRows: [expect.objectContaining({ model: 'Frozen catalog name', unitPrice: 11134 })]
             })
         }));
+        expect(notificationMocks.notifyWarn).not.toHaveBeenCalled();
     });
 
     it('keeps a legacy request on its original version while clearly warning about current-catalog reconstruction', async () => {

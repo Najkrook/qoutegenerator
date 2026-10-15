@@ -1,7 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { catalogData } from '../data/catalog';
 import { getCatalogLineName } from '../data/catalogLookup';
-import { computeQuoteTotals } from '../services/calculationEngine';
 import { quoteRepository } from '../services/quoteRepositoryClient';
 import {
     getOrderRequestStatusLabel,
@@ -9,7 +7,8 @@ import {
     orderRequestService
 } from '../services/orderRequestService';
 import { createQuotePdfBlob } from '../services/quotePdfService';
-import { prepareQuote, restorePreparedQuote, type PreparedQuote } from '../services/quotePreparation';
+import type { PreparedQuote } from '../services/quotePreparation';
+import { prepareSavedQuoteForPdf } from '../services/savedQuotePdfPreparation';
 import {
     notifyError,
     notifyInfo,
@@ -18,8 +17,6 @@ import {
 } from '../services/notificationService';
 import { downloadBlob, saveBlobWithPicker } from '../utils/fileUtils';
 import { getErrorMessage } from '../utils/runtime';
-import { buildHistoryOpenQuotePayload } from './historyPayload';
-import { hydrateQuoteState } from '../store/quoteStateSchema';
 import { useAuth } from '../store/AuthContext';
 import type {
     OrderRequestRecord,
@@ -84,14 +81,6 @@ function buildOrderRequestItemsCacheKey(request: OrderRequestRecord): string {
     return `${request.quoteId}__v${request.quoteVersion}`;
 }
 
-function getLegacyRevisionFallbackDate(savedAtMs: unknown): string {
-    const parsed = Number(savedAtMs);
-    if (!Number.isFinite(parsed) || parsed <= 0) {
-        return '1970-01-01';
-    }
-    return new Date(parsed).toISOString().slice(0, 10);
-}
-
 async function loadSubmittedQuoteData(
     request: OrderRequestRecord
 ): Promise<SubmittedQuoteData | null> {
@@ -105,50 +94,20 @@ async function loadSubmittedQuoteData(
         return null;
     }
 
-    const payload = buildHistoryOpenQuotePayload(
-        revision.state,
-        request.quoteId,
-        request.quoteNumber,
-        request.quoteVersion,
-        'draft'
-    );
-    const state = hydrateQuoteState(payload);
-    const quoteIdentity = {
-        quoteId: request.quoteId,
-        quoteNumber: request.quoteNumber,
-        version: request.quoteVersion,
-        status: state.quoteStatus
-    };
-
-    if (revision.commercialSnapshot) {
-        return {
-            preparedQuote: restorePreparedQuote({
-                state,
-                commercialSnapshot: revision.commercialSnapshot,
-                audience: {
-                    isRetailer: true,
-                    allowedPdfThemes: request.pdfThemeId === 'brixx' ? [] : [request.pdfThemeId]
-                },
-                quoteIdentity
-            }),
-            usesCurrentCatalog: false
-        };
-    }
-
-    const totals = computeQuoteTotals({ state, catalogData });
-    return {
-        preparedQuote: prepareQuote({
-            state,
-            totals,
-            audience: {
-                isRetailer: true,
-                allowedPdfThemes: request.pdfThemeId === 'brixx' ? [] : [request.pdfThemeId]
-            },
-            fallbackDate: getLegacyRevisionFallbackDate(revision.savedAtMs),
-            catalogData
-        }),
-        usesCurrentCatalog: true
-    };
+    return prepareSavedQuoteForPdf({
+        revision,
+        metadata: {
+            quoteId: request.quoteId,
+            quoteNumber: request.quoteNumber,
+            status: 'draft',
+            originType: 'retailer'
+        },
+        // Orders retain the theme permission recorded at submission.
+        audience: {
+            isRetailer: true,
+            allowedPdfThemes: request.pdfThemeId === 'brixx' ? [] : [request.pdfThemeId]
+        }
+    });
 }
 
 function buildOrderRequestItemOverviewRows(preparedQuote: PreparedQuote): OrderRequestItemOverviewRow[] {
