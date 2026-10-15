@@ -615,95 +615,17 @@ describe('SummaryExport PDF override', () => {
         expect(activityState.safeLogActivity).not.toHaveBeenCalled();
     });
 
-    it('retains an ambiguous Save Intent across a refresh for the same draft', async () => {
-        quoteSaveState.save
-            .mockResolvedValueOnce({
-                status: 'not-saved',
-                failure: {
-                    code: 'persistence-ambiguous',
-                    message: 'Transport response lost.',
-                    retryable: true
-                },
-                retry: { saveIntentId: 'save-retry-1' }
-            })
-            .mockResolvedValueOnce({
-                status: 'saved',
-                quote: { ownerUid: 'user-1', quoteId: 'quote-1' },
-                isNewQuote: false,
-                statePatch: {
-                    activeQuoteId: 'quote-1',
-                    activeQuoteVersion: 3,
-                    quoteNumber: 'BRIXX - 260423-101',
-                    quoteStatus: 'draft'
-                }
-            });
-        const stateOverrides = {
-            activeQuoteId: 'quote-1',
-            quoteNumber: 'BRIXX - 260423-101',
-            activeQuoteVersion: 2
-        };
-        const { container, dispatch } = await renderSummaryExport({
-            stateOverrides
+    it('leaves retry recovery to Quote Save and keeps a failed save dirty', async () => {
+        quoteSaveState.save.mockResolvedValueOnce({
+            status: 'not-saved',
+            failure: { code: 'persistence-ambiguous', message: 'Transport response lost.', retryable: true }
         });
-
-        await clickButton(container, 'Spara ny version');
+        const { container, dispatch } = await renderSummaryExport();
+        await clickButton(container, 'Spara offert');
+        expect(quoteSaveState.save).toHaveBeenCalledTimes(1);
+        expect(quoteSaveState.save.mock.calls[0][0]).not.toHaveProperty('retrySaveIntentId');
         expect(dispatch).not.toHaveBeenCalledWith(expect.objectContaining({ type: 'QUOTE_SAVED' }));
-
-        const refreshed = await renderSummaryExport({
-            stateOverrides
-        });
-        await clickButton(refreshed.container, 'Spara ny version');
-
-        expect(quoteSaveState.save.mock.calls[0][0].retrySaveIntentId).toBeNull();
-        expect(quoteSaveState.save.mock.calls[1][0].retrySaveIntentId).toBe('save-retry-1');
-        expect(refreshed.dispatch).toHaveBeenCalledWith(expect.objectContaining({ type: 'QUOTE_SAVED' }));
-    });
-
-    it('does not reuse an ambiguous Save Intent after the draft changes', async () => {
-        quoteSaveState.save
-            .mockResolvedValueOnce({
-                status: 'not-saved',
-                failure: {
-                    code: 'persistence-ambiguous',
-                    message: 'Transport response lost.',
-                    retryable: true
-                },
-                retry: { saveIntentId: 'save-retry-1' }
-            })
-            .mockResolvedValueOnce({
-                status: 'saved',
-                quote: { ownerUid: 'user-1', quoteId: 'quote-1' },
-                isNewQuote: false,
-                statePatch: {
-                    activeQuoteId: 'quote-1',
-                    activeQuoteVersion: 4,
-                    quoteNumber: 'BRIXX - 260423-101',
-                    quoteStatus: 'sent'
-                }
-            });
-        const original = await renderSummaryExport({
-            stateOverrides: {
-                activeQuoteId: 'quote-1',
-                quoteNumber: 'BRIXX - 260423-101',
-                activeQuoteVersion: 2
-            }
-        });
-
-        await clickButton(original.container, 'Spara ny version');
-
-        const edited = await renderSummaryExport({
-            stateOverrides: {
-                activeQuoteId: 'quote-1',
-                quoteNumber: 'BRIXX - 260423-101',
-                activeQuoteVersion: 2,
-                quoteStatus: 'sent'
-            }
-        });
-        await clickButton(edited.container, 'Spara ny version');
-
-        expect(quoteSaveState.save.mock.calls[0][0].retrySaveIntentId).toBeNull();
-        expect(quoteSaveState.save.mock.calls[1][0].retrySaveIntentId).toBeNull();
-        expect(edited.dispatch).toHaveBeenCalledWith(expect.objectContaining({ type: 'QUOTE_SAVED' }));
+        expect(toastState.error).toHaveBeenCalled();
     });
 
     it('logs the English Excel filename when exporting in English', async () => {

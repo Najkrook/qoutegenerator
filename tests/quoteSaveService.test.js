@@ -576,21 +576,184 @@ describe('Quote Save module', () => {
         });
         expect(first).toMatchObject({
             status: 'not-saved',
-            failure: { code: 'persistence-ambiguous' },
-            retry: { saveIntentId: 'intent-1' }
+            failure: { code: 'persistence-ambiguous' }
         });
 
         const retried = await harness.module.save({
             actor: ACTOR,
             state: quoteState(),
-            target: { kind: 'new' },
-            retrySaveIntentId: first.retry.saveIntentId
+            target: { kind: 'new' }
         });
 
         expect(retried.status).toBe('saved');
         expect(retried.statePatch.activeQuoteVersion).toBe(1);
         expect(createQuote).toHaveBeenCalledTimes(2);
         expect(revisionPaths(firestore, 'actor-1', retried.quote.quoteId)).toHaveLength(1);
+    });
+
+    function retryHarness(storageOverride) {
+        const values = new Map();
+        const storage = storageOverride || {
+            getItem: (key) => values.get(key) || null,
+            setItem: (key, value) => values.set(key, value),
+            removeItem: (key) => values.delete(key)
+        };
+        const harness = createHarness();
+        let sequence = 0;
+        const createQuote = vi.fn((input) => harness.repository.createQuote(input));
+        const saveQuoteRevision = vi.fn((input) => harness.repository.saveQuoteRevision(input));
+        const reopen = () => createQuoteSaveModule({
+            quotePersistence: { ...harness.repository, createQuote, saveQuoteRevision },
+            crm: harness.crm,
+            logActivity: harness.logActivity,
+            retryStorage: storage,
+            calculateTotals: () => SUMMARY,
+            createSaveIntentId: () => `recovery-${++sequence}`,
+            schedule: vi.fn()
+        });
+        const input = { actor: ACTOR, state: quoteState(), target: { kind: 'new' } };
+        return { ...harness, storage, values, createQuote, saveQuoteRevision, reopen, input };
+    }
+
+    it('restores a lost response after reload without creating another revision, then clears the intent', async () => {
+        const h = retryHarness();
+        h.createQuote.mockImplementationOnce(async (input) => {
+            await h.repository.createQuote(input);
+            throw Object.assign(new Error('Response lost'), { code: 'unavailable' });
+        });
+        expect((await h.reopen().save(h.input)).status).toBe('not-saved');
+        const restored = h.reopen();
+        const saved = await restored.save(h.input);
+        expect(saved.status).toBe('saved');
+        expect(h.createQuote.mock.calls.map(([input]) => input.saveIntentId)).toEqual(['recovery-1', 'recovery-1']);
+        expect(revisionPaths(h.firestore, ACTOR.uid, saved.quote.quoteId)).toHaveLength(1);
+        expect(h.values.size).toBe(0);
+        await restored.save(h.input);
+        expect(h.createQuote.mock.calls[2][0].saveIntentId).toBe('recovery-2');
+    });
+
+    it('recovers the previous SummaryExport storage format across an app update', async () => {
+        const h = retryHarness();
+        const original = await h.repository.createQuote({
+            user: ACTOR,
+            state: h.input.state,
+            summary: SUMMARY,
+            customerInfo: h.input.state.customerInfo,
+            saveIntentId: 'legacy-intent'
+        });
+        h.values.set(`quote-generator:pending-save-retry:${ACTOR.uid}`, JSON.stringify({
+            saveIntentId: 'legacy-intent',
+            draftSignature: JSON.stringify({
+                ownerUid: ACTOR.uid, quoteId: null, crmDealId: null, retailerId: null, state: h.input.state
+            })
+        }));
+        const recovered = await h.reopen().save(h.input);
+        expect(recovered.quote.quoteId).toBe(original.quoteId);
+        expect(h.createQuote.mock.calls[0][0].saveIntentId).toBe('legacy-intent');
+        expect(revisionPaths(h.firestore, ACTOR.uid, original.quoteId)).toHaveLength(1);
+    });
+
+    it('clears recovery after persistence even when CRM still needs repair', async () => {
+        const h = retryHarness();
+        const saved = await h.reopen().save({ ...h.input, target: { kind: 'new', crmDealId: 'missing-deal' } });
+        expect(saved.status).toBe('saved-needs-crm-repair');
+        expect(h.values.size).toBe(0);
+    });
+
+    it('records an intent before persistence so a reload during the request can recover it', async () => {
+        const h = retryHarness();
+        let finish;
+        h.createQuote.mockImplementationOnce((input) => new Promise((resolve) => {
+            finish = () => resolve(h.repository.createQuote(input));
+        }));
+        const pendingSave = h.reopen().save(h.input);
+        expect(h.values.size).toBe(1);
+        const saved = await h.reopen().save(h.input);
+        finish();
+        await pendingSave;
+        expect(revisionPaths(h.firestore, ACTOR.uid, saved.quote.quoteId)).toHaveLength(1);
+        expect(h.createQuote.mock.calls[1][0].saveIntentId).toBe('recovery-1');
+    });
+
+    it.each([
+        ['draft', (input) => ({ ...input, state: quoteState({ quoteStatus: 'sent' }) })],
+        ['actor', (input) => ({ ...input, actor: { ...ACTOR, uid: 'actor-2' } })],
+        ['owner', (input) => ({ ...input, target: { kind: 'new', ownerUid: 'owner-2' }, canManageAllQuotes: true })],
+        ['CRM deal', (input) => ({ ...input, target: { kind: 'new', crmDealId: 'deal-2' } })],
+        ['retailer', (input) => ({ ...input, retailer: { id: 'retailer-2', name: 'Retailer', productLines: { BaHaMa: { enabled: true, discountPct: 10 } }, pdfThemes: [] } })],
+        ['change note', (input) => ({ ...input, changeNote: 'Changed request' })]
+    ])('starts a new intent after %s changes', async (_label, change) => {
+        const h = retryHarness();
+        h.createQuote.mockRejectedValue(Object.assign(new Error('Offline'), { code: 'unavailable' }));
+        await h.reopen().save(h.input);
+        await h.reopen().save(change(h.input));
+        expect(h.createQuote.mock.calls.map(([input]) => input.saveIntentId)).toEqual(['recovery-1', 'recovery-2']);
+    });
+
+    it('isolates existing quote targets and retries an ambiguous revision without incrementing it again', async () => {
+        const h = retryHarness();
+        const module = h.reopen();
+        const first = await module.save(h.input);
+        const second = await module.save(h.input);
+        const revisionInput = { ...h.input, target: { kind: 'existing', quote: first.quote } };
+        h.saveQuoteRevision.mockImplementationOnce(async (input) => {
+            await h.repository.saveQuoteRevision(input);
+            throw Object.assign(new Error('Response lost'), { code: 'unavailable' });
+        });
+        await module.save(revisionInput);
+        const recovered = await h.reopen().save(revisionInput);
+        expect(recovered.statePatch.activeQuoteVersion).toBe(2);
+        expect(revisionPaths(h.firestore, ACTOR.uid, first.quote.quoteId)).toHaveLength(2);
+        expect(h.saveQuoteRevision.mock.calls[1][0].saveIntentId).toBe(h.saveQuoteRevision.mock.calls[0][0].saveIntentId);
+        h.saveQuoteRevision.mockRejectedValue(Object.assign(new Error('Offline'), { code: 'unavailable' }));
+        await module.save(revisionInput);
+        await module.save({ ...revisionInput, target: { kind: 'existing', quote: second.quote } });
+        expect(h.saveQuoteRevision.mock.calls[3][0].saveIntentId).not.toBe(h.saveQuoteRevision.mock.calls[2][0].saveIntentId);
+    });
+
+    it('clears a definite persistence failure rather than reusing its intent', async () => {
+        const h = retryHarness();
+        h.createQuote.mockRejectedValueOnce(Object.assign(new Error('Denied'), { code: 'permission-denied' }));
+        const module = h.reopen();
+        const failure = await module.save(h.input);
+        expect(failure.failure.retryable).toBe(false);
+        expect(h.values.size).toBe(0);
+        await module.save(h.input);
+        expect(h.createQuote.mock.calls[1][0].saveIntentId).toBe('recovery-2');
+    });
+
+    it('keeps in-memory retries working when every storage operation throws', async () => {
+        const fail = () => { throw new Error('Storage blocked'); };
+        const h = retryHarness({ getItem: fail, setItem: fail, removeItem: fail });
+        h.createQuote.mockRejectedValueOnce(Object.assign(new Error('Offline'), { code: 'unavailable' }));
+        const module = h.reopen();
+        await module.save(h.input);
+        expect((await module.save(h.input)).status).toBe('saved');
+        expect(h.createQuote.mock.calls[1][0].saveIntentId).toBe('recovery-1');
+        await module.save(h.input);
+        expect(h.createQuote.mock.calls[2][0].saveIntentId).toBe('recovery-2');
+    });
+
+    it('ignores malformed stored recovery data', async () => {
+        const h = retryHarness();
+        h.values.set(`quote-generator:pending-save-retry:${ACTOR.uid}`, '{broken');
+        expect((await h.reopen().save(h.input)).status).toBe('saved');
+    });
+
+    it('does not let an older request clear a newer pending intent', async () => {
+        const h = retryHarness();
+        let finish;
+        h.createQuote.mockImplementationOnce((input) => new Promise((resolve) => {
+            finish = () => resolve(h.repository.createQuote(input));
+        })).mockRejectedValueOnce(Object.assign(new Error('Offline'), { code: 'unavailable' }));
+        const module = h.reopen();
+        const older = module.save(h.input);
+        const edited = { ...h.input, state: quoteState({ quoteStatus: 'sent' }) };
+        await module.save(edited);
+        finish();
+        await older;
+        await h.reopen().save(edited);
+        expect(h.createQuote.mock.calls[2][0].saveIntentId).toBe('recovery-2');
     });
 
     it('links CRM on first save, advances lead once, and preserves later stages', async () => {

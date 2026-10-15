@@ -45,7 +45,6 @@ export interface SaveQuoteRevisionInput {
     target: QuoteSaveTarget;
     retailer?: RetailerRecord | null;
     canManageAllQuotes?: boolean;
-    retrySaveIntentId?: string | null;
     changeNote?: string;
 }
 
@@ -92,7 +91,6 @@ export interface QuoteSavedNeedsCrmRepairOutcome extends SavedQuoteOutcomeBase {
 export interface QuoteNotSavedOutcome {
     status: 'not-saved';
     failure: QuoteSaveFailure;
-    retry?: { saveIntentId: string };
 }
 
 export type QuoteSaveOutcome =
@@ -123,6 +121,7 @@ interface ActivityResultLike {
 
 interface QuoteSaveModuleDependencies {
     quotePersistence: QuotePersistencePort;
+    retryStorage?: Pick<Storage, 'getItem' | 'setItem' | 'removeItem'>;
     crm: CrmPort;
     logActivity: (input: UnknownRecord) => Promise<ActivityResultLike | void>;
     calculateTotals?: (draft: QuoteState) => QuoteTotalsResult;
@@ -408,6 +407,7 @@ function buildCrmLinkInput({
 
 export function createQuoteSaveModule({
     quotePersistence,
+    retryStorage,
     crm,
     logActivity,
     catalogData: quoteCatalogData = defaultCatalogData,
@@ -421,6 +421,40 @@ export function createQuoteSaveModule({
     schedule = (callback, delayMs) => globalThis.setTimeout(callback, delayMs)
 }: QuoteSaveModuleDependencies): QuoteSaveModule {
     const scheduledRepairs = new Set<string>();
+
+    // A tab owns its pending Save Intents. Memory keeps retries safe when browser
+    // storage is unavailable; the optional port also supports restoring after reload.
+    const pendingSaves = new Map<string, { saveIntentId: string; draftSignature: string } | null>();
+    const retryKey = (actorUid: string) => `quote-generator:pending-save-retry:${actorUid}`;
+    const readPending = (actorUid: string) => {
+        if (!pendingSaves.has(actorUid)) {
+            let pending = null;
+            try {
+                const parsed: unknown = JSON.parse(retryStorage?.getItem(retryKey(actorUid)) || 'null');
+                if (isRecord(parsed) && typeof parsed.saveIntentId === 'string'
+                    && parsed.saveIntentId.trim() && typeof parsed.draftSignature === 'string') {
+                    pending = { saveIntentId: parsed.saveIntentId, draftSignature: parsed.draftSignature };
+                }
+            } catch {
+                // Malformed or inaccessible storage must not prevent Quote Save.
+            }
+            pendingSaves.set(actorUid, pending);
+        }
+        return pendingSaves.get(actorUid);
+    };
+    const writePending = (actorUid: string, pending: { saveIntentId: string; draftSignature: string } | null) => {
+        pendingSaves.set(actorUid, pending);
+        try {
+            if (pending) retryStorage?.setItem(retryKey(actorUid), JSON.stringify(pending));
+            else retryStorage?.removeItem(retryKey(actorUid));
+        } catch {
+            // Same-session retries still use the in-memory entry.
+        }
+    };
+    const clearPending = (actorUid: string, saveIntentId: string) => {
+        // An older request must not clear a newer draft's pending intent.
+        if (pendingSaves.get(actorUid)?.saveIntentId === saveIntentId) writePending(actorUid, null);
+    };
 
     const canWriteQuote = (
         actorUid: string,
@@ -750,7 +784,27 @@ export function createQuoteSaveModule({
         });
         const persistenceSnapshot = preparedQuote.persistenceSnapshot;
         const commercialSnapshot = createQuoteCommercialSnapshot(preparedQuote);
-        const saveIntentId = normalizeId(input.retrySaveIntentId) || makeSaveIntentId();
+        const draftIdentity = {
+            ownerUid,
+            quoteId: target.kind === 'existing' ? normalizeId(target.quote.quoteId) : null,
+            crmDealId: normalizeId(target.crmDealId) || null,
+            retailerId: input.retailer?.id || null,
+            state: input.state
+        };
+        const draftSignature = JSON.stringify({
+            ...draftIdentity,
+            retailer: input.retailer || null,
+            canManageAllQuotes: input.canManageAllQuotes === true,
+            changeNote: input.changeNote || ''
+        });
+        const pending = readPending(actorUid);
+        // SummaryExport used this smaller signature before recovery moved here.
+        // Preserve unresolved intents across an app update, then write the new form.
+        const matchesLegacy = !input.changeNote
+            && pending?.draftSignature === JSON.stringify(draftIdentity);
+        const saveIntentId = pending && (pending.draftSignature === draftSignature || matchesLegacy)
+            ? pending.saveIntentId
+            : makeSaveIntentId();
         const isNewQuote = target.kind === 'new';
         const requestedDealId = normalizeId(target.crmDealId);
         const existingDealId = normalizeId(existing?.metadata.crmDealId);
@@ -785,6 +839,9 @@ export function createQuoteSaveModule({
             metadata: NonNullable<SavedQuoteLike['metadata']>;
             revision: { revisionId?: string; version?: number };
         };
+        // Write before the request: a reload can lose the response even before
+        // JavaScript gets a chance to classify a transport failure.
+        writePending(actorUid, { saveIntentId, draftSignature });
         try {
             if (target.kind === 'new') {
                 const createInput: CreateQuoteInput = {
@@ -820,11 +877,8 @@ export function createQuoteSaveModule({
             }
         } catch (error) {
             const failure = persistenceFailure(error);
-            return {
-                status: 'not-saved',
-                failure,
-                ...(failure.code === 'persistence-ambiguous' ? { retry: { saveIntentId } } : {})
-            };
+            if (!failure.retryable) clearPending(actorUid, saveIntentId);
+            return { status: 'not-saved', failure };
         }
 
         const quote: QuoteReference = {
@@ -834,6 +888,8 @@ export function createQuoteSaveModule({
         if (!quote.quoteId) {
             throw new Error('Quote persistence returned no Quote identity.');
         }
+        // Persistence defines success, independently of CRM repair and logging.
+        clearPending(actorUid, saveIntentId);
         const statePatch = buildSavedQuoteStatePatch(saved, persistenceSnapshot);
         const version = saved.metadata.latestVersion || saved.revision.version || statePatch.activeQuoteVersion || 1;
         const persistedDealId = normalizeId(existing?.metadata.crmDealId || saved.metadata.crmDealId);
@@ -933,6 +989,11 @@ async function getDefaultQuoteSaveModule(): Promise<QuoteSaveModule> {
             import('./activityLogService')
         ]).then(([quoteModule, crmModule, activityModule]) => createQuoteSaveModule({
             quotePersistence: quoteModule.quoteRepository,
+            retryStorage: {
+                getItem: (key) => globalThis.sessionStorage?.getItem(key) ?? null,
+                setItem: (key, value) => globalThis.sessionStorage?.setItem(key, value),
+                removeItem: (key) => globalThis.sessionStorage?.removeItem(key)
+            },
             crm: crmModule.crmRepository,
             logActivity: activityModule.safeLogActivity
         }));
