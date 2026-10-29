@@ -375,6 +375,108 @@ export function renderExtraNotesBlock(doc, { customerInfo = {}, pageWidth, pageH
     return y + 4;
 }
 
+export function renderSustainabilityBlock(doc, {
+    currentY,
+    pageWidth,
+    pageHeight,
+    drawMainHeader,
+    layout = PDF_LAYOUT,
+    exportLanguage = 'sv'
+}) {
+    const copy = getExportLabels(exportLanguage).sustainability;
+    const x = layout.pageMarginX;
+    const width = pageWidth - x * 2;
+    const padding = 4.5;
+    const innerWidth = width - padding * 2;
+    const green = [46, 174, 96] as const;
+    const border = [220, 225, 230] as const;
+    const muted = [82, 96, 115] as const;
+    const lineHeight = 4;
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(8);
+    const headingLines = doc.splitTextToSize(copy.heading, innerWidth * 0.7 - 4);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(7.5);
+    const badgeLines = doc.splitTextToSize(copy.badge, innerWidth * 0.3);
+    const headerHeight = Math.max(headingLines.length, badgeLines.length) * lineHeight;
+    doc.setFontSize(8.5);
+    const descriptionLines = doc.splitTextToSize(copy.description, innerWidth);
+
+    const gap = 3.5;
+    const metricWidth = (innerWidth - gap * 2) / 3;
+    const metrics = copy.metrics.map((metric) => {
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(9);
+        const valueLines = doc.splitTextToSize(metric.value, metricWidth - 4);
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(7.5);
+        const detailLines = doc.splitTextToSize(metric.detail, metricWidth - 4);
+        return { valueLines, detailLines };
+    });
+    const metricHeight = Math.max(...metrics.map((metric) => (
+        5 + (metric.valueLines.length + metric.detailLines.length) * lineHeight
+    )));
+    const height = padding + headerHeight + 6 + descriptionLines.length * lineHeight + 4 + metricHeight + padding;
+    const y = ensurePageSpace(
+        doc, currentY, height, pageHeight, drawMainHeader, layout.contentStartY, layout.contentBottomSafe
+    );
+
+    doc.setLineWidth(0.25);
+    doc.setDrawColor(...border);
+    doc.setFillColor(247, 249, 248);
+    doc.roundedRect(x, y, width, height, 1.5, 1.5, 'FD');
+
+    const headerY = y + padding + 2.5;
+    doc.setFillColor(...green);
+    doc.roundedRect(x + padding, headerY - 2.3, 2.5, 2.5, 1.25, 1.25, 'F');
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(8);
+    doc.setTextColor(...layout.colors.darkText);
+    doc.text(headingLines, x + padding + 4.5, headerY, { lineHeightFactor: 1.4 });
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(7.5);
+    doc.setTextColor(0, 128, 45);
+    doc.text(badgeLines, x + width - padding, headerY, { align: 'right', lineHeightFactor: 1.5 });
+
+    const dividerY = y + padding + headerHeight + 1.5;
+    doc.line(x + padding, dividerY, x + width - padding, dividerY);
+    doc.setTextColor(...muted);
+    doc.setFontSize(8.5);
+    let textY = dividerY + 5;
+    descriptionLines.forEach((line) => {
+        doc.text(line, x + padding, textY);
+        textY += lineHeight;
+    });
+
+    const metricY = textY + 2;
+    metrics.forEach((metric, index) => {
+        const metricX = x + padding + index * (metricWidth + gap);
+        const centerX = metricX + metricWidth / 2;
+        doc.setDrawColor(...border);
+        doc.setFillColor(255, 255, 255);
+        doc.roundedRect(metricX, metricY, metricWidth, metricHeight, 1, 1, 'FD');
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(9);
+        doc.setTextColor(...(index === 0 ? green : layout.colors.darkText));
+        let metricTextY = metricY + 5;
+        metric.valueLines.forEach((line) => {
+            doc.text(line, centerX, metricTextY, { align: 'center' });
+            metricTextY += lineHeight;
+        });
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(7.5);
+        doc.setTextColor(...muted);
+        metric.detailLines.forEach((line) => {
+            doc.text(line, centerX, metricTextY, { align: 'center' });
+            metricTextY += lineHeight;
+        });
+    });
+
+    doc.setTextColor(...layout.colors.darkText);
+    return y + height;
+}
+
 export function renderGroupedTables(doc, {
     summaryData,
     formatSEK,
@@ -951,7 +1053,7 @@ export function renderSignatureBlock(doc, {
     let y = preferredY;
 
     if (y + blockHeight > footerZone) {
-        y = startNewPage(doc, drawPageHeader, 34);
+        y = startNewPage(doc, drawPageHeader, layout.contentStartY);
     }
 
     const boxWidth = pageWidth - (layout.pageMarginX * 2);

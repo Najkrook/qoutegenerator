@@ -84,6 +84,8 @@ import {
     groupSummaryTotalsByLine
 } from '../src/features/pdfExport';
 import { createCatalogFixture, createStateFixture } from './fixtures/calculationFixtures';
+import { renderSignatureBlock, renderSustainabilityBlock } from '../src/features/pdfExportLayout';
+import { jsPDF } from 'jspdf';
 
 function createZeroDiscountState(overrides = {}) {
     return createStateFixture({
@@ -128,6 +130,62 @@ describe('pdfExport helpers', () => {
     it('computes valid-until date from quote date and validity days', () => {
         const validUntil = computeValidUntilDateString('2026-03-01', 14);
         expect(validUntil).toBe('2026-03-15');
+    });
+
+    it.each(['sv', 'en'])('adds one localized sustainability card after notes and before approval (%s)', (exportLanguage) => {
+        const state = createZeroDiscountState({
+            exportLanguage,
+            includeSignatureBlock: true,
+            customerInfo: { extraNotes: 'Example freight note' }
+        });
+        const summary = computeQuoteTotals({ state, catalogData: createCatalogFixture() });
+
+        expect(generatePDF(state, summary, true)).toBeInstanceOf(Blob);
+
+        const textValues = pdfMockState.textCalls.map((call) => call.value);
+        const heading = exportLanguage === 'en'
+            ? 'ENVIRONMENT & SUSTAINABILITY - REDUXA PRODUCTION'
+            : 'MILJÖ & HÅLLBARHET - PRODUKTION MED REDUXA-METODEN';
+        const approval = exportLanguage === 'en' ? 'Approval' : 'Godkännande';
+        expect(textValues.filter((value) => value === heading)).toHaveLength(1);
+        expect(textValues.indexOf(heading)).toBeGreaterThan(textValues.indexOf('Example freight note'));
+        expect(textValues.indexOf(heading)).toBeLessThan(textValues.indexOf(approval));
+        expect(textValues).toContain(exportLanguage === 'en' ? '> 75% lower CO2' : '> 75 % lägre CO2');
+        expect(textValues).toContain(exportLanguage === 'en' ? '100% Recyclable' : '100 % Återvinningsbart');
+    });
+
+    it.each([{}, { totals: [] }])('omits sustainability claims when there are no product rows', (summary) => {
+        expect(generatePDF(createZeroDiscountState(), summary, true)).toBeInstanceOf(Blob);
+        expect(pdfMockState.textCalls.some((call) => /REDUXA/.test(call.value))).toBe(false);
+    });
+
+    it.each([170, 245])('keeps the complete sustainability card above the footer from y=%s', (currentY) => {
+        let headerCalls = 0;
+        const endY = renderSustainabilityBlock(new jsPDF(), {
+            currentY,
+            pageWidth: 210,
+            pageHeight: 297,
+            drawMainHeader: () => { headerCalls += 1; }
+        });
+        const card = pdfMockState.roundedRectCalls[0];
+        expect(headerCalls).toBe(currentY === 245 ? 1 : 0);
+        expect(card.page).toBe(currentY === 245 ? 2 : 1);
+        expect(card.y).toBe(currentY === 245 ? 41 : currentY);
+        expect(endY).toBeLessThanOrEqual(261);
+        expect(pdfMockState.roundedRectCalls.every((rect) => (
+            rect.page === card.page && rect.y + rect.height <= endY
+        ))).toBe(true);
+        expect(pdfMockState.textCalls.every((call) => call.page === card.page)).toBe(true);
+    });
+
+    it('keeps approval below the main header when it needs a new page', () => {
+        renderSignatureBlock(new jsPDF(), {
+            preferredY: 260,
+            pageWidth: 210,
+            pageHeight: 297,
+            drawPageHeader: () => {}
+        });
+        expect(pdfMockState.roundedRectCalls[0]).toMatchObject({ page: 2, y: 41, height: 31 });
     });
 
     it('does not consult the runtime clock when the prepared quote date is missing', () => {

@@ -18,6 +18,7 @@ import {
     renderFooters,
     renderGroupedTables,
     renderSignatureBlock,
+    renderSustainabilityBlock,
     renderTermsPages,
     renderTotalsSection
 } from './pdfExportLayout';
@@ -225,6 +226,17 @@ export function generatePDF(
             layout: activeLayout,
             exportLanguage
         });
+
+        if (hasProducts) {
+            finalY = renderSustainabilityBlock(doc, {
+                currentY: finalY + 5,
+                pageWidth,
+                pageHeight,
+                drawMainHeader,
+                layout: activeLayout,
+                exportLanguage
+            });
+        }
 
         const termsPageEndY = renderTermsPages(doc, {
             state,

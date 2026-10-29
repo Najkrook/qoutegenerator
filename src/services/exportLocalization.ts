@@ -22,6 +22,16 @@ const EXPORT_LABELS = {
         validityPeriod: 'Giltighetstid',
         to: 'Till',
         notes: 'Noteringar',
+        sustainability: {
+            heading: 'MILJÖ & HÅLLBARHET - PRODUKTION MED REDUXA-METODEN',
+            badge: 'Certifierat koldioxidsnålt aluminium',
+            description: 'Våra stommar och aluminiumprofiler i denna offert framställs enligt Hydro REDUXA-metoden med 100 % förnybar energi. Det ger er verksamhet en dokumenterat mer hållbar utemiljö utan kompromisser på kvalitet eller stormsäkerhet.',
+            metrics: [
+                { value: '> 75 % lägre CO2', detail: 'Jämfört med globalt snitt' },
+                { value: '100 % Förnybar el', detail: 'Vatten-, vind- & solkraft' },
+                { value: '100 % Återvinningsbart', detail: 'Cirkulärt konstruktionsmaterial' }
+            ]
+        },
         quoteDetails: 'Offertdetaljer',
         productsHeading: 'Produkter',
         productTotalExVat: 'Produkttotal exkl. moms',
@@ -86,6 +96,16 @@ const EXPORT_LABELS = {
         validityPeriod: 'Validity period',
         to: 'To',
         notes: 'Notes',
+        sustainability: {
+            heading: 'ENVIRONMENT & SUSTAINABILITY - REDUXA PRODUCTION',
+            badge: 'Certified low-carbon aluminium',
+            description: 'The frames and aluminium profiles in this quote are produced using the Hydro REDUXA method with 100% renewable energy. This gives your business a documented, more sustainable outdoor environment without compromising quality or storm resistance.',
+            metrics: [
+                { value: '> 75% lower CO2', detail: 'Compared with the global average' },
+                { value: '100% Renewable electricity', detail: 'Hydro, wind & solar power' },
+                { value: '100% Recyclable', detail: 'Circular construction material' }
+            ]
+        },
         quoteDetails: 'Quote details',
         productsHeading: 'Products',
         productTotalExVat: 'Product total excl. VAT',

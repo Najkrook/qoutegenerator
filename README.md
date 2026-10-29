@@ -1,236 +1,54 @@
 # QuoteGenerator
 
-## What This Repo Is
-QuoteGenerator is an internal portal for BRIXX that provides quoting, sketching, inventory management, project planning, activity logging, and a dedicated retailer workspace (including order requests and product documents).
+Internal BRIXX portal for quotes, pricing, PDF/Excel exports, sketching and 3D visualization, inventory and QR labels, planning, CRM, and retailer order requests and documents.
 
-The primary UI is a React + TypeScript + Vite Single Page Application (SPA) under `src/`.
+Built with React 19, TypeScript, Vite, Tailwind CSS, and Firebase Authentication/Firestore. Active application code lives in `src/`; Vitest tests live in `tests/`.
 
-- `src/` contains the main entrypoint, views, context providers, client-facing services, configuration, and data models. All source code in this directory has been migrated to TypeScript.
-- The application uses URL-based routing with `react-router-dom` for login, quote flow steps, history, sketch, and admin views.
-- Legacy vanilla JS files and multi-page HTML entrypoints have been removed to consolidate the architecture.
+## Run locally
 
-This repository is a fully isolated `src/`-only React SPA environment.
+Use Node.js 22.13+ (22.x) or 24+ and npm.
 
-## Technology Stack
-- **Frontend**: React 19, TypeScript, Vite 5
-- **Styling**: Tailwind CSS v4
-- **Routing**: React Router v7
-- **Backend & Auth**: Firebase (Firestore, Auth, Hosting)
-- **Specialized Integrations**:
-  - `react-konva` for the Sketch tool
-  - `jspdf` and `xlsx` for PDF and Excel exports
-- **Testing**: Vitest
-
-## Quick Start
-### Prerequisites
-- Node.js 20+ (LTS recommended)
-- npm 10+
-
-### Run locally
-From the repository root, run:
-
-```powershell
-npm install
+```sh
+npm ci
 npm run dev
 ```
 
-If PowerShell execution policy blocks `npm.ps1`, use `cmd /c npm ...` instead:
+Vite opens at `http://127.0.0.1:5173` (or the next available port). If PowerShell blocks `npm.ps1`, use `cmd /c npm ...`.
 
-```powershell
-cmd /c npm install
-cmd /c npm run dev
-```
+Firebase client configuration is in `src/services/firebase.ts`. **Local development connects to the configured remote Firebase project**; the app does not automatically connect to an emulator. Never commit Admin credentials or local secrets.
 
-Default Vite dev URL:
-- `http://localhost:5173` unless Vite selects a different port
+## App structure
 
-## Firebase Setup
-The Firebase web app client config is currently defined in `src/services/firebase.ts`.
+- `src/App.tsx` and `src/navigation/`: URL-based routes and access guards. The quote flow is content selection → configuration → pricing → summary/export.
+- `src/store/`: authentication, quote state, hydration, and local persistence.
+- `src/services/`: calculations, quote saving, CRM, inventory, and retailer workflows.
+- `src/features/`, `src/views/`, and `src/components/`: exports, sketching, visualization, and UI.
+- `src/data/` and `src/types/`: catalogs and shared contracts.
+- `firestore.rules` and `firestore.indexes.json`: backend access rules and indexes.
 
-- This client-side config is not the same thing as Firebase Admin credentials.
-- Admin or service-account credentials are only required for admin scripts such as `scripts/backfill-quote-metadata.mjs`.
-- Do not commit secrets or private credential files.
+Access levels are `full` (admin), `quote-only`, `sketch-only`, `retailer`, and `guest`. Role resolution lives in `src/store/AuthContext.tsx`; shared capabilities live in `src/config/accessControl.shared.ts`. Retailers have scoped quotes, orders, and documents. Inventory, QR tools, CRM, and planning require admin access.
 
-## Available Scripts
-From the repository root:
+## Development checks
 
-- `npm run dev`: Start the local Vite dev server.
-- `npm run build`: Create a production build in `dist/`.
-- `npm run preview`: Preview the production build locally.
-- `npm run test`: Run Vitest in interactive mode.
-- `npm run test:watch`: Run Vitest in watch mode.
-- `npm run test:confidence`: Run the fast regression suite for access control, state, sketch export, PDF/export, and text integrity.
-- `npm run test:run`: Run Vitest once with the basic reporter.
-- `npm run typecheck`: Run TypeScript compiler to validate types.
+| Command | Purpose |
+| --- | --- |
+| `npm run typecheck` | Check TypeScript |
+| `npm run test:confidence` | Selected regression suite |
+| `npm run test:run` | Full Vitest suite |
+| `npm run test:firestore` | Rules tests using the Firestore emulator; requires Java |
+| `npm run build` | Production build in `dist/` |
+| `npm run preview` | Preview the production build |
 
-## Environment & Secrets
-Do not commit secrets or local-only credentials.
+For a focused test, use `npm run test:run -- tests/<name>.test.js`. All scripts are listed in `package.json`. Before pushing, run `powershell -ExecutionPolicy Bypass -File ./scripts/verify-git-safety.ps1`.
 
-Common sensitive/local files include:
-- `.env`
-- `.env.*`
-- `*.env`
-- `API_keys.env`
-- `credentials.json`
-- `token.json`
-- `token.pickle`
+Firebase Hosting serves `dist/` with the SPA rewrite configured in `firebase.json`. Local rules edits take effect only after a separate rules deployment; keep rules and application access checks aligned.
 
-Before pushing, run:
+## Further reading
 
-```powershell
-git status
-git ls-files
-powershell -ExecutionPolicy Bypass -File .\scripts\verify-git-safety.ps1
-```
-
-## Project Structure
-Current active directories:
-
-- `src/`: React app entrypoint, views, contexts, client-side services, utilities, and catalog data. Contains migrated `features/`, `services/`, and `config/` directories. Fully migrated to TypeScript.
-- `tests/`: Vitest coverage for calculations, repositories, exports, and UI text.
-- `scripts/`: Maintenance and safety scripts.
-
-
-The active application is fully encapsulated within the `src/` directory.
-
-## Additional Documentation
-For a deeper understanding of the project, refer to these internal documents:
-- [`AGENT_KNOWLEDGE_BASE.md`](file:///c:/Users/rooki/Documents/qoutegenerator/AGENT_KNOWLEDGE_BASE.md): The definitive guide to the runtime architecture, state models, database schema, and detailed user flows. Read this before making architectural changes.
-- [`roadmap.md`](file:///c:/Users/rooki/Documents/qoutegenerator/roadmap.md): The engineering roadmap with phased goals and cross-cutting dependencies.
-- [`TYPESCRIPT_MIGRATION_TRACKER.md`](file:///c:/Users/rooki/Documents/qoutegenerator/TYPESCRIPT_MIGRATION_TRACKER.md): Details the completed TypeScript migration process and decisions.
-- [`docs/COPY_EDITING_GUIDE.md`](file:///c:/Users/rooki/Documents/qoutegenerator/docs/COPY_EDITING_GUIDE.md): Guidelines for modifying Swedish copy and avoiding encoding issues.
-- [`retailer_plan.md`](file:///c:/Users/rooki/Documents/qoutegenerator/retailer_plan.md): Specification for the Retailer Workspace features.
-
-## Core Workflow
-The quote flow uses semantic browser URLs:
-
-1. Dashboard
-2. Product Line Selection
-3. Configuration
-4. Pricing
-5. Summary Export
-
-Other active paths:
-
-- Inventory management is an admin-only branch from the dashboard.
-- Sketch mode is a separate branch from the dashboard.
-- Quote history, inventory logs, and activity logs are routed SPA views launched from the header or dashboard.
-
-## Useful Local Checks
-Useful local validation commands:
-
-```powershell
-npm run typecheck
-npm run test:run
-npm run build
-```
-
-Note:
-- Vite may warn about large chunk sizes during build. Treat that as informational unless a release decision depends on it.
-
-## Security and Git Safety
-Baseline team practice:
-
-1. Never commit secrets or local runtime files.
-2. Prefer branch and PR-based changes into `main`.
-3. Run the safety script before push:
-
-```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\verify-git-safety.ps1
-```
-
-## Access Roles
-Access control is maintained primarily via the `user_roles` collection in Firestore, with fallback logic to legacy hardcoded UID lists in `config/accessControl.shared.ts`.
-
-- `full`: admin-level access, including inventory management and inventory logs.
-- `quote-only`: quote flow plus quote history.
-- `sketch-only`: dashboard plus the sketch tool only.
-- `retailer`: retailer-specific views and order requests.
-- `guest`: not signed in / no UID.
-
-Role precedence:
-
-1. No UID -> `guest`
-2. `user_roles` doc has `role: 'admin'` -> `full`
-3. `user_roles` doc has `role: 'sketch_only'` -> `sketch-only`
-4. (Fallback) UID in hardcoded `ADMIN_UIDS` -> `full`
-5. (Fallback) UID in hardcoded `SKETCH_ONLY_UIDS` -> `sketch-only`
-6. User email matches a document in `retailers` collection -> `retailer`
-7. Otherwise -> `quote-only`
-
-Notes:
-- `sketch-only` users cannot enter the quote flow.
-- `quote-only` users can access `Mina Offerter`.
-- Quote-history permissions should remain aligned with the shared access-control helpers used by both auth state and step gating.
-- User roles should be managed via Firestore documents in the `user_roles` collection.
-
-## Firestore Rules and Deploy Notes
-The checked-in `firestore.rules` file currently allows:
-
-- `/users/{uid}/quotes/{quoteId}` for the signed-in owner
-- `/users/{uid}/quotes/{quoteId}/revisions/{revisionId}` for the signed-in owner
-- `/users/{uid}/templates/{templateId}` for the signed-in owner
-- `/stock/{docId}` for admins
-- `/inventory_logs/{logId}` for admins
-- admin read access to `templates` through collection-group queries
-- all other document paths denied
-
-Before deploy:
-
-1. If admin UIDs change, keep `firestore.rules` and `config/accessControl.shared.js` synchronized.
-2. Deploy rules through Firebase Console or Firebase CLI.
-
-Firebase Hosting SPA fallback is configured in `firebase.json`:
-
-- Hosting public dir: `dist`
-- Catch-all rewrite: `** -> /index.html`
-
-This rewrite is required so deep links such as `/quote/new/summary` and `/quotes` work on refresh in production.
-
-## Quote Lifecycle and Backfill
-Quote lifecycle is enabled by default.
-
-- You can disable it locally with `window.FEATURE_QUOTE_LIFECYCLE = false` before app scripts run.
-- Optional metadata backfill script:
-
-```powershell
-node .\scripts\backfill-quote-metadata.mjs
-```
-
-The backfill script requires Firebase Admin credentials via `GOOGLE_APPLICATION_CREDENTIALS` or `FIREBASE_SERVICE_ACCOUNT_JSON`.
-
-
-
-## Legacy and Reference Notes
-Actual legacy/reference assets:
-
-- `index_legacy.html`
-- older root shell files such as `app.js` and `data.js`
-- `server.py`
-- `start_server.bat`
-- `start_tunnel.py`
-
-Still-active shared code:
-
-- `features/`
-- `services/`
-- `config/`
-
-Use `npm run dev` for normal development unless you are intentionally debugging the older shell.
-
-## Branch and Contribution Flow
-Typical workflow:
-
-```powershell
-git checkout main
-git pull
-git checkout -b docs/readme-sync
-# make changes
-npm run test:run
-npm run build
-git add .
-git commit -m "Sync QuoteGenerator README with current repo"
-git push -u origin docs/readme-sync
-```
-
-Then open a PR to `main`.
+- [Agent instructions](AGENTS.md): architecture, invariants, and verification requirements.
+- [Roadmap](roadmap.md): planned work; verify shipped behavior against source and tests.
+- [3D visualization](docs/3D_VISUALIZATION.md): workflow and model limitations.
+- [QR inventory](docs/QR_INVENTORY.md): labels, backfill, and rollout.
+- [CRM backfill](docs/CRM_BACKFILL_GUIDE.md): preview and migration procedure.
+- [Quote-save architecture](docs/adr/0001-deepen-quote-save-workflow.md): persistence and recoverable CRM synchronization.
+- [Copy editing](docs/COPY_EDITING_GUIDE.md): Swedish text and encoding checks.
