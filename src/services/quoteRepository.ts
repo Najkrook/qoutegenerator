@@ -453,12 +453,16 @@ function normalizeQuoteRevision(
     };
 }
 
-type QuoteFilterableRow = Pick<QuoteMetadata, 'status' | 'searchText' | 'customerName' | 'reference' | 'customerReference'> & Partial<Pick<QuoteMetadata, 'updatedAtMs' | 'originType'>>;
+type QuoteFilterableRow = Pick<QuoteMetadata, 'status' | 'searchText' | 'customerName' | 'reference' | 'customerReference'> & Partial<Pick<QuoteMetadata, 'updatedAtMs' | 'originType' | 'company' | 'quoteNumber'>>;
 
 export function applyQuoteFilters<T extends QuoteFilterableRow>(quotes: T[] = [], { status = '', search = '', dateFilter = '', originFilter = '' }: QuoteFilters = {}): T[] {
     const normalizedStatus = String(status || '').trim().toLowerCase();
     const normalizedSearch = String(search || '').trim().toLowerCase();
     const now = Date.now();
+    const yearFormat = dateFilter === 'thisyear'
+        ? new Intl.DateTimeFormat('sv-SE', { timeZone: QUOTE_NUMBER_TIME_ZONE, year: 'numeric' })
+        : null;
+    const currentYear = yearFormat?.format(now);
 
     return quotes.filter((quote) => {
         if (normalizedStatus && quote.status !== normalizedStatus) return false;
@@ -469,6 +473,7 @@ export function applyQuoteFilters<T extends QuoteFilterableRow>(quotes: T[] = []
             const diffDays = diffMs / (1000 * 60 * 60 * 24);
             if (dateFilter === '7days' && diffDays > 7) return false;
             if (dateFilter === '30days' && diffDays > 30) return false;
+            if (yearFormat && yearFormat.format(updatedAt) !== currentYear) return false;
         }
 
         if (originFilter && quote.originType !== originFilter) {
@@ -476,7 +481,7 @@ export function applyQuoteFilters<T extends QuoteFilterableRow>(quotes: T[] = []
         }
 
         if (!normalizedSearch) return true;
-        const haystack = `${quote.searchText || ''} ${quote.customerName || ''} ${quote.reference || ''} ${quote.customerReference || ''}`.toLowerCase();
+        const haystack = `${quote.searchText || ''} ${quote.company || ''} ${quote.quoteNumber || ''} ${quote.customerName || ''} ${quote.reference || ''} ${quote.customerReference || ''}`.toLowerCase();
         return haystack.includes(normalizedSearch);
     });
 }

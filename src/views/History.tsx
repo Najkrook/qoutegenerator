@@ -1,5 +1,8 @@
-import React, { useCallback, useEffect, useRef, useState, type ChangeEvent } from 'react';
+import React, { useCallback, useEffect, useRef, useState, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import { IconLayoutList, IconPlus, IconSearch, IconTable } from '@tabler/icons-react';
+import { Button } from '../components/ui/Button';
+import { HistoryQuoteList, HISTORY_STATUS_LABELS, historyQuoteKey, formatHistorySek } from './HistoryQuoteList';
 import { useAuth } from '../store/AuthContext';
 import { quoteRepository } from '../services/quoteRepositoryClient';
 import { normalizeQuoteStatus, applyQuoteFilters, sortQuotes } from '../services/quoteRepository';
@@ -14,22 +17,13 @@ import type {
     HistoryOwnerOption,
     HistoryProps,
     HistoryQuoteRow,
-    QuoteRevision,
-    QuoteStatus
+    QuoteRevision
 } from '../types/contracts';
 
 type HistoryOwnerSelection = '__mine__' | '__all__' | string;
 
-const STATUS_LABELS: Record<QuoteStatus, string> = {
-    draft: 'Utkast',
-    sent: 'Skickad',
-    won: 'Vunnen',
-    lost: 'Förlorad',
-    archived: 'Arkiverad'
-};
-
-export function History({ onBack, onOpenQuote }: HistoryProps) {
-    const { user, canAccessQuoteHistory, canViewEverything, isRetailer, retailer } = useAuth();
+export function History({ onBack, onOpenQuote, onStartQuote }: HistoryProps) {
+    const { user, canAccessQuoteHistory, canViewEverything, canStartQuote, isRetailer, retailer } = useAuth();
     const [pdfPreview, setPdfPreview] = useState<{
         quote: HistoryQuoteRow;
         ownerUid: string;
@@ -37,7 +31,7 @@ export function History({ onBack, onOpenQuote }: HistoryProps) {
         audience?: QuotePreparationAudience;
     } | null>(null);
     const [searchParams, setSearchParams] = useSearchParams();
-    const [quotes, setQuotes] = useState<HistoryQuoteRow[]>([]);
+    const [source, setSource] = useState<{ userId: string; rows: HistoryQuoteRow[] }>({ userId: '', rows: [] });
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [statusFilter, setStatusFilter] = useState('');
@@ -48,19 +42,66 @@ export function History({ onBack, onOpenQuote }: HistoryProps) {
     const [revisionCache, setRevisionCache] = useState<Record<string, QuoteRevision[]>>({});
     const [visibleRevisions, setVisibleRevisions] = useState<Record<string, boolean>>({});
     const [allUsersQuotes, setAllUsersQuotes] = useState<Array<HistoryQuoteRow & { ownerUid: string }>>([]);
-    const [userList, setUserList] = useState<HistoryOwnerOption[]>([]);
+    const [allUsersUid, setAllUsersUid] = useState('');
+    const [ownerDirectory, setOwnerDirectory] = useState<HistoryOwnerOption[]>([]);
     const [selectedOwnerUid, setSelectedOwnerUid] = useState<HistoryOwnerSelection>('__mine__');
     const [loadingAllUsers, setLoadingAllUsers] = useState(false);
-    const allUsersQuotesRef = useRef<Array<HistoryQuoteRow & { ownerUid: string }>>([]);
+    const [allUsersError, setAllUsersError] = useState<string | null>(null);
+    const [refreshVersion, setRefreshVersion] = useState(0);
+    const [layout, setLayout] = useState<'cards' | 'table'>('cards');
+    const [revisionErrors, setRevisionErrors] = useState<Record<string, string>>({});
+    const [pending, setPending] = useState<Record<string, boolean>>({});
+    const pendingRef = useRef(new Set<string>());
+    const revisionRequests = useRef(new Set<string>());
+    const requestVersion = useRef(0);
+    const quoteMutations = useRef(new Map<string, Partial<HistoryQuoteRow> | null>());
 
     const quoteLifecycleEnabled = typeof window === 'undefined'
         ? true
         : window.FEATURE_QUOTE_LIFECYCLE !== false;
-    const isAdminBrowsing = canViewEverything && selectedOwnerUid !== '__mine__';
+    const ownerScope = canViewEverything ? selectedOwnerUid : '__mine__';
+    const isAdminBrowsing = ownerScope !== '__mine__';
+    const scopedQuotes = useMemo(() => isAdminBrowsing
+        ? allUsersUid === user?.uid ? allUsersQuotes.filter((quote) => ownerScope === '__all__' || quote.ownerUid === ownerScope) : []
+        : source.userId === user?.uid ? source.rows : [], [isAdminBrowsing, allUsersUid, allUsersQuotes, ownerScope, source, user?.uid]);
+    const overviewQuotes = useMemo(() => applyQuoteFilters(scopedQuotes, {
+        search: searchFilter, dateFilter, originFilter: isAdminBrowsing ? originFilter : ''
+    }), [scopedQuotes, searchFilter, dateFilter, isAdminBrowsing, originFilter]);
+    const quotes = sortQuotes(applyQuoteFilters(overviewQuotes, { status: statusFilter }), sortBy);
+    const busy = isAdminBrowsing ? loadingAllUsers || allUsersUid !== user?.uid : loading || source.userId !== user?.uid;
+    const loadError = isAdminBrowsing ? allUsersError : error;
+    const userList = useMemo(() => {
+        if (allUsersUid !== user?.uid) return [];
+        const counts = new Map<string, number>();
+        for (const quote of allUsersQuotes) {
+            counts.set(quote.ownerUid, (counts.get(quote.ownerUid) || 0) + 1);
+        }
+        return ownerDirectory.map((owner) => ({ ...owner, quoteCount: counts.get(owner.uid) || 0 }));
+    }, [allUsersQuotes, allUsersUid, ownerDirectory, user?.uid]);
 
-    useEffect(() => {
-        allUsersQuotesRef.current = allUsersQuotes;
-    }, [allUsersQuotes]);
+    const updateQuoteRows = (quote: HistoryQuoteRow, patch: Partial<HistoryQuoteRow> | null): void => {
+        quoteMutations.current.set(historyQuoteKey(quote), patch);
+        const update = <T extends HistoryQuoteRow>(rows: T[]): T[] => rows.flatMap((row) => (
+            historyQuoteKey(row) !== historyQuoteKey(quote) ? [row] : patch ? [{ ...row, ...patch }] : []
+        ));
+        setSource((previous) => ({ ...previous, rows: update(previous.rows) }));
+        setAllUsersQuotes(update);
+    };
+
+    const runAction = async (quote: HistoryQuoteRow, action: () => void | Promise<void>): Promise<void> => {
+        const key = historyQuoteKey(quote);
+        if (!user?.uid || !canAccessQuoteHistory || (!canViewEverything && quote.ownerUid !== user.uid) || pendingRef.current.has(key)) return;
+        pendingRef.current.add(key);
+        setPending((previous) => ({ ...previous, [key]: true }));
+        try { await action(); }
+        catch (actionError) {
+            console.error('Quote history action failed:', actionError);
+            notifyError('Åtgärden kunde inte slutföras. Försök igen.');
+        } finally {
+            pendingRef.current.delete(key);
+            setPending((previous) => ({ ...previous, [key]: false }));
+        }
+    };
 
     const copyQuoteLink = useCallback(async ({
         quoteId,
@@ -154,11 +195,14 @@ export function History({ onBack, onOpenQuote }: HistoryProps) {
     }, [canAccessQuoteHistory, canViewEverything, onOpenQuote, searchParams, setSearchParams, user?.uid]);
 
     useEffect(() => {
-        if (!user?.uid || !canViewEverything) return;
+        if (!user?.uid || !canAccessQuoteHistory || !canViewEverything) return;
 
         let cancelled = false;
         const loadAllUsers = async (): Promise<void> => {
             setLoadingAllUsers(true);
+            setAllUsersError(null);
+            setAllUsersQuotes([]);
+            setAllUsersUid(user.uid);
             try {
                 const data = await quoteRepository.getAllUsersQuotes({ status: '', search: '' });
                 if (cancelled) return;
@@ -185,30 +229,21 @@ export function History({ onBack, onOpenQuote }: HistoryProps) {
                     }
                 });
 
-                setAllUsersQuotes(data);
-
-                const userMap = new Map<string, HistoryOwnerOption>();
-                data.forEach((quote) => {
-                    if (quote.ownerUid && !userMap.has(quote.ownerUid)) {
-                        userMap.set(quote.ownerUid, {
-                            uid: quote.ownerUid,
-                            email: quote.savedBy || quote.ownerUid,
-                            retailerName: quote.retailerName || null,
-                            quoteCount: 0
-                        });
-                    }
-
-                    if (quote.ownerUid && userMap.has(quote.ownerUid)) {
-                        const existing = userMap.get(quote.ownerUid);
-                        if (existing) {
-                            existing.quoteCount += 1;
-                        }
-                    }
-                });
-
-                setUserList(Array.from(userMap.values()));
+                if (cancelled) return;
+                const owners = new Map<string, HistoryOwnerOption>();
+                for (const quote of data) {
+                    owners.set(quote.ownerUid, { uid: quote.ownerUid, email: quote.savedBy || quote.ownerUid,
+                        retailerName: quote.retailerName || null, quoteCount: 0 });
+                }
+                setOwnerDirectory(Array.from(owners.values()));
+                setAllUsersQuotes(data.flatMap((quote) => {
+                    const key = historyQuoteKey(quote);
+                    const patch = quoteMutations.current.get(key);
+                    return !quoteMutations.current.has(key) ? [quote] : patch ? [{ ...quote, ...patch, ownerUid: quote.ownerUid }] : [];
+                }));
             } catch (loadError) {
                 console.error('Failed to load all users quotes:', loadError);
+                if (!cancelled) setAllUsersError(getErrorMessage(loadError, 'Okänt fel'));
             } finally {
                 if (!cancelled) {
                     setLoadingAllUsers(false);
@@ -220,86 +255,34 @@ export function History({ onBack, onOpenQuote }: HistoryProps) {
         return () => {
             cancelled = true;
         };
-    }, [canViewEverything, user?.uid]);
+    }, [canAccessQuoteHistory, canViewEverything, refreshVersion, user?.uid]);
 
-    const loadQuotes = useCallback(async (status: string, search: string, date: string, origin: string, sort: string): Promise<void> => {
-        if (!user?.uid) return;
-
+    const loadQuotes = useCallback(async (): Promise<void> => {
+        if (!user?.uid || !canAccessQuoteHistory) return;
+        const version = ++requestVersion.current;
         setLoading(true);
         setError(null);
-
         try {
-            let data: HistoryQuoteRow[];
-            if (selectedOwnerUid === '__mine__') {
-                data = await quoteRepository.getUserQuotes({
-                    userId: user.uid,
-                    status,
-                    search,
-                    dateFilter: date,
-                    originFilter: origin,
-                    sortBy: sort
-                });
-            } else if (selectedOwnerUid === '__all__') {
-                const allQuotes = allUsersQuotesRef.current.length > 0
-                    ? allUsersQuotesRef.current
-                    : await quoteRepository.getAllUsersQuotes({ status: '', search: '' });
-
-                data = sortQuotes(
-                    applyQuoteFilters(allQuotes, { status, search, dateFilter: date, originFilter: origin }),
-                    sort
-                );
-            } else {
-                data = await quoteRepository.getUserQuotes({
-                    userId: selectedOwnerUid,
-                    status,
-                    search,
-                    dateFilter: date,
-                    originFilter: origin,
-                    sortBy: sort
-                });
-            }
-
-            setQuotes(data);
-            setRevisionCache({});
-            setVisibleRevisions({});
+            const data = await quoteRepository.getUserQuotes({ userId: user.uid, status: '', search: '' });
+            if (version !== requestVersion.current) return;
+            setSource({ userId: user.uid, rows: data.map((quote) => ({ ...quote, ownerUid: quote.ownerUid || user.uid })) });
         } catch (loadError) {
-            console.error('Failed to load quotes:', loadError);
+            if (version !== requestVersion.current) return;
+            setSource({ userId: user.uid, rows: [] });
             setError(getErrorMessage(loadError, 'Okänt fel'));
         } finally {
-            setLoading(false);
+            if (version === requestVersion.current) setLoading(false);
         }
-    }, [selectedOwnerUid, user?.uid]);
+    }, [canAccessQuoteHistory, user?.uid]);
 
     useEffect(() => {
-        if (selectedOwnerUid !== '__all__' || allUsersQuotes.length === 0) {
-            return;
-        }
-
-        void loadQuotes(statusFilter, searchFilter, dateFilter, originFilter, sortBy);
-    }, [allUsersQuotes, dateFilter, loadQuotes, originFilter, searchFilter, selectedOwnerUid, sortBy, statusFilter]);
-
-    useEffect(() => {
-        if (!user?.uid || !canAccessQuoteHistory) return;
-
-        const timer = setTimeout(() => {
-            void loadQuotes(statusFilter, searchFilter, dateFilter, originFilter, sortBy);
-        }, 220);
-
-        return () => clearTimeout(timer);
-    }, [canAccessQuoteHistory, loadQuotes, searchFilter, statusFilter, dateFilter, originFilter, sortBy, user?.uid]);
-
-    const formatDateTime = (value: number): string => {
-        const dateObj = new Date(Number(value) || Date.now());
-        return dateObj.toLocaleDateString('sv-SE', {
-            year: 'numeric',
-            month: 'short',
-            day: 'numeric',
-            hour: '2-digit',
-            minute: '2-digit'
-        });
-    };
-
-    const formatSek = (value: number): string => Math.round(Number(value) || 0).toLocaleString('sv-SE');
+        quoteMutations.current.clear();
+        setRevisionCache({});
+        setVisibleRevisions({});
+        setRevisionErrors({});
+        void loadQuotes();
+        return () => { requestVersion.current += 1; };
+    }, [loadQuotes, refreshVersion]);
 
     const getQuoteOwnerUid = (quote: HistoryQuoteRow): string => {
         if (quote.ownerUid) {
@@ -368,11 +351,7 @@ export function History({ onBack, onOpenQuote }: HistoryProps) {
             }
 
             if (outcome.status === 'repaired' || outcome.status === 'no-repair-needed') {
-                setQuotes((previous) => previous.map((row) => (
-                    row.quoteId === quote.quoteId && getQuoteOwnerUid(row) === quoteRef.ownerUid
-                        ? { ...row, crmSynchronizationIssue: null }
-                        : row
-                )));
+                updateQuoteRows(quote, { crmSynchronizationIssue: null });
                 notifySuccess('CRM-länken är reparerad.');
                 return;
             }
@@ -418,45 +397,34 @@ export function History({ onBack, onOpenQuote }: HistoryProps) {
                     status: nextStatus
                 });
             }
-            setQuotes((previous) => previous.map((row) => (
-                row.quoteId === quote.quoteId
-                    ? { ...updated, ownerUid: quote.ownerUid }
-                    : row
-            )));
+            updateQuoteRows(quote, updated);
             notifySuccess('Status uppdaterad.');
         } catch (updateError) {
             console.error('Failed to update quote status:', updateError);
             notifyError('Kunde inte uppdatera status.');
-            void loadQuotes(statusFilter, searchFilter, dateFilter, originFilter, sortBy);
         }
     };
 
-    const toggleRevisions = async (quote: HistoryQuoteRow): Promise<void> => {
-        if (!quoteLifecycleEnabled || !user?.uid) return;
-
-        const quoteId = quote.quoteId;
+    const loadRevisions = async (quote: HistoryQuoteRow): Promise<void> => {
+        const key = historyQuoteKey(quote);
         const ownerUid = getQuoteOwnerUid(quote);
-        const isVisible = visibleRevisions[quoteId];
+        if (!quoteLifecycleEnabled || !user?.uid || (!canViewEverything && ownerUid !== user.uid) || revisionRequests.current.has(key)) return;
+        revisionRequests.current.add(key);
+        setRevisionErrors((previous) => ({ ...previous, [key]: '' }));
+        try {
+            const revisions = await quoteRepository.getQuoteRevisions({ userId: ownerUid, quoteId: quote.quoteId, limit: 5 });
+            setRevisionCache((previous) => ({ ...previous, [key]: revisions }));
+        } catch (loadError) {
+            console.error('Failed to load revisions:', loadError);
+            setRevisionErrors((previous) => ({ ...previous, [key]: 'Kunde inte ladda revisioner.' }));
+        } finally { revisionRequests.current.delete(key); }
+    };
 
-        if (isVisible) {
-            setVisibleRevisions((previous) => ({ ...previous, [quoteId]: false }));
-            return;
-        }
-
-        setVisibleRevisions((previous) => ({ ...previous, [quoteId]: true }));
-
-        if (!revisionCache[quoteId]) {
-            try {
-                const revisions = await quoteRepository.getQuoteRevisions({
-                    userId: ownerUid,
-                    quoteId,
-                    limit: 5
-                });
-                setRevisionCache((previous) => ({ ...previous, [quoteId]: revisions }));
-            } catch (loadError) {
-                console.error('Failed to load revisions:', loadError);
-            }
-        }
+    const toggleRevisions = (quote: HistoryQuoteRow): void => {
+        if (!quoteLifecycleEnabled) return;
+        const key = historyQuoteKey(quote);
+        setVisibleRevisions((previous) => ({ ...previous, [key]: !previous[key] }));
+        if (!visibleRevisions[key] && !revisionCache[key]) void loadRevisions(quote);
     };
 
     const openRevisionPayload = async (
@@ -469,7 +437,7 @@ export function History({ onBack, onOpenQuote }: HistoryProps) {
             return;
         }
 
-        const metadata = quotes.find((quote) => quote.quoteId === quoteId);
+        const metadata = quotes.find((quote) => quote.quoteId === quoteId && getQuoteOwnerUid(quote) === quoteOwnerUid);
         const nextState = buildHistoryOpenQuotePayload(
             revision.state,
             quoteId,
@@ -542,7 +510,7 @@ export function History({ onBack, onOpenQuote }: HistoryProps) {
     };
 
     const openSpecificRevision = async (quote: HistoryQuoteRow, revisionId: string): Promise<void> => {
-        const cached = revisionCache[quote.quoteId] || [];
+        const cached = revisionCache[historyQuoteKey(quote)] || [];
         const revision = cached.find((row) => row.revisionId === revisionId);
         if (!revision) {
             notifyInfo('Revisionen kunde inte hittas.');
@@ -565,6 +533,7 @@ export function History({ onBack, onOpenQuote }: HistoryProps) {
         const ownerUid = getQuoteOwnerUid(quote);
         try {
             await quoteRepository.deleteQuote({ userId: ownerUid, quoteId: quote.quoteId });
+            updateQuoteRows(quote, null);
             notifySuccess('Offerten togs bort.');
             if (canViewEverything && quote.crmDealId) {
                 try {
@@ -581,7 +550,6 @@ export function History({ onBack, onOpenQuote }: HistoryProps) {
                     notifyWarn('Offerten togs bort, men CRM-länken kunde inte rensas automatiskt.');
                 }
             }
-            void loadQuotes(statusFilter, searchFilter, dateFilter, originFilter, sortBy);
         } catch (deleteError) {
             console.error('Failed to delete quote:', deleteError);
             notifyError(`Kunde inte ta bort offerten: ${getErrorMessage(deleteError, 'okänt fel')}`);
@@ -596,288 +564,96 @@ export function History({ onBack, onOpenQuote }: HistoryProps) {
         );
     }
 
+    const controlClass = 'min-h-10 max-w-full rounded-control border border-control-border bg-input px-3 py-2 text-xs text-text focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring';
+    const clearFilters = () => { setSearchFilter(''); setStatusFilter(''); setDateFilter(''); setOriginFilter(''); setSortBy('newest'); };
+    const overview = [
+        { status: '', label: 'Alla offerter', dot: 'bg-action' },
+        { status: 'draft', label: 'Utkast', dot: 'bg-warning-solid' },
+        { status: 'sent', label: 'Skickade', dot: 'bg-info-solid' },
+        { status: 'won', label: 'Vunna', dot: 'bg-success-solid' }
+    ];
+
     return (
-        <div className="max-w-[900px] mx-auto py-6">
-            <div className="flex items-center justify-between gap-4 mb-4 flex-wrap">
-                <div className="flex gap-2 flex-wrap items-center">
-                    {canViewEverything && (
-                        <select
-                            value={selectedOwnerUid}
-                            onChange={(event: ChangeEvent<HTMLSelectElement>) => setSelectedOwnerUid(event.target.value)}
-                            className="px-3 py-2 rounded-md border border-panel-border bg-panel-bg text-text-primary min-w-[200px]"
-                        >
-                            <option value="__mine__">Mina offerter</option>
-                            <option value="__all__">Alla användare</option>
-                            {userList
-                                .filter((option) => option.uid !== user?.uid)
-                                .map((option) => (
-                                    <option key={option.uid} value={option.uid}>
-                                        {option.retailerName ? `[ÅF] ${option.retailerName}` : option.email} ({option.quoteCount})
-                                    </option>
-                                ))}
-                        </select>
-                    )}
-                    <select
-                        value={statusFilter}
-                        onChange={(event: ChangeEvent<HTMLSelectElement>) => setStatusFilter(event.target.value)}
-                        className="px-3 py-2 rounded-md border border-panel-border bg-panel-bg text-text-primary min-w-[140px]"
-                    >
-                        <option value="">Alla statusar</option>
-                        <option value="draft">Utkast</option>
-                        <option value="sent">Skickad</option>
-                        <option value="won">Vunnen</option>
-                        <option value="lost">Förlorad</option>
-                        <option value="archived">Arkiverad</option>
-                    </select>
-                    <select
-                        value={dateFilter}
-                        onChange={(event: ChangeEvent<HTMLSelectElement>) => setDateFilter(event.target.value)}
-                        className="px-3 py-2 rounded-md border border-panel-border bg-panel-bg text-text-primary min-w-[140px]"
-                    >
-                        <option value="">Alla datum</option>
-                        <option value="7days">Senaste 7 dagarna</option>
-                        <option value="30days">Senaste 30 dagarna</option>
-                        <option value="thisyear">I år</option>
-                    </select>
-                    {isAdminBrowsing && (
-                        <select
-                            value={originFilter}
-                            onChange={(event: ChangeEvent<HTMLSelectElement>) => setOriginFilter(event.target.value)}
-                            className="px-3 py-2 rounded-md border border-panel-border bg-panel-bg text-text-primary min-w-[140px]"
-                        >
-                            <option value="">Alla källor</option>
-                            <option value="retailer">Endast Återförsäljare</option>
-                            <option value="internal">Endast Interna</option>
-                        </select>
-                    )}
-                    <select
-                        value={sortBy}
-                        onChange={(event: ChangeEvent<HTMLSelectElement>) => setSortBy(event.target.value)}
-                        className="px-3 py-2 rounded-md border border-panel-border bg-panel-bg text-text-primary min-w-[140px]"
-                    >
-                        <option value="newest">Senast uppdaterad</option>
-                        <option value="oldest">Äldst först</option>
-                        <option value="highest-value">Högst värde</option>
-                        <option value="lowest-value">Lägst värde</option>
-                    </select>
-                    <input
-                        type="text"
-                        value={searchFilter}
-                        onChange={(event: ChangeEvent<HTMLInputElement>) => setSearchFilter(event.target.value)}
-                        placeholder="Sök företag eller referens"
-                        className="px-3 py-2 rounded-md border border-panel-border bg-panel-bg text-text-primary min-w-[180px]"
-                    />
+        <div className="mx-auto w-full max-w-6xl space-y-5 py-6">
+            <header className="flex flex-wrap items-center justify-between gap-4">
+                <div>
+                    <div className="flex items-center gap-3">
+                        <h1 className="text-2xl font-bold tracking-tight text-text">Offerter</h1>
+                        {!busy && !loadError && <span className="rounded-full border border-border bg-panel-bg px-2.5 py-0.5 text-xs tabular-nums text-text-muted">{quotes.length} st</span>}
+                    </div>
+                    <p className="mt-1 text-sm text-text-muted">Hantera kundofferter, förhandsgranska PDF och följ upp revisioner.</p>
                 </div>
-                <div className="text-sm text-text-secondary">
-                    {loading || loadingAllUsers
-                        ? 'Laddar offerter...'
-                        : (quotes.length === 0 ? 'Inga offerter matchar filtret.' : `Visar ${quotes.length} offert${quotes.length === 1 ? '' : 'er'}.`)}
+                {canStartQuote && onStartQuote && <Button variant="primary" size="sm" onClick={onStartQuote}><IconPlus size={17} aria-hidden="true" /> <span className="ml-1.5">Ny offert</span></Button>}
+            </header>
+
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4" aria-label="Offertöversikt">
+                {overview.map((item) => {
+                    const rows = item.status ? overviewQuotes.filter((quote) => normalizeQuoteStatus(quote.status) === item.status) : overviewQuotes;
+                    return <button key={item.status} type="button" disabled={busy || Boolean(loadError)} aria-pressed={statusFilter === item.status}
+                        onClick={() => setStatusFilter(item.status)}
+                        className={`rounded-panel border bg-panel-bg p-3.5 text-left transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring disabled:opacity-60 ${statusFilter === item.status ? 'border-action ring-1 ring-action' : 'border-border hover:border-control-border'}`}>
+                        <span className="flex items-center justify-between gap-2 text-xs text-text-muted"><span>{item.label} {!busy && !loadError && `(${rows.length})`}</span><span aria-hidden="true" className={`h-2 w-2 shrink-0 rounded-full ${item.dot}`} /></span>
+                        <span className="mt-1.5 block break-words text-base font-semibold tabular-nums text-text">{busy || loadError ? '–' : `${formatHistorySek(rows.reduce((total, quote) => total + (Number(quote.totalSek) || 0), 0))} SEK`}</span>
+                    </button>;
+                })}
+            </div>
+
+            <div className="flex flex-wrap items-center gap-3 rounded-panel border border-border bg-panel-bg p-3" role="search" aria-label="Filtrera offerter">
+                <label className="relative min-w-0 basis-full lg:flex-1 lg:basis-64">
+                    <span className="sr-only">Sök företag eller referens</span>
+                    <IconSearch size={17} aria-hidden="true" className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-text-muted" />
+                    <input type="search" value={searchFilter} onChange={(event) => setSearchFilter(event.target.value)} placeholder="Sök företag eller referens" className={`${controlClass} w-full pl-9 placeholder:text-text-muted`} />
+                </label>
+                <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2 lg:flex-none">
+                    {canViewEverything && <select aria-label="Offertägare" value={ownerScope} onChange={(event) => setSelectedOwnerUid(event.target.value)} className={`${controlClass} max-w-52`}>
+                        <option value="__mine__">Mina offerter</option><option value="__all__">Alla användare</option>
+                        {userList.filter((option) => option.uid !== user?.uid).map((option) => <option key={option.uid} value={option.uid}>{option.retailerName ? `[ÅF] ${option.retailerName}` : option.email} ({option.quoteCount})</option>)}
+                    </select>}
+                    <select aria-label="Filtrera status" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} className={controlClass}>
+                        <option value="">Alla statusar</option>{Object.entries(HISTORY_STATUS_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+                    </select>
+                    <select aria-label="Datum" value={dateFilter} onChange={(event) => setDateFilter(event.target.value)} className={controlClass}>
+                        <option value="">Alla datum</option><option value="7days">Senaste 7 dagarna</option><option value="30days">Senaste 30 dagarna</option><option value="thisyear">I år</option>
+                    </select>
+                    {isAdminBrowsing && <select aria-label="Källa" value={originFilter} onChange={(event) => setOriginFilter(event.target.value)} className={controlClass}>
+                        <option value="">Alla källor</option><option value="retailer">Endast Återförsäljare</option><option value="internal">Endast Interna</option>
+                    </select>}
+                    <select aria-label="Sortering" value={sortBy} onChange={(event) => setSortBy(event.target.value)} className={controlClass}>
+                        <option value="newest">Senast uppdaterad</option><option value="oldest">Äldst först</option><option value="highest-value">Högst värde</option><option value="lowest-value">Lägst värde</option>
+                    </select>
+                    <div className="ml-auto flex shrink-0 gap-1 rounded-control border border-border p-0.5" role="group" aria-label="Visningsläge">
+                        <Button size="sm" variant={layout === 'cards' ? 'primary' : 'ghost'} aria-label="Kortvy" title="Kortvy" aria-pressed={layout === 'cards'} className="!px-2.5" onClick={() => setLayout('cards')}><IconLayoutList size={18} aria-hidden="true" /></Button>
+                        <Button size="sm" variant={layout === 'table' ? 'primary' : 'ghost'} aria-label="Tabellvy" title="Tabellvy" aria-pressed={layout === 'table'} className="!px-2.5" onClick={() => setLayout('table')}><IconTable size={18} aria-hidden="true" /></Button>
+                    </div>
                 </div>
             </div>
 
-            <div>
-                {loading ? (
-                    <div className="text-center py-16 text-text-secondary">Laddar offerter...</div>
-                ) : error ? (
-                    <div className="text-center py-16 text-text-secondary bg-panel-bg border border-dashed border-panel-border rounded-lg">
-                        <h3 className="mt-0 mb-2 text-lg font-semibold">Kunde inte ladda offerter</h3>
-                        <p>{error}</p>
-                    </div>
-                ) : quotes.length === 0 ? (
-                    <div className="text-center py-16 text-text-secondary bg-panel-bg border border-dashed border-panel-border rounded-lg">
-                        <h3 className="mt-0 mb-2 text-lg font-semibold">Inga sparade offerter</h3>
-                        <p>Skapa en ny offert i dashboarden och klicka på "Spara offert".</p>
-                    </div>
-                ) : (
-                    quotes.map((quote) => {
-                        const status = normalizeQuoteStatus(quote.status);
-                        const isRevisionsVisible = visibleRevisions[quote.quoteId];
-                        const revisions = revisionCache[quote.quoteId];
-                        const showOwnerBadge = canViewEverything && selectedOwnerUid !== '__mine__' && quote.ownerUid;
-
-                        return (
-                            <article key={`${quote.ownerUid || ''}_${quote.quoteId}`} className="bg-panel-bg border border-panel-border rounded-lg p-6 mb-4 flex flex-col md:flex-row flex-wrap justify-between items-start md:items-center transition-all hover:bg-gray-800 hover:border-white/30 gap-4">
-                                <div>
-                                    <div className="flex items-center gap-3 mb-1">
-                                        <h3 className="m-0 text-xl font-semibold">{quote.company || quote.customerName || 'Okänd kund'}</h3>
-                                        <span className={`inline-flex items-center rounded-full text-[11px] tracking-wider uppercase font-bold px-2 py-0.5 status-${status}`}>
-                                            {STATUS_LABELS[status]}
-                                        </span>
-                                    </div>
-                                    <p className="m-0 text-text-secondary text-sm leading-relaxed">
-                                        <strong>Företag:</strong> {quote.company || quote.customerName || '-'} &nbsp;|&nbsp; <strong>Projektreferens:</strong> {quote.reference || '-'} &nbsp;|&nbsp; <strong>Er referens:</strong> {quote.customerReference || '-'}
-                                    </p>
-                                    <p className="m-0 text-text-secondary text-sm leading-relaxed">
-                                        <strong>Uppdaterad:</strong> {formatDateTime(quote.updatedAtMs)} &nbsp;|&nbsp; <strong>Version:</strong> v{quote.latestVersion}
-                                    </p>
-                                    {showOwnerBadge && (
-                                        <p className="m-0 text-text-secondary text-xs leading-relaxed mt-1 opacity-70">
-                                            <strong>Användare:</strong> {quote.retailerName ? `[ÅF] ${quote.retailerName}` : (quote.savedBy || quote.ownerUid)}
-                                        </p>
-                                    )}
-                                    {quote.latestChangeNote && (
-                                        <p className="m-0 text-text-primary text-sm leading-relaxed mt-2 p-2 bg-black/20 rounded border border-white/5 italic">
-                                            "{quote.latestChangeNote}"
-                                        </p>
-                                    )}
-                                    <div className="mt-2 text-success-color font-semibold">Totalt: {formatSek(quote.totalSek || 0)} SEK</div>
-                                </div>
-                                <div className="flex gap-2 flex-col items-stretch w-full md:w-auto mt-4 md:mt-0 min-w-[140px]">
-                                    {quoteLifecycleEnabled && (
-                                        <label className="flex flex-col gap-1 text-xs text-text-secondary mb-1">
-                                            <span>Status</span>
-                                            <select
-                                                value={status}
-                                                onChange={(event: ChangeEvent<HTMLSelectElement>) => {
-                                                    void handleStatusChange(quote, event.target.value);
-                                                }}
-                                                className="px-2 py-1.5 rounded-md border border-panel-border bg-panel-bg text-text-primary outline-none focus:border-white/50 w-full"
-                                            >
-                                                {Object.entries(STATUS_LABELS).map(([key, label]) => (
-                                                    <option key={key} value={key}>{label}</option>
-                                                ))}
-                                            </select>
-                                        </label>
-                                    )}
-                                    <button
-                                        type="button"
-                                        className="px-4 py-2 text-sm w-full rounded font-semibold bg-blue-600 hover:bg-blue-500 text-white border border-blue-500 transition-colors"
-                                        onClick={() => {
-                                            void openLatestQuote(quote);
-                                        }}
-                                    >
-                                        {quoteLifecycleEnabled ? 'Öppna senaste' : 'Öppna offert'}
-                                    </button>
-                                    <button
-                                        type="button"
-                                        className="px-4 py-2 text-sm border border-panel-border bg-transparent text-text-primary hover:bg-white/5 rounded w-full transition-colors"
-                                        onClick={() => previewQuote(quote)}
-                                    >
-                                        Förhandsgranska PDF
-                                    </button>
-                                    <button
-                                        type="button"
-                                        className="px-4 py-2 text-sm border border-panel-border bg-transparent text-text-primary hover:bg-white/5 rounded w-full transition-colors"
-                                        onClick={() => {
-                                            void duplicateQuote(quote);
-                                        }}
-                                    >
-                                        Duplicera
-                                    </button>
-                                    {canViewEverything && quote.crmSynchronizationIssue && (
-                                        <button
-                                            type="button"
-                                            className="px-4 py-2 text-sm border border-warning-border bg-warning-bg text-warning-text hover:bg-white/5 rounded w-full transition-colors"
-                                            onClick={() => {
-                                                void handleCrmRepair(quote);
-                                            }}
-                                        >
-                                            Reparera CRM-länk
-                                        </button>
-                                    )}
-                                    <button
-                                        type="button"
-                                        className="px-4 py-2 text-sm border border-panel-border bg-transparent text-text-primary hover:bg-white/5 rounded w-full transition-colors"
-                                        onClick={() => {
-                                            void copyQuoteLink({
-                                                quoteId: quote.quoteId,
-                                                version: quote.latestVersion,
-                                                ownerUid: getQuoteLinkOwnerUid(quote)
-                                            });
-                                        }}
-                                    >
-                                        Kopiera länk
-                                    </button>
-                                    {quoteLifecycleEnabled && (
-                                        <button
-                                            type="button"
-                                            className="px-4 py-2 text-sm border border-panel-border bg-transparent text-text-primary hover:bg-white/5 rounded w-full"
-                                            onClick={() => {
-                                                void toggleRevisions(quote);
-                                            }}
-                                        >
-                                            Visa revisioner
-                                        </button>
-                                    )}
-                                    <button
-                                        type="button"
-                                        className="px-4 py-2 text-sm bg-transparent border border-danger-color hover:bg-danger-color/10 text-danger-color rounded w-full"
-                                        onClick={() => {
-                                            void deleteQuote(quote);
-                                        }}
-                                    >
-                                        Ta bort
-                                    </button>
-                                </div>
-
-                                {isRevisionsVisible && (
-                                    <div className="mt-4 w-full md:basis-full">
-                                        {!revisions ? (
-                                            <p className="text-text-secondary text-sm m-0">Laddar revisioner...</p>
-                                        ) : revisions.length === 0 ? (
-                                            <p className="text-text-secondary text-sm m-0">Inga revisioner hittades.</p>
-                                        ) : (
-                                            <div className="flex flex-col gap-2 pt-2">
-                                                {revisions.map((revision) => (
-                                                    <div
-                                                        key={revision.revisionId}
-                                                        className="w-full border border-panel-border bg-white/5 hover:bg-white/10 rounded-md text-text-primary text-xs px-3 py-2 flex flex-wrap items-center justify-between gap-3 transition-colors"
-                                                    >
-                                                        <button
-                                                            type="button"
-                                                            className="flex-1 text-left flex justify-between gap-3"
-                                                            onClick={() => {
-                                                                void openSpecificRevision(quote, revision.revisionId);
-                                                            }}
-                                                        >
-                                                            <span>v{revision.version} - {formatDateTime(revision.savedAtMs)}</span>
-                                                            <span>{revision.changeNote || ''}</span>
-                                                        </button>
-                                                        <button
-                                                            type="button"
-                                                            className="shrink-0 rounded border border-panel-border px-2 py-1 text-[11px] text-text-primary hover:bg-white/10"
-                                                            onClick={() => previewQuote(quote, revision.version)}
-                                                        >
-                                                            Förhandsgranska PDF
-                                                        </button>
-                                                        <button
-                                                            type="button"
-                                                            className="shrink-0 rounded border border-panel-border px-2 py-1 text-[11px] text-text-primary hover:bg-white/10"
-                                                            onClick={() => {
-                                                                void copyQuoteLink({
-                                                                    quoteId: quote.quoteId,
-                                                                    version: revision.version,
-                                                                    ownerUid: getQuoteLinkOwnerUid(quote)
-                                                                });
-                                                            }}
-                                                        >
-                                                            Kopiera länk
-                                                        </button>
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        )}
-                                    </div>
-                                )}
-                            </article>
-                        );
-                    })
-                )}
-            </div>
+            <div aria-live="polite" className="text-xs text-text-muted">{busy ? 'Laddar offerter...' : loadError ? 'Offerterna kunde inte laddas.' : `Visar ${quotes.length} av ${scopedQuotes.length} offerter.`}</div>
+            {busy ? <div role="status" aria-label="Laddar offerter" className="space-y-3">{[0, 1, 2].map((item) => <div key={item} aria-hidden="true" className="h-32 animate-pulse rounded-panel border border-border bg-panel-bg motion-reduce:animate-none" />)}</div>
+                : loadError ? <div role="alert" className="rounded-panel border border-border bg-panel-bg px-5 py-12 text-center">
+                    <h2 className="text-lg font-semibold text-text">Kunde inte ladda offerter</h2><p className="my-3 text-sm text-text-muted">{loadError}</p><Button onClick={() => setRefreshVersion((value) => value + 1)}>Försök igen</Button>
+                </div> : quotes.length === 0 ? <div className="rounded-panel border border-dashed border-border bg-panel-bg px-5 py-12 text-center">
+                    <h2 className="text-lg font-semibold text-text">{scopedQuotes.length ? 'Inga offerter matchar filtret' : 'Inga sparade offerter'}</h2>
+                    <p className="mb-4 mt-2 text-sm text-text-muted">{scopedQuotes.length ? 'Prova en annan sökning eller rensa filtren.' : 'Skapa en ny offert och klicka på ”Spara offert”.'}</p>
+                    {scopedQuotes.length > 0 && <Button onClick={clearFilters}>Rensa filter</Button>}
+                </div> : <HistoryQuoteList quotes={quotes} layout={layout} lifecycleEnabled={quoteLifecycleEnabled} showOwners={isAdminBrowsing} canRepair={canViewEverything}
+                    pending={pending} visibleRevisions={visibleRevisions} revisionCache={revisionCache} revisionErrors={revisionErrors}
+                    actions={{
+                        open: (quote) => { void runAction(quote, () => openLatestQuote(quote)); },
+                        preview: previewQuote,
+                        copy: (quote, version) => { void runAction(quote, () => copyQuoteLink({ quoteId: quote.quoteId, version: version ?? quote.latestVersion, ownerUid: getQuoteLinkOwnerUid(quote) })); },
+                        revisions: toggleRevisions,
+                        retryRevisions: (quote) => { void loadRevisions(quote); },
+                        openRevision: (quote, revisionId) => { void runAction(quote, () => openSpecificRevision(quote, revisionId)); },
+                        duplicate: (quote) => { void runAction(quote, () => duplicateQuote(quote)); },
+                        remove: (quote) => { void runAction(quote, () => deleteQuote(quote)); },
+                        repair: (quote) => { void runAction(quote, () => handleCrmRepair(quote)); },
+                        status: (quote, status) => { void runAction(quote, () => handleStatusChange(quote, status)); }
+                    }} />}
             {pdfPreview && canAccessQuoteHistory && user?.uid && (canViewEverything || pdfPreview.ownerUid === user.uid) && (
-                <QuotePdfPreview
-                    key={`${pdfPreview.ownerUid}/${pdfPreview.quote.quoteId}/${pdfPreview.version ?? 'latest'}`}
-                    {...pdfPreview}
-                    onClose={() => setPdfPreview(null)}
-                />
+                <QuotePdfPreview key={`${pdfPreview.ownerUid}/${pdfPreview.quote.quoteId}/${pdfPreview.version ?? 'latest'}`} {...pdfPreview} onClose={() => setPdfPreview(null)} />
             )}
-            {onBack && (
-                <div className="mt-6 text-center">
-                    <button type="button" onClick={onBack} className="px-4 py-2 bg-panel-bg border border-panel-border hover:bg-white/5 rounded text-text-primary transition-colors">
-                        Tillbaka till Dashboard
-                    </button>
-                </div>
-            )}
+            {onBack && <div className="pt-1 text-center"><Button onClick={onBack} variant="ghost" size="sm">Tillbaka till Dashboard</Button></div>}
         </div>
     );
 }

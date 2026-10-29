@@ -460,6 +460,7 @@ function PlannerPage() {
 
 function HistoryPage() {
     const navigation = useAppNavigation();
+    const { startQuote } = useQuoteDraftActions();
     const { state, dispatch } = useQuote();
     const { isRetailer } = useAuth();
 
@@ -508,7 +509,7 @@ function HistoryPage() {
         navigation.goToQuoteStep(targetStep);
     };
 
-    return <History onBack={() => navigation.goToDashboard()} onOpenQuote={handleOpenQuote} />;
+    return <History onBack={() => navigation.goToDashboard()} onOpenQuote={handleOpenQuote} onStartQuote={() => { void startQuote(); }} />;
 }
 
 function ActivityLogsPage() {

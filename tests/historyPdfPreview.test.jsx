@@ -80,7 +80,7 @@ describe('History PDF preview', () => {
     it('fetches exactly the selected older version without opening the quote flow', async () => {
         const { onOpenQuote } = mount();
         fireEvent.click(await screen.findByRole('button', { name: 'Visa revisioner' }));
-        const versionButton = await screen.findByRole('button', { name: /v1 -/ });
+        const versionButton = await screen.findByRole('button', { name: 'Öppna v1' });
         fireEvent.click(within(versionButton.parentElement).getByRole('button', { name: 'Förhandsgranska PDF' }));
         await screen.findByTitle('PDF-förhandsvisning v1');
         expect(mocks.repository.getQuoteRevisionByVersion).toHaveBeenCalledWith({ userId: 'user-1', quoteId: 'q1', version: 1 });
@@ -143,7 +143,7 @@ describe('History PDF preview', () => {
         fireEvent.keyDown(document, { key: 'Escape' });
         expect(screen.queryByRole('dialog')).toBeNull();
         fireEvent.click(screen.getByRole('button', { name: 'Visa revisioner' }));
-        const versionButton = await screen.findByRole('button', { name: /v1 -/ });
+        const versionButton = await screen.findByRole('button', { name: 'Öppna v1' });
         fireEvent.click(within(versionButton.parentElement).getByRole('button', { name: 'Förhandsgranska PDF' }));
         await screen.findByTitle('PDF-förhandsvisning v1');
         await act(async () => finishPdf(new Blob(['stale pdf'])));

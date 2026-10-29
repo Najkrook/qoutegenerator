@@ -1282,6 +1282,7 @@ export interface SummaryExportProps {
 
 export interface HistoryProps {
     onBack?: () => void;
+    onStartQuote?: () => void;
     onOpenQuote?: (payload: HistoryOpenQuotePayload, context?: HistoryOpenQuoteContext) => void;
 }
 

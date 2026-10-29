@@ -162,8 +162,9 @@ vi.mock('../src/views/RetailerDocuments', () => ({
 }));
 
 vi.mock('../src/views/History', () => ({
-    History: ({ onOpenQuote }) => (
+    History: ({ onOpenQuote, onStartQuote }) => (
         <div>
+            <button type="button" onClick={() => onStartQuote?.()}>Ny offert från historik</button>
             <button
                 type="button"
                 onClick={() => onOpenQuote?.({
@@ -1161,6 +1162,26 @@ describe('app routing', () => {
         await clickButton(container, 'Starta Ny Offert');
         expect(notificationMocks.confirmChoiceAction).not.toHaveBeenCalled();
         expect(dispatch).toHaveBeenCalledWith({ type: 'RESET_QUOTE_DRAFT' });
+    });
+
+    it.each(['confirm', 'cancel', 'secondary'])('starts a quote from history through the shared draft flow: %s', async (choice) => {
+        notificationMocks.confirmChoiceAction.mockResolvedValueOnce(choice);
+        const dispatch = vi.fn();
+        const { container, router } = await renderApp({
+            initialEntries: [APP_PATHS[APP_ROUTE_IDS.quotes]],
+            quoteState: { ...createInitialQuoteState(), selectedLines: ['BaHaMa'] },
+            hasUnsavedChanges: true,
+            dispatch
+        });
+        await clickButton(container, 'Ny offert från historik');
+        expect(notificationMocks.confirmChoiceAction).toHaveBeenCalledWith(expect.objectContaining({ title: 'Starta ny offert?' }));
+        if (choice === 'confirm') {
+            expect(dispatch).toHaveBeenCalledWith({ type: 'RESET_QUOTE_DRAFT' });
+            expect(router.state.location.pathname).toBe(APP_PATHS[APP_ROUTE_IDS.quoteProductLines]);
+        } else {
+            expect(dispatch).not.toHaveBeenCalledWith({ type: 'RESET_QUOTE_DRAFT' });
+            expect(router.state.location.pathname).toBe(choice === 'cancel' ? APP_PATHS[APP_ROUTE_IDS.quotes] : APP_PATHS[APP_ROUTE_IDS.quoteConfiguration]);
+        }
     });
 
     it('asks non-retailers to confirm before replacing an existing draft', async () => {

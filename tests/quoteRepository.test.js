@@ -682,6 +682,17 @@ describe('quoteRepository', () => {
 });
 
 describe('quoteRepository pure helpers', () => {
+    it('filters I år using Stockholm calendar years and searches legacy company metadata', () => {
+        vi.spyOn(Date, 'now').mockReturnValue(Date.parse('2026-10-29T12:00:00Z'));
+        const rows = [
+            { status: 'draft', company: 'Mossbylund AB', updatedAtMs: Date.parse('2025-12-31T23:00:00Z') },
+            { status: 'sent', company: 'Brixx AB', updatedAtMs: Date.parse('2025-12-31T22:59:59Z') }
+        ];
+        try {
+            expect(applyQuoteFilters(rows, { dateFilter: 'thisyear' })).toEqual([rows[0]]);
+            expect(applyQuoteFilters(rows, { search: 'mossbylund' })).toEqual([rows[0]]);
+        } finally { vi.restoreAllMocks(); }
+    });
     it('normalizeQuoteMetadata defaults status/version for legacy payload', () => {
         const normalized = normalizeQuoteMetadata('q1', {
             quoteNumber: 'BRIXX - 260422-101',

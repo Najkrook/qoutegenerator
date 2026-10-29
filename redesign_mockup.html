@@ -1,0 +1,557 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Mina offerter — Redesign Mockup</title>
+  <script src="https://www.gstatic.com/antigravity/web/dev/tailwindcss.min.js"></script>
+</head>
+<body class="bg-[var(--background)] text-[var(--foreground)] antialiased p-6 select-none">
+
+  <!-- Top Redesign Mode Switcher Banner -->
+  <div class="max-w-6xl mx-auto mb-6 bg-[var(--card)] border border-[var(--border)] rounded-xl p-3.5 flex flex-wrap items-center justify-between gap-4 shadow-sm">
+    <div class="flex items-center gap-3">
+      <span class="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-blue-500/15 text-blue-400 font-semibold text-xs">UX</span>
+      <div>
+        <div class="text-sm font-semibold text-[var(--foreground)]">Interaktiv Redesign-prototyp</div>
+        <div class="text-xs text-[var(--muted-foreground)]">Växla mellan omdesignade kort, kompakt tabellvy och nuvarande layout för att jämföra täthet & hierarki.</div>
+      </div>
+    </div>
+    <div class="flex items-center gap-1.5 bg-[var(--background)] p-1 rounded-lg border border-[var(--border)]">
+      <button onclick="setViewMode('cards')" id="btn-mode-cards" class="px-3 py-1.5 rounded-md text-xs font-medium transition-all bg-blue-600 text-white shadow-sm">
+        Nya kort (Kompakt)
+      </button>
+      <button onclick="setViewMode('table')" id="btn-mode-table" class="px-3 py-1.5 rounded-md text-xs font-medium transition-all text-[var(--muted-foreground)] hover:text-[var(--foreground)]">
+        Tabellvy (100+ offerter)
+      </button>
+      <button onclick="setViewMode('before')" id="btn-mode-before" class="px-3 py-1.5 rounded-md text-xs font-medium transition-all text-[var(--muted-foreground)] hover:text-[var(--foreground)]">
+        Före (Nuvarande)
+      </button>
+    </div>
+  </div>
+
+  <!-- MAIN REDESIGNED INTERFACE -->
+  <div id="redesign-container" class="max-w-6xl mx-auto space-y-5">
+
+    <!-- Page Header + Primary Action -->
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div>
+        <div class="flex items-center gap-3">
+          <h1 class="text-2xl font-bold tracking-tight text-[var(--foreground)]">Offerter</h1>
+          <span id="offer-count-badge" class="px-2.5 py-0.5 text-xs font-medium rounded-full bg-[var(--card)] border border-[var(--border)] text-[var(--muted-foreground)]">
+            104 st
+          </span>
+        </div>
+        <p class="text-xs text-[var(--muted-foreground)] mt-1">Hantera kundofferter, förhandsgranska PDF-underlag och följ upp revideringar</p>
+      </div>
+      <div class="flex items-center gap-2.5">
+        <button onclick="showToast('Exporterar vy till CSV...')" class="px-3.5 py-2 rounded-lg border border-[var(--border)] bg-[var(--card)] hover:bg-[var(--secondary)] text-xs font-medium text-[var(--foreground)] flex items-center gap-2 transition">
+          <svg class="w-4 h-4 text-[var(--muted-foreground)]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+          Exportera
+        </button>
+        <button onclick="showToast('Skapar ny offert...')" class="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold flex items-center gap-2 shadow-sm transition">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+          Ny offert
+        </button>
+      </div>
+    </div>
+
+    <!-- Pipeline Summary Strip (Quick Status Filter + Value Overview) -->
+    <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+      <button onclick="filterByStatus('ALL')" id="stat-ALL" class="text-left p-3.5 rounded-xl bg-[var(--card)] border-2 border-blue-500/60 transition hover:border-blue-500">
+        <div class="flex items-center justify-between">
+          <span class="text-xs font-medium text-[var(--muted-foreground)]">Alla offerter (104)</span>
+          <span class="w-2 h-2 rounded-full bg-blue-500"></span>
+        </div>
+        <div class="text-base font-bold text-[var(--foreground)] mt-1">14 820 450 SEK</div>
+      </button>
+
+      <button onclick="filterByStatus('UTKAST')" id="stat-UTKAST" class="text-left p-3.5 rounded-xl bg-[var(--card)] border border-[var(--border)] transition hover:border-amber-500/50">
+        <div class="flex items-center justify-between">
+          <span class="text-xs font-medium text-[var(--muted-foreground)]">Utkast (38)</span>
+          <span class="w-2 h-2 rounded-full bg-amber-400"></span>
+        </div>
+        <div class="text-base font-bold text-[var(--foreground)] mt-1">4 190 200 SEK</div>
+      </button>
+
+      <button onclick="filterByStatus('SKICKAD')" id="stat-SKICKAD" class="text-left p-3.5 rounded-xl bg-[var(--card)] border border-[var(--border)] transition hover:border-sky-500/50">
+        <div class="flex items-center justify-between">
+          <span class="text-xs font-medium text-[var(--muted-foreground)]">Skickade (44)</span>
+          <span class="w-2 h-2 rounded-full bg-sky-400"></span>
+        </div>
+        <div class="text-base font-bold text-[var(--foreground)] mt-1">6 940 000 SEK</div>
+      </button>
+
+      <button onclick="filterByStatus('ACCEPTERAD')" id="stat-ACCEPTERAD" class="text-left p-3.5 rounded-xl bg-[var(--card)] border border-[var(--border)] transition hover:border-emerald-500/50">
+        <div class="flex items-center justify-between">
+          <span class="text-xs font-medium text-[var(--muted-foreground)]">Accepterade (22)</span>
+          <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+        </div>
+        <div class="text-base font-bold text-[var(--foreground)] mt-1">3 690 250 SEK</div>
+      </button>
+    </div>
+
+    <!-- Unified Single-Row Toolbar: Search + Filters -->
+    <div class="bg-[var(--card)] border border-[var(--border)] rounded-xl p-3 flex flex-wrap items-center justify-between gap-3">
+      <!-- Search input (Prominent & wide) -->
+      <div class="relative flex-1 min-w-[240px]">
+        <svg class="w-4 h-4 text-[var(--muted-foreground)] absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+        </svg>
+        <input
+          id="search-input"
+          oninput="renderOffers()"
+          type="text"
+          placeholder="Sök företag, org.nr, projektreferens eller kontakt..."
+          class="w-full pl-9 pr-3 py-1.5 rounded-lg bg-[var(--background)] border border-[var(--border)] text-xs text-[var(--foreground)] placeholder-[var(--muted-foreground)] focus:outline-none focus:border-blue-500 transition"
+        />
+      </div>
+
+      <!-- Compact Filter Controls -->
+      <div class="flex flex-wrap items-center gap-2">
+        <select class="px-3 py-1.5 rounded-lg bg-[var(--background)] border border-[var(--border)] text-xs text-[var(--foreground)] focus:outline-none focus:border-blue-500">
+          <option>Mina offerter</option>
+          <option>Alla säljare</option>
+        </select>
+
+        <select id="status-select" onchange="filterByStatus(this.value)" class="px-3 py-1.5 rounded-lg bg-[var(--background)] border border-[var(--border)] text-xs text-[var(--foreground)] focus:outline-none focus:border-blue-500">
+          <option value="ALL">Alla statusar</option>
+          <option value="UTKAST">Utkast</option>
+          <option value="SKICKAD">Skickad</option>
+          <option value="ACCEPTERAD">Accepterad</option>
+          <option value="FORLORAD">Förlorad</option>
+        </select>
+
+        <select class="px-3 py-1.5 rounded-lg bg-[var(--background)] border border-[var(--border)] text-xs text-[var(--foreground)] focus:outline-none focus:border-blue-500">
+          <option>Alla datum</option>
+          <option>Senaste 7 dagarna</option>
+          <option>Denna månad</option>
+          <option>Detta kvartal</option>
+        </select>
+
+        <select class="px-3 py-1.5 rounded-lg bg-[var(--background)] border border-[var(--border)] text-xs text-[var(--foreground)] focus:outline-none focus:border-blue-500">
+          <option>Sortera: Senast uppdaterad</option>
+          <option>Sortera: Högst belopp</option>
+          <option>Sortera: Företag (A–Ö)</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- OFFERS LIST (CARDS VIEW) -->
+    <div id="cards-view" class="space-y-2.5"></div>
+
+    <!-- OFFERS LIST (TABLE VIEW) -->
+    <div id="table-view" class="hidden bg-[var(--card)] border border-[var(--border)] rounded-xl overflow-hidden">
+      <div class="overflow-x-auto">
+        <table class="w-full text-left border-collapse">
+          <thead>
+            <tr class="border-b border-[var(--border)] text-xs font-semibold text-[var(--muted-foreground)] bg-[var(--background)]/50">
+              <th class="py-3 px-4">Projektreferens & Företag</th>
+              <th class="py-3 px-3">Er referens</th>
+              <th class="py-3 px-3">Version</th>
+              <th class="py-3 px-3">Uppdaterad</th>
+              <th class="py-3 px-3">Status</th>
+              <th class="py-3 px-4 text-right">Totalt (exkl. moms)</th>
+              <th class="py-3 px-4 text-right">Åtgärder</th>
+            </tr>
+          </thead>
+          <tbody id="table-body" class="divide-y divide-[var(--border)] text-xs"></tbody>
+        </table>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- BEFORE VIEW (ORIGINAL SCREENSHOT REPLICA FOR COMPARISON) -->
+  <div id="before-container" class="hidden max-w-2xl mx-auto space-y-4">
+    <div class="p-3 rounded-lg bg-amber-500/10 border border-amber-500/30 text-xs text-amber-300 mb-4">
+      <strong>Problem i nuvarande vy:</strong> Varje kort tar upp ~420px på höjden p.g.a. 6 vertikalt staplade knappar till vänster, medan 65% av kortets bredd är helt tom. Företagsnamn och status dubbleras, och projektreferensen (det som faktiskt skiljer offerterna åt!) är gömd i liten brödtext.
+    </div>
+
+    <div class="bg-[var(--card)] border border-[var(--border)] rounded-lg p-6 space-y-3">
+      <div class="flex items-center gap-2">
+        <span class="font-bold text-base text-[var(--foreground)]">Hotell Mossbylund AB - 556628-4476</span>
+        <span class="px-2 py-0.5 text-xs rounded bg-[var(--background)] border border-[var(--border)] font-semibold">UTKAST</span>
+      </div>
+      <div class="text-xs text-[var(--muted-foreground)]">
+        <strong class="text-[var(--foreground)]">Företag:</strong> Hotell Mossbylund AB - 556628-4476 | <strong class="text-[var(--foreground)]">Projektreferens:</strong> BaHaMa Parasoller - Baksida | <strong class="text-[var(--foreground)]">Er referens:</strong> -
+      </div>
+      <div class="text-xs text-[var(--muted-foreground)]">
+        <strong class="text-[var(--foreground)]">Uppdaterad:</strong> 29 okt. 2026 13:32 | <strong class="text-[var(--foreground)]">Version:</strong> v1
+      </div>
+      <div class="font-bold text-sm pt-1">Totalt: 263 784 SEK</div>
+      <div class="space-y-1.5 w-44 pt-1">
+        <div class="text-xs text-[var(--muted-foreground)]">Status</div>
+        <select class="w-full px-2.5 py-1.5 rounded bg-[var(--background)] border border-[var(--border)] text-xs">
+          <option>Utkast</option>
+        </select>
+        <button class="w-full py-2 rounded bg-blue-600 text-white text-xs font-medium">Öppna senaste</button>
+        <button class="w-full py-2 rounded border border-[var(--border)] text-xs">Förhandsgranska PDF</button>
+        <button class="w-full py-2 rounded border border-[var(--border)] text-xs">Duplicera</button>
+        <button class="w-full py-2 rounded border border-[var(--border)] text-xs">Kopiera länk</button>
+        <button class="w-full py-2 rounded border border-[var(--border)] text-xs">Visa revisioner</button>
+        <button class="w-full py-2 rounded border border-slate-400 text-xs">Ta bort</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Notification -->
+  <div id="toast" class="fixed bottom-5 right-5 px-4 py-2.5 rounded-lg bg-blue-600 text-white text-xs font-medium shadow-lg transition-all opacity-0 pointer-events-none translate-y-2">
+    Åtgärd utförd
+  </div>
+
+  <script>
+    const offers = [
+      {
+        id: 1,
+        company: "Hotell Mossbylund AB",
+        orgNr: "556628-4476",
+        projectRef: "BaHaMa Parasoller – Baksida",
+        clientRef: "Anna Lindqvist",
+        updatedAt: "29 okt. 2026 13:32",
+        version: "v1",
+        revisions: [
+          { ver: "v1", date: "29 okt. 2026 13:32", total: "263 784 SEK", note: "Första utkast skapat" }
+        ],
+        total: "263 784 SEK",
+        status: "UTKAST"
+      },
+      {
+        id: 2,
+        company: "Hotell Mossbylund AB",
+        orgNr: "556628-4476",
+        projectRef: "BaHaMa Parasoller – Framsida",
+        clientRef: "Anna Lindqvist",
+        updatedAt: "29 okt. 2026 13:31",
+        version: "v2",
+        revisions: [
+          { ver: "v2", date: "29 okt. 2026 13:31", total: "116 856 SEK", note: "Uppdaterat markfästen & värmare" },
+          { ver: "v1", date: "27 okt. 2026 09:14", total: "108 400 SEK", note: "Ursprunglig offert" }
+        ],
+        total: "116 856 SEK",
+        status: "UTKAST"
+      },
+      {
+        id: 3,
+        company: "Hotell Mossbylund AB",
+        orgNr: "556628-4476",
+        projectRef: "Uteservering Pergola & Vindskydd",
+        clientRef: "Erik Sjöberg",
+        updatedAt: "28 okt. 2026 16:45",
+        version: "v3",
+        revisions: [
+          { ver: "v3", date: "28 okt. 2026 16:45", total: "489 200 SEK", note: "Slutgiltig specifikation med LED-belysning" },
+          { ver: "v2", date: "24 okt. 2026 14:20", total: "465 000 SEK", note: "Justerat mått sektion B" },
+          { ver: "v1", date: "19 okt. 2026 11:05", total: "440 000 SEK", note: "Initial kalkyl" }
+        ],
+        total: "489 200 SEK",
+        status: "SKICKAD"
+      },
+      {
+        id: 4,
+        company: "Grand Hôtel Stockholm AB",
+        orgNr: "556009-9292",
+        projectRef: "Veranda Solskydd & Specialparasoller",
+        clientRef: "Marcus Wallenberg Jr",
+        updatedAt: "26 okt. 2026 10:12",
+        version: "v2",
+        revisions: [
+          { ver: "v2", date: "26 okt. 2026 10:12", total: "842 500 SEK", note: "Signerat av kund" }
+        ],
+        total: "842 500 SEK",
+        status: "ACCEPTERAD"
+      }
+    ];
+
+    let activeStatusFilter = "ALL";
+    let openMenuId = null;
+    let expandedRevisionsId = null;
+    let currentMode = "cards";
+
+    const statusConfig = {
+      UTKAST: {
+        label: "Utkast",
+        badgeClass: "bg-amber-500/15 text-amber-300 border-amber-500/30",
+        dotClass: "bg-amber-400"
+      },
+      SKICKAD: {
+        label: "Skickad",
+        badgeClass: "bg-sky-500/15 text-sky-300 border-sky-500/30",
+        dotClass: "bg-sky-400"
+      },
+      ACCEPTERAD: {
+        label: "Accepterad",
+        badgeClass: "bg-emerald-500/15 text-emerald-300 border-emerald-500/30",
+        dotClass: "bg-emerald-400"
+      },
+      FORLORAD: {
+        label: "Förlorad",
+        badgeClass: "bg-rose-500/15 text-rose-300 border-rose-500/30",
+        dotClass: "bg-rose-400"
+      }
+    };
+
+    function showToast(msg) {
+      const t = document.getElementById("toast");
+      t.textContent = msg;
+      t.classList.remove("opacity-0", "translate-y-2");
+      setTimeout(() => {
+        t.classList.add("opacity-0", "translate-y-2");
+      }, 2200);
+    }
+
+    function setViewMode(mode) {
+      currentMode = mode;
+      const redesign = document.getElementById("redesign-container");
+      const before = document.getElementById("before-container");
+      const cardsView = document.getElementById("cards-view");
+      const tableView = document.getElementById("table-view");
+
+      ["cards", "table", "before"].forEach(m => {
+        const btn = document.getElementById("btn-mode-" + m);
+        if (m === mode) {
+          btn.className = "px-3 py-1.5 rounded-md text-xs font-medium transition-all bg-blue-600 text-white shadow-sm";
+        } else {
+          btn.className = "px-3 py-1.5 rounded-md text-xs font-medium transition-all text-[var(--muted-foreground)] hover:text-[var(--foreground)]";
+        }
+      });
+
+      if (mode === "before") {
+        redesign.classList.add("hidden");
+        before.classList.remove("hidden");
+      } else {
+        before.classList.add("hidden");
+        redesign.classList.remove("hidden");
+        if (mode === "cards") {
+          cardsView.classList.remove("hidden");
+          tableView.classList.add("hidden");
+        } else {
+          cardsView.classList.add("hidden");
+          tableView.classList.remove("hidden");
+        }
+      }
+    }
+
+    function filterByStatus(status) {
+      activeStatusFilter = status;
+      document.getElementById("status-select").value = status;
+      ["ALL", "UTKAST", "SKICKAD", "ACCEPTERAD"].forEach(s => {
+        const el = document.getElementById("stat-" + s);
+        if (!el) return;
+        if (s === status) {
+          el.className = "text-left p-3.5 rounded-xl bg-[var(--card)] border-2 border-blue-500/60 transition";
+        } else {
+          el.className = "text-left p-3.5 rounded-xl bg-[var(--card)] border border-[var(--border)] transition hover:border-blue-500/40";
+        }
+      });
+      renderOffers();
+    }
+
+    function changeOfferStatus(id, newStatus) {
+      const item = offers.find(o => o.id === id);
+      if (item) {
+        item.status = newStatus;
+        showToast(`Status ändrad till ${statusConfig[newStatus].label}`);
+        renderOffers();
+      }
+    }
+
+    function toggleRevisions(id) {
+      expandedRevisionsId = expandedRevisionsId === id ? null : id;
+      openMenuId = null;
+      renderOffers();
+    }
+
+    function toggleMenu(id, event) {
+      event.stopPropagation();
+      openMenuId = openMenuId === id ? null : id;
+      renderOffers();
+    }
+
+    document.addEventListener("click", () => {
+      if (openMenuId !== null) {
+        openMenuId = null;
+        renderOffers();
+      }
+    });
+
+    function renderOffers() {
+      const query = (document.getElementById("search-input")?.value || "").toLowerCase();
+      const filtered = offers.filter(o => {
+        const matchesStatus = activeStatusFilter === "ALL" || o.status === activeStatusFilter;
+        const matchesQuery =
+          o.company.toLowerCase().includes(query) ||
+          o.orgNr.toLowerCase().includes(query) ||
+          o.projectRef.toLowerCase().includes(query) ||
+          o.clientRef.toLowerCase().includes(query);
+        return matchesStatus && matchesQuery;
+      });
+
+      // Render Compact Horizontal Cards
+      const cardsContainer = document.getElementById("cards-view");
+      cardsContainer.innerHTML = filtered.map(o => {
+        const st = statusConfig[o.status];
+        const isRevOpen = expandedRevisionsId === o.id;
+        const isMenuOpen = openMenuId === o.id;
+
+        return `
+          <div class="bg-[var(--card)] border border-[var(--border)] hover:border-blue-500/40 rounded-xl p-4 transition shadow-sm">
+            <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+              
+              <!-- Left Column: Hierarchy -> Project Name & Company -->
+              <div class="space-y-1.5 min-w-0 flex-1">
+                <div class="flex flex-wrap items-center gap-2.5">
+                  <!-- Project Reference first or prominent alongside Company so identical companies are easy to tell apart -->
+                  <span class="text-base font-bold text-[var(--foreground)] truncate">${o.projectRef}</span>
+                  <span class="px-2 py-0.5 text-xs font-semibold rounded-md bg-[var(--background)] border border-[var(--border)] text-[var(--muted-foreground)]">
+                    ${o.version}
+                  </span>
+                  <!-- Single interactive Status Pill (replaces duplicate badge + dropdown!) -->
+                  <div class="relative inline-flex items-center">
+                    <span class="w-2 h-2 rounded-full ${st.dotClass} absolute left-2.5 pointer-events-none"></span>
+                    <select
+                      onchange="changeOfferStatus(${o.id}, this.value)"
+                      class="pl-6 pr-6 py-0.5 text-xs font-semibold rounded-full border ${st.badgeClass} bg-transparent cursor-pointer focus:outline-none appearance-none"
+                      title="Klicka för att byta status direkt"
+                    >
+                      <option value="UTKAST" class="bg-slate-900 text-white" ${o.status === 'UTKAST' ? 'selected' : ''}>Utkast ▾</option>
+                      <option value="SKICKAD" class="bg-slate-900 text-white" ${o.status === 'SKICKAD' ? 'selected' : ''}>Skickad ▾</option>
+                      <option value="ACCEPTERAD" class="bg-slate-900 text-white" ${o.status === 'ACCEPTERAD' ? 'selected' : ''}>Accepterad ▾</option>
+                      <option value="FORLORAD" class="bg-slate-900 text-white" ${o.status === 'FORLORAD' ? 'selected' : ''}>Förlorad ▾</option>
+                    </select>
+                  </div>
+                </div>
+
+                <!-- Clean Metadata Row (No duplicate company string!) -->
+                <div class="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-[var(--muted-foreground)]">
+                  <span class="font-medium text-[var(--foreground)] flex items-center gap-1.5">
+                    <svg class="w-3.5 h-3.5 text-[var(--muted-foreground)]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>
+                    ${o.company} <span class="opacity-60">(${o.orgNr})</span>
+                  </span>
+                  <span>•</span>
+                  <span>Er referens: <strong class="text-[var(--foreground)] font-medium">${o.clientRef || '–'}</strong></span>
+                  <span>•</span>
+                  <span>Uppdaterad ${o.updatedAt}</span>
+                </div>
+              </div>
+
+              <!-- Right Column: Price + Consolidated Horizontal Actions -->
+              <div class="flex flex-wrap sm:flex-nowrap items-center justify-between lg:justify-end gap-4 pt-3 lg:pt-0 border-t lg:border-t-0 border-[var(--border)]">
+                
+                <!-- Prominent Right-Aligned Total Amount -->
+                <div class="text-left lg:text-right mr-2">
+                  <div class="text-xs text-[var(--muted-foreground)]">Totalt belopp</div>
+                  <div class="text-base font-bold text-[var(--foreground)] tabular-nums">${o.total}</div>
+                </div>
+
+                <!-- Primary + Quick Icon Actions + Overflow Menu -->
+                <div class="flex items-center gap-1.5 relative">
+                  <button onclick="showToast('Öppnar ${o.projectRef} (${o.version})...')" class="px-3.5 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold transition shadow-sm whitespace-nowrap">
+                    Öppna senaste
+                  </button>
+
+                  <button onclick="showToast('Förhandsgranskar PDF för ${o.projectRef}...')" title="Förhandsgranska PDF" class="p-2 rounded-lg border border-[var(--border)] bg-[var(--background)] hover:bg-[var(--secondary)] text-[var(--foreground)] transition">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>
+                  </button>
+
+                  <button onclick="showToast('Offertlänk kopierad till urklipp!')" title="Kopiera länk" class="p-2 rounded-lg border border-[var(--border)] bg-[var(--background)] hover:bg-[var(--secondary)] text-[var(--foreground)] transition">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"/></svg>
+                  </button>
+
+                  <button onclick="toggleRevisions(${o.id})" title="Visa revisioner (${o.revisions.length})" class="px-2.5 py-2 rounded-lg border ${isRevOpen ? 'border-blue-500 text-blue-400 bg-blue-500/10' : 'border-[var(--border)] bg-[var(--background)] text-[var(--foreground)]'} hover:bg-[var(--secondary)] text-xs font-medium flex items-center gap-1 transition">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                    <span>${o.revisions.length}</span>
+                  </button>
+
+                  <!-- More Dropdown Button (Duplicera, Ta bort) -->
+                  <button onclick="toggleMenu(${o.id}, event)" title="Fler åtgärder" class="p-2 rounded-lg border border-[var(--border)] bg-[var(--background)] hover:bg-[var(--secondary)] text-[var(--foreground)] transition">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z"/></svg>
+                  </button>
+
+                  ${isMenuOpen ? `
+                    <div class="absolute right-0 top-11 w-48 rounded-xl bg-[var(--card)] border border-[var(--border)] shadow-xl py-1.5 z-30 text-xs">
+                      <button onclick="showToast('Förhandsgranskar PDF...')" class="w-full px-3.5 py-2 text-left hover:bg-[var(--secondary)] flex items-center gap-2.5 text-[var(--foreground)]">
+                        <span>📄</span> Förhandsgranska PDF
+                      </button>
+                      <button onclick="showToast('Offert duplicerad!')" class="w-full px-3.5 py-2 text-left hover:bg-[var(--secondary)] flex items-center gap-2.5 text-[var(--foreground)]">
+                        <span>📑</span> Duplicera offert
+                      </button>
+                      <button onclick="toggleRevisions(${o.id})" class="w-full px-3.5 py-2 text-left hover:bg-[var(--secondary)] flex items-center gap-2.5 text-[var(--foreground)]">
+                        <span>🕓</span> Visa revisioner (${o.revisions.length})
+                      </button>
+                      <div class="my-1 border-t border-[var(--border)]"></div>
+                      <button onclick="showToast('Bekräfta borttagning av offert')" class="w-full px-3.5 py-2 text-left hover:bg-rose-500/15 flex items-center gap-2.5 text-rose-400 font-medium">
+                        <span>🗑️</span> Ta bort offert...
+                      </button>
+                    </div>
+                  ` : ''}
+                </div>
+              </div>
+            </div>
+
+            <!-- Expandable Revision History Drawer -->
+            ${isRevOpen ? `
+              <div class="mt-3.5 pt-3 border-t border-[var(--border)] bg-[var(--background)]/60 rounded-lg p-3 space-y-2">
+                <div class="text-xs font-semibold text-[var(--muted-foreground)] flex items-center justify-between">
+                  <span>Revisionshistorik (${o.revisions.length} versioner)</span>
+                  <button onclick="toggleRevisions(${o.id})" class="text-xs text-blue-400 hover:underline">Stäng</button>
+                </div>
+                <div class="divide-y divide-[var(--border)] text-xs">
+                  ${o.revisions.map(r => `
+                    <div class="py-2 flex items-center justify-between gap-4">
+                      <div class="flex items-center gap-2.5">
+                        <span class="px-2 py-0.5 rounded bg-[var(--card)] border border-[var(--border)] font-semibold">${r.ver}</span>
+                        <span class="text-[var(--foreground)]">${r.note}</span>
+                        <span class="text-[var(--muted-foreground)]">• ${r.date}</span>
+                      </div>
+                      <div class="flex items-center gap-3">
+                        <span class="font-semibold tabular-nums">${r.total}</span>
+                        <button onclick="showToast('Öppnar ${r.ver}...')" class="text-blue-400 hover:underline font-medium">Öppna</button>
+                      </div>
+                    </div>
+                  `).join('')}
+                </div>
+              </div>
+            ` : ''}
+          </div>
+        `;
+      }).join('');
+
+      // Render High-Density Table View
+      const tableBody = document.getElementById("table-body");
+      tableBody.innerHTML = filtered.map(o => {
+        const st = statusConfig[o.status];
+        return `
+          <tr class="hover:bg-[var(--background)]/40 transition">
+            <td class="py-3 px-4">
+              <div class="font-bold text-[var(--foreground)] text-xs">${o.projectRef}</div>
+              <div class="text-xs text-[var(--muted-foreground)]">${o.company} (${o.orgNr})</div>
+            </td>
+            <td class="py-3 px-3 text-[var(--foreground)]">${o.clientRef}</td>
+            <td class="py-3 px-3">
+              <span class="px-2 py-0.5 rounded bg-[var(--background)] border border-[var(--border)] font-medium">${o.version}</span>
+            </td>
+            <td class="py-3 px-3 text-[var(--muted-foreground)]">${o.updatedAt}</td>
+            <td class="py-3 px-3">
+              <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full border text-xs font-medium ${st.badgeClass}">
+                <span class="w-1.5 h-1.5 rounded-full ${st.dotClass}"></span>
+                ${st.label}
+              </span>
+            </td>
+            <td class="py-3 px-4 text-right font-bold tabular-nums text-[var(--foreground)]">${o.total}</td>
+            <td class="py-3 px-4 text-right">
+              <div class="inline-flex items-center justify-end gap-1.5">
+                <button onclick="showToast('Öppnar ${o.projectRef}...')" class="px-2.5 py-1 rounded bg-blue-600 hover:bg-blue-500 text-white font-medium text-xs">Öppna</button>
+                <button onclick="showToast('Förhandsgranskar PDF...')" title="PDF" class="px-2 py-1 rounded border border-[var(--border)] hover:bg-[var(--secondary)] text-xs">PDF</button>
+                <button onclick="showToast('Länk kopierad!')" title="Kopiera länk" class="px-2 py-1 rounded border border-[var(--border)] hover:bg-[var(--secondary)] text-xs">Länk</button>
+              </div>
+            </td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    renderOffers();
+  </script>
+</body>
+</html>
