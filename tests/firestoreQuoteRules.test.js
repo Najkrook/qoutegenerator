@@ -158,6 +158,22 @@ describeQuoteRules('Quote Save Firestore rules', () => {
         }));
     });
 
+    it.each([true, false])('allows the sustainability setting on a saved revision (%s)', async (includeSustainabilityBlock) => {
+        const db = testEnv.authenticatedContext('owner-uid').firestore();
+        await assertSucceeds(setDoc(
+            doc(db, 'users', 'owner-uid', 'quotes', 'quote-1', 'revisions', `intent_sustainability-${includeSustainabilityBlock}`),
+            revision({ state: { includeSustainabilityBlock }, saveIntentId: `sustainability-${includeSustainabilityBlock}` })
+        ));
+    });
+
+    it('rejects a non-boolean sustainability setting', async () => {
+        const db = testEnv.authenticatedContext('owner-uid').firestore();
+        await assertFails(setDoc(
+            doc(db, 'users', 'owner-uid', 'quotes', 'quote-1', 'revisions', 'intent_sustainability-invalid'),
+            revision({ state: { includeSustainabilityBlock: 'false' }, saveIntentId: 'sustainability-invalid' })
+        ));
+    });
+
     it('allows one immutable Save Intent revision and rejects revision state routing data', async () => {
         const db = testEnv.authenticatedContext('owner-uid').firestore();
         const revisionRef = doc(

@@ -311,6 +311,20 @@ afterEach(() => {
 });
 
 describe('SummaryExport PDF override', () => {
+    it('toggles sustainability and regenerates the PDF preview with the updated setting', async () => {
+        const stateOverrides = { customCosts: [{ description: 'Product', price: 1000, qty: 1 }] };
+        const { container, dispatch, rerender } = await renderSummaryExport({ stateOverrides });
+        const checkbox = container.querySelector('input[type="checkbox"]');
+        expect(checkbox?.closest('label')?.textContent).toContain('Miljö & hållbarhet i PDF');
+        expect(checkbox.checked).toBe(true);
+        await act(async () => checkbox.click());
+        expect(dispatch).toHaveBeenCalledWith({ type: 'SET_INCLUDE_SUSTAINABILITY_BLOCK', payload: false });
+        await rerender({ ...stateOverrides, includeSustainabilityBlock: false });
+        await waitForPreviewDebounce();
+        expect(container.querySelector('input[type="checkbox"]').checked).toBe(false);
+        expect(createQuotePdfBlob.mock.calls.at(-1)[0].agreement.includeSustainabilityBlock).toBe(false);
+    });
+
     it('renders when the draft retains a zero-quantity custom grid add-on', async () => {
         const { container } = await renderSummaryExport({
             stateOverrides: {

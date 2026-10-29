@@ -469,6 +469,7 @@ export interface QuoteState {
     termsCustomized: boolean;
     includeSignatureBlock: boolean;
     includePaymentBox: boolean;
+    includeSustainabilityBlock: boolean;
     hideZeroDiscountReferencesInPdf: boolean;
     pdfThemeId: PdfThemeId;
     exportLanguage: QuoteExportLanguage;
@@ -1201,6 +1202,7 @@ export type QuoteReducerAction =
     | { type: 'SET_TERMS_TEMPLATE_ID'; payload: string }
     | { type: 'SET_TERMS_CUSTOMIZED'; payload: boolean }
     | { type: 'SET_INCLUDE_PAYMENT_BOX'; payload: boolean }
+    | { type: 'SET_INCLUDE_SUSTAINABILITY_BLOCK'; payload: boolean }
     | { type: 'SET_INCLUDE_SIGNATURE_BLOCK'; payload: boolean }
     | { type: 'SET_HIDE_ZERO_DISCOUNT_REFERENCES_IN_PDF'; payload: boolean }
     | { type: 'SET_PDF_THEME_ID'; payload: PdfThemeId }

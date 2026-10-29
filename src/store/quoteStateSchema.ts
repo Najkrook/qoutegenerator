@@ -28,7 +28,7 @@ import { getGridItemsQtyTotal } from '../utils/gridAutoScale';
 import { normalizeClickitupAccessories, normalizeClickitupCounted, normalizeStockQuantity } from '../services/clickitupInventory';
 
 export const QUOTE_STATE_STORAGE_KEY = 'offertverktyg_state';
-export const CURRENT_STATE_VERSION = 8;
+export const CURRENT_STATE_VERSION = 9;
 
 const VALID_QUOTE_STATUSES: QuoteStatus[] = ['draft', 'sent', 'won', 'lost', 'archived'];
 const VALID_BAHAMA_STATUSES: BahamaInventoryStatus[] = ['available', 'reserved', 'needs-review', 'used', 'sold'];
@@ -445,6 +445,7 @@ function createBaseInitialState(): QuoteState {
         termsCustomized: false,
         includeSignatureBlock: false,
         includePaymentBox: false,
+        includeSustainabilityBlock: true,
         hideZeroDiscountReferencesInPdf: false,
         pdfThemeId: DEFAULT_PDF_THEME_ID,
         exportLanguage: DEFAULT_EXPORT_LANGUAGE,
@@ -607,6 +608,15 @@ function migrateV7ToV8(rawState: UnknownRecord = {}): UnknownRecord {
     };
 }
 
+function migrateV8ToV9(rawState: UnknownRecord = {}): UnknownRecord {
+    const next = toRecord(rawState);
+    return {
+        ...next,
+        stateVersion: 9,
+        includeSustainabilityBlock: next.includeSustainabilityBlock !== false
+    };
+}
+
 export function migrateQuoteState(fromVersion: unknown, rawState: unknown): UnknownRecord {
     let version = Number.isFinite(Number(fromVersion)) ? Number(fromVersion) : 0;
     let nextState: UnknownRecord = isObject(rawState) ? clone(rawState) : {};
@@ -657,6 +667,12 @@ export function migrateQuoteState(fromVersion: unknown, rawState: unknown): Unkn
         if (version === 7) {
             nextState = migrateV7ToV8(nextState);
             version = 8;
+            continue;
+        }
+
+        if (version === 8) {
+            nextState = migrateV8ToV9(nextState);
+            version = 9;
             continue;
         }
 
@@ -766,6 +782,7 @@ export function hydrateQuoteState(input: HydratedQuoteStatePayload): QuoteState 
             : false,
         includeSignatureBlock: mergedState.includeSignatureBlock === true,
         includePaymentBox: mergedState.includePaymentBox === true,
+        includeSustainabilityBlock: mergedState.includeSustainabilityBlock !== false,
         hideZeroDiscountReferencesInPdf: mergedState.hideZeroDiscountReferencesInPdf === true,
         pdfThemeId: normalizePdfThemeId(mergedState.pdfThemeId),
         exportLanguage: normalizeExportLanguage(mergedState.exportLanguage) as QuoteExportLanguage,

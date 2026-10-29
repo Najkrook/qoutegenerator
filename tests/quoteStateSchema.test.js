@@ -7,6 +7,22 @@ import {
 } from '../src/store/quoteStateSchema';
 
 describe('quoteStateSchema', () => {
+    it.each([undefined, null, 'false', false, true])('migrates the sustainability setting from v8 (%j)', (value) => {
+        const state = hydrateQuoteState({ stateVersion: 8, includeSustainabilityBlock: value });
+        expect(state.stateVersion).toBe(CURRENT_STATE_VERSION);
+        expect(state.includeSustainabilityBlock).toBe(value !== false);
+        expect(hydrateQuoteState(state).includeSustainabilityBlock).toBe(value !== false);
+    });
+
+    it('toggles sustainability through the reducer and restores the default on reset', () => {
+        const initial = createInitialQuoteState();
+        expect(initial.includeSustainabilityBlock).toBe(true);
+        const disabled = quoteReducer(initial, { type: 'SET_INCLUDE_SUSTAINABILITY_BLOCK', payload: false });
+        expect(disabled.includeSustainabilityBlock).toBe(false);
+        expect(disabled.draftUpdatedAtMs).not.toBeNull();
+        expect(quoteReducer(disabled, { type: 'RESET_QUOTE_DRAFT' }).includeSustainabilityBlock).toBe(true);
+    });
+
     it('returns current defaults for empty input', () => {
         const hydrated = hydrateQuoteState(null);
 

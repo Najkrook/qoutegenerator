@@ -162,7 +162,8 @@ describe('prepareQuote', () => {
             paymentTermsDays: 30,
             validityDays: 30,
             includePaymentBox: true,
-            includeSignatureBlock: true
+            includeSignatureBlock: true,
+            includeSustainabilityBlock: true
         });
         expect(result.visibility).toEqual({
             contractingWork: 'visible',
@@ -587,6 +588,14 @@ describe('prepareQuote', () => {
         });
 
         expect(changed.presentation.equivalenceKey).not.toBe(baseline.presentation.equivalenceKey);
+    });
+
+    it('changes PDF preview equivalence and persists the disabled sustainability setting', () => {
+        const baseline = prepare();
+        const changed = prepare({ state: { includeSustainabilityBlock: false } });
+        expect(changed.presentation.equivalenceKey).not.toBe(baseline.presentation.equivalenceKey);
+        expect(changed.agreement.includeSustainabilityBlock).toBe(false);
+        expect(changed.persistenceSnapshot.includeSustainabilityBlock).toBe(false);
     });
 
     it('accepts a 200 percent deduction internally but rejects it for retailers', () => {

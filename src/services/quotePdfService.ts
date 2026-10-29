@@ -43,6 +43,7 @@ function adaptPreparedQuote(prepared: PreparedQuote) {
         termsTemplateId: prepared.agreement.legalTerms.templateId,
         termsCustomized: prepared.agreement.legalTerms.customized,
         includePaymentBox: prepared.agreement.includePaymentBox,
+        includeSustainabilityBlock: prepared.agreement.includeSustainabilityBlock,
         includeSignatureBlock: prepared.agreement.includeSignatureBlock,
         paymentTermsDays: prepared.agreement.paymentTermsDays,
         quoteValidityDays: prepared.agreement.validityDays,

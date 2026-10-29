@@ -137,6 +137,8 @@ export function quoteReducer(state: QuoteState, action: QuoteReducerAction): Quo
             return markQuoteDraftUpdated({ ...state, termsCustomized: Boolean(action.payload) });
         case 'SET_INCLUDE_PAYMENT_BOX':
             return markQuoteDraftUpdated({ ...state, includePaymentBox: Boolean(action.payload) });
+        case 'SET_INCLUDE_SUSTAINABILITY_BLOCK':
+            return markQuoteDraftUpdated({ ...state, includeSustainabilityBlock: Boolean(action.payload) });
         case 'SET_INCLUDE_SIGNATURE_BLOCK':
             return markQuoteDraftUpdated({ ...state, includeSignatureBlock: Boolean(action.payload) });
         case 'SET_HIDE_ZERO_DISCOUNT_REFERENCES_IN_PDF':

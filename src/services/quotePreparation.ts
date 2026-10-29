@@ -121,6 +121,7 @@ export interface PreparedQuote {
         paymentTermsDays: number;
         validityDays: number;
         includePaymentBox: boolean;
+        includeSustainabilityBlock: boolean;
         includeSignatureBlock: boolean;
     };
     visibility: {
@@ -647,6 +648,7 @@ function createPersistenceSnapshot(
         termsCustomized: state.termsCustomized === true,
         includeSignatureBlock: state.includeSignatureBlock === true,
         includePaymentBox: state.includePaymentBox === true,
+        includeSustainabilityBlock: state.includeSustainabilityBlock !== false,
         hideZeroDiscountReferencesInPdf: state.hideZeroDiscountReferencesInPdf === true,
         pdfThemeId: presentation.pdfThemeId,
         exportLanguage: presentation.exportLanguage,
@@ -911,6 +913,7 @@ export function prepareQuote({
             paymentTermsDays: state.paymentTermsDays,
             validityDays: state.quoteValidityDays,
             includePaymentBox: state.includePaymentBox === true,
+            includeSustainabilityBlock: state.includeSustainabilityBlock !== false,
             includeSignatureBlock: state.includeSignatureBlock === true
         },
         visibility: {
@@ -1050,6 +1053,7 @@ export function restorePreparedQuote({
         paymentTermsDays: state.paymentTermsDays,
         validityDays: state.quoteValidityDays,
         includePaymentBox: state.includePaymentBox === true,
+        includeSustainabilityBlock: state.includeSustainabilityBlock !== false,
         includeSignatureBlock: state.includeSignatureBlock === true
     };
     const commercial: PreparedQuote['commercial'] = {

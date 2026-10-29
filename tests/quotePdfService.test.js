@@ -154,11 +154,36 @@ describe('prepareSavedQuoteForPdf', () => {
     it('rejects invalid snapshots instead of silently recalculating them', () => {
         expect(() => prepareSavedQuoteForPdf({ revision: { ...revision, commercialSnapshot: {} }, metadata })).toThrow();
     });
+
+    it.each([null, 'frozen'])('keeps the disabled sustainability choice when reopening a %s revision', (snapshotMode) => {
+        const prepared = createPreparedQuote();
+        const { preparedQuote } = prepareSavedQuoteForPdf({
+            revision: {
+                ...revision,
+                state: { ...prepared.persistenceSnapshot, includeSustainabilityBlock: false },
+                commercialSnapshot: snapshotMode ? createQuoteCommercialSnapshot(prepared) : null
+            },
+            metadata
+        });
+        expect(preparedQuote.agreement.includeSustainabilityBlock).toBe(false);
+        expect(preparedQuote.persistenceSnapshot.includeSustainabilityBlock).toBe(false);
+    });
 });
 
 describe('createQuotePdfBlob', () => {
     beforeEach(() => {
         generatePDF.mockClear();
+    });
+
+    it('passes the disabled sustainability setting to the PDF renderer', async () => {
+        const base = createPreparedQuote();
+        const prepared = prepareQuote({
+            state: { ...base.persistenceSnapshot, includeSustainabilityBlock: false },
+            totals: { totals: [], grossTotalSek: 0, totalDiscountSek: 0, finalTotalSek: 0, globalDiscountAmt: 0 },
+            audience: { isRetailer: false }
+        });
+        await createQuotePdfBlob(prepared);
+        expect(generatePDF.mock.calls[0][0].includeSustainabilityBlock).toBe(false);
     });
 
     it('adapts one prepared Quote result without reinterpreting canonical state', async () => {

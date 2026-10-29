@@ -49,6 +49,11 @@ describe('quoteStatePersistence', () => {
         });
     });
 
+    it.each([true, false])('round-trips the sustainability setting (%s)', (includeSustainabilityBlock) => {
+        persistQuoteState({ ...createInitialQuoteState(), includeSustainabilityBlock }, OWNER_UID, storage);
+        expect(loadPersistedQuoteState(OWNER_UID, storage).includeSustainabilityBlock).toBe(includeSustainabilityBlock);
+    });
+
     it('falls back to initial state when persisted JSON is malformed', () => {
         storage.getItem.mockReturnValueOnce('{broken');
         const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});

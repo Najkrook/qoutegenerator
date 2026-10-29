@@ -227,7 +227,7 @@ export function generatePDF(
             exportLanguage
         });
 
-        if (hasProducts) {
+        if (hasProducts && state.includeSustainabilityBlock !== false) {
             finalY = renderSustainabilityBlock(doc, {
                 currentY: finalY + 5,
                 pageWidth,

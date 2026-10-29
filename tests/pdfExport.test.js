@@ -159,6 +159,14 @@ describe('pdfExport helpers', () => {
         expect(pdfMockState.textCalls.some((call) => /REDUXA/.test(call.value))).toBe(false);
     });
 
+    it('omits the sustainability card when the setting is disabled', () => {
+        const state = createZeroDiscountState({ includeSustainabilityBlock: false });
+        const summary = computeQuoteTotals({ state, catalogData: createCatalogFixture() });
+        expect(generatePDF(state, summary, true)).toBeInstanceOf(Blob);
+        expect(pdfMockState.textCalls.some((call) => /REDUXA/.test(call.value))).toBe(false);
+        expect(pdfMockState.autoTableCalls.flatMap((table) => table.body).some((row) => row[0].includes('Jumbrella'))).toBe(true);
+    });
+
     it.each([170, 245])('keeps the complete sustainability card above the footer from y=%s', (currentY) => {
         let headerCalls = 0;
         const endY = renderSustainabilityBlock(new jsPDF(), {

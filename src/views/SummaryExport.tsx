@@ -807,6 +807,25 @@ export function SummaryExport({
                             <ExportLanguageSelector />
                         </div>
                     </div>
+                    {hasProducts && (
+                        <label className="flex cursor-pointer items-start gap-3 text-sm text-text-primary">
+                            <input
+                                type="checkbox"
+                                checked={state.includeSustainabilityBlock !== false}
+                                onChange={(event) => dispatch({
+                                    type: 'SET_INCLUDE_SUSTAINABILITY_BLOCK',
+                                    payload: event.target.checked
+                                })}
+                                className="mt-0.5 h-4 w-4 shrink-0 accent-primary"
+                            />
+                            <span>
+                                Miljö & hållbarhet i PDF
+                                <span className="mt-1 block text-xs text-text-secondary">
+                                    Visa informationsrutan om Hydro REDUXA under noteringarna.
+                                </span>
+                            </span>
+                        </label>
+                    )}
                     <div
                         className="relative h-[860px] overflow-hidden rounded-control border border-border bg-paper"
                         aria-busy={isPreviewUpdating}

@@ -565,9 +565,10 @@ service cloud.firestore {
           'sketchMeta', 'inventoryBasket', 'activeQuoteId', 'quoteNumber',
           'activeQuoteVersion', 'quoteStatus', 'includeTerms', 'termsText',
           'termsTemplateId', 'termsCustomized', 'includeSignatureBlock',
-          'includePaymentBox', 'hideZeroDiscountReferencesInPdf', 'pdfThemeId',
+          'includePaymentBox', 'includeSustainabilityBlock', 'hideZeroDiscountReferencesInPdf', 'pdfThemeId',
           'exportLanguage', 'paymentTermsDays', 'quoteValidityDays'
         ])
+        && state.get('includeSustainabilityBlock', true) is bool
         && (
           state.get('customerInfo', null) == null
           || (
