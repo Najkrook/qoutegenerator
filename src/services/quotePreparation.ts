@@ -18,6 +18,7 @@ import type {
     PlacedFiesta,
     PlacedParasol,
     QuoteCommercialSnapshot,
+    QuoteCommercialSnapshotContractingWork,
     QuoteExportLanguage,
     QuoteState,
     QuoteStatus,
@@ -64,22 +65,7 @@ export interface PreparedQuoteProductRow {
     originalIndex: number;
 }
 
-export interface PreparedQuoteContractingWork {
-    projectName: string;
-    rows: Array<{
-        id: string;
-        workPackage: string;
-        scope: string;
-        unit: string;
-        priceExVatSek: number;
-    }>;
-    baseTotalSek: number;
-    ataEnabled: boolean;
-    ataPercent: number;
-    allowanceSek: number;
-    lowerIndicativeSek: number;
-    upperIndicativeSek: number;
-}
+export type PreparedQuoteContractingWork = QuoteCommercialSnapshotContractingWork;
 
 export interface PreparedQuote {
     presentation: {
@@ -565,12 +551,15 @@ function cloneGridLineSelection(selection: GridLineSelection): GridLineSelection
 function cloneContractingWork(contractingWork: ContractingWorkState): ContractingWorkState {
     return {
         enabled: contractingWork?.enabled === true,
+        ...(contractingWork?.provider ? { provider: contractingWork.provider } : {}),
         projectName: String(contractingWork?.projectName || ''),
         rows: Array.isArray(contractingWork?.rows) ? contractingWork.rows.map((row) => ({
             id: String(row.id),
             workPackage: String(row.workPackage),
             scope: String(row.scope),
             unit: String(row.unit),
+            ...(row.quantity !== undefined ? { quantity: row.quantity } : {}),
+            ...(row.unitPriceExVatSek !== undefined ? { unitPriceExVatSek: row.unitPriceExVatSek } : {}),
             priceExVatSek: row.priceExVatSek
         })) : [],
         margin: {
@@ -805,12 +794,13 @@ function prepareContractingWork(
 
     return {
         projectName: String(state.contractingWork.projectName || ''),
+        ...(summary.providerName ? { providerName: summary.providerName } : {}),
         rows: summary.customerRows.map((row) => ({
+            ...row,
             id: String(row.id),
             workPackage: String(row.workPackage),
             scope: String(row.scope),
-            unit: String(row.unit),
-            priceExVatSek: row.priceExVatSek
+            unit: String(row.unit)
         })),
         baseTotalSek: summary.baseTotalSek,
         ataEnabled: summary.ataEnabled,

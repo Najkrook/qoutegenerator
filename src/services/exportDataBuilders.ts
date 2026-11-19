@@ -11,6 +11,8 @@ import type {
 import type { PreparedQuote } from './quotePreparation';
 import { applyVat } from '../utils/vatHelper';
 import {
+    formatContractingHeading,
+    formatContractingUnit,
     formatLocalizedValidityPeriod,
     getExportLabels,
     translateQuoteTotalsRowModel
@@ -37,6 +39,7 @@ interface PreparedExcelValues {
     };
     contractingSummary: Pick<ContractingWorkSummary,
         | 'customerRows'
+        | 'providerName'
         | 'baseTotalSek'
         | 'allowanceSek'
         | 'lowerIndicativeSek'
@@ -184,10 +187,9 @@ function buildExcelSheetDataInternal(
     }
 
     if (hasContractingWork) {
-        const projectName = String(state.contractingWork?.projectName || '');
-        const contractingTitle = projectName.trim()
-            ? `${labels.contractingHeading} ${labels.contractingFor} ${projectName}`
-            : labels.contractingHeading;
+        const contractingTitle = formatContractingHeading(
+            state.exportLanguage, state.contractingWork?.projectName, contractingSummary.providerName
+        );
 
         wsData.push([]);
         wsData.push([
@@ -203,7 +205,7 @@ function buildExcelSheetDataInternal(
             wsData.push([
                 row.workPackage,
                 row.scope,
-                row.unit,
+                formatContractingUnit(row, state.exportLanguage),
                 roundSek(row.priceExVatSek)
             ]);
         });
@@ -247,6 +249,7 @@ export function buildPreparedExcelSheetData(prepared: PreparedQuote): WorksheetR
     const preparedContractingSummary = contractingWork
         ? {
             customerRows: contractingWork.rows,
+            providerName: contractingWork.providerName,
             baseTotalSek: contractingWork.baseTotalSek,
             allowanceSek: contractingWork.allowanceSek,
             lowerIndicativeSek: contractingWork.lowerIndicativeSek,

@@ -1,3 +1,4 @@
+import { contractingCatalog } from '../data/contractingCatalog';
 import type {
     ContractingWorkState,
     ContractingWorkSummary
@@ -5,6 +6,10 @@ import type {
 
 const DEFAULT_ATA_PERCENT = 15;
 const DEFAULT_MARGIN_PERCENT = 15;
+
+export function isContractingQuantity(value: unknown): value is number {
+    return typeof value === 'number' && Number.isSafeInteger(value) && value > 0;
+}
 
 function normalizeNonNegativeNumber(value: unknown): number {
     const parsed = Number(value);
@@ -46,9 +51,10 @@ export function calculateContractingWorkSummary(
     const marginEnabled = isEnabled && contractingWork?.margin?.enabled === true;
     const marginPercent = normalizeMarginPercent(contractingWork?.margin?.percent);
     const marginMultiplier = marginEnabled ? 1 + marginPercent / 100 : 1;
-    const customerRows = activeRows.map((row) => ({
-        ...row,
-        priceExVatSek: Math.round(normalizeNonNegativeNumber(row.priceExVatSek) * marginMultiplier)
+    const customerRows = activeRows.map(({ id, workPackage, scope, unit, quantity, priceExVatSek }) => ({
+        id, workPackage, scope, unit,
+        ...(quantity !== undefined ? { quantity } : {}),
+        priceExVatSek: Math.round(normalizeNonNegativeNumber(priceExVatSek) * marginMultiplier)
     }));
     const baseTotalSek = customerRows.reduce((sum, row) => sum + row.priceExVatSek, 0);
     const marginAmountSek = marginEnabled
@@ -61,6 +67,7 @@ export function calculateContractingWorkSummary(
     return {
         activeRows,
         customerRows,
+        ...(contractingWork?.provider ? { providerName: contractingCatalog[contractingWork.provider].name } : {}),
         costTotalSek,
         baseTotalSek,
         marginEnabled,

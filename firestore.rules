@@ -583,7 +583,8 @@ service cloud.firestore {
           state.get('contractingWork', null) == null
           || (
             state.contractingWork is map
-            && state.contractingWork.keys().hasOnly(['enabled', 'projectName', 'rows', 'margin', 'ata'])
+            && state.contractingWork.keys().hasOnly(['enabled', 'provider', 'projectName', 'rows', 'margin', 'ata'])
+            && (!('provider' in state.contractingWork) || state.contractingWork.provider in ['stabil-entreprenad', 'tavi-co'])
             && state.contractingWork.get('margin', {}) is map
             && state.contractingWork.get('margin', {}).keys().hasOnly(['enabled', 'percent'])
             && state.contractingWork.get('ata', {}) is map
@@ -681,10 +682,11 @@ service cloud.firestore {
       return work == null || (
         work is map
         && work.keys().hasOnly([
-          'projectName', 'rows', 'baseTotalSek', 'ataEnabled', 'ataPercent',
+          'projectName', 'providerName', 'rows', 'baseTotalSek', 'ataEnabled', 'ataPercent',
           'allowanceSek', 'lowerIndicativeSek', 'upperIndicativeSek'
         ])
         && work.projectName is string
+        && (!('providerName' in work) || (work.providerName is string && work.providerName.size() > 0))
         && work.rows is list
         && work.rows.size() <= 100
         && (work.baseTotalSek is int || work.baseTotalSek is float)

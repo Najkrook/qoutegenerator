@@ -92,16 +92,24 @@ export interface CustomCostRow {
     discountPct: number;
 }
 
-export interface ContractingWorkRow {
+export type ContractingWorkProvider = 'stabil-entreprenad' | 'tavi-co';
+
+export interface ContractingWorkCustomerRow {
     id: string;
     workPackage: string;
     scope: string;
     unit: string;
     priceExVatSek: number;
+    quantity?: number;
+}
+
+export interface ContractingWorkRow extends ContractingWorkCustomerRow {
+    unitPriceExVatSek?: number;
 }
 
 export interface ContractingWorkState {
     enabled: boolean;
+    provider?: ContractingWorkProvider;
     projectName: string;
     rows: ContractingWorkRow[];
     margin: {
@@ -116,7 +124,8 @@ export interface ContractingWorkState {
 
 export interface ContractingWorkSummary {
     activeRows: ContractingWorkRow[];
-    customerRows: ContractingWorkRow[];
+    customerRows: ContractingWorkCustomerRow[];
+    providerName?: string;
     costTotalSek: number;
     baseTotalSek: number;
     marginEnabled: boolean;
@@ -599,13 +608,8 @@ export interface QuoteCommercialSnapshotProductTotals {
 
 export interface QuoteCommercialSnapshotContractingWork {
     projectName: string;
-    rows: Array<{
-        id: string;
-        workPackage: string;
-        scope: string;
-        unit: string;
-        priceExVatSek: number;
-    }>;
+    providerName?: string;
+    rows: ContractingWorkCustomerRow[];
     baseTotalSek: number;
     ataEnabled: boolean;
     ataPercent: number;

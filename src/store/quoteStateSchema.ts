@@ -3,6 +3,7 @@ import type {
     BahamaInventoryV2Item,
     ClickitupStockEntry,
     BuilderAddon,
+    ContractingWorkRow,
     ContractingWorkState,
     GridAddonState,
     GridItemSelectionState,
@@ -22,7 +23,9 @@ import type {
 } from '../types/contracts';
 import { DEFAULT_TEMPLATE_ID, getTemplateById, isBuiltinTemplateId } from '../config/legalTemplates.shared';
 import { DEFAULT_PDF_THEME_ID, normalizePdfThemeId } from '../config/pdfThemes';
+import { isContractingWorkProvider } from '../data/contractingCatalog';
 import { DEFAULT_EXPORT_LANGUAGE, normalizeExportLanguage } from '../services/exportLocalization';
+import { isContractingQuantity } from '../services/contractingWork';
 import { stripPrivateQuoteStateData } from '../utils/quoteStateSanitization';
 import { getGridItemsQtyTotal } from '../utils/gridAutoScale';
 import { normalizeClickitupAccessories, normalizeClickitupCounted, normalizeStockQuantity } from '../services/clickitupInventory';
@@ -157,22 +160,42 @@ function normalizeContractingWork(value: unknown): ContractingWorkState {
     const record = toRecord(value);
     const margin = toRecord(record.margin);
     const ata = toRecord(record.ata);
+    const provider = isContractingWorkProvider(record.provider) ? record.provider : undefined;
+    const seenServices = new Set<string>();
 
     return {
         enabled: record.enabled === true,
+        ...(provider ? { provider } : {}),
         projectName: preserveText(record.projectName),
         rows: Array.isArray(record.rows)
-            ? record.rows.map((row, index) => {
+            ? record.rows.flatMap<ContractingWorkRow>((row, index) => {
                 const safeRow = toRecord(row);
-                const persistedId = preserveText(safeRow.id);
+                const id = preserveText(safeRow.id).trim();
+                const workPackage = preserveText(safeRow.workPackage);
+                const scope = preserveText(safeRow.scope);
+                const unit = preserveText(safeRow.unit);
 
-                return {
-                    id: persistedId.trim() || `contracting_work_row_${index + 1}`,
-                    workPackage: preserveText(safeRow.workPackage),
-                    scope: preserveText(safeRow.scope),
-                    unit: preserveText(safeRow.unit),
+                if (provider) {
+                    const { quantity, unitPriceExVatSek } = safeRow;
+                    if (!id || seenServices.has(id) || !workPackage.trim()
+                        || !isContractingQuantity(quantity) || typeof unitPriceExVatSek !== 'number'
+                        || !Number.isFinite(unitPriceExVatSek) || unitPriceExVatSek < 0
+                        || !Number.isFinite(quantity * unitPriceExVatSek)) {
+                        return [];
+                    }
+
+                    seenServices.add(id);
+                    return [{ id, workPackage, scope, unit, quantity, unitPriceExVatSek,
+                        priceExVatSek: quantity * unitPriceExVatSek }];
+                }
+
+                return [{
+                    id: id || `contracting_work_row_${index + 1}`,
+                    workPackage,
+                    scope,
+                    unit,
                     priceExVatSek: normalizeNonNegativeNumber(safeRow.priceExVatSek)
-                };
+                }];
             })
             : [],
         margin: {

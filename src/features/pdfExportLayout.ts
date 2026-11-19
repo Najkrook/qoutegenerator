@@ -3,6 +3,8 @@ import { BRIXX_LOGO_BASE64 } from '../../assets/logoData';
 import { buildPdfTableData } from '../services/exportDataBuilders';
 import { calculateContractingWorkSummary } from '../services/contractingWork';
 import {
+    formatContractingHeading,
+    formatContractingUnit,
     formatLocalizedDays,
     formatLocalizedValidityPeriod,
     getExportLabels,
@@ -676,10 +678,7 @@ export function renderContractingWorkSection(doc, {
     }
 
     const labels = getExportLabels(exportLanguage);
-    const projectName = String(contractingWork?.projectName || '');
-    const title = projectName.trim()
-        ? `${labels.contractingHeading} ${labels.contractingFor} ${projectName}`
-        : labels.contractingHeading;
+    const title = formatContractingHeading(exportLanguage, contractingWork?.projectName, summary.providerName);
 
     currentY = ensurePageSpace(
         doc,
@@ -711,7 +710,7 @@ export function renderContractingWorkSection(doc, {
         body: summary.customerRows.map((row) => [
             row.workPackage,
             row.scope,
-            row.unit,
+            formatContractingUnit(row, exportLanguage),
             `${formatSEK(Math.max(0, Number(row.priceExVatSek) || 0))} SEK`
         ]),
         theme: 'striped',

@@ -115,7 +115,7 @@ export function ProductLineSelection({ onNext }: ProductLineSelectionProps) {
             payload: {
                 ...contractingWork,
                 enabled,
-                rows: enabled && contractingWork.rows.length === 0
+                rows: enabled && !contractingWork.provider && contractingWork.rows.length === 0
                     ? [createContractingWorkRow()]
                     : contractingWork.rows
             }
@@ -262,7 +262,7 @@ export function ProductLineSelection({ onNext }: ProductLineSelectionProps) {
                                 <div className="min-w-0 flex-1">
                                     <h3 className="m-0 text-base font-semibold text-text">Entreprenadarbete</h3>
                                     <p id="contracting-work-option-description" className="mb-0 mt-2 text-sm leading-relaxed text-text-muted">
-                                        Fria arbetspaket med egen omfattning, enhet och pris exkl. moms.
+                                        Lägg till egna arbetspaket eller välj tjänster från ett installationsföretag.
                                     </p>
                                 </div>
                             </label>

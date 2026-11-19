@@ -66,10 +66,12 @@ export function ContractingWorkPricing() {
                     Separat offertdel
                 </p>
                 <h3 id="contracting-work-pricing-heading" className="mt-2 text-xl font-bold text-text-primary">
-                    Entreprenadarbete
+                    Entreprenadarbete{summary.providerName ? ` – ${summary.providerName}` : ''}
                 </h3>
                 <p className="mb-0 mt-1 text-sm leading-relaxed text-text-secondary">
-                    Ange underentreprenörens grundpris per arbetspaket i SEK exkl. moms. Priserna hålls separata från produktdelens rabatter och interna marginalanalys.
+                    {summary.providerName
+                        ? 'Grundpriserna beräknas från tjänsternas antal och styckpris. Du kan ändra antalet i steg 2.'
+                        : 'Ange underentreprenörens grundpris per arbetspaket i SEK exkl. moms. Priserna hålls separata från produktdelens rabatter och interna marginalanalys.'}
                 </p>
             </div>
 
@@ -80,7 +82,7 @@ export function ContractingWorkPricing() {
                 <table className={`w-full border-collapse text-left text-sm ${summary.marginEnabled ? 'min-w-[900px]' : 'min-w-[720px]'}`}>
                     <thead className="bg-input-bg text-xs uppercase tracking-wide text-text-secondary">
                         <tr>
-                            <th scope="col" className="px-4 py-3 font-bold">Arbetspaket</th>
+                            <th scope="col" className="px-4 py-3 font-bold">{summary.providerName ? 'Tjänst' : 'Arbetspaket'}</th>
                             <th scope="col" className="px-4 py-3 font-bold">Omfattning</th>
                             <th scope="col" className="px-4 py-3 font-bold">Enhet</th>
                             <th scope="col" className="px-4 py-3 text-right font-bold">Grundpris exkl. moms</th>
@@ -99,30 +101,37 @@ export function ContractingWorkPricing() {
                                         {row.workPackage || `Arbetspaket ${index + 1}`}
                                     </td>
                                     <td className="max-w-xl whitespace-pre-wrap px-4 py-4 leading-relaxed text-text-secondary">
-                                        {row.scope || 'Ingen omfattning angiven'}
+                                        {row.scope || (summary.providerName ? '–' : 'Ingen omfattning angiven')}
                                     </td>
                                     <td className="px-4 py-4 text-text-secondary">
-                                        {row.unit || '–'}
+                                        {row.quantity === undefined ? row.unit || '–' : `${row.quantity} ${row.unit}`}
                                     </td>
                                     <td className="px-4 py-3 text-right">
-                                        <label htmlFor={priceId} className="sr-only">
-                                            Grundpris exkl. moms för {row.workPackage || `arbetspaket ${index + 1}`}
-                                        </label>
-                                        <div className="ml-auto flex w-[190px] items-center rounded-md border border-panel-border bg-input-bg focus-within:border-primary">
-                                            <input
-                                                id={priceId}
-                                                type="number"
-                                                min="0"
-                                                step="1"
-                                                inputMode="decimal"
-                                                value={row.priceExVatSek}
-                                                onChange={(event) => updateRow(row.id, {
-                                                    priceExVatSek: normalizeContractingPriceInput(event.target.value)
-                                                })}
-                                                className="min-w-0 flex-1 bg-transparent px-3 py-2.5 text-right font-bold text-text-primary outline-none"
-                                            />
-                                            <span className="pr-3 text-xs font-bold text-text-secondary">SEK</span>
-                                        </div>
+                                        {row.unitPriceExVatSek !== undefined ? (
+                                            <>
+                                                <span className="block font-bold text-text-primary">{formatSek(row.priceExVatSek)}</span>
+                                                <span className="block text-xs text-text-secondary">{formatSek(row.unitPriceExVatSek)}/st</span>
+                                            </>
+                                        ) : (
+                                            <div className="ml-auto flex w-[190px] items-center rounded-md border border-panel-border bg-input-bg focus-within:border-primary">
+                                                <label htmlFor={priceId} className="sr-only">
+                                                    Grundpris exkl. moms för {row.workPackage || `arbetspaket ${index + 1}`}
+                                                </label>
+                                                <input
+                                                    id={priceId}
+                                                    type="number"
+                                                    min="0"
+                                                    step="1"
+                                                    inputMode="decimal"
+                                                    value={row.priceExVatSek}
+                                                    onChange={(event) => updateRow(row.id, {
+                                                        priceExVatSek: normalizeContractingPriceInput(event.target.value)
+                                                    })}
+                                                    className="min-w-0 flex-1 bg-transparent px-3 py-2.5 text-right font-bold text-text-primary outline-none"
+                                                />
+                                                <span className="pr-3 text-xs font-bold text-text-secondary">SEK</span>
+                                            </div>
+                                        )}
                                     </td>
                                     {summary.marginEnabled ? (
                                         <td className="whitespace-nowrap px-4 py-4 text-right font-black text-primary">

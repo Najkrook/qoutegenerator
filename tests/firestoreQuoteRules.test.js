@@ -139,6 +139,37 @@ describeQuoteRules('Quote Save Firestore rules', () => {
         await assertFails(updateDoc(quoteRef, { originType: 'retailer' }));
     });
 
+    it('accepts contractor service revisions and rejects unsupported provider IDs and name types', async () => {
+        const db = testEnv.authenticatedContext('owner-uid').firestore();
+        const revisionsPath = 'users/owner-uid/quotes/quote-1/revisions';
+        const service = { id: 'stabil-marksruv', workPackage: 'Marksruv', scope: '', unit: 'st', quantity: 2 };
+        const work = {
+            enabled: true, provider: 'stabil-entreprenad', projectName: '',
+            rows: [{ ...service, unitPriceExVatSek: 1500, priceExVatSek: 3000 }],
+            margin: { enabled: true, percent: 15 }, ata: { enabled: false, percent: 15 }
+        };
+        const snapshotWork = {
+            projectName: '', providerName: 'Stabil Entreprenad',
+            rows: [{ ...service, priceExVatSek: 3450 }],
+            baseTotalSek: 3450, ataEnabled: false, ataPercent: 15,
+            allowanceSek: 0, lowerIndicativeSek: 3450, upperIndicativeSek: 3450
+        };
+        const serviceRevision = (intent, contractingWork, commercialWork) => revision({
+            saveIntentId: intent,
+            state: { contractingWork },
+            commercialSnapshot: commercialSnapshot({
+                contractingWork: commercialWork,
+                visibility: { contractingWork: 'visible', discountReferences: 'visible' }
+            })
+        });
+
+        await assertSucceeds(setDoc(doc(db, revisionsPath, 'intent_services'), serviceRevision('services', work, snapshotWork)));
+        await assertFails(setDoc(doc(db, revisionsPath, 'intent_bad-provider'),
+            serviceRevision('bad-provider', { ...work, provider: 'unknown' }, snapshotWork)));
+        await assertFails(setDoc(doc(db, revisionsPath, 'intent_bad-provider-name'),
+            serviceRevision('bad-provider-name', work, { ...snapshotWork, providerName: 10 })));
+    });
+
     it('accepts a valid durable CRM issue and rejects malformed issue metadata', async () => {
         const db = testEnv.authenticatedContext('admin-uid').firestore();
         const quoteRef = doc(db, 'users', 'owner-uid', 'quotes', 'quote-1');

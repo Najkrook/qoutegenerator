@@ -2,7 +2,7 @@
 
 import React, { useReducer } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { ContractingWorkEditor } from '../src/components/features/ContractingWorkEditor';
 import {
     ContractingWorkPricing,
@@ -207,6 +207,69 @@ describe('contracting-work quote UI', () => {
         );
 
         expect(screen.getByRole('button', { name: /Fortsätt till Prissättning/i }).disabled).toBe(false);
+    });
+
+    it('selects and deselects a catalog service and calculates its price from a positive whole quantity', () => {
+        render(
+            <TestProviders initialState={createContractingState({ rows: [] })}>
+                <Configuration onNext={() => {}} onPrev={() => {}} />
+                <ContractingWorkPricing />
+            </TestProviders>
+        );
+        const continueButton = screen.getByRole('button', { name: /Fortsätt till prissättning/i });
+        expect(screen.getByRole('radio', { name: 'Fritext' }).checked).toBe(true);
+        fireEvent.click(screen.getByRole('radio', { name: 'Stabil Entreprenad' }));
+        const service = screen.getByRole('checkbox', { name: /TRI-BASE Markskruvsinstallation/ });
+        const parasolService = screen.getByRole('checkbox', { name: /Montering av parasoll/ });
+        expect(screen.queryByRole('checkbox', { name: /Marksruv/ })).toBeNull();
+        expect(continueButton.disabled).toBe(true);
+        fireEvent.click(service);
+        fireEvent.click(parasolService);
+
+        const quantity = screen.getByRole('spinbutton', { name: 'Antal för TRI-BASE Markskruvsinstallation' });
+        expect(quantity.value).toBe('1');
+        expect(continueButton.disabled).toBe(false);
+        fireEvent.change(quantity, { target: { value: '2' } });
+        fireEvent.change(quantity, { target: { value: '0' } });
+        fireEvent.change(quantity, { target: { value: '1.5' } });
+
+        const currentWork = () => JSON.parse(screen.getByTestId('contracting-state').textContent);
+        expect(currentWork().rows).toMatchObject([
+            { scope: 'Körersättning ingår', quantity: 2, unitPriceExVatSek: 7500, priceExVatSek: 15000 },
+            { scope: 'Körersättning ingår', quantity: 1, unitPriceExVatSek: 1000, priceExVatSek: 1000 }
+        ]);
+        const pricingRow = screen.getByRole('row', { name: /TRI-BASE Markskruvsinstallation/ });
+        expect(pricingRow.textContent.replace(/\s/g, '')).toContain('15000SEK7500SEK/st');
+        fireEvent.click(screen.getByRole('checkbox', { name: 'Lägg på marginal/påslag' }));
+        expect(pricingRow.textContent.replace(/\s/g, '')).toContain('17250SEK');
+
+        fireEvent.click(service);
+        expect(continueButton.disabled).toBe(false);
+        fireEvent.click(parasolService);
+        expect(currentWork().rows).toEqual([]);
+        expect(continueButton.disabled).toBe(true);
+    });
+
+    it('confirms removal of configured work on a category switch and keeps the project name', async () => {
+        render(
+            <TestProviders initialState={createContractingState()}>
+                <Configuration onNext={() => {}} onPrev={() => {}} />
+            </TestProviders>
+        );
+        const tavi = screen.getByRole('radio', { name: 'Tavi&Co' });
+        fireEvent.click(tavi);
+        const dialog = screen.getByRole('dialog', { name: 'Byt entreprenadkategori?' });
+        fireEvent.click(within(dialog).getByRole('button', { name: 'Avbryt' }));
+        await waitFor(() => expect(tavi.disabled).toBe(false));
+        expect(screen.getByRole('radio', { name: 'Fritext' }).checked).toBe(true);
+        expect(screen.getByLabelText('Arbetspaket').value).toBe('Markarbete');
+
+        fireEvent.click(tavi);
+        fireEvent.click(within(dialog).getByRole('button', { name: 'Byt kategori' }));
+        expect(await screen.findByText('Tavi&Co har inga tjänster i katalogen ännu.')).toBeTruthy();
+        expect(screen.getByRole('button', { name: /Fortsätt till prissättning/i }).disabled).toBe(true);
+        expect(screen.getByLabelText('Projektnamn (valfritt)').value).toBe('Designer Village');
+        expect(JSON.parse(screen.getByTestId('contracting-state').textContent).rows).toEqual([]);
     });
 
     it('prices contracting work separately, adds an optional margin, and applies ATA to the customer total', () => {

@@ -7,6 +7,7 @@ import type {
     QuoteExportLanguage,
     UnknownRecord
 } from '../types/contracts';
+import { isContractingQuantity } from './contractingWork';
 
 const EXPORT_LANGUAGES = new Set<QuoteExportLanguage>(['sv', 'en']);
 const PDF_THEMES = new Set<PdfThemeId>(['brixx', 'custom', 'roslagsmarkisen']);
@@ -43,10 +44,10 @@ function finite(value: unknown): number | null {
     return typeof value === 'number' && Number.isFinite(value) ? value : null;
 }
 
-function hasExactKeys(value: UnknownRecord, allowed: readonly string[]): boolean {
-    const allowedSet = new Set(allowed);
-    const keys = Object.keys(value);
-    return keys.length === allowed.length && keys.every((key) => allowedSet.has(key));
+function hasExactKeys(value: UnknownRecord, required: readonly string[], optional: readonly string[] = []): boolean {
+    const allowed = new Set([...required, ...optional]);
+    return required.every((key) => Object.hasOwn(value, key))
+        && Object.keys(value).every((key) => allowed.has(key));
 }
 
 function reconciles(actual: number, expected: number): boolean {
@@ -122,9 +123,12 @@ function normalizeProductTotals(value: unknown): QuoteCommercialSnapshotProductT
 
 function normalizeContractingWork(value: unknown): QuoteCommercialSnapshotContractingWork | null | undefined {
     if (value == null) return null;
-    if (!isRecord(value) || !hasExactKeys(value, CONTRACTING_KEYS) || !Array.isArray(value.rows)) return undefined;
+    if (!isRecord(value) || !hasExactKeys(value, CONTRACTING_KEYS, ['providerName']) || !Array.isArray(value.rows)) return undefined;
+    const { providerName } = value;
+    if (providerName !== undefined && (typeof providerName !== 'string' || !providerName.trim())) return undefined;
+
     const rows = value.rows.map((row) => {
-        if (!isRecord(row) || !hasExactKeys(row, CONTRACTING_ROW_KEYS)) return null;
+        if (!isRecord(row) || !hasExactKeys(row, CONTRACTING_ROW_KEYS, ['quantity'])) return null;
         if (
             typeof row.id !== 'string'
             || typeof row.workPackage !== 'string'
@@ -133,11 +137,14 @@ function normalizeContractingWork(value: unknown): QuoteCommercialSnapshotContra
         ) return null;
         const priceExVatSek = finite(row.priceExVatSek);
         if (priceExVatSek == null) return null;
+        const { quantity } = row;
+        if (providerName !== undefined ? !isContractingQuantity(quantity) : quantity !== undefined) return null;
         return {
             id: String(row.id || ''),
             workPackage: String(row.workPackage || ''),
             scope: String(row.scope || ''),
             unit: String(row.unit || ''),
+            ...(isContractingQuantity(quantity) ? { quantity } : {}),
             priceExVatSek
         };
     });
@@ -167,6 +174,7 @@ function normalizeContractingWork(value: unknown): QuoteCommercialSnapshotContra
 
     return {
         projectName: String(value.projectName || ''),
+        ...(typeof providerName === 'string' ? { providerName } : {}),
         rows: rows as QuoteCommercialSnapshotContractingWork['rows'],
         baseTotalSek,
         ataEnabled: value.ataEnabled === true,

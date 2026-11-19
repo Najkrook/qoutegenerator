@@ -636,6 +636,7 @@ describe('pdfExport helpers', () => {
         });
         const summary = computeQuoteTotals({ state, catalogData: createCatalogFixture() });
         const frozenContractingSummary = {
+            providerName: 'Stabil Entreprenad',
             activeRows: [{
                 id: 'saved-row',
                 workPackage: 'Saved installation',
@@ -647,7 +648,8 @@ describe('pdfExport helpers', () => {
                 id: 'saved-row',
                 workPackage: 'Saved installation',
                 scope: 'Frozen customer scope',
-                unit: 'project',
+                unit: 'st',
+                quantity: 2,
                 priceExVatSek: 1225
             }],
             costTotalSek: 1225,
@@ -670,10 +672,11 @@ describe('pdfExport helpers', () => {
         expect(contractingTable.body).toEqual([[
             'Saved installation',
             'Frozen customer scope',
-            'project',
+            '2 pcs',
             '1 225 SEK'
         ]]);
         expect(textValues).toEqual(expect.arrayContaining([
+            expect.stringMatching(/Frozen project – Stabil Entreprenad$/),
             '1 225 SEK',
             'Variation work allowance (±10%)',
             '123 SEK',

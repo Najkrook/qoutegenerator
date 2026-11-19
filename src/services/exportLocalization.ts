@@ -1,7 +1,21 @@
 import { catalogData } from '../data/catalog';
-import type { QuoteExportLanguage, QuoteTotalsRow } from '../types/contracts';
+import type { ContractingWorkCustomerRow, QuoteExportLanguage, QuoteTotalsRow } from '../types/contracts';
 
 export const DEFAULT_EXPORT_LANGUAGE: QuoteExportLanguage = 'sv';
+
+export function formatContractingHeading(language: unknown, projectName = '', providerName?: string): string {
+    const labels = getExportLabels(language);
+    const title = projectName.trim()
+        ? `${labels.contractingHeading} ${labels.contractingFor} ${projectName}`
+        : labels.contractingHeading;
+    return providerName ? `${title} – ${providerName}` : title;
+}
+
+export function formatContractingUnit(row: ContractingWorkCustomerRow, language: unknown): string {
+    if (row.quantity === undefined) return row.unit;
+    const unit = row.unit === 'st' && normalizeExportLanguage(language) === 'en' ? 'pcs' : row.unit;
+    return `${row.quantity} ${unit}`;
+}
 
 export function getVisualizationExportLabels(language: unknown) {
     return normalizeExportLanguage(language) === 'en'

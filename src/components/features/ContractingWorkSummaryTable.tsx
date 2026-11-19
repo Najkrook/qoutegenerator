@@ -1,5 +1,5 @@
 import React from 'react';
-import { getExportLabels } from '../../services/exportLocalization';
+import { formatContractingHeading, formatContractingUnit, getExportLabels } from '../../services/exportLocalization';
 import type { PreparedQuoteContractingWork } from '../../services/quotePreparation';
 import type { QuoteExportLanguage } from '../../types/contracts';
 
@@ -23,10 +23,7 @@ export function ContractingWorkSummaryTable({
     }
 
     const labels = getExportLabels(exportLanguage);
-    const projectName = contractingWork.projectName;
-    const title = projectName.trim()
-        ? `${labels.contractingHeading} ${labels.contractingFor} ${projectName}`
-        : labels.contractingHeading;
+    const title = formatContractingHeading(exportLanguage, contractingWork.projectName, contractingWork.providerName);
 
     return (
         <section className={`min-w-0 max-w-full overflow-hidden rounded-lg border border-panel-border bg-panel-bg shadow-inner ${className}`.trim()}>
@@ -55,7 +52,9 @@ export function ContractingWorkSummaryTable({
                             <tr key={row.id} className="align-top">
                                 <td className="p-4 text-sm font-bold text-text-primary">{row.workPackage}</td>
                                 <td className="whitespace-pre-wrap p-4 text-sm leading-6 text-text-secondary">{row.scope}</td>
-                                <td className="whitespace-pre-wrap p-4 text-center text-sm text-text-secondary">{row.unit}</td>
+                                <td className="whitespace-pre-wrap p-4 text-center text-sm text-text-secondary">
+                                    {formatContractingUnit(row, exportLanguage)}
+                                </td>
                                 <td className="whitespace-nowrap bg-success/10 p-4 text-right text-sm font-bold text-text-primary">
                                     {formatSek(row.priceExVatSek)} SEK
                                 </td>

@@ -78,6 +78,76 @@ function createSaveHarness(sourceCatalog) {
 }
 
 describe('saved Quote commercial round trip', () => {
+    it.each([
+        {
+            language: 'sv', mixed: false, unit: '2 st', marginEnabled: false, rowTotal: 15000,
+            service: {
+                id: 'stabil-tri-base-markskruvsinstallation',
+                workPackage: 'TRI-BASE Markskruvsinstallation',
+                scope: 'Körersättning ingår',
+                unitPriceExVatSek: 7500
+            }
+        },
+        {
+            language: 'en', mixed: true, unit: '2 pcs', marginEnabled: true, rowTotal: 3450,
+            service: { id: 'stabil-marksruv', workPackage: 'Marksruv', scope: '', unitPriceExVatSek: 1500 }
+        }
+    ])('restores contractor services and their $language export for mixed=$mixed', async ({
+        language, mixed, unit, marginEnabled, rowTotal, service
+    }) => {
+        const draft = mixed ? createCatalogBackedState() : createInitialQuoteState();
+        draft.exportLanguage = language;
+        draft.contractingWork = {
+            ...draft.contractingWork,
+            enabled: true,
+            provider: 'stabil-entreprenad',
+            projectName: 'Terrass',
+            rows: [{
+                ...service,
+                unit: 'st',
+                quantity: 2,
+                priceExVatSek: 2 * service.unitPriceExVatSek
+            }],
+            margin: { enabled: marginEnabled, percent: 15 }
+        };
+        const { quoteSave, repository } = createSaveHarness(catalogData);
+        const outcome = await quoteSave.save({ actor: USER, state: draft, target: { kind: 'new' } });
+        expect(outcome.status).toBe('saved');
+
+        const { revision } = await repository.getQuoteLatestRevision({
+            userId: USER.uid, quoteId: outcome.quote.quoteId
+        });
+        const reopened = hydrateQuoteState(revision.state);
+        expect(reopened.contractingWork).toEqual(draft.contractingWork);
+        const prepared = restorePreparedQuote({
+            state: reopened,
+            commercialSnapshot: revision.commercialSnapshot
+        });
+        if (mixed) {
+            expect(prepared.commercial.productRows).toContainEqual(expect.objectContaining({
+                model: 'ClickitUp section', qty: 1
+            }));
+        } else {
+            expect(prepared.commercial.productRows).toEqual([]);
+        }
+        expect(prepared.commercial.contractingWork).toMatchObject({
+            providerName: 'Stabil Entreprenad',
+            baseTotalSek: rowTotal,
+            rows: [{ quantity: 2, priceExVatSek: rowTotal }]
+        });
+        expect(prepared.commercial.contractingWork.rows[0]).not.toHaveProperty('unitPriceExVatSek');
+        const excel = buildPreparedExcelSheetData(prepared);
+        expect(excel).toContainEqual([service.workPackage, service.scope, unit, rowTotal]);
+        expect(excel.flat().some((cell) => String(cell).includes('Terrass – Stabil Entreprenad'))).toBe(true);
+
+        expect(await createQuotePdfBlob(prepared)).toBeInstanceOf(Blob);
+        const [, , , pdfContractingSummary] = pdfAdapter.generatePDF.mock.calls.at(-1);
+        expect(pdfContractingSummary).toMatchObject({
+            providerName: 'Stabil Entreprenad',
+            customerRows: [{ scope: service.scope, quantity: 2, priceExVatSek: rowTotal }]
+        });
+    });
+
     it('keeps a catalog-backed revision unchanged after the current catalog price and name change', async () => {
         const originalCatalog = structuredClone(catalogData);
         const draft = createCatalogBackedState();

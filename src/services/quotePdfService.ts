@@ -13,6 +13,7 @@ function adaptPreparedContractingSummary(
     return {
         activeRows: customerRows.map((row) => ({ ...row })),
         customerRows,
+        providerName: contractingWork.providerName,
         costTotalSek: contractingWork.baseTotalSek,
         baseTotalSek: contractingWork.baseTotalSek,
         marginEnabled: false,
