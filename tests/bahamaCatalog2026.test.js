@@ -141,6 +141,29 @@ describe('BaHaMa 2026 catalog data', () => {
         });
     });
 
+    it.each([
+        ['5x5 Kvadrat', '5x5', 8560, 9080],
+        ['5,5x5,5 Kvadrat', '55x55', 9220, 9800],
+        ['6x6 Kvadrat', '6x6', 9980, 10620],
+        ['7x7 Kvadrat', '7x7', 12300, 13200],
+        ['6x5,14 Rektangel', '6x514', 9980, 10620],
+        ['7x5 Rektangel', '7x5', 11410, 12180],
+        ['7x6 Rektangel', '7x6', 12760, 13660]
+    ])('matches complete Precontraint 302 list prices for XL %s', (size, suffix, plain, withValance) => {
+        const upgrade = 'xl_upgrade_precontraint_' + suffix;
+        for (const [ids, expected] of [
+            [[upgrade], plain],
+            [[upgrade + '_valance', 'xl_valance_' + suffix], withValance]
+        ]) {
+            const item = {
+                line: 'BaHaMa', model: 'Jumbrella XL', size, qty: 1,
+                addons: ids.map(id => ({ id, qty: 1 }))
+            };
+            const totals = computeQuoteTotals({ catalogData, state: { exchangeRate: 10, builderItems: [item] } });
+            expect(totals.finalTotalSek).toBe(expected * 10);
+        }
+    });
+
     it('includes Jumbrella XL valance categories from the 2026 price list', () => {
         expectAddonPrices('Jumbrella XL', {
             xl_print_on_membrane: 1100

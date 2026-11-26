@@ -421,6 +421,26 @@ const rawCatalogData: CatalogData = {
                         ]
                     },
                     {
+                        id: "xl_textildukuppgradering",
+                        name: "Textildukuppgradering",
+                        items: [
+                            { id: "xl_upgrade_precontraint_5x5", name: "Uppgradering till Precontraint 302, 5 × 5 m utan kappa", price: 1120 },
+                            { id: "xl_upgrade_precontraint_5x5_valance", name: "Uppgradering till Precontraint 302, 5 × 5 m med kappa (kappa väljs separat)", price: 1190 },
+                            { id: "xl_upgrade_precontraint_55x55", name: "Uppgradering till Precontraint 302, 5,5 × 5,5 m utan kappa", price: 1210 },
+                            { id: "xl_upgrade_precontraint_55x55_valance", name: "Uppgradering till Precontraint 302, 5,5 × 5,5 m med kappa (kappa väljs separat)", price: 1290 },
+                            { id: "xl_upgrade_precontraint_6x6", name: "Uppgradering till Precontraint 302, 6 × 6 m utan kappa", price: 1310 },
+                            { id: "xl_upgrade_precontraint_6x6_valance", name: "Uppgradering till Precontraint 302, 6 × 6 m med kappa (kappa väljs separat)", price: 1390 },
+                            { id: "xl_upgrade_precontraint_7x7", name: "Uppgradering till Precontraint 302, 7 × 7 m utan kappa", price: 1600 },
+                            { id: "xl_upgrade_precontraint_7x7_valance", name: "Uppgradering till Precontraint 302, 7 × 7 m med kappa (kappa väljs separat)", price: 1720 },
+                            { id: "xl_upgrade_precontraint_6x514", name: "Uppgradering till Precontraint 302, 6 × 5,14 m utan kappa", price: 1310 },
+                            { id: "xl_upgrade_precontraint_6x514_valance", name: "Uppgradering till Precontraint 302, 6 × 5,14 m med kappa (kappa väljs separat)", price: 1390 },
+                            { id: "xl_upgrade_precontraint_7x5", name: "Uppgradering till Precontraint 302, 7 × 5 m utan kappa", price: 1490 },
+                            { id: "xl_upgrade_precontraint_7x5_valance", name: "Uppgradering till Precontraint 302, 7 × 5 m med kappa (kappa väljs separat)", price: 1590 },
+                            { id: "xl_upgrade_precontraint_7x6", name: "Uppgradering till Precontraint 302, 7 × 6 m utan kappa", price: 1660 },
+                            { id: "xl_upgrade_precontraint_7x6_valance", name: "Uppgradering till Precontraint 302, 7 × 6 m med kappa (kappa väljs separat)", price: 1780 }
+                        ]
+                    },
+                    {
                         name: "Textilduk XL – Kvadrat",
                         items: [
                             { id: "xl_textil_5x5", name: "Textilduk XL 5x5", price: 3310 },
